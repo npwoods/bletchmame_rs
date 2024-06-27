@@ -1,0 +1,82 @@
+import { HorizontalBox, VerticalBox, Button, StandardListView, StandardTableView, LineEdit, ListView } from "std-widgets.slint";
+import { TreeView, TreeNode } from "treeview.slint";
+
+export component AppWindow inherits Window {
+    min-width: 100px;
+    min-height: 100px;
+    max-width: 10000px;
+    max-height: 10000px;
+    title: "BletchMAME 3.0 prototype";
+    callback find_mame_clicked();
+    in property <bool> is_running;
+    in property <bool> has_info_db;
+    in-out property <string> items_search_text;
+    callback collection_item_changed(int);
+    callback items_search_text_changed(string);
+    callback items_sort_ascending(int);
+    callback items_sort_descending(int);
+    callback items_row_pointer_event(int, PointerEvent, Point);
+    in property <[TreeNode]> collections_nodes;
+    in property <[[StandardListViewItem]]> items_model;
+    public function collections-bring-into-view(row: int) {
+        collections-tree-view.bring-into-view(row);
+    }
+    VerticalBox {
+        alignment: center;
+        Text {
+            text: "BletchMAME needs a working MAME to function";
+            font-size: 24px;
+            wrap: word-wrap;
+        }
+
+        Button {
+            text: "Find MAME...";
+            clicked => {
+                root.find_mame_clicked();
+            }
+        }
+
+        width: 300px;
+        visible: !has_info_db;
+    }
+
+    HorizontalBox {
+        visible: has_info_db && !is_running;
+        collections-tree-view := TreeView {
+            width: 250px;
+            preferred-height: 100%;
+            nodes: collections_nodes;
+        }
+
+        VerticalBox {
+            LineEdit {
+                text: items_search_text;
+                edited(text) => {
+                    items_search_text_changed(text)
+                }
+            }
+
+            StandardTableView {
+                columns: [
+                    { title: @tr("Name") },
+                    { title: @tr("Source File") },
+                    { title: @tr("Description") },
+                    { title: @tr("Year") },
+                    { title: @tr("Manufacturer") }
+                ];
+                rows: items_model;
+                preferred-width: 100%;
+                preferred-height: 100%;
+                sort-ascending(index) => {
+                    items_sort_ascending(index)
+                }
+                sort-descending(index) => {
+                    items_sort_descending(index)
+                }
+                row-pointer-event(row, event, point) => {
+                    items_row_pointer_event(row, event, point)
+                }
+            }
+        }
+    }
+}

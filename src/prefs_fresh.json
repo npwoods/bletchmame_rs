@@ -1,0 +1,20 @@
+{
+  "collections": [
+    {
+      "type": "builtin",
+      "subtype": "all"
+    },
+    {
+      "type": "builtin",
+      "subtype": "source"
+    },
+    {
+      "type": "builtin",
+      "subtype": "year"
+    },
+    {
+      "type": "builtin",
+      "subtype": "manufacturer"
+    }
+  ]
+}
