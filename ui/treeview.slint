@@ -126,11 +126,9 @@ export component TreeViewBase inherits ListView {
         }
         into-view-item = row;
         if (into-view-item-y < 0) {
-            root.visible = false;
             self.viewport-y += 0 - into-view-item-y;
         }
         if (into-view-item-y + item-height > self.visible-height) {
-            root.visible = false;
             self.viewport-y -= into-view-item-y + item-height - self.visible-height;
         }
     }

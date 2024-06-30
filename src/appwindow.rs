@@ -21,16 +21,16 @@ use slint::Model;
 use slint::ModelRc;
 use slint::Weak;
 
+use crate::dialogs::builtincollections::dialog_builtin_collections;
+use crate::dialogs::loading::dialog_load_mame_info;
 use crate::guiutils::menuing::accel;
 use crate::guiutils::menuing::iterate_menu_items;
 use crate::guiutils::menuing::setup_window_menu_bar;
 use crate::guiutils::menuing::show_popup_menu;
 use crate::info::InfoDb;
-use crate::loading::dialog_load_mame_info;
-use crate::models::collectionstree::CollectionTreeModel;
+use crate::models::collectionstree::CollectionsTreeModel;
 use crate::models::itemstable::ItemsTableModel;
 use crate::prefs::Preferences;
-use crate::prefs::PrefsPaths;
 use crate::threadlocalbubble::ThreadLocalBubble;
 use crate::ui::AppWindow;
 use crate::Result;
@@ -38,6 +38,7 @@ use crate::Result;
 #[derive(Clone, Copy, Serialize, Deserialize)]
 enum MenuId {
 	FileExit,
+	OptionsBuiltinCollections,
 	HelpRefreshInfoDb,
 	HelpWebSite,
 }
@@ -78,15 +79,28 @@ impl AppModel {
 		self.app_window_weak.unwrap()
 	}
 
-	pub fn with_items_view_model(&self, func: impl FnOnce(&ItemsTableModel)) {
-		let items_model = self.app_window().get_items_model();
-		let items_model = items_model.as_any().downcast_ref::<ItemsTableModel>().unwrap();
-		func(items_model);
+	pub fn with_collections_tree_model<T>(&self, func: impl FnOnce(&CollectionsTreeModel) -> T) -> T {
+		let collections_model = self.app_window().get_collections_model();
+		let collections_model = collections_model
+			.as_any()
+			.downcast_ref::<CollectionsTreeModel>()
+			.expect("with_collections_tree_model(): downcast_ref::<CollectionsTreeModel>() failed");
+		func(collections_model)
 	}
 
-	pub fn modify_prefs(&self, func: impl FnOnce(Preferences) -> Preferences) -> Result<()> {
-		let new_prefs = func(self.preferences.take());
-		self.preferences.replace(new_prefs);
+	pub fn with_items_table_model<T>(&self, func: impl FnOnce(&ItemsTableModel) -> T) -> T {
+		let items_model = self.app_window().get_items_model();
+		let items_model = items_model
+			.as_any()
+			.downcast_ref::<ItemsTableModel>()
+			.expect("with_items_table_model(): downcast_ref::<ItemsTableModel>() failed");
+		func(items_model)
+	}
+
+	pub fn modify_prefs(&self, func: impl FnOnce(&mut Preferences)) -> Result<()> {
+		let mut prefs = self.preferences.borrow_mut();
+		func(&mut prefs);
+		drop(prefs);
 		self.preferences.borrow().save()
 	}
 
@@ -145,7 +159,10 @@ pub fn create() -> AppWindow {
 			],
 		)
 		.unwrap(),
-		&Submenu::with_items("Options", true, &[]).unwrap(),
+		&Submenu::with_items("Options", true, &[
+			&MenuItem::with_id(MenuId::OptionsBuiltinCollections, "Builtin Collections...", false, None)
+
+		]).unwrap(),
 		&Submenu::with_items("Settings", true, &[]).unwrap(),
 		&Submenu::with_items(
 			"Help",
@@ -189,9 +206,9 @@ pub fn create() -> AppWindow {
 	});
 
 	// set up the collections view model
-	let collections_tree_model = CollectionTreeModel::new();
+	let collections_tree_model = CollectionsTreeModel::new();
 	let collections_tree_model = Rc::new(collections_tree_model);
-	app_window.set_collections_nodes(ModelRc::new(collections_tree_model.clone()));
+	app_window.set_collections_model(ModelRc::new(collections_tree_model.clone()));
 
 	// set up items view model
 	let items_model = ItemsTableModel::new();
@@ -224,15 +241,15 @@ pub fn create() -> AppWindow {
 	// set up items filter
 	let model_clone = model.clone();
 	app_window.on_items_sort_ascending(move |index| {
-		model_clone.with_items_view_model(move |x| x.sort_ascending(index));
+		model_clone.with_items_table_model(move |x| x.sort_ascending(index));
 	});
 	let model_clone = model.clone();
 	app_window.on_items_sort_descending(move |index| {
-		model_clone.with_items_view_model(move |x| x.sort_descending(index));
+		model_clone.with_items_table_model(move |x| x.sort_descending(index));
 	});
 	let model_clone = model.clone();
 	app_window.on_items_search_text_changed(move |text| {
-		model_clone.with_items_view_model(move |x| x.search_text_changed(text));
+		model_clone.with_items_table_model(move |x| x.search_text_changed(text));
 	});
 
 	// set up menu handler
@@ -240,8 +257,22 @@ pub fn create() -> AppWindow {
 	setup_menu_handler(&model, move |model, menu_id| {
 		match menu_id {
 			MenuId::FileExit => {
-				shutdown(&model.clone(), &collections_tree_model_clone);
+				let _ = update_prefs(&model.clone());
 				quit_event_loop().unwrap()
+			}
+			MenuId::OptionsBuiltinCollections => {
+				let _ = update_prefs(&model.clone());
+				let model = model.clone();
+				let prefs = model.preferences.borrow().collections.clone();
+				let collections_tree_model_clone = collections_tree_model_clone.clone();
+				let fut = async move {
+					if let Some(new_prefs) = dialog_builtin_collections(model.app_window(), prefs).await {
+						model.preferences.borrow_mut().collections = new_prefs;
+						collections_tree_model_clone
+							.update(model.info_db.borrow().clone(), &model.preferences.borrow().collections);
+					}
+				};
+				spawn_local(fut).unwrap();
 			}
 			MenuId::HelpRefreshInfoDb => {
 				let model = model.clone();
@@ -256,7 +287,7 @@ pub fn create() -> AppWindow {
 	// for when we shut down
 	let model_clone = model.clone();
 	app_window.window().on_close_requested(move || {
-		shutdown(&model_clone, &collections_tree_model);
+		let _ = update_prefs(&model_clone);
 		CloseRequestResponse::HideWindow
 	});
 
@@ -347,13 +378,7 @@ async fn process_mame_listxml(model: Rc<AppModel>, new_mame_executable: Option<S
 
 	// we've succeeded; if appropriate, update the path
 	if let Some(new_mame_executable) = new_mame_executable.as_ref() {
-		let _ = model.modify_prefs(|prefs| Preferences {
-			paths: PrefsPaths {
-				mame_executable: Some(new_mame_executable.clone()),
-				..prefs.paths
-			},
-			..prefs
-		});
+		let _ = model.modify_prefs(|prefs| prefs.paths.mame_executable = Some(new_mame_executable.clone()));
 	}
 
 	// save the info DB
@@ -378,23 +403,22 @@ fn update(model: &AppModel) {
 	for menu_item in iterate_menu_items(&model.menu_bar) {
 		match MenuId::try_from(menu_item.id()) {
 			Ok(MenuId::HelpRefreshInfoDb) => menu_item.set_enabled(has_mame_executable),
+			Ok(MenuId::OptionsBuiltinCollections) => menu_item.set_enabled(true),
 			_ => {}
 		}
 	}
 }
 
-fn shutdown(model: &AppModel, collections_tree_model: &CollectionTreeModel) {
-	// update window size
-	let physical_size = model.app_window().window().size();
-	let logical_size = physical_size.to_logical(model.app_window().window().scale_factor());
-	model.preferences.borrow_mut().window_size = Some(logical_size.into());
+fn update_prefs(model: &AppModel) -> Result<()> {
+	model.modify_prefs(|prefs| {
+		// update window size
+		let physical_size = model.app_window().window().size();
+		let logical_size = physical_size.to_logical(model.app_window().window().scale_factor());
+		prefs.window_size = Some(logical_size.into());
 
-	// update collections related prefs
-	let new_collections_prefs = collections_tree_model.get_prefs();
-	model.preferences.borrow_mut().collections = new_collections_prefs;
-
-	// and save!
-	let _ = model.preferences.borrow().save();
+		// update collections related prefs
+		prefs.collections = model.with_collections_tree_model(|x| x.get_prefs());
+	})
 }
 
 fn on_find_mame_clicked(model: Rc<AppModel>) {

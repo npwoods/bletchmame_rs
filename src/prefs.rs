@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::fs::File;
 use std::io::BufReader;
 use std::io::Read;
@@ -5,6 +6,7 @@ use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 
+use derive_enum_all_values::AllValues;
 use dirs::config_dir;
 use serde::Deserialize;
 use serde::Serialize;
@@ -16,9 +18,9 @@ use crate::Result;
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Preferences {
-	#[serde(default, skip_serializing_if = "is_default")]
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub paths: PrefsPaths,
-	#[serde(default, skip_serializing_if = "is_default")]
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub window_size: Option<PrefsSize>,
 	#[serde(default)]
 	pub collections: Vec<PrefsCollectionItem>,
@@ -58,7 +60,7 @@ impl From<PrefsSize> for LogicalSize {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct PrefsCollectionItem {
-	#[serde(default, skip_serializing_if = "is_default")]
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub selected: PrefsSelection,
 
 	#[serde(flatten)]
@@ -70,10 +72,6 @@ pub struct PrefsCollectionItem {
 pub enum PrefsSelection {
 	Bool(bool),
 	String(String),
-}
-
-fn is_default(obj: &(impl Default + PartialEq)) -> bool {
-	obj == &Default::default()
 }
 
 impl Default for PrefsSelection {
@@ -91,7 +89,7 @@ pub enum InnerCollectionItem {
 	Folder(FolderCollectionItem),
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(AllValues, Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase", tag = "subtype")]
 pub enum BuiltinCollectionItem {
 	All,
@@ -100,10 +98,22 @@ pub enum BuiltinCollectionItem {
 	Manufacturer,
 }
 
+impl Display for BuiltinCollectionItem {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let s = match self {
+			BuiltinCollectionItem::All => "All Systems",
+			BuiltinCollectionItem::Source => "Source",
+			BuiltinCollectionItem::Year => "Year",
+			BuiltinCollectionItem::Manufacturer => "Manufacturer",
+		};
+		write!(f, "{s}")
+	}
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct MachinesCollectionItem {
-	#[serde(default)]
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub name: Option<String>,
 	pub machines: Vec<String>,
 	#[serde(default)]
@@ -134,6 +144,53 @@ pub struct SoftwareCollectionItem {
 pub struct FolderCollectionItem {
 	pub name: String,
 	pub children: Vec<PrefsCollectionItem>,
+}
+
+impl PrefsCollectionItem {
+	pub fn walk<'a>(items: &'a [PrefsCollectionItem], mut callback: impl FnMut(&'a PrefsCollectionItem, usize)) {
+		Self::walk_internal(items, &mut callback, 0);
+	}
+
+	fn walk_internal<'a>(
+		items: &'a [PrefsCollectionItem],
+		callback: &mut impl FnMut(&'a PrefsCollectionItem, usize),
+		indent: usize,
+	) {
+		for item in items {
+			callback(item, indent);
+			if let InnerCollectionItem::Folder(x) = &item.inner {
+				Self::walk_internal(&x.children, callback, indent + 1);
+			}
+		}
+	}
+
+	pub fn process(
+		items: Vec<PrefsCollectionItem>,
+		mut callback: impl FnMut(Vec<PrefsCollectionItem>) -> Vec<PrefsCollectionItem>,
+	) -> Vec<PrefsCollectionItem> {
+		Self::internal_process(items, &mut callback)
+	}
+
+	fn internal_process(
+		items: Vec<PrefsCollectionItem>,
+		callback: &mut impl FnMut(Vec<PrefsCollectionItem>) -> Vec<PrefsCollectionItem>,
+	) -> Vec<PrefsCollectionItem> {
+		let new_items = items
+			.into_iter()
+			.map(|item| PrefsCollectionItem {
+				selected: item.selected,
+				inner: if let InnerCollectionItem::Folder(x) = item.inner {
+					InnerCollectionItem::Folder(FolderCollectionItem {
+						name: x.name,
+						children: Self::internal_process(x.children, callback),
+					})
+				} else {
+					item.inner
+				},
+			})
+			.collect();
+		callback(new_items)
+	}
 }
 
 const PREFS: Option<&str> = Some("BletchMAME.json");

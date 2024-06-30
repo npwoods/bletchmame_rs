@@ -1,0 +1,25 @@
+import { HorizontalBox, VerticalBox, Button, StandardListView, StandardTableView } from "std-widgets.slint";
+
+export component LoadingDialog inherits Window {
+    in property <string> current_status;
+    in-out property <bool> cancelled;
+    width: 240px;
+    height: 120px;
+    title: "BletchMAME";
+    VerticalBox {
+        Text {
+            text: "Building MAME info database...";
+        }
+
+        Text {
+            text: current_status;
+        }
+
+        Button {
+            text: "Cancel";
+            clicked => {
+                cancelled = true
+            }
+        }
+    }
+}

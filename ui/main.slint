@@ -1,12 +1,16 @@
 import { HorizontalBox, VerticalBox, Button, StandardListView, StandardTableView, LineEdit, ListView } from "std-widgets.slint";
 import { TreeView, TreeNode } from "treeview.slint";
+import { LoadingDialog } from "loading.slint";
+import { BuiltinCollectionsDialog } from "builtincollections.slint";
+
+export { LoadingDialog, BuiltinCollectionsDialog }
 
 export component AppWindow inherits Window {
     min-width: 100px;
     min-height: 100px;
     max-width: 10000px;
     max-height: 10000px;
-    title: "BletchMAME 3.0 prototype";
+    title: @tr("BletchMAME 3.0 prototype");
     callback find_mame_clicked();
     in property <bool> is_running;
     in property <bool> has_info_db;
@@ -16,21 +20,25 @@ export component AppWindow inherits Window {
     callback items_sort_ascending(int);
     callback items_sort_descending(int);
     callback items_row_pointer_event(int, PointerEvent, Point);
-    in property <[TreeNode]> collections_nodes;
+    in property <[TreeNode]> collections_model;
     in property <[[StandardListViewItem]]> items_model;
     public function collections-bring-into-view(row: int) {
-        collections-tree-view.bring-into-view(row);
+        // disabling this functionality because we often do this after refrehsing
+        // the collections view, and it is possible that the notify has not been "taken"
+        // yet (https://github.com/slint-ui/slint/issues/5503#)
+        //
+        // collections-tree-view.bring-into-view(row);
     }
     VerticalBox {
         alignment: center;
         Text {
-            text: "BletchMAME needs a working MAME to function";
+            text: @tr("BletchMAME needs a working MAME to function");
             font-size: 24px;
             wrap: word-wrap;
         }
 
         Button {
-            text: "Find MAME...";
+            text: @tr("Find MAME...");
             clicked => {
                 root.find_mame_clicked();
             }
@@ -45,7 +53,7 @@ export component AppWindow inherits Window {
         collections-tree-view := TreeView {
             width: 250px;
             preferred-height: 100%;
-            nodes: collections_nodes;
+            nodes: collections_model;
         }
 
         VerticalBox {

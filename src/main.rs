@@ -1,8 +1,8 @@
 mod appwindow;
+mod dialogs;
 mod error;
 mod guiutils;
 mod info;
-mod loading;
 mod models;
 mod prefs;
 mod threadlocalbubble;

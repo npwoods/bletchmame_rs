@@ -16,6 +16,7 @@ use tokio::task::spawn_blocking;
 
 use crate::guiutils::windowing::with_modal_parent;
 use crate::info::InfoDb;
+use crate::ui::LoadingDialog;
 
 const UPDATE_INTERVAL: Duration = Duration::from_millis(250);
 
@@ -49,11 +50,9 @@ pub async fn dialog_load_mame_info(
 
 	// and with that out of the way, launch the thread
 	let dialog_weak = dialog.as_weak();
-	spawn_blocking(move || {
-		load_mame_info_thread_proc(dialog_weak, process.stdout.unwrap(), cancelled)
-	})
-	.await
-	.unwrap()
+	spawn_blocking(move || load_mame_info_thread_proc(dialog_weak, process.stdout.unwrap(), cancelled))
+		.await
+		.unwrap()
 }
 
 /// worker thread for loading MAME info
@@ -100,28 +99,4 @@ fn load_mame_info_thread_proc(
 		.upgrade_in_event_loop(|dialog| dialog.hide().unwrap())
 		.unwrap();
 	db
-}
-
-slint::slint! {
-	import { HorizontalBox, VerticalBox, Button, StandardListView, StandardTableView } from "std-widgets.slint";
-
-	export component LoadingDialog inherits Window {
-		in property <string> current_status;
-		in-out property <bool> cancelled;
-		width: 240px;
-		height: 120px;
-		title: "BletchMAME";
-		VerticalBox {
-			Text {
-				text: "Building MAME info database...";
-			}
-
-			Text { text: current_status; }
-
-			Button {
-				text: "Cancel";
-				clicked => { cancelled = true }
-			}
-		}
-	}
 }

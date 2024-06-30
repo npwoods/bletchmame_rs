@@ -5,10 +5,10 @@
 //! Terminology note:
 //!     `index` - Represents an absolute index into the `entries` vector
 //!     `row`   - Represents the visible row
+use std::any::Any;
 use std::cell::Cell;
 use std::cell::RefCell;
 
-use arrayvec::ArrayVec;
 use itertools::Itertools;
 use slint::Model;
 use slint::ModelNotify;
@@ -160,7 +160,10 @@ where
 	}
 }
 
-impl<T> Model for TreeModel<T> {
+impl<T> Model for TreeModel<T>
+where
+	T: 'static,
+{
 	type Data = TreeNode;
 
 	fn row_count(&self) -> usize {
@@ -183,6 +186,10 @@ impl<T> Model for TreeModel<T> {
 
 	fn model_tracker(&self) -> &dyn ModelTracker {
 		&self.notify
+	}
+
+	fn as_any(&self) -> &dyn Any {
+		self
 	}
 }
 
@@ -229,8 +236,9 @@ fn identify_selected_index<T>(entries: &mut [Entry<T>]) -> Option<usize> {
 	selected_index
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum SetSelectedIndexChanges {
-	Indexes(ArrayVec<usize, 2>),
+	Indexes(Vec<usize>),
 	Opened,
 }
 
@@ -243,7 +251,7 @@ fn set_selected_index<T>(
 	assert!(!selected_index.get().is_some_and(|x| x >= entries.len()));
 	assert!(!new_selected_index.is_some_and(|x| x >= entries.len()));
 
-	let mut result = ArrayVec::new();
+	let mut result = Vec::new();
 	let mut items_opened = false;
 	if selected_index.get() != new_selected_index {
 		// identify the items that are different and might need to be updated
@@ -261,7 +269,7 @@ fn set_selected_index<T>(
 
 		// ensure that all parents are open
 		if let Some(new_selected_index) = new_selected_index {
-			for entry in &mut entries[0..new_selected_index]
+			for entry in &mut entries[0..=new_selected_index]
 				.iter_mut()
 				.rev()
 				.dedup_by(|a, b| a.display.indentation <= b.display.indentation)
@@ -297,11 +305,67 @@ fn ensure_visible_selection<T>(entries: &[Entry<T>], selected_index: Option<usiz
 
 #[cfg(test)]
 mod test {
+	use std::cell::Cell;
+
 	use test_case::test_case;
 
 	use crate::ui::TreeNode;
 
 	use super::Entry;
+	use super::SetSelectedIndexChanges;
+
+	#[test_case(00, None, Some(1), SetSelectedIndexChanges::Indexes([1].into()), &[])]
+	#[test_case(01, None, Some(2), SetSelectedIndexChanges::Indexes([2].into()), &[])]
+	#[test_case(02, None, Some(3), SetSelectedIndexChanges::Opened, &[2])]
+	#[test_case(02, None, Some(4), SetSelectedIndexChanges::Opened, &[2])]
+	#[test_case(03, None, Some(7), SetSelectedIndexChanges::Indexes([7].into()), &[])]
+	pub fn set_selected_index(
+		_index: usize,
+		selected_index: Option<usize>,
+		new_selected_index: Option<usize>,
+		expected: SetSelectedIndexChanges,
+		expected_newly_opened: &[usize],
+	) {
+		let original_entries = [
+			(0, false, Some(0)), //  [0]
+			(0, true, Some(1)),  //  [1]
+			(1, false, Some(2)), //     [2]
+			(2, false, None),    //        ?3?
+			(2, false, None),    //        ?4?
+			(1, false, None),    //     ?5?
+			(2, false, None),    //        ?6?
+			(0, true, Some(5)),  //  [7]
+			(1, false, Some(6)), //     [8]
+			(2, false, None),    //        ?9?
+		];
+		let mut entries = original_entries
+			.iter()
+			.cloned()
+			.map(|(indentation, is_open, row)| Entry {
+				display: TreeNode {
+					indentation,
+					is_open,
+					..Default::default()
+				},
+				data: (),
+				row,
+			})
+			.collect::<Vec<_>>();
+
+		let selected_index = Cell::new(selected_index);
+		let actual = super::set_selected_index(&mut entries, &selected_index, new_selected_index);
+		assert_eq!(expected, actual);
+
+		// validate which ones were opened
+		let actual_newly_opened = Iterator::zip(original_entries.iter(), entries.iter())
+			.enumerate()
+			.filter_map(|(index, ((_, is_opened_before, _), entry))| {
+				let is_opened_after = entry.display.is_open;
+				(!is_opened_before && is_opened_after).then_some(index)
+			})
+			.collect::<Vec<_>>();
+		assert_eq!(expected_newly_opened, actual_newly_opened.as_slice());
+	}
 
 	#[test_case(0, None, None)]
 	#[test_case(1, Some(1), None)]

@@ -16,10 +16,10 @@ use crate::prefs::PrefsCollectionItem;
 use crate::prefs::PrefsSelection;
 use crate::ui::TreeNode;
 
-pub type CollectionTreeModel = TreeModel<Rc<dyn CollectionNode>>;
+pub type CollectionsTreeModel = TreeModel<Rc<dyn CollectionNode>>;
 type Entry = crate::models::tree::Entry<Rc<dyn CollectionNode>>;
 
-impl CollectionTreeModel {
+impl CollectionsTreeModel {
 	pub fn update(&self, info_db: Option<Rc<InfoDb>>, prefs: &[PrefsCollectionItem]) {
 		update_collections_tree_model(self, info_db, prefs)
 	}
@@ -34,7 +34,7 @@ impl CollectionTreeModel {
 }
 
 fn update_collections_tree_model(
-	model: &CollectionTreeModel,
+	model: &CollectionsTreeModel,
 	info_db: Option<Rc<InfoDb>>,
 	prefs: &[PrefsCollectionItem],
 ) {
@@ -43,7 +43,54 @@ fn update_collections_tree_model(
 
 	// things are actually interesting when we have an InfoDb
 	if let Some(info_db) = info_db.as_ref() {
-		build_entries_for_prefs(&mut entries, 0, info_db, prefs);
+		PrefsCollectionItem::walk(&prefs, |item, indentation| {
+			// duplicate the item, but we need to detach any children
+			let (pref_dup, has_prefs_children) = match &item.inner {
+				InnerCollectionItem::Folder(x) => {
+					let name = x.name.clone();
+					(
+						InnerCollectionItem::Folder(FolderCollectionItem {
+							name,
+							children: Default::default(),
+						}),
+						!x.children.is_empty(),
+					)
+				}
+				_ => (item.inner.clone(), false),
+			};
+
+			// create the node
+			let node = PrefsCollectionNode::new(pref_dup, info_db.clone());
+			let node = Rc::new(node) as Rc<dyn CollectionNode>;
+
+			// and create the entry
+			let text = node.text();
+			let is_selected = matches!(item.selected, PrefsSelection::Bool(true));
+			let node_children = node.children();
+			let indentation = indentation.try_into().unwrap();
+			let display = TreeNode {
+				has_children: has_prefs_children || !node_children.is_empty(),
+				indentation,
+				text,
+				is_selected,
+				is_open: false,
+			};
+			entries.push((display, node));
+
+			// node children are treated differently
+			for child in node_children {
+				let text = child.text();
+				let is_selected = matches!(&item.selected, PrefsSelection::String(x) if **x == *text);
+				let display = TreeNode {
+					has_children: false,
+					indentation: indentation + 1,
+					text,
+					is_selected,
+					is_open: false,
+				};
+				entries.push((display, child));
+			}
+		});
 	}
 
 	// take note of whether we have any items
@@ -55,65 +102,6 @@ fn update_collections_tree_model(
 	// if we're not selecting anything but we have items, select the first item
 	if !model.has_selection() && has_items {
 		model.set_selected_index(Some(0));
-	}
-}
-
-/// recursive function to build all entries
-fn build_entries_for_prefs(
-	entries: &mut Vec<(TreeNode, Rc<dyn CollectionNode>)>,
-	indentation: i32,
-	info_db: &Rc<InfoDb>,
-	prefs: &[PrefsCollectionItem],
-) {
-	for pref in prefs {
-		// we need to duplicate the item separate from any children
-		let (pref_dup, pref_children) = match &pref.inner {
-			InnerCollectionItem::Folder(x) => {
-				let name = x.name.clone();
-				(
-					InnerCollectionItem::Folder(FolderCollectionItem {
-						name,
-						children: Default::default(),
-					}),
-					x.children.as_slice(),
-				)
-			}
-			_ => (pref.inner.clone(), Default::default()),
-		};
-
-		// create the node
-		let node = PrefsCollectionNode::new(pref_dup, info_db.clone());
-		let node = Rc::new(node) as Rc<dyn CollectionNode>;
-
-		// and create the entry
-		let text = node.text();
-		let is_selected = matches!(pref.selected, PrefsSelection::Bool(true));
-		let node_children = node.children();
-		let display = TreeNode {
-			has_children: !pref_children.is_empty() || !node_children.is_empty(),
-			indentation,
-			text,
-			is_selected,
-			is_open: false,
-		};
-		entries.push((display, node));
-
-		// add any child preferences
-		build_entries_for_prefs(entries, indentation + 1, info_db, pref_children);
-
-		// node children are treated differently
-		for child in node_children {
-			let text = child.text();
-			let is_selected = matches!(&pref.selected, PrefsSelection::String(x) if **x == *text);
-			let display = TreeNode {
-				has_children: false,
-				indentation: indentation + 1,
-				text,
-				is_selected,
-				is_open: false,
-			};
-			entries.push((display, child));
-		}
 	}
 }
 
@@ -165,12 +153,7 @@ impl PrefsCollectionNode {
 impl CollectionNode for PrefsCollectionNode {
 	fn text(&self) -> SharedString {
 		match &self.item {
-			InnerCollectionItem::Builtin(x) => match x {
-				BuiltinCollectionItem::All => "All Systems".into(),
-				BuiltinCollectionItem::Source => "Source".into(),
-				BuiltinCollectionItem::Year => "Year".into(),
-				BuiltinCollectionItem::Manufacturer => "Manufacturer".into(),
-			},
+			InnerCollectionItem::Builtin(x) => format!("{}", x).into(),
 			InnerCollectionItem::Machines(x) => x.name.as_ref().map_or_else(
 				|| {
 					x.machines
