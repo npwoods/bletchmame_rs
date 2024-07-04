@@ -32,6 +32,9 @@ binary-search = "0.1.2"
 smallvec = "1.13.2"
 derive-enum-all-values = "=0.1.0"
 default-ext = "0.1.0"
+num = "=0.4.3"
+strum = "0.26"
+strum_macros = "0.26"
 
 [dev-dependencies]
 assert_matches = "1.5.0"
@@ -39,3 +42,7 @@ test-case = "3.3.1"
 
 [build-dependencies]
 slint-build = { git = "https://github.com/slint-ui/slint.git", rev = "b45945a234d4c06bcd685a71d537df8ac1353ae0" }
+
+[profile.release]
+lto = "fat"
+opt-level = "s"

@@ -96,6 +96,8 @@ pub enum BuiltinCollectionItem {
 	Source,
 	Year,
 	Manufacturer,
+	Cpu,
+	Sound,
 }
 
 impl Display for BuiltinCollectionItem {
@@ -105,6 +107,8 @@ impl Display for BuiltinCollectionItem {
 			BuiltinCollectionItem::Source => "Source",
 			BuiltinCollectionItem::Year => "Year",
 			BuiltinCollectionItem::Manufacturer => "Manufacturer",
+			BuiltinCollectionItem::Cpu => "CPU",
+			BuiltinCollectionItem::Sound => "Sound",
 		};
 		write!(f, "{s}")
 	}

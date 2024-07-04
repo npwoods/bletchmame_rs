@@ -171,6 +171,7 @@
 		<disk name="samplechd" sha1="BFEC48AE2439308AC3A547231A13F122EF303C76" region="ata:0:hdd:image" index="0" writable="yes"/>
 		<sample name="fakesample"/>
 		<chip type="cpu" tag="maincpu" name="Motorola MC6809E" clock="1000000"/>
+		<chip type="FAKE" tag="FAKE" name="FAKE FAKE FAKE" clock="424242"/>
 		<display tag="screen" type="raster" rotate="0" width="292" height="240" refresh="60.096154" pixclock="8000000" htotal="512" hbend="6" hbstart="298" vtotal="260" vbend="7" vbstart="247" />
 		<sound channels="1"/>
 		<input players="2" coins="3" service="yes" tilt="yes">

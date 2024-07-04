@@ -4,6 +4,7 @@ use std::rc::Rc;
 use itertools::Itertools;
 use slint::SharedString;
 
+use crate::info::ChipType;
 use crate::info::InfoDb;
 use crate::info::Machine;
 use crate::info::SmallStrRef;
@@ -43,7 +44,7 @@ fn update_collections_tree_model(
 
 	// things are actually interesting when we have an InfoDb
 	if let Some(info_db) = info_db.as_ref() {
-		PrefsCollectionItem::walk(&prefs, |item, indentation| {
+		PrefsCollectionItem::walk(prefs, |item, indentation| {
 			// duplicate the item, but we need to detach any children
 			let (pref_dup, has_prefs_children) = match &item.inner {
 				InnerCollectionItem::Folder(x) => {
@@ -176,13 +177,31 @@ impl CollectionNode for PrefsCollectionNode {
 	fn children(&self) -> Vec<Rc<dyn CollectionNode>> {
 		match &self.item {
 			InnerCollectionItem::Builtin(BuiltinCollectionItem::Source) => {
-				MachineSubsetCollectionNode::new_nodes_vec(&self.info_db, |machine| machine.source_file())
+				MachineSubsetCollectionNode::new_nodes_vec(&self.info_db, |machine| vec![machine.source_file()])
 			}
 			InnerCollectionItem::Builtin(BuiltinCollectionItem::Year) => {
-				MachineSubsetCollectionNode::new_nodes_vec(&self.info_db, |machine| machine.year())
+				MachineSubsetCollectionNode::new_nodes_vec(&self.info_db, |machine| vec![machine.year()])
 			}
 			InnerCollectionItem::Builtin(BuiltinCollectionItem::Manufacturer) => {
-				MachineSubsetCollectionNode::new_nodes_vec(&self.info_db, |machine| machine.manufacturer())
+				MachineSubsetCollectionNode::new_nodes_vec(&self.info_db, |machine| vec![machine.manufacturer()])
+			}
+			InnerCollectionItem::Builtin(BuiltinCollectionItem::Cpu) => {
+				MachineSubsetCollectionNode::new_nodes_vec(&self.info_db, |machine| {
+					machine
+						.chips()
+						.iter()
+						.filter_map(|x| (x.chip_type() == ChipType::Cpu).then_some(x.name()))
+						.collect()
+				})
+			}
+			InnerCollectionItem::Builtin(BuiltinCollectionItem::Sound) => {
+				MachineSubsetCollectionNode::new_nodes_vec(&self.info_db, |machine| {
+					machine
+						.chips()
+						.iter()
+						.filter_map(|x| (x.chip_type() == ChipType::Audio).then_some(x.name()))
+						.collect()
+				})
 			}
 			_ => Default::default(),
 		}
@@ -194,7 +213,9 @@ impl CollectionNode for PrefsCollectionNode {
 				BuiltinCollectionItem::All
 				| BuiltinCollectionItem::Source
 				| BuiltinCollectionItem::Year
-				| BuiltinCollectionItem::Manufacturer => items_from_machines(&self.info_db, |_| true),
+				| BuiltinCollectionItem::Manufacturer
+				| BuiltinCollectionItem::Cpu
+				| BuiltinCollectionItem::Sound => items_from_machines(&self.info_db, |_| true),
 			},
 			_ => [].into(),
 		}
@@ -240,12 +261,16 @@ fn items_from_machines(info_db: &InfoDb, predicate: impl Fn(Machine) -> bool) ->
 
 struct MachineSubsetCollectionNode {
 	info_db: Rc<InfoDb>,
-	selector: for<'a> fn(Machine<'a>) -> SmallStrRef<'a>,
+	selector: for<'a> fn(Machine<'a>) -> Vec<SmallStrRef<'a>>,
 	text: SharedString,
 }
 
 impl MachineSubsetCollectionNode {
-	pub fn new(info_db: Rc<InfoDb>, selector: for<'a> fn(Machine<'a>) -> SmallStrRef<'a>, text: SharedString) -> Self {
+	pub fn new(
+		info_db: Rc<InfoDb>,
+		selector: for<'a> fn(Machine<'a>) -> Vec<SmallStrRef<'a>>,
+		text: SharedString,
+	) -> Self {
 		Self {
 			info_db,
 			selector,
@@ -255,13 +280,13 @@ impl MachineSubsetCollectionNode {
 
 	pub fn new_nodes_vec(
 		info_db: &Rc<InfoDb>,
-		selector: for<'a> fn(Machine<'a>) -> SmallStrRef<'a>,
+		selector: for<'a> fn(Machine<'a>) -> Vec<SmallStrRef<'a>>,
 	) -> Vec<Rc<dyn CollectionNode>> {
 		info_db
 			.machines()
 			.iter()
 			.filter(|machine| machine.runnable())
-			.map(selector)
+			.flat_map(selector)
 			.unique()
 			.sorted()
 			.map(|text| {
@@ -278,6 +303,8 @@ impl CollectionNode for MachineSubsetCollectionNode {
 	}
 
 	fn get_items(&self) -> Rc<[Item]> {
-		items_from_machines(&self.info_db, |machine| (self.selector)(machine) == self.text.as_ref())
+		items_from_machines(&self.info_db, |machine| {
+			(self.selector)(machine).into_iter().any(|x| x == self.text.as_ref())
+		})
 	}
 }

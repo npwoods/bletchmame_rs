@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-type BoxDynError = Box<dyn std::error::Error + Send + Sync>;
+pub type BoxDynError = Box<dyn std::error::Error + Send + Sync>;
 
 #[derive(Error, Debug)]
 pub enum Error {

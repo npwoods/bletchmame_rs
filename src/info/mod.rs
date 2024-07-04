@@ -2,6 +2,7 @@
 
 mod binary;
 mod build;
+mod entities;
 mod smallstr;
 mod strings;
 
@@ -14,11 +15,10 @@ use std::io::BufReader;
 use std::io::Read;
 use std::io::Write;
 use std::marker::PhantomData;
+use std::ops::Range;
 use std::path::Path;
 use std::path::PathBuf;
 
-use binary_search::binary_search;
-use binary_search::Direction;
 use binary_serde::BinarySerde;
 use binary_serde::Endianness;
 
@@ -26,6 +26,10 @@ use crate::prefs::prefs_filename;
 use crate::Error;
 use crate::Result;
 
+pub use self::binary::ChipType;
+pub use self::entities::ChipsView;
+pub use self::entities::Machine;
+pub use self::entities::MachinesView;
 pub use self::smallstr::SmallStrRef;
 
 use self::build::calculate_sizes_hash;
@@ -38,8 +42,8 @@ const ENDIANNESS: Endianness = Endianness::Little;
 
 pub struct InfoDb {
 	data: Box<[u8]>,
-	machines_offset: usize,
-	machines_count: usize,
+	machines: RootView<binary::Machine>,
+	chips: RootView<binary::Chip>,
 	strings_offset: usize,
 
 	#[allow(dead_code)]
@@ -52,24 +56,25 @@ impl InfoDb {
 	}
 
 	fn new_internal(data: Box<[u8]>, skip_validations: bool) -> Result<Self> {
+		// first get the header
 		let hdr = decode_header(&data)?;
-		let machines_offset = binary::Header::SERIALIZED_SIZE;
-		let machines_count = hdr
-			.machine_count
-			.try_into()
-			.map_err(|_| Error::CannotDeserializeInfoDbHeader)?;
-		let strings_offset = machines_offset + binary::Machine::SERIALIZED_SIZE * machines_count;
+
+		// now walk the views
+		let mut cursor = binary::Header::SERIALIZED_SIZE..data.len();
+		let machines = next_root_view(&mut cursor, hdr.machine_count)?;
+		let chips = next_root_view(&mut cursor, hdr.chips_count)?;
 
 		// validations we want to skip if we're creating things ourselves
 		if !skip_validations {
-			validate_string_table(&data[strings_offset..]).map_err(|_| Error::CorruptStringTable)?;
+			validate_string_table(&data[cursor.start..]).map_err(|_| Error::CorruptStringTable)?;
 		}
 
+		// and return
 		let result = Self {
 			data,
-			machines_offset,
-			machines_count,
-			strings_offset,
+			machines,
+			chips,
+			strings_offset: cursor.start,
 			build_strindex: hdr.build_strindex,
 		};
 		Ok(result)
@@ -113,18 +118,24 @@ impl InfoDb {
 		self.string(self.build_strindex)
 	}
 
-	pub fn machines(&self) -> View<'_, binary::Machine> {
-		self.make_view(self.machines_offset, self.machines_count)
+	pub fn machines(&self) -> MachinesView<'_> {
+		self.make_view(&self.machines)
+	}
+
+	pub fn chips(&self) -> ChipsView<'_> {
+		self.make_view(&self.chips)
 	}
 
 	fn string(&self, offset: u32) -> SmallStrRef<'_> {
 		read_string(&self.data[self.strings_offset..], offset).unwrap_or_default()
 	}
 
-	fn make_view<B>(&self, offset: usize, count: usize) -> View<'_, B>
+	fn make_view<B>(&self, root_view: &RootView<B>) -> View<'_, B>
 	where
 		B: BinarySerde,
 	{
+		let offset = root_view.offset.try_into().unwrap();
+		let count = root_view.count.try_into().unwrap();
 		View {
 			db: self,
 			offset,
@@ -138,6 +149,41 @@ impl Debug for InfoDb {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
 		write!(f, "{:?}", self.data)
 	}
+}
+
+fn next_root_view<T>(cursor: &mut Range<usize>, count: u32) -> Result<RootView<T>>
+where
+	T: BinarySerde,
+{
+	// get the result
+	let offset = cursor
+		.start
+		.try_into()
+		.map_err(|_| Error::CannotDeserializeInfoDbHeader)?;
+
+	// advance the cursor
+	let count_bytes = count
+		.checked_mul(T::SERIALIZED_SIZE.try_into().unwrap())
+		.ok_or(Error::CannotDeserializeInfoDbHeader)?;
+	let new_start = cursor
+		.start
+		.checked_add(count_bytes.try_into().unwrap())
+		.ok_or(Error::CannotDeserializeInfoDbHeader)?;
+	if new_start > cursor.end {
+		return Err(Error::CannotDeserializeInfoDbHeader.into());
+	}
+	*cursor = new_start..(cursor.end);
+
+	// and return
+	let phantom = PhantomData;
+	Ok(RootView { offset, count, phantom })
+}
+
+#[derive(Clone, Copy, Debug)]
+struct RootView<T> {
+	offset: u32,
+	count: u32,
+	phantom: PhantomData<T>,
 }
 
 fn infodb_filename(mame_executable_path: &str) -> Result<PathBuf> {
@@ -210,6 +256,20 @@ where
 			phantom: PhantomData,
 		})
 	}
+
+	pub fn sub_view(&self, index: u32, count: u32) -> View<'a, B> {
+		let index = usize::try_from(index).unwrap();
+		let count = usize::try_from(count).unwrap();
+		let offset = self.offset + index * B::SERIALIZED_SIZE;
+		assert!(offset <= self.db.data.len());
+		assert!(offset + count * B::SERIALIZED_SIZE <= self.db.data.len());
+		View {
+			db: self.db,
+			offset,
+			count,
+			phantom: PhantomData,
+		}
+	}
 }
 
 #[derive(Clone, Copy)]
@@ -261,53 +321,11 @@ where
 	}
 }
 
-pub type Machine<'a> = Object<'a, binary::Machine>;
-
-impl<'a> Machine<'a> {
-	pub fn name(&self) -> SmallStrRef<'a> {
-		self.string(|x| x.name_strindex)
-	}
-
-	pub fn source_file(&self) -> SmallStrRef<'a> {
-		self.string(|x| x.source_file_strindex)
-	}
-
-	pub fn description(&self) -> SmallStrRef<'a> {
-		self.string(|x| x.description_strindex)
-	}
-
-	pub fn year(&self) -> SmallStrRef<'a> {
-		self.string(|x| x.year_strindex)
-	}
-
-	pub fn manufacturer(&self) -> SmallStrRef<'a> {
-		self.string(|x| x.manufacturer_strindex)
-	}
-
-	pub fn runnable(&self) -> bool {
-		self.obj().runnable
-	}
-}
-
-impl<'a> View<'a, binary::Machine> {
-	pub fn find(&self, target: &str) -> Option<Machine<'a>> {
-		let ((largest_low, _), _) = binary_search((0, ()), (self.len(), ()), |i| {
-			if self.get(i).unwrap().name().as_ref() <= target {
-				Direction::Low(())
-			} else {
-				Direction::High(())
-			}
-		});
-		let machine = self.get(largest_low).unwrap();
-		(machine.name() == target).then_some(machine)
-	}
-}
-
 #[cfg(test)]
 mod test {
 	use test_case::test_case;
 
-	use super::InfoDb;
+	use super::{ChipType, InfoDb};
 
 	#[test_case(0, include_str!("test_data/listxml_alienar.xml"), "0.229 (mame0229)", 13, 1, &[("alienar", "1985"),("ipt_merge_any_hi", ""),("ls157", "")])]
 	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "0.229 (mame0229)", 104, 15, &[("acia6850", ""), ("address_map_bank", ""), ("ay8910", "")])]
@@ -385,5 +403,25 @@ mod test {
 			let other_machine = db.machines().find(&machine.name());
 			assert_eq!(other_machine.map(|m| m.name()), Some(machine.name()));
 		}
+	}
+
+	#[test_case(0, include_str!("test_data/listxml_alienar.xml"), "alienar", &[(ChipType::Cpu, "maincpu"), (ChipType::Cpu, "soundcpu"), (ChipType::Audio, "speaker"), (ChipType::Audio, "dac")])]
+	#[test_case(1, include_str!("test_data/listxml_fake.xml"), "fake", &[(ChipType::Cpu, "maincpu")])]
+	pub fn chips(_index: usize, xml: &str, machine: &str, expected: &[(ChipType, &str)]) {
+		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
+		let actual = db
+			.machines()
+			.find(machine)
+			.unwrap()
+			.chips()
+			.iter()
+			.map(|chip| (chip.chip_type(), chip.tag().to_string()))
+			.collect::<Vec<_>>();
+
+		let expected = expected
+			.into_iter()
+			.map(|(chip_type, tag)| (*chip_type, tag.to_string()))
+			.collect::<Vec<_>>();
+		assert_eq!(expected, actual);
 	}
 }

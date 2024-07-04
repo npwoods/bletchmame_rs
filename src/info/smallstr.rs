@@ -2,6 +2,7 @@ use std::borrow::Borrow;
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::fmt::Debug;
+use std::fmt::Display;
 use std::fmt::Error;
 use std::fmt::Formatter;
 use std::hash::Hash;
@@ -60,9 +61,15 @@ impl Default for SmallStrRef<'_> {
 	}
 }
 
+impl Display for SmallStrRef<'_> {
+	fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+		Display::fmt(self.as_ref(), f)
+	}
+}
+
 impl Debug for SmallStrRef<'_> {
 	fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-		self.as_ref().fmt(f)
+		Display::fmt(self.as_ref(), f)
 	}
 }
 

@@ -1,4 +1,6 @@
 use binary_serde::BinarySerde;
+use serde::Deserialize;
+use strum::EnumString;
 
 #[derive(Clone, Copy, Debug, Default, BinarySerde)]
 pub struct Header {
@@ -6,6 +8,7 @@ pub struct Header {
 	pub sizes_hash: u64,
 	pub build_strindex: u32,
 	pub machine_count: u32,
+	pub chips_count: u32,
 }
 
 #[derive(Clone, Copy, Debug, Default, BinarySerde)]
@@ -15,5 +18,41 @@ pub struct Machine {
 	pub description_strindex: u32,
 	pub year_strindex: u32,
 	pub manufacturer_strindex: u32,
+	pub chips_index: u32,
+	pub chips_count: u32,
 	pub runnable: bool,
+}
+
+#[derive(Clone, Copy, Debug, BinarySerde)]
+pub struct Chip {
+	pub clock: u64,
+	pub tag_strindex: u32,
+	pub name_strindex: u32,
+	pub chip_type: ChipType,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, BinarySerde, EnumString, PartialEq, Eq)]
+#[repr(u8)]
+pub enum ChipType {
+	#[strum(serialize = "cpu")]
+	Cpu,
+	#[strum(serialize = "audio")]
+	Audio,
+}
+
+#[cfg(test)]
+mod test {
+	use std::str::FromStr;
+
+	use test_case::test_case;
+
+	use super::ChipType;
+
+	#[test_case(0, "cpu", Ok(ChipType::Cpu))]
+	#[test_case(1, "audio", Ok(ChipType::Audio))]
+	#[test_case(2, "<<invalid>>", Err(()))]
+	pub fn chip_type_from_str(_index: usize, s: &str, expected: std::result::Result<ChipType, ()>) {
+		let actual = ChipType::from_str(s).map_err(|_| ());
+		assert_eq!(expected, actual);
+	}
 }
