@@ -74,6 +74,13 @@ impl<T> TreeModel<T> {
 			.map(|entry| func(&entry.data))
 	}
 
+	pub fn with_row<R>(&self, row: impl TryInto<usize>, func: impl FnOnce(&T) -> R) -> Option<R> {
+		let row = row.try_into().ok()?;
+		let index = self.visibility.borrow().get(row).cloned()?;
+		let entries = self.entries.borrow();
+		entries.get(index).map(|entry| func(&entry.data))
+	}
+
 	pub fn on_selected_item_changed(&self, callback: impl Fn(&TreeModel<T>) + 'static) {
 		self.selected_item_changed_callback.replace(Some(Box::new(callback)));
 	}

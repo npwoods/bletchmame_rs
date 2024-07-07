@@ -27,6 +27,7 @@ component TreeNodeListItem {
     in property <bool> has-focus;
     in property <int> index;
     callback expand-toggled;
+    callback item-pointer-event(/* item-index */ int, /* event */ PointerEvent, /* absolute mouse position */ Point);
     callback text-clicked;
     min-width: i-layout.min-width;
     min-height: max(40px, i-layout.min-height);
@@ -64,6 +65,12 @@ component TreeNodeListItem {
                     clicked => {
                         expand-toggled();
                     }
+                    pointer-event(pe) => {
+                        root.item-pointer-event(index, pe, {
+                            x: self.absolute-position.x + self.mouse-x - root.absolute-position.x,
+                            y: self.absolute-position.y + self.mouse-y - root.absolute-position.y,
+                        })
+                    }
                 }
             }
 
@@ -75,6 +82,12 @@ component TreeNodeListItem {
                 TouchArea {
                     clicked => {
                         text-clicked();
+                    }
+                    pointer-event(pe) => {
+                        root.item-pointer-event(index, pe, {
+                            x: self.absolute-position.x + self.mouse-x - root.absolute-position.x,
+                            y: self.absolute-position.y + self.mouse-y - root.absolute-position.y,
+                        })
                     }
                 }
             }
@@ -158,6 +171,9 @@ export component TreeViewBase inherits ListView {
         has-focus: root.has-focus && index == root.focus-item;
         expand-toggled => {
             item.is-open = !item.is-open;
+        }
+        item-pointer-event(item-index, event, absolute-mouse-position) => {
+            root.item-pointer-event(item-index, event, absolute-mouse-position);
         }
         text-clicked => {
             root.set-current-item(index);

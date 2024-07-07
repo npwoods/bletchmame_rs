@@ -1,9 +1,11 @@
+use std::borrow::Cow;
 use std::default::Default;
 use std::rc::Rc;
 
 use itertools::Itertools;
 use slint::SharedString;
 
+use crate::appcommand::AppCommand;
 use crate::info::ChipType;
 use crate::info::InfoDb;
 use crate::info::Machine;
@@ -44,7 +46,7 @@ fn update_collections_tree_model(
 
 	// things are actually interesting when we have an InfoDb
 	if let Some(info_db) = info_db.as_ref() {
-		PrefsCollectionItem::walk(prefs, |item, indentation| {
+		PrefsCollectionItem::walk(prefs, |item, path| {
 			// duplicate the item, but we need to detach any children
 			let (pref_dup, has_prefs_children) = match &item.inner {
 				InnerCollectionItem::Folder(x) => {
@@ -61,14 +63,14 @@ fn update_collections_tree_model(
 			};
 
 			// create the node
-			let node = PrefsCollectionNode::new(pref_dup, info_db.clone());
+			let node = PrefsCollectionNode::new(pref_dup, info_db.clone(), path.into());
 			let node = Rc::new(node) as Rc<dyn CollectionNode>;
 
 			// and create the entry
 			let text = node.text();
 			let is_selected = matches!(item.selected, PrefsSelection::Bool(true));
 			let node_children = node.children();
-			let indentation = indentation.try_into().unwrap();
+			let indentation = path.len().try_into().unwrap();
 			let display = TreeNode {
 				has_children: has_prefs_children || !node_children.is_empty(),
 				indentation,
@@ -132,6 +134,9 @@ pub trait CollectionNode {
 	fn children(&self) -> Vec<Rc<dyn CollectionNode>> {
 		Default::default()
 	}
+	fn popup_menu_commands(&self) -> Vec<(Cow<'static, str>, AppCommand)> {
+		[].into()
+	}
 	fn get_items(&self) -> Rc<[Item]> {
 		[].into()
 	}
@@ -143,11 +148,12 @@ pub trait CollectionNode {
 struct PrefsCollectionNode {
 	item: InnerCollectionItem,
 	info_db: Rc<InfoDb>,
+	path: Box<[usize]>,
 }
 
 impl PrefsCollectionNode {
-	pub fn new(item: InnerCollectionItem, info_db: Rc<InfoDb>) -> Self {
-		Self { item, info_db }
+	pub fn new(item: InnerCollectionItem, info_db: Rc<InfoDb>, path: Box<[usize]>) -> Self {
+		Self { item, info_db, path }
 	}
 }
 
@@ -205,6 +211,21 @@ impl CollectionNode for PrefsCollectionNode {
 			}
 			_ => Default::default(),
 		}
+	}
+
+	fn popup_menu_commands(&self) -> Vec<(Cow<'static, str>, AppCommand)> {
+		let hide_cmd = matches!(self.item, InnerCollectionItem::Builtin(_)).then_some(("Hide", None));
+		let up_cmd = Some(("Move Up", Some(-1)));
+		let down_cmd = Some(("Move Down", Some(1)));
+
+		[hide_cmd, up_cmd, down_cmd]
+			.into_iter()
+			.filter_map(|x| x)
+			.map(|(text, delta)| {
+				let path = self.path.clone();
+				(text.into(), AppCommand::MoveCollection { path, delta })
+			})
+			.collect()
 	}
 
 	fn get_items(&self) -> Rc<[Item]> {
@@ -290,7 +311,8 @@ impl MachineSubsetCollectionNode {
 			.unique()
 			.sorted()
 			.map(|text| {
-				let node = MachineSubsetCollectionNode::new(info_db.clone(), selector, SharedString::from(text));
+				let text = SharedString::from(text);
+				let node = MachineSubsetCollectionNode::new(info_db.clone(), selector, text);
 				Rc::new(node) as Rc<dyn CollectionNode>
 			})
 			.collect()

@@ -2,25 +2,26 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use muda::IsMenuItem;
 use muda::Menu;
 use muda::MenuEvent;
 use muda::MenuItem;
 use muda::PredefinedMenuItem;
 use muda::Submenu;
 use rfd::FileDialog;
-use serde::Deserialize;
-use serde::Serialize;
 use slint::invoke_from_event_loop;
 use slint::platform::PointerEventButton;
 use slint::quit_event_loop;
 use slint::spawn_local;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
+use slint::LogicalPosition;
 use slint::LogicalSize;
 use slint::Model;
 use slint::ModelRc;
 use slint::Weak;
 
+use crate::appcommand::AppCommand;
 use crate::dialogs::builtincollections::dialog_builtin_collections;
 use crate::dialogs::loading::dialog_load_mame_info;
 use crate::guiutils::menuing::accel;
@@ -35,35 +36,6 @@ use crate::threadlocalbubble::ThreadLocalBubble;
 use crate::ui::AppWindow;
 use crate::Result;
 
-#[derive(Clone, Copy, Serialize, Deserialize)]
-enum MenuId {
-	FileExit,
-	OptionsBuiltinCollections,
-	HelpRefreshInfoDb,
-	HelpWebSite,
-}
-
-const MENU_PREFIX: &str = "MENU_";
-
-impl From<MenuId> for muda::MenuId {
-	fn from(value: MenuId) -> Self {
-		format!("{}{}", MENU_PREFIX, serde_json::to_string(&value).unwrap()).into()
-	}
-}
-
-impl TryFrom<&muda::MenuId> for MenuId {
-	type Error = ();
-
-	fn try_from(value: &muda::MenuId) -> std::result::Result<Self, Self::Error> {
-		let value = value.as_ref();
-		if let Some(value) = value.strip_prefix(MENU_PREFIX) {
-			serde_json::from_str(value).map_err(|_| ())
-		} else {
-			Err(())
-		}
-	}
-}
-
 type InfoDbSubscriberCallback = Box<dyn Fn(Option<Rc<InfoDb>>, &Preferences)>;
 
 struct AppModel {
@@ -72,6 +44,7 @@ struct AppModel {
 	preferences: RefCell<Preferences>,
 	info_db: RefCell<Option<Rc<InfoDb>>>,
 	info_db_subscribers: RefCell<Vec<InfoDbSubscriberCallback>>,
+	current_popup_menu: RefCell<Option<Menu>>,
 }
 
 impl AppModel {
@@ -123,6 +96,16 @@ impl AppModel {
 			func(info_db, &prefs);
 		}
 	}
+
+	pub fn show_popup_menu(&self, popup_menu: Menu, point: LogicalPosition) {
+		let mut current_popup_menu = self.current_popup_menu.borrow_mut();
+		*current_popup_menu = Some(popup_menu);
+
+		let window = self.app_window();
+		let window = window.window();
+		let popup_menu = current_popup_menu.as_ref().unwrap();
+		show_popup_menu(window, popup_menu, point);
+	}
 }
 
 pub fn create() -> AppWindow {
@@ -155,12 +138,12 @@ pub fn create() -> AppWindow {
 					],
 				)
 				.unwrap(),
-				&MenuItem::with_id(MenuId::FileExit, "Exit", true, accel("Ctrl+Alt+X")),
+				&MenuItem::with_id(AppCommand::FileExit, "Exit", true, accel("Ctrl+Alt+X")),
 			],
 		)
 		.unwrap(),
 		&Submenu::with_items("Options", true, &[
-			&MenuItem::with_id(MenuId::OptionsBuiltinCollections, "Builtin Collections...", false, None)
+			&MenuItem::with_id(AppCommand::OptionsBuiltinCollections, "Builtin Collections...", false, None)
 
 		]).unwrap(),
 		&Submenu::with_items("Settings", true, &[]).unwrap(),
@@ -168,8 +151,8 @@ pub fn create() -> AppWindow {
 			"Help",
 			true,
 			&[
-				&MenuItem::with_id(MenuId::HelpRefreshInfoDb, "Refresh MAME machine info...", false, None),
-				&MenuItem::with_id(MenuId::HelpWebSite, "BlechMAME web site...", true, None),
+				&MenuItem::with_id(AppCommand::HelpRefreshInfoDb, "Refresh MAME machine info...", false, None),
+				&MenuItem::with_id(AppCommand::HelpWebSite, "BlechMAME web site...", true, None),
 				&MenuItem::new("About...", false, None),
 			],
 		)
@@ -196,6 +179,7 @@ pub fn create() -> AppWindow {
 		preferences: RefCell::new(preferences),
 		info_db: RefCell::new(None),
 		info_db_subscribers: RefCell::new(Vec::new()),
+		current_popup_menu: RefCell::new(None),
 	};
 	let model = Rc::new(model);
 
@@ -256,11 +240,11 @@ pub fn create() -> AppWindow {
 	let collections_tree_model_clone = collections_tree_model.clone();
 	setup_menu_handler(&model, move |model, menu_id| {
 		match menu_id {
-			MenuId::FileExit => {
+			AppCommand::FileExit => {
 				let _ = update_prefs(&model.clone());
 				quit_event_loop().unwrap()
 			}
-			MenuId::OptionsBuiltinCollections => {
+			AppCommand::OptionsBuiltinCollections => {
 				let _ = update_prefs(&model.clone());
 				let model = model.clone();
 				let prefs = model.preferences.borrow().collections.clone();
@@ -274,12 +258,18 @@ pub fn create() -> AppWindow {
 				};
 				spawn_local(fut).unwrap();
 			}
-			MenuId::HelpRefreshInfoDb => {
+			AppCommand::HelpRefreshInfoDb => {
 				let model = model.clone();
 				spawn_local(process_mame_listxml(model, None)).unwrap();
 			}
-			MenuId::HelpWebSite => {
+			AppCommand::HelpWebSite => {
 				let _ = open::that("https://www.bletchmame.org");
+			}
+			AppCommand::MoveCollection { path, delta } => {
+				let delta = delta.map(|x| x.into());
+				let _ = model.modify_prefs(|prefs| prefs.move_collection(&path, delta));
+				collections_tree_model_clone
+					.update(model.info_db.borrow().clone(), &model.preferences.borrow().collections);
 			}
 		};
 	});
@@ -292,18 +282,35 @@ pub fn create() -> AppWindow {
 	});
 
 	// popup menus
-	let app_window_weak = app_window.as_weak();
+	let model_clone = model.clone();
+	app_window.on_collections_tree_pointer_event(move |row, evt, point| {
+		let is_mouse_down_event = format!("{:?}", evt.kind) == "Down"; // hack
+		if evt.button == PointerEventButton::Right && is_mouse_down_event {
+			model_clone.with_collections_tree_model(|collections_tree_model| {
+				collections_tree_model.with_row(row, |node| {
+					let menu_items = node
+						.popup_menu_commands()
+						.into_iter()
+						.map(|(text, command)| MenuItem::with_id(command, &text, true, None))
+						.collect::<Vec<_>>();
+					let menu_items = menu_items.iter().map(|x| x as &dyn IsMenuItem).collect::<Vec<_>>();
+					let popup_menu = Menu::with_items(&menu_items).unwrap();
+					model_clone.show_popup_menu(popup_menu, point);
+				});
+			});
+		}
+	});
+	let model_clone = model.clone();
 	app_window.on_items_row_pointer_event(move |_row, evt, point| {
-		if evt.button == PointerEventButton::Right {
-			let app_window = app_window_weak.unwrap();
-			let window = app_window.window();
+		let is_mouse_down_event = format!("{:?}", evt.kind) == "Down"; // hack
+		if evt.button == PointerEventButton::Right && is_mouse_down_event {
 			let popup_menu = Menu::with_items(&[
-				&MenuItem::new("Alpha", false, None),
-				&MenuItem::new("Bravo", false, None),
-				&MenuItem::new("Charlie", false, None),
+				&MenuItem::new("Alpha", true, None),
+				&MenuItem::new("Bravo", true, None),
+				&MenuItem::new("Charlie", true, None),
 			])
 			.unwrap();
-			show_popup_menu(window, &popup_menu, point);
+			model_clone.show_popup_menu(popup_menu, point);
 		}
 	});
 
@@ -316,12 +323,12 @@ pub fn create() -> AppWindow {
 	app_window
 }
 
-fn setup_menu_handler(model: &Rc<AppModel>, callback: impl Fn(&Rc<AppModel>, MenuId) + 'static + Clone) {
+fn setup_menu_handler(model: &Rc<AppModel>, callback: impl Fn(&Rc<AppModel>, AppCommand) + 'static + Clone) {
 	let packet = (model.clone(), callback);
 	let packet = ThreadLocalBubble::new(packet);
 
 	MenuEvent::set_event_handler(Some(move |menu_event: MenuEvent| {
-		if let Ok(menu_id) = MenuId::try_from(&menu_event.id) {
+		if let Ok(menu_id) = AppCommand::try_from(&menu_event.id) {
 			let packet = packet.clone();
 			invoke_from_event_loop(move || {
 				let (model, callback) = packet.unwrap();
@@ -401,9 +408,9 @@ fn update(model: &AppModel) {
 
 	// update the menu bar
 	for menu_item in iterate_menu_items(&model.menu_bar) {
-		match MenuId::try_from(menu_item.id()) {
-			Ok(MenuId::HelpRefreshInfoDb) => menu_item.set_enabled(has_mame_executable),
-			Ok(MenuId::OptionsBuiltinCollections) => menu_item.set_enabled(true),
+		match AppCommand::try_from(menu_item.id()) {
+			Ok(AppCommand::HelpRefreshInfoDb) => menu_item.set_enabled(has_mame_executable),
+			Ok(AppCommand::OptionsBuiltinCollections) => menu_item.set_enabled(true),
 			_ => {}
 		}
 	}

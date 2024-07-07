@@ -15,11 +15,12 @@ export component AppWindow inherits Window {
     in property <bool> is_running;
     in property <bool> has_info_db;
     in-out property <string> items_search_text;
-    callback collection_item_changed(int);
-    callback items_search_text_changed(string);
-    callback items_sort_ascending(int);
-    callback items_sort_descending(int);
-    callback items_row_pointer_event(int, PointerEvent, Point);
+    callback collections-tree-changed(int);
+    callback collections-tree-pointer-event(int, PointerEvent, Point);
+    callback items-search_text-changed(string);
+    callback items-sort-ascending(int);
+    callback items-sort-descending(int);
+    callback items-row-pointer-event(int, PointerEvent, Point);
     in property <[TreeNode]> collections_model;
     in property <[[StandardListViewItem]]> items_model;
     public function collections-bring-into-view(row: int) {
@@ -54,13 +55,16 @@ export component AppWindow inherits Window {
             width: 250px;
             preferred-height: 100%;
             nodes: collections_model;
+            item-pointer-event(item-index, event, absolute-mouse-position) => {
+                root.collections-tree-pointer-event(item-index, event, absolute-mouse-position);
+            }
         }
 
         VerticalBox {
             LineEdit {
                 text: items_search_text;
                 edited(text) => {
-                    items_search_text_changed(text)
+                    items-search-text-changed(text)
                 }
             }
 
@@ -76,13 +80,13 @@ export component AppWindow inherits Window {
                 preferred-width: 100%;
                 preferred-height: 100%;
                 sort-ascending(index) => {
-                    items_sort_ascending(index)
+                    items-sort-ascending(index)
                 }
                 sort-descending(index) => {
-                    items_sort_descending(index)
+                    items-sort-descending(index)
                 }
                 row-pointer-event(row, event, point) => {
-                    items_row_pointer_event(row, event, point)
+                    items-row-pointer-event(row, event, point)
                 }
             }
         }

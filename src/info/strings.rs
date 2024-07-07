@@ -11,6 +11,7 @@ const SMALL_STRING_CHARS: &[u8; 63] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmn
 const MAGIC_STRINGTABLE_BEGIN: &[u8; 2] = &[0x9D, 0x9B];
 const MAGIC_STRINGTABLE_END: &[u8; 2] = &[0x9F, 0x99];
 
+#[derive(Debug)]
 pub struct StringTableBuilder {
 	data: Vec<u8>,
 	map: HashMap<u64, SmallVec<[u32; 4]>>,

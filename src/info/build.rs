@@ -1,5 +1,8 @@
 use std::borrow::Cow;
 use std::cmp::Ordering;
+use std::fmt::Debug;
+use std::fmt::Formatter;
+use std::fmt::Write;
 use std::io::BufRead;
 use std::marker::PhantomData;
 use std::str::from_utf8;
@@ -21,6 +24,8 @@ use crate::info::ENDIANNESS;
 use crate::info::MAGIC_HDR;
 use crate::Error;
 use crate::Result;
+
+const LOG: bool = true;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Phase {
@@ -44,11 +49,13 @@ struct State {
 
 impl State {
 	pub fn new() -> Self {
-		// root level attributes
+		// prepare a string table, allocating capacity with respect to what we know about MAME 0.239
 		let mut strings = StringTableBuilder::new(4500000); // 4326752 bytes
+
+		// placeholder build string, which will be overridden later on
 		let build_strindex = strings.lookup("");
 
-		// reserve space based on what we know about MAME 0.239
+		// reserve space based the same MAME version as above
 		Self {
 			phase: Phase::Root,
 			machines: BinBuilder::new(48000), // 44092 machines,
@@ -60,6 +67,11 @@ impl State {
 	}
 
 	pub fn handle_start(&mut self, evt: BytesStart) -> std::result::Result<Option<Phase>, BoxDynError> {
+		if LOG {
+			println!("handle_start(): self={:?}", self);
+			println!("handle_start(): {}", debug_start_tag(&evt));
+		}
+
 		let new_phase = match (self.phase, evt.name().as_ref()) {
 			(Phase::Root, b"mame") => {
 				let [build] = find_attributes(&evt, [b"build"]);
@@ -121,6 +133,10 @@ impl State {
 		&mut self,
 		callback: &mut impl FnMut(&str) -> bool,
 	) -> std::result::Result<Option<Phase>, BoxDynError> {
+		if LOG {
+			println!("handle_end(): self={:?}", self);
+		}
+
 		let new_phase = match self.phase {
 			Phase::Root => panic!(),
 			Phase::Mame => Phase::Root,
@@ -176,6 +192,18 @@ impl State {
 			.chain(self.chips.into_iter())
 			.chain(self.strings.into_iter())
 			.collect()
+	}
+}
+
+impl Debug for State {
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+		write!(
+			f,
+			"[phase={:?} machine.len()={} current_text={:?}]",
+			self.phase,
+			self.machines.len(),
+			self.current_text
+		)
 	}
 }
 
@@ -262,6 +290,7 @@ pub fn data_from_listxml_output(
 	Ok(Some(data))
 }
 
+#[derive(Debug)]
 struct BinBuilder<T>
 where
 	T: BinarySerde,
@@ -288,7 +317,12 @@ where
 	}
 
 	fn tweak<R>(&mut self, func: impl FnOnce(&mut T) -> R) -> R {
-		let pos = self.vec.len() - T::SERIALIZED_SIZE;
+		let index = (self.len() - 1).try_into().unwrap();
+		self.tweak_by_index(index, func)
+	}
+
+	fn tweak_by_index<R>(&mut self, index: usize, func: impl FnOnce(&mut T) -> R) -> R {
+		let pos = index * T::SERIALIZED_SIZE;
 		let slice = &mut self.vec[pos..];
 		let mut obj = T::binary_deserialize(slice, ENDIANNESS).unwrap();
 		let result = func(&mut obj);
@@ -369,9 +403,30 @@ fn cow_bytes_to_str(cow: Cow<'_, [u8]>) -> std::result::Result<Cow<'_, str>, Box
 
 pub fn calculate_sizes_hash() -> u64 {
 	let multiplicand = 4729; // arbitrary prime number
-	[binary::Header::SERIALIZED_SIZE, binary::Machine::SERIALIZED_SIZE, binary::Chip::SERIALIZED_SIZE]
-		.into_iter()
-		.fold(0, |value, item| (value * multiplicand) ^ (item as u64))
+	[
+		binary::Header::SERIALIZED_SIZE,
+		binary::Machine::SERIALIZED_SIZE,
+		binary::Chip::SERIALIZED_SIZE,
+	]
+	.into_iter()
+	.fold(0, |value, item| (value * multiplicand) ^ (item as u64))
+}
+
+fn debug_start_tag(e: &BytesStart) -> String {
+	let mut text = String::with_capacity(1024);
+	write!(text, "<{}", String::from_utf8_lossy(e.name().as_ref())).unwrap();
+	for x in e.attributes().with_checks(false) {
+		let attribute = x.unwrap();
+		write!(
+			text,
+			" {}=\"{}\"",
+			String::from_utf8_lossy(attribute.key.as_ref()),
+			String::from_utf8_lossy(attribute.value.as_ref())
+		)
+		.unwrap();
+	}
+	write!(text, ">").unwrap();
+	text
 }
 
 #[cfg(test)]

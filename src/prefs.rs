@@ -151,20 +151,23 @@ pub struct FolderCollectionItem {
 }
 
 impl PrefsCollectionItem {
-	pub fn walk<'a>(items: &'a [PrefsCollectionItem], mut callback: impl FnMut(&'a PrefsCollectionItem, usize)) {
-		Self::walk_internal(items, &mut callback, 0);
+	pub fn walk<'a>(items: &'a [PrefsCollectionItem], mut callback: impl FnMut(&'a PrefsCollectionItem, &[usize])) {
+		let mut path = Vec::new();
+		Self::walk_internal(items, &mut callback, &mut path);
 	}
 
 	fn walk_internal<'a>(
 		items: &'a [PrefsCollectionItem],
-		callback: &mut impl FnMut(&'a PrefsCollectionItem, usize),
-		indent: usize,
+		callback: &mut impl FnMut(&'a PrefsCollectionItem, &[usize]),
+		path: &mut Vec<usize>,
 	) {
-		for item in items {
-			callback(item, indent);
+		for (index, item) in items.iter().enumerate() {
+			path.push(index);
+			callback(item, &path);
 			if let InnerCollectionItem::Folder(x) = &item.inner {
-				Self::walk_internal(&x.children, callback, indent + 1);
+				Self::walk_internal(&x.children, callback, path);
 			}
+			path.truncate(path.len() - 1);
 		}
 	}
 
@@ -214,6 +217,13 @@ impl Preferences {
 		let json = include_str!("prefs_fresh.json");
 		load_prefs_from_reader(json.as_bytes()).unwrap()
 	}
+
+	pub fn move_collection(&mut self, path: &[usize], delta: Option<isize>) {
+		let remove_index = *path.last().unwrap();
+		let reinsert_index = delta.map(|x| remove_index.checked_add_signed(x).unwrap());
+		let path = &path[..(path.len() - 1)];
+		move_collection(&mut self.collections, path, remove_index, reinsert_index);
+	}
 }
 
 pub fn prefs_filename(filename: Option<&str>) -> Result<PathBuf> {
@@ -257,6 +267,25 @@ fn prefs_load_error(e: impl std::error::Error + Send + Sync + 'static) -> Error 
 
 fn prefs_save_error(e: impl std::error::Error + Send + Sync + 'static) -> Error {
 	Error::PreferencesSave(e.into())
+}
+
+fn move_collection(
+	collections: &mut Vec<PrefsCollectionItem>,
+	path: &[usize],
+	remove_index: usize,
+	reinsert_index: Option<usize>,
+) {
+	if let Some(&index) = path.first() {
+		let InnerCollectionItem::Folder(folder) = &mut collections[index].inner else {
+			panic!("Invalid collection path");
+		};
+		move_collection(&mut folder.children, path, remove_index, reinsert_index);
+	} else {
+		let element = collections.remove(remove_index);
+		if let Some(reinsert_index) = reinsert_index {
+			collections.insert(reinsert_index, element);
+		}
+	}
 }
 
 #[cfg(test)]
