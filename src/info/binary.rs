@@ -9,6 +9,7 @@ pub struct Header {
 	pub build_strindex: u32,
 	pub machine_count: u32,
 	pub chips_count: u32,
+	pub software_lists_count: u32,
 }
 
 #[derive(Clone, Copy, Debug, Default, BinarySerde)]
@@ -20,6 +21,8 @@ pub struct Machine {
 	pub manufacturer_strindex: u32,
 	pub chips_index: u32,
 	pub chips_count: u32,
+	pub software_lists_index: u32,
+	pub software_lists_count: u32,
 	pub runnable: bool,
 }
 
@@ -38,6 +41,23 @@ pub enum ChipType {
 	Cpu,
 	#[strum(serialize = "audio")]
 	Audio,
+}
+
+#[derive(Clone, Copy, Debug, BinarySerde)]
+pub struct SoftwareList {
+	pub tag_strindex: u32,
+	pub name_strindex: u32,
+	pub status: SoftwareListStatus,
+	pub filter_strindex: u32,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, BinarySerde, EnumString, PartialEq, Eq)]
+#[repr(u8)]
+pub enum SoftwareListStatus {
+	#[strum(serialize = "cpu")]
+	Original,
+	#[strum(serialize = "audio")]
+	Compatible,
 }
 
 #[cfg(test)]

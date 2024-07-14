@@ -40,7 +40,7 @@ pub async fn dialog_builtin_collections(
 
 		// and identify all usage
 		let mut current_path = Vec::new();
-		PrefsCollectionItem::walk(&prefs, |item, path| {
+		PrefsCollectionItem::walk(&prefs, |item, path, _| {
 			current_path.resize(path.len(), Default::default());
 			match &item.inner {
 				InnerCollectionItem::Builtin(item) => {

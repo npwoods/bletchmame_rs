@@ -7,7 +7,9 @@ mod guiutils;
 mod info;
 mod models;
 mod prefs;
+mod software;
 mod threadlocalbubble;
+mod xml;
 
 use std::path::PathBuf;
 

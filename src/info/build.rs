@@ -1,33 +1,29 @@
-use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::fmt::Debug;
 use std::fmt::Formatter;
-use std::fmt::Write;
 use std::io::BufRead;
 use std::marker::PhantomData;
-use std::str::from_utf8;
 
 use binary_serde::BinarySerde;
 use itertools::Itertools;
 use num::CheckedAdd;
-use quick_xml::escape::unescape;
-use quick_xml::events::BytesStart;
-use quick_xml::events::BytesText;
-use quick_xml::events::Event;
-use quick_xml::reader::Reader;
 
 use crate::error::BoxDynError;
 use crate::info::binary;
 use crate::info::strings::StringTableBuilder;
 use crate::info::ChipType;
+use crate::info::SoftwareListStatus;
 use crate::info::ENDIANNESS;
 use crate::info::MAGIC_HDR;
+use crate::xml::XmlElement;
+use crate::xml::XmlEvent;
+use crate::xml::XmlReader;
 use crate::Error;
 use crate::Result;
 
-const LOG: bool = true;
+const LOG: bool = false;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Phase {
 	Root,
 	Mame,
@@ -38,12 +34,18 @@ enum Phase {
 	MachineManufacturer,
 }
 
+const TEXT_CAPTURE_PHASES: &[Phase] = &[
+	Phase::MachineDescription,
+	Phase::MachineYear,
+	Phase::MachineManufacturer,
+];
+
 struct State {
 	phase: Phase,
 	machines: BinBuilder<binary::Machine>,
 	chips: BinBuilder<binary::Chip>,
+	software_lists: BinBuilder<binary::SoftwareList>,
 	strings: StringTableBuilder,
-	current_text: Option<String>,
 	build_strindex: u32,
 }
 
@@ -58,28 +60,36 @@ impl State {
 		// reserve space based the same MAME version as above
 		Self {
 			phase: Phase::Root,
-			machines: BinBuilder::new(48000), // 44092 machines,
-			chips: BinBuilder::new(190000),   // 174679 chips
+			machines: BinBuilder::new(48000),      // 44092 machines,
+			chips: BinBuilder::new(190000),        // 174679 chips
+			software_lists: BinBuilder::new(6800), // 6337 software lists
 			strings,
-			current_text: None,
 			build_strindex,
 		}
 	}
 
-	pub fn handle_start(&mut self, evt: BytesStart) -> std::result::Result<Option<Phase>, BoxDynError> {
+	pub fn handle_start(&mut self, evt: XmlElement<'_>) -> std::result::Result<Option<Phase>, BoxDynError> {
 		if LOG {
 			println!("handle_start(): self={:?}", self);
-			println!("handle_start(): {}", debug_start_tag(&evt));
+			println!("handle_start(): {:?}", evt);
 		}
 
 		let new_phase = match (self.phase, evt.name().as_ref()) {
 			(Phase::Root, b"mame") => {
-				let [build] = find_attributes(&evt, [b"build"]);
+				let [build] = evt.find_attributes([b"build"])?;
 				self.build_strindex = self.strings.lookup(&build.unwrap_or_default());
 				Some(Phase::Mame)
 			}
 			(Phase::Mame, b"machine") => {
-				let [name, source_file, runnable] = find_attributes(&evt, [b"name", b"sourcefile", b"runnable"]);
+				let [name, source_file, runnable] = evt.find_attributes([b"name", b"sourcefile", b"runnable"])?;
+
+				if LOG {
+					println!(
+						"handle_start(): name={:?} source_file={:?} runnable={:?}",
+						name, source_file, runnable
+					);
+				}
+
 				let Some(name) = name else { return Ok(None) };
 				let name_strindex = self.strings.lookup(&name);
 				let source_file_strindex = self.strings.lookup(&source_file.unwrap_or_default());
@@ -88,26 +98,18 @@ impl State {
 					name_strindex,
 					source_file_strindex,
 					chips_index: self.chips.len(),
+					software_lists_index: self.software_lists.len(),
 					runnable,
 					..Default::default()
 				};
 				self.machines.push(machine);
 				Some(Phase::Machine)
 			}
-			(Phase::Machine, b"description") => {
-				self.current_text = Some(String::new());
-				Some(Phase::MachineDescription)
-			}
-			(Phase::Machine, b"year") => {
-				self.current_text = Some(String::new());
-				Some(Phase::MachineYear)
-			}
-			(Phase::Machine, b"manufacturer") => {
-				self.current_text = Some(String::new());
-				Some(Phase::MachineManufacturer)
-			}
+			(Phase::Machine, b"description") => Some(Phase::MachineDescription),
+			(Phase::Machine, b"year") => Some(Phase::MachineYear),
+			(Phase::Machine, b"manufacturer") => Some(Phase::MachineManufacturer),
 			(Phase::Machine, b"chip") => {
-				let [chip_type, tag, name, clock] = find_attributes(&evt, [b"type", b"tag", b"name", b"clock"]);
+				let [chip_type, tag, name, clock] = evt.find_attributes([b"type", b"tag", b"name", b"clock"])?;
 				let Some(chip_type) = chip_type.and_then(|x| x.as_ref().parse::<ChipType>().ok()) else {
 					return Ok(None);
 				};
@@ -124,6 +126,24 @@ impl State {
 				self.machines.increment(|m| &mut m.chips_count)?;
 				Some(Phase::MachineSubtag)
 			}
+			(Phase::Machine, b"softwarelist") => {
+				let [tag, name, status, filter] = evt.find_attributes([b"tag", b"name", b"status", b"filter"])?;
+				let Some(status) = status.and_then(|x| x.as_ref().parse::<SoftwareListStatus>().ok()) else {
+					return Ok(None);
+				};
+				let tag_strindex = self.strings.lookup(&tag.unwrap_or_default());
+				let name_strindex = self.strings.lookup(&name.unwrap_or_default());
+				let filter_strindex = self.strings.lookup(&filter.unwrap_or_default());
+				let software_list = binary::SoftwareList {
+					tag_strindex,
+					name_strindex,
+					status,
+					filter_strindex,
+				};
+				self.software_lists.push(software_list);
+				self.machines.increment(|m| &mut m.software_lists_count)?;
+				Some(Phase::MachineSubtag)
+			}
 			_ => None,
 		};
 		Ok(new_phase)
@@ -132,6 +152,7 @@ impl State {
 	pub fn handle_end(
 		&mut self,
 		callback: &mut impl FnMut(&str) -> bool,
+		text: Option<String>,
 	) -> std::result::Result<Option<Phase>, BoxDynError> {
 		if LOG {
 			println!("handle_end(): self={:?}", self);
@@ -144,7 +165,7 @@ impl State {
 			Phase::MachineSubtag => Phase::Machine,
 
 			Phase::MachineDescription => {
-				let description = self.current_text.take().unwrap_or_default();
+				let description = text.unwrap();
 				if !description.is_empty() && callback(&description) {
 					return Ok(None);
 				}
@@ -153,12 +174,12 @@ impl State {
 				Phase::Machine
 			}
 			Phase::MachineYear => {
-				let year_strindex = self.strings.lookup(&self.current_text.take().unwrap_or_default());
+				let year_strindex = self.strings.lookup(&text.unwrap());
 				self.machines.tweak(|x| x.year_strindex = year_strindex);
 				Phase::Machine
 			}
 			Phase::MachineManufacturer => {
-				let manufacturer_strindex = self.strings.lookup(&self.current_text.take().unwrap_or_default());
+				let manufacturer_strindex = self.strings.lookup(&text.unwrap());
 				self.machines.tweak(|x| x.manufacturer_strindex = manufacturer_strindex);
 				Phase::Machine
 			}
@@ -181,6 +202,7 @@ impl State {
 			build_strindex: self.build_strindex,
 			machine_count: self.machines.len(),
 			chips_count: self.chips.len(),
+			software_lists_count: self.software_lists.len(),
 		};
 		let mut header_bytes: [u8; binary::Header::SERIALIZED_SIZE] = Default::default();
 		header.binary_serialize(&mut header_bytes, ENDIANNESS);
@@ -190,6 +212,7 @@ impl State {
 			.into_iter()
 			.chain(self.machines.into_iter())
 			.chain(self.chips.into_iter())
+			.chain(self.software_lists.into_iter())
 			.chain(self.strings.into_iter())
 			.collect()
 	}
@@ -197,25 +220,12 @@ impl State {
 
 impl Debug for State {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-		write!(
-			f,
-			"[phase={:?} machine.len()={} current_text={:?}]",
-			self.phase,
-			self.machines.len(),
-			self.current_text
-		)
+		write!(f, "[phase={:?} machine.len()={}]", self.phase, self.machines.len(),)
 	}
 }
 
-fn listxml_err<R>(reader: &quick_xml::Reader<R>, e: BoxDynError) -> crate::error::Error {
+fn listxml_err(reader: &XmlReader<impl BufRead>, e: BoxDynError) -> crate::error::Error {
 	Error::ListXmlProcessing(reader.buffer_position(), e)
-}
-
-/// quick-xml events are at a slightly different granularity than what we would prefer
-enum XmlEvent<'a> {
-	Start(BytesStart<'a>),
-	End,
-	Text(BytesText<'a>),
 }
 
 pub fn data_from_listxml_output(
@@ -223,67 +233,41 @@ pub fn data_from_listxml_output(
 	mut callback: impl FnMut(&str) -> bool,
 ) -> Result<Option<Box<[u8]>>> {
 	let mut state = State::new();
-	let mut reader = Reader::from_reader(reader);
-	let mut buf = Vec::new();
-	let mut unknown_depth = 0;
+	let mut reader = XmlReader::from_reader(reader);
+	let mut buf = Vec::with_capacity(1024);
 
-	loop {
-		// read the quick-xml event
-		let qxml_event = reader
-			.read_event_into(&mut buf)
-			.map_err(|e| listxml_err(&reader, e.into()))?;
+	while let Some(evt) = reader.next(&mut buf).map_err(|e| listxml_err(&reader, e))? {
+		match evt {
+			XmlEvent::Start(evt) => {
+				let new_phase = state.handle_start(evt).map_err(|e| listxml_err(&reader, e))?;
 
-		// convert to our events
-		let events = match qxml_event {
-			Event::Eof => {
-				assert_eq!(Phase::Root, state.phase);
-				break;
-			}
-			Event::Start(x) => vec![XmlEvent::Start(x)],
-			Event::End(_) => vec![XmlEvent::End],
-			Event::Empty(x) => vec![XmlEvent::Start(x), XmlEvent::End],
-			Event::Text(x) => vec![XmlEvent::Text(x)],
-			_ => vec![],
-		};
+				if let Some(new_phase) = new_phase {
+					state.phase = new_phase;
 
-		// and loop through them
-		for evt in events {
-			match evt {
-				XmlEvent::Start(evt) => {
-					let new_phase = (unknown_depth == 0)
-						.then(|| state.handle_start(evt))
-						.transpose()
-						.map_err(|e| listxml_err(&reader, e))?
-						.flatten();
-
-					if let Some(new_phase) = new_phase {
-						state.phase = new_phase
-					} else {
-						unknown_depth += 1
+					if TEXT_CAPTURE_PHASES.contains(&state.phase) {
+						reader.start_text_capture();
 					}
-				}
-
-				XmlEvent::End => {
-					if unknown_depth == 0 {
-						let new_phase = state.handle_end(&mut callback).map_err(|e| listxml_err(&reader, e))?;
-						let Some(new_phase) = new_phase else {
-							return Ok(None);
-						};
-						state.phase = new_phase;
-					} else {
-						unknown_depth -= 1;
-					}
-				}
-
-				XmlEvent::Text(bytes_text) => {
-					if let Some(current_text) = &mut state.current_text {
-						let string = cow_bytes_to_str(bytes_text.into_inner()).map_err(|e| listxml_err(&reader, e))?;
-						current_text.push_str(&string);
-					}
+				} else {
+					reader.start_unknown_tag();
 				}
 			}
+
+			XmlEvent::End(s) => {
+				let new_phase = state
+					.handle_end(&mut callback, s)
+					.map_err(|e| listxml_err(&reader, e))?;
+				let Some(new_phase) = new_phase else {
+					return Ok(None);
+				};
+				state.phase = new_phase;
+			}
+
+			XmlEvent::Null => {} // meh
 		}
 	}
+
+	// sanity check
+	assert_eq!(Phase::Root, state.phase);
 
 	// get all bytes and return
 	let data = state.into_data();
@@ -368,37 +352,9 @@ where
 	}
 }
 
-fn find_attributes<'a, const N: usize>(e: &'a BytesStart, attrs: [&[u8]; N]) -> [Option<Cow<'a, str>>; N] {
-	attrs
-		.iter()
-		.map(|&attr_name| {
-			e.attributes()
-				.filter_map(|x| x.ok())
-				.find(|x| x.key.as_ref() == attr_name)
-				.and_then(|x| cow_bytes_to_str(x.value).ok())
-		})
-		.collect::<Vec<_>>()
-		.try_into()
-		.unwrap()
-}
-
 fn bool_attribute(text: impl AsRef<str>) -> bool {
 	let text = text.as_ref();
 	text == "yes" || text == "1" || text == "true"
-}
-
-fn cow_bytes_to_str(cow: Cow<'_, [u8]>) -> std::result::Result<Cow<'_, str>, Box<dyn std::error::Error + Send + Sync>> {
-	match cow {
-		Cow::Borrowed(bytes) => {
-			let s = from_utf8(bytes)?;
-			Ok(unescape(s)?)
-		}
-		Cow::Owned(bytes) => {
-			let s = from_utf8(&bytes)?;
-			let s = unescape(s)?;
-			Ok(s.into_owned().into())
-		}
-	}
 }
 
 pub fn calculate_sizes_hash() -> u64 {
@@ -407,31 +363,14 @@ pub fn calculate_sizes_hash() -> u64 {
 		binary::Header::SERIALIZED_SIZE,
 		binary::Machine::SERIALIZED_SIZE,
 		binary::Chip::SERIALIZED_SIZE,
+		binary::SoftwareList::SERIALIZED_SIZE,
 	]
 	.into_iter()
 	.fold(0, |value, item| (value * multiplicand) ^ (item as u64))
 }
 
-fn debug_start_tag(e: &BytesStart) -> String {
-	let mut text = String::with_capacity(1024);
-	write!(text, "<{}", String::from_utf8_lossy(e.name().as_ref())).unwrap();
-	for x in e.attributes().with_checks(false) {
-		let attribute = x.unwrap();
-		write!(
-			text,
-			" {}=\"{}\"",
-			String::from_utf8_lossy(attribute.key.as_ref()),
-			String::from_utf8_lossy(attribute.value.as_ref())
-		)
-		.unwrap();
-	}
-	write!(text, ">").unwrap();
-	text
-}
-
 #[cfg(test)]
 mod test {
-	use std::borrow::Cow;
 	use std::io::BufReader;
 
 	use assert_matches::assert_matches;
@@ -447,17 +386,5 @@ mod test {
 		let data = super::data_from_listxml_output(reader, |_| false).unwrap().unwrap();
 		let result = InfoDb::new(data);
 		assert_matches!(result, Ok(_));
-	}
-
-	#[test_case(0, Cow::Borrowed(b""), Ok(""))]
-	#[test_case(1, Cow::Owned(b"".into()), Ok(""))]
-	#[test_case(2, Cow::Borrowed(b"foo"), Ok("foo"))]
-	#[test_case(3, Cow::Owned(b"foo".into()), Ok("foo"))]
-	#[test_case(4, Cow::Borrowed(b"&lt;escaping&gt; &amp; things"), Ok("<escaping> & things"))]
-	#[test_case(5, Cow::Owned(b"&lt;escaping&gt; &amp; things".into()), Ok("<escaping> & things"))]
-	pub fn cow_bytes_to_str(_index: usize, input: Cow<'_, [u8]>, expected: std::result::Result<&str, ()>) {
-		let actual = super::cow_bytes_to_str(input);
-		let actual = actual.as_ref().map_or_else(|_| Err(()), |x| Ok(x.as_ref()));
-		assert_eq!(expected, actual);
 	}
 }

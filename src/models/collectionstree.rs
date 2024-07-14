@@ -3,6 +3,7 @@ use std::default::Default;
 use std::rc::Rc;
 
 use itertools::Itertools;
+use itertools::Position;
 use slint::SharedString;
 
 use crate::appcommand::AppCommand;
@@ -46,7 +47,7 @@ fn update_collections_tree_model(
 
 	// things are actually interesting when we have an InfoDb
 	if let Some(info_db) = info_db.as_ref() {
-		PrefsCollectionItem::walk(prefs, |item, path| {
+		PrefsCollectionItem::walk(prefs, |item, path, position| {
 			// duplicate the item, but we need to detach any children
 			let (pref_dup, has_prefs_children) = match &item.inner {
 				InnerCollectionItem::Folder(x) => {
@@ -63,7 +64,7 @@ fn update_collections_tree_model(
 			};
 
 			// create the node
-			let node = PrefsCollectionNode::new(pref_dup, info_db.clone(), path.into());
+			let node = PrefsCollectionNode::new(pref_dup, info_db.clone(), path.into(), position);
 			let node = Rc::new(node) as Rc<dyn CollectionNode>;
 
 			// and create the entry
@@ -149,11 +150,17 @@ struct PrefsCollectionNode {
 	item: InnerCollectionItem,
 	info_db: Rc<InfoDb>,
 	path: Box<[usize]>,
+	position: Position,
 }
 
 impl PrefsCollectionNode {
-	pub fn new(item: InnerCollectionItem, info_db: Rc<InfoDb>, path: Box<[usize]>) -> Self {
-		Self { item, info_db, path }
+	pub fn new(item: InnerCollectionItem, info_db: Rc<InfoDb>, path: Box<[usize]>, position: Position) -> Self {
+		Self {
+			item,
+			info_db,
+			path,
+			position,
+		}
 	}
 }
 
@@ -214,18 +221,22 @@ impl CollectionNode for PrefsCollectionNode {
 	}
 
 	fn popup_menu_commands(&self) -> Vec<(Cow<'static, str>, AppCommand)> {
-		let hide_cmd = matches!(self.item, InnerCollectionItem::Builtin(_)).then_some(("Hide", None));
-		let up_cmd = Some(("Move Up", Some(-1)));
-		let down_cmd = Some(("Move Down", Some(1)));
+		let hide_cmd = ("Hide", None);
+		let up_cmd = ("Move Up", Some(-1));
+		let down_cmd = ("Move Down", Some(1));
 
-		[hide_cmd, up_cmd, down_cmd]
-			.into_iter()
-			.filter_map(|x| x)
-			.map(|(text, delta)| {
-				let path = self.path.clone();
-				(text.into(), AppCommand::MoveCollection { path, delta })
-			})
-			.collect()
+		[
+			matches!(self.item, InnerCollectionItem::Builtin(_)).then_some(hide_cmd),
+			(!at_start(self.position)).then_some(up_cmd),
+			(!at_end(self.position)).then_some(down_cmd),
+		]
+		.into_iter()
+		.filter_map(|x| x)
+		.map(|(text, delta)| {
+			let path = self.path.clone();
+			(text.into(), AppCommand::MoveCollection { path, delta })
+		})
+		.collect()
 	}
 
 	fn get_items(&self) -> Rc<[Item]> {
@@ -329,4 +340,12 @@ impl CollectionNode for MachineSubsetCollectionNode {
 			(self.selector)(machine).into_iter().any(|x| x == self.text.as_ref())
 		})
 	}
+}
+
+fn at_start(position: Position) -> bool {
+	position == Position::First || position == Position::Only
+}
+
+fn at_end(position: Position) -> bool {
+	position == Position::Last || position == Position::Only
 }

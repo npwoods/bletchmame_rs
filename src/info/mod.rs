@@ -1,5 +1,5 @@
 //! Logic for parsing "InfoDb" databases; our internal representation of --listml output
-
+#![allow(dead_code)]
 mod binary;
 mod build;
 mod entities;
@@ -27,9 +27,11 @@ use crate::Error;
 use crate::Result;
 
 pub use self::binary::ChipType;
+pub use self::binary::SoftwareListStatus;
 pub use self::entities::ChipsView;
 pub use self::entities::Machine;
 pub use self::entities::MachinesView;
+pub use self::entities::SoftwareListsView;
 pub use self::smallstr::SmallStrRef;
 
 use self::build::calculate_sizes_hash;
@@ -44,9 +46,8 @@ pub struct InfoDb {
 	data: Box<[u8]>,
 	machines: RootView<binary::Machine>,
 	chips: RootView<binary::Chip>,
+	software_lists: RootView<binary::SoftwareList>,
 	strings_offset: usize,
-
-	#[allow(dead_code)]
 	build_strindex: u32,
 }
 
@@ -63,6 +64,7 @@ impl InfoDb {
 		let mut cursor = binary::Header::SERIALIZED_SIZE..data.len();
 		let machines = next_root_view(&mut cursor, hdr.machine_count)?;
 		let chips = next_root_view(&mut cursor, hdr.chips_count)?;
+		let software_lists = next_root_view(&mut cursor, hdr.software_lists_count)?;
 
 		// validations we want to skip if we're creating things ourselves
 		if !skip_validations {
@@ -74,6 +76,7 @@ impl InfoDb {
 			data,
 			machines,
 			chips,
+			software_lists,
 			strings_offset: cursor.start,
 			build_strindex: hdr.build_strindex,
 		};
@@ -113,7 +116,6 @@ impl InfoDb {
 		Ok(Some(info_db))
 	}
 
-	#[allow(dead_code)]
 	pub fn build(&self) -> SmallStrRef<'_> {
 		self.string(self.build_strindex)
 	}
@@ -124,6 +126,10 @@ impl InfoDb {
 
 	pub fn chips(&self) -> ChipsView<'_> {
 		self.make_view(&self.chips)
+	}
+
+	pub fn software_lists(&self) -> SoftwareListsView<'_> {
+		self.make_view(&self.software_lists)
 	}
 
 	fn string(&self, offset: u32) -> SmallStrRef<'_> {

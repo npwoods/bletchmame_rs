@@ -8,6 +8,8 @@ use std::path::PathBuf;
 
 use derive_enum_all_values::AllValues;
 use dirs::config_dir;
+use itertools::Itertools;
+use itertools::Position;
 use serde::Deserialize;
 use serde::Serialize;
 use slint::LogicalSize;
@@ -151,19 +153,22 @@ pub struct FolderCollectionItem {
 }
 
 impl PrefsCollectionItem {
-	pub fn walk<'a>(items: &'a [PrefsCollectionItem], mut callback: impl FnMut(&'a PrefsCollectionItem, &[usize])) {
+	pub fn walk<'a>(
+		items: &'a [PrefsCollectionItem],
+		mut callback: impl FnMut(&'a PrefsCollectionItem, &[usize], Position),
+	) {
 		let mut path = Vec::new();
 		Self::walk_internal(items, &mut callback, &mut path);
 	}
 
 	fn walk_internal<'a>(
 		items: &'a [PrefsCollectionItem],
-		callback: &mut impl FnMut(&'a PrefsCollectionItem, &[usize]),
+		callback: &mut impl FnMut(&'a PrefsCollectionItem, &[usize], Position),
 		path: &mut Vec<usize>,
 	) {
-		for (index, item) in items.iter().enumerate() {
+		for (position, (index, item)) in items.iter().enumerate().with_position() {
 			path.push(index);
-			callback(item, &path);
+			callback(item, &path, position);
 			if let InnerCollectionItem::Folder(x) = &item.inner {
 				Self::walk_internal(&x.children, callback, path);
 			}
@@ -218,11 +223,13 @@ impl Preferences {
 		load_prefs_from_reader(json.as_bytes()).unwrap()
 	}
 
-	pub fn move_collection(&mut self, path: &[usize], delta: Option<isize>) {
-		let remove_index = *path.last().unwrap();
-		let reinsert_index = delta.map(|x| remove_index.checked_add_signed(x).unwrap());
-		let path = &path[..(path.len() - 1)];
-		move_collection(&mut self.collections, path, remove_index, reinsert_index);
+	pub fn move_collection(&mut self, path: &[usize], delta: Option<i8>) {
+		move_within_tree(&mut self.collections, path, delta, |item| {
+			let InnerCollectionItem::Folder(item) = &mut item.inner else {
+				panic!("Invalid path");
+			};
+			&mut item.children
+		});
 	}
 }
 
@@ -269,22 +276,27 @@ fn prefs_save_error(e: impl std::error::Error + Send + Sync + 'static) -> Error 
 	Error::PreferencesSave(e.into())
 }
 
-fn move_collection(
-	collections: &mut Vec<PrefsCollectionItem>,
+fn move_within_tree<T>(
+	mut tree: &mut Vec<T>,
 	path: &[usize],
-	remove_index: usize,
-	reinsert_index: Option<usize>,
+	delta: Option<impl Into<isize>>,
+	traverse: impl Fn(&mut T) -> &mut Vec<T>,
 ) {
-	if let Some(&index) = path.first() {
-		let InnerCollectionItem::Folder(folder) = &mut collections[index].inner else {
-			panic!("Invalid collection path");
-		};
-		move_collection(&mut folder.children, path, remove_index, reinsert_index);
-	} else {
-		let element = collections.remove(remove_index);
-		if let Some(reinsert_index) = reinsert_index {
-			collections.insert(reinsert_index, element);
-		}
+	// change the path to not have the final element
+	let remove_index = *path.last().unwrap();
+	let reinsert_index = delta.map(|x| remove_index.checked_add_signed(x.into()).unwrap());
+	let path = &path[..(path.len() - 1)];
+
+	// traverse the tree
+	for &index in path {
+		let element = &mut tree[index];
+		tree = traverse(element);
+	}
+
+	// and manipulate the final item
+	let element = tree.remove(remove_index);
+	if let Some(reinsert_index) = reinsert_index {
+		tree.insert(reinsert_index, element);
 	}
 }
 

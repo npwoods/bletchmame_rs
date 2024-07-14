@@ -266,8 +266,10 @@ pub fn create() -> AppWindow {
 				let _ = open::that("https://www.bletchmame.org");
 			}
 			AppCommand::MoveCollection { path, delta } => {
-				let delta = delta.map(|x| x.into());
-				let _ = model.modify_prefs(|prefs| prefs.move_collection(&path, delta));
+				let _ = model.modify_prefs(|prefs| {
+					prefs.collections = model.with_collections_tree_model(|x| x.get_prefs());
+					prefs.move_collection(&path, delta)
+				});
 				collections_tree_model_clone
 					.update(model.info_db.borrow().clone(), &model.preferences.borrow().collections);
 			}

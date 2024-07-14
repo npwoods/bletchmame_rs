@@ -14,6 +14,8 @@ pub enum Error {
 	CantFindPreferencesDirectory,
 	#[error("Cannot determine InfoDB filename")]
 	CannotBuildInfoDbFilename,
+	#[error("Error parsing software list XML at position {0}: {1}")]
+	SoftwareListXmlParsing(u64, BoxDynError),
 
 	// InfoDB corruption
 	#[error("Cannot deserialize InfoDB header")]
