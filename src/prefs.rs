@@ -5,11 +5,11 @@ use std::io::Read;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
+use std::rc::Rc;
 
 use derive_enum_all_values::AllValues;
 use dirs::config_dir;
-use itertools::Itertools;
-use itertools::Position;
+use num::clamp;
 use serde::Deserialize;
 use serde::Serialize;
 use slint::LogicalSize;
@@ -25,7 +25,11 @@ pub struct Preferences {
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub window_size: Option<PrefsSize>,
 	#[serde(default)]
-	pub collections: Vec<PrefsCollectionItem>,
+	pub collections: Vec<Rc<PrefsCollection>>,
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub history: Vec<HistoryEntry>,
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub history_position: usize,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
@@ -60,149 +64,52 @@ impl From<PrefsSize> for LogicalSize {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct PrefsCollectionItem {
-	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
-	pub selected: PrefsSelection,
-
-	#[serde(flatten)]
-	pub inner: InnerCollectionItem,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(untagged)]
-pub enum PrefsSelection {
-	Bool(bool),
-	String(String),
-}
-
-impl Default for PrefsSelection {
-	fn default() -> Self {
-		PrefsSelection::Bool(false)
-	}
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", tag = "type")]
-pub enum InnerCollectionItem {
-	Builtin(BuiltinCollectionItem),
-	Machines(MachinesCollectionItem),
-	Software(SoftwareCollectionItem),
-	Folder(FolderCollectionItem),
+pub enum PrefsCollection {
+	Builtin(BuiltinCollection),
+	MachineSoftware {
+		#[serde(rename = "machine")]
+		machine_name: String,
+	},
+	Folder {
+		name: String,
+
+		#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+		items: Vec<PrefsItem>,
+	},
 }
 
 #[derive(AllValues, Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase", tag = "subtype")]
-pub enum BuiltinCollectionItem {
+pub enum BuiltinCollection {
 	All,
-	Source,
-	Year,
-	Manufacturer,
-	Cpu,
-	Sound,
 }
 
-impl Display for BuiltinCollectionItem {
+impl Display for BuiltinCollection {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		let s = match self {
-			BuiltinCollectionItem::All => "All Systems",
-			BuiltinCollectionItem::Source => "Source",
-			BuiltinCollectionItem::Year => "Year",
-			BuiltinCollectionItem::Manufacturer => "Manufacturer",
-			BuiltinCollectionItem::Cpu => "CPU",
-			BuiltinCollectionItem::Sound => "Sound",
+			BuiltinCollection::All => "All Systems",
 		};
 		write!(f, "{s}")
 	}
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct MachinesCollectionItem {
+pub struct HistoryEntry {
+	#[serde(flatten)]
+	pub collection: Rc<PrefsCollection>,
+
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
-	pub name: Option<String>,
-	pub machines: Vec<String>,
-	#[serde(default)]
-	pub show_software: bool,
-	#[serde(default)]
-	pub custom_software_directories: Vec<CustomSoftwareDirectory>,
+	pub selection: Vec<PrefsItem>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct CustomSoftwareDirectory {
-	pub path: String,
-	#[serde(default)]
-	pub recursive: bool,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct SoftwareCollectionItem {
-	#[serde(default)]
-	pub name: Option<String>,
-	pub machine: String,
-	pub software: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct FolderCollectionItem {
-	pub name: String,
-	pub children: Vec<PrefsCollectionItem>,
-}
-
-impl PrefsCollectionItem {
-	pub fn walk<'a>(
-		items: &'a [PrefsCollectionItem],
-		mut callback: impl FnMut(&'a PrefsCollectionItem, &[usize], Position),
-	) {
-		let mut path = Vec::new();
-		Self::walk_internal(items, &mut callback, &mut path);
-	}
-
-	fn walk_internal<'a>(
-		items: &'a [PrefsCollectionItem],
-		callback: &mut impl FnMut(&'a PrefsCollectionItem, &[usize], Position),
-		path: &mut Vec<usize>,
-	) {
-		for (position, (index, item)) in items.iter().enumerate().with_position() {
-			path.push(index);
-			callback(item, &path, position);
-			if let InnerCollectionItem::Folder(x) = &item.inner {
-				Self::walk_internal(&x.children, callback, path);
-			}
-			path.truncate(path.len() - 1);
-		}
-	}
-
-	pub fn process(
-		items: Vec<PrefsCollectionItem>,
-		mut callback: impl FnMut(Vec<PrefsCollectionItem>) -> Vec<PrefsCollectionItem>,
-	) -> Vec<PrefsCollectionItem> {
-		Self::internal_process(items, &mut callback)
-	}
-
-	fn internal_process(
-		items: Vec<PrefsCollectionItem>,
-		callback: &mut impl FnMut(Vec<PrefsCollectionItem>) -> Vec<PrefsCollectionItem>,
-	) -> Vec<PrefsCollectionItem> {
-		let new_items = items
-			.into_iter()
-			.map(|item| PrefsCollectionItem {
-				selected: item.selected,
-				inner: if let InnerCollectionItem::Folder(x) = item.inner {
-					InnerCollectionItem::Folder(FolderCollectionItem {
-						name: x.name,
-						children: Self::internal_process(x.children, callback),
-					})
-				} else {
-					item.inner
-				},
-			})
-			.collect();
-		callback(new_items)
-	}
+#[serde(rename_all = "camelCase", tag = "type")]
+pub enum PrefsItem {
+	Machine {
+		#[serde(rename = "machine")]
+		machine_name: String,
+	},
 }
 
 const PREFS: Option<&str> = Some("BletchMAME.json");
@@ -222,15 +129,6 @@ impl Preferences {
 		let json = include_str!("prefs_fresh.json");
 		load_prefs_from_reader(json.as_bytes()).unwrap()
 	}
-
-	pub fn move_collection(&mut self, path: &[usize], delta: Option<i8>) {
-		move_within_tree(&mut self.collections, path, delta, |item| {
-			let InnerCollectionItem::Folder(item) = &mut item.inner else {
-				panic!("Invalid path");
-			};
-			&mut item.children
-		});
-	}
 }
 
 pub fn prefs_filename(filename: Option<&str>) -> Result<PathBuf> {
@@ -248,8 +146,17 @@ fn load_prefs(path: &Path) -> Result<Preferences> {
 }
 
 fn load_prefs_from_reader(reader: impl Read) -> Result<Preferences> {
+	// deserialize the preferences
 	let reader = BufReader::new(reader);
-	let prefs = serde_json::from_reader(reader).map_err(prefs_load_error)?;
+	let mut prefs: Preferences = serde_json::from_reader(reader).map_err(prefs_load_error)?;
+
+	// special treatments
+	if prefs.history.is_empty() {
+		prefs.history = Preferences::fresh().history;
+	}
+	prefs.history_position = clamp(prefs.history_position, 0, prefs.history.len() - 1);
+
+	// and return!
 	Ok(prefs)
 }
 
@@ -274,30 +181,6 @@ fn prefs_load_error(e: impl std::error::Error + Send + Sync + 'static) -> Error 
 
 fn prefs_save_error(e: impl std::error::Error + Send + Sync + 'static) -> Error {
 	Error::PreferencesSave(e.into())
-}
-
-fn move_within_tree<T>(
-	mut tree: &mut Vec<T>,
-	path: &[usize],
-	delta: Option<impl Into<isize>>,
-	traverse: impl Fn(&mut T) -> &mut Vec<T>,
-) {
-	// change the path to not have the final element
-	let remove_index = *path.last().unwrap();
-	let reinsert_index = delta.map(|x| remove_index.checked_add_signed(x.into()).unwrap());
-	let path = &path[..(path.len() - 1)];
-
-	// traverse the tree
-	for &index in path {
-		let element = &mut tree[index];
-		tree = traverse(element);
-	}
-
-	// and manipulate the final item
-	let element = tree.remove(remove_index);
-	if let Some(reinsert_index) = reinsert_index {
-		tree.insert(reinsert_index, element);
-	}
 }
 
 #[cfg(test)]

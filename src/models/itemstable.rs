@@ -14,18 +14,23 @@ use slint::SharedString;
 use slint::StandardListViewItem;
 use unicase::UniCase;
 
+use crate::appcommand::AppCommand;
 use crate::info::InfoDb;
+use crate::prefs::BuiltinCollection;
+use crate::prefs::PrefsCollection;
+use crate::prefs::PrefsItem;
 
 pub struct ItemsTableModel {
 	info_db: RefCell<Option<Rc<InfoDb>>>,
 	items: RefCell<Rc<[Item]>>,
 	items_map: RefCell<Box<[u32]>>,
 	sorting_searching: RefCell<SortingSearching>,
+	current_collection: RefCell<Rc<PrefsCollection>>,
 	notify: ModelNotify,
 }
 
 impl ItemsTableModel {
-	pub fn new() -> Rc<Self> {
+	pub fn new(current_collection: Rc<PrefsCollection>) -> Rc<Self> {
 		let sorting_searching = SortingSearching {
 			column: Column::Name,
 			order: SortOrder::Ascending,
@@ -36,6 +41,7 @@ impl ItemsTableModel {
 			items: RefCell::new([].into()),
 			items_map: RefCell::new([].into()),
 			sorting_searching: RefCell::new(sorting_searching),
+			current_collection: RefCell::new(current_collection),
 			notify: ModelNotify::default(),
 		};
 		Rc::new(result)
@@ -43,12 +49,59 @@ impl ItemsTableModel {
 
 	pub fn info_db_changed(&self, info_db: Option<Rc<InfoDb>>) {
 		self.info_db.replace(info_db);
+		self.refresh();
+	}
+
+	pub fn browse(&self, collection: Rc<PrefsCollection>) {
+		self.current_collection.replace(collection);
+		self.refresh();
+	}
+
+	fn refresh(&self) {
+		let info_db = self.info_db.borrow();
+		let collection = self.current_collection.borrow().clone();
+
+		let items = info_db.as_ref().map(|info_db| match collection.as_ref() {
+			PrefsCollection::Builtin(BuiltinCollection::All) => {
+				let machine_count = info_db.machines().len();
+				(0..machine_count)
+					.map(|machine_index| Item::Machine { machine_index })
+					.collect::<Rc<[_]>>()
+			}
+			PrefsCollection::MachineSoftware { machine_name: _ } => todo!(),
+			PrefsCollection::Folder { name: _, items } => items
+				.iter()
+				.filter_map(|item| match item {
+					PrefsItem::Machine { machine_name } => info_db
+						.machines()
+						.find_index(&machine_name)
+						.map(|machine_index| Item::Machine { machine_index }),
+				})
+				.collect::<Rc<[_]>>(),
+		});
+		let items = items.unwrap_or_else(|| Rc::new([]));
+		self.items.replace(items);
 		self.update_items_map();
 	}
 
-	pub fn items_changed(&self, items: Rc<[Item]>) {
-		self.items.replace(items);
-		self.update_items_map();
+	pub fn context_commands(&self, index: usize) -> impl Iterator<Item = AppCommand> {
+		let items = self.items.borrow();
+		let info_db = self.info_db.borrow();
+		let item = items.get(index);
+
+		let commands = match item.as_ref() {
+			Some(Item::Machine { machine_index }) => {
+				info_db.as_ref().unwrap().machines().get(*machine_index).map(|machine| {
+					let collection = PrefsCollection::MachineSoftware {
+						machine_name: machine.name().into(),
+					};
+					vec![AppCommand::Browse(collection)]
+				})
+			}
+			None => None,
+		};
+
+		commands.unwrap_or_default().into_iter()
 	}
 
 	pub fn sort_ascending(&self, index: i32) {
@@ -114,11 +167,14 @@ impl Model for ItemsTableModel {
 	type Data = ModelRc<StandardListViewItem>;
 
 	fn row_count(&self) -> usize {
-		self.items.borrow().len()
+		self.items_map.borrow().len()
 	}
 
 	fn row_data(&self, row: usize) -> Option<Self::Data> {
 		let info_db = self.info_db.borrow().as_ref().unwrap().clone();
+		let items_map = self.items_map.borrow();
+		let row = *items_map.get(row)?;
+		let row = row.try_into().unwrap();
 		let items = self.items.borrow().clone();
 		let row_model = RowModel::new(info_db, items, row);
 		Some(ModelRc::from(row_model))
@@ -134,7 +190,7 @@ impl Model for ItemsTableModel {
 }
 
 pub enum Item {
-	Machine { machine_index: u32 },
+	Machine { machine_index: usize },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

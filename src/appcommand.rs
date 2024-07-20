@@ -1,23 +1,36 @@
 use muda::MenuId;
+use muda::MenuItem;
 use serde::Deserialize;
 use serde::Serialize;
 
 use crate::error::BoxDynError;
+use crate::guiutils::menuing::accel;
+use crate::prefs::PrefsCollection;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum AppCommand {
 	// File menu
 	FileExit,
 
-	// Options menu
-	OptionsBuiltinCollections,
-
 	// Help menu
 	HelpRefreshInfoDb,
 	HelpWebSite,
 
 	// Other
-	MoveCollection { path: Box<[usize]>, delta: Option<i8> },
+	Browse(PrefsCollection),
+}
+
+impl AppCommand {
+	pub fn into_menu_item(self) -> MenuItem {
+		let (text, enabled, accel_text) = match &self {
+			AppCommand::FileExit => ("Exit", true, Some("Ctrl+Alt+X")),
+			AppCommand::HelpRefreshInfoDb => ("Refresh MAME machine info...", false, None),
+			AppCommand::HelpWebSite => ("BlechMAME web site...", true, None),
+			AppCommand::Browse(_) => ("Browse", true, None),
+		};
+		let accelerator = accel_text.and_then(accel);
+		MenuItem::with_id(self, text, enabled, accelerator)
+	}
 }
 
 const MENU_PREFIX: &str = "MENU_";

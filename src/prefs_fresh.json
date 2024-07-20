@@ -5,16 +5,14 @@
       "subtype": "all"
     },
     {
-      "type": "builtin",
-      "subtype": "source"
-    },
+      "type": "folder",
+      "name": "Favorites"
+    }
+  ],
+  "history": [
     {
       "type": "builtin",
-      "subtype": "year"
-    },
-    {
-      "type": "builtin",
-      "subtype": "manufacturer"
+      "subtype": "all"
     }
   ]
 }

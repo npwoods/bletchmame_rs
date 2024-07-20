@@ -22,16 +22,19 @@ use slint::ModelRc;
 use slint::Weak;
 
 use crate::appcommand::AppCommand;
-use crate::dialogs::builtincollections::dialog_builtin_collections;
 use crate::dialogs::loading::dialog_load_mame_info;
 use crate::guiutils::menuing::accel;
 use crate::guiutils::menuing::iterate_menu_items;
 use crate::guiutils::menuing::setup_window_menu_bar;
 use crate::guiutils::menuing::show_popup_menu;
+use crate::history::collection_for_current_history_item;
+use crate::history::history_advance;
+use crate::history::history_push;
 use crate::info::InfoDb;
-use crate::models::collectionstree::CollectionsTreeModel;
+use crate::models::collectionsview::CollectionsViewModel;
 use crate::models::itemstable::ItemsTableModel;
 use crate::prefs::Preferences;
+use crate::prefs::PrefsCollection;
 use crate::threadlocalbubble::ThreadLocalBubble;
 use crate::ui::AppWindow;
 use crate::Result;
@@ -52,12 +55,12 @@ impl AppModel {
 		self.app_window_weak.unwrap()
 	}
 
-	pub fn with_collections_tree_model<T>(&self, func: impl FnOnce(&CollectionsTreeModel) -> T) -> T {
+	pub fn with_collections_view_model<T>(&self, func: impl FnOnce(&CollectionsViewModel) -> T) -> T {
 		let collections_model = self.app_window().get_collections_model();
 		let collections_model = collections_model
 			.as_any()
-			.downcast_ref::<CollectionsTreeModel>()
-			.expect("with_collections_tree_model(): downcast_ref::<CollectionsTreeModel>() failed");
+			.downcast_ref::<CollectionsViewModel>()
+			.expect("with_collections_view_model(): downcast_ref::<CollectionsViewModel>() failed");
 		func(collections_model)
 	}
 
@@ -71,9 +74,18 @@ impl AppModel {
 	}
 
 	pub fn modify_prefs(&self, func: impl FnOnce(&mut Preferences)) -> Result<()> {
+		// modify actual preferences
 		let mut prefs = self.preferences.borrow_mut();
 		func(&mut prefs);
 		drop(prefs);
+
+		// update "in" properties
+		self.app_window()
+			.set_history_length(self.preferences.borrow().history.len().try_into().unwrap());
+		self.app_window()
+			.set_history_position(self.preferences.borrow().history_position.try_into().unwrap());
+
+		// and save
 		self.preferences.borrow().save()
 	}
 
@@ -105,6 +117,26 @@ impl AppModel {
 		let window = window.window();
 		let popup_menu = current_popup_menu.as_ref().unwrap();
 		show_popup_menu(window, popup_menu, point);
+	}
+
+	pub fn browse(&self, collection: Rc<PrefsCollection>) {
+		let _ = self.modify_prefs(|prefs| {
+			history_push(&mut prefs.history, &mut prefs.history_position, &collection);
+			update_ui_for_history(&self.app_window(), prefs);
+		});
+		self.with_items_table_model(|x| x.browse(collection));
+	}
+
+	pub fn advance(&self, delta: isize) {
+		let _ = self.modify_prefs(|prefs| {
+			history_advance(&mut prefs.history, &mut prefs.history_position, delta);
+			update_ui_for_history(&self.app_window(), prefs);
+
+			let (collection, _) =
+				collection_for_current_history_item(&prefs.collections, &prefs.history, prefs.history_position)
+					.unwrap();
+			self.with_items_table_model(|x: &ItemsTableModel| x.browse(collection));
+		});
 	}
 }
 
@@ -138,21 +170,17 @@ pub fn create() -> AppWindow {
 					],
 				)
 				.unwrap(),
-				&MenuItem::with_id(AppCommand::FileExit, "Exit", true, accel("Ctrl+Alt+X")),
+				&AppCommand::FileExit.into_menu_item()
 			],
 		)
 		.unwrap(),
-		&Submenu::with_items("Options", true, &[
-			&MenuItem::with_id(AppCommand::OptionsBuiltinCollections, "Builtin Collections...", false, None)
-
-		]).unwrap(),
 		&Submenu::with_items("Settings", true, &[]).unwrap(),
 		&Submenu::with_items(
 			"Help",
 			true,
 			&[
-				&MenuItem::with_id(AppCommand::HelpRefreshInfoDb, "Refresh MAME machine info...", false, None),
-				&MenuItem::with_id(AppCommand::HelpWebSite, "BlechMAME web site...", true, None),
+				&AppCommand::HelpRefreshInfoDb.into_menu_item(),
+				&AppCommand::HelpWebSite.into_menu_item(),
 				&MenuItem::new("About...", false, None),
 			],
 		)
@@ -190,37 +218,42 @@ pub fn create() -> AppWindow {
 	});
 
 	// set up the collections view model
-	let collections_tree_model = CollectionsTreeModel::new();
-	let collections_tree_model = Rc::new(collections_tree_model);
-	app_window.set_collections_model(ModelRc::new(collections_tree_model.clone()));
+	let collections_view_model = CollectionsViewModel::new(app_window.as_weak());
+	let collections_view_model = Rc::new(collections_view_model);
+	app_window.set_collections_model(ModelRc::new(collections_view_model.clone()));
 
 	// set up items view model
-	let items_model = ItemsTableModel::new();
+	let current_collection = {
+		let prefs = model.preferences.borrow();
+		let (collection, _) =
+			collection_for_current_history_item(&prefs.collections, &prefs.history, prefs.history_position).unwrap();
+		collection
+	};
+	let items_model = ItemsTableModel::new(current_collection);
 	let items_model_clone = items_model.clone();
 	model.subscribe_to_info_db_changes(move |info_db, _| items_model_clone.info_db_changed(info_db));
 	let items_model_clone = items_model.clone();
 	app_window.set_items_model(ModelRc::new(items_model_clone));
 
 	// InfoDB changes
-	let collections_tree_model_clone = collections_tree_model.clone();
-	model.subscribe_to_info_db_changes(move |info_db, prefs| {
-		collections_tree_model_clone.update(info_db, &prefs.collections);
+	let collections_view_model_clone = collections_view_model.clone();
+	model.subscribe_to_info_db_changes(move |_, prefs| {
+		collections_view_model_clone.update(&prefs.collections);
 	});
 
 	// bind collection selection changes to the items view model
-	let app_window_weak = app_window.as_weak();
-	collections_tree_model.on_selected_item_changed(move |collections_tree_model| {
-		if let Some(row) = collections_tree_model.selected_row() {
-			let app_window_weak = app_window_weak.clone();
-			let row = row.try_into().unwrap();
-			app_window_weak.unwrap().invoke_collections_bring_into_view(row);
-		}
-
-		// load items
-		if let Some(items) = collections_tree_model.get_selected_items() {
-			items_model.items_changed(items);
+	let collections_view_model_clone = collections_view_model.clone();
+	let model_clone = model.clone();
+	app_window.on_collections_view_selected(move |index| {
+		let index = index.try_into().unwrap();
+		if let Some(collection) = collections_view_model_clone.get(index) {
+			model_clone.browse(collection);
 		}
 	});
+
+	// set up back/foward buttons
+	let model_clone = model.clone();
+	app_window.on_history_advance_clicked(move |delta| model_clone.advance(delta.try_into().unwrap()));
 
 	// set up items filter
 	let model_clone = model.clone();
@@ -237,26 +270,12 @@ pub fn create() -> AppWindow {
 	});
 
 	// set up menu handler
-	let collections_tree_model_clone = collections_tree_model.clone();
+	//let collections_tree_model_clone = collections_tree_model.clone();
 	setup_menu_handler(&model, move |model, menu_id| {
 		match menu_id {
 			AppCommand::FileExit => {
 				let _ = update_prefs(&model.clone());
 				quit_event_loop().unwrap()
-			}
-			AppCommand::OptionsBuiltinCollections => {
-				let _ = update_prefs(&model.clone());
-				let model = model.clone();
-				let prefs = model.preferences.borrow().collections.clone();
-				let collections_tree_model_clone = collections_tree_model_clone.clone();
-				let fut = async move {
-					if let Some(new_prefs) = dialog_builtin_collections(model.app_window(), prefs).await {
-						model.preferences.borrow_mut().collections = new_prefs;
-						collections_tree_model_clone
-							.update(model.info_db.borrow().clone(), &model.preferences.borrow().collections);
-					}
-				};
-				spawn_local(fut).unwrap();
 			}
 			AppCommand::HelpRefreshInfoDb => {
 				let model = model.clone();
@@ -265,13 +284,10 @@ pub fn create() -> AppWindow {
 			AppCommand::HelpWebSite => {
 				let _ = open::that("https://www.bletchmame.org");
 			}
-			AppCommand::MoveCollection { path, delta } => {
-				let _ = model.modify_prefs(|prefs| {
-					prefs.collections = model.with_collections_tree_model(|x| x.get_prefs());
-					prefs.move_collection(&path, delta)
-				});
-				collections_tree_model_clone
-					.update(model.info_db.borrow().clone(), &model.preferences.borrow().collections);
+			AppCommand::Browse(collection) => {
+				let model = model.clone();
+				let collection = Rc::new(collection);
+				model.browse(collection);
 			}
 		};
 	});
@@ -285,33 +301,21 @@ pub fn create() -> AppWindow {
 
 	// popup menus
 	let model_clone = model.clone();
-	app_window.on_collections_tree_pointer_event(move |row, evt, point| {
+	app_window.on_items_row_pointer_event(move |index, evt, point| {
+		let index: usize = index.try_into().unwrap();
 		let is_mouse_down_event = format!("{:?}", evt.kind) == "Down"; // hack
+
 		if evt.button == PointerEventButton::Right && is_mouse_down_event {
-			model_clone.with_collections_tree_model(|collections_tree_model| {
-				collections_tree_model.with_row(row, |node| {
-					let menu_items = node
-						.popup_menu_commands()
-						.into_iter()
-						.map(|(text, command)| MenuItem::with_id(command, &text, true, None))
-						.collect::<Vec<_>>();
-					let menu_items = menu_items.iter().map(|x| x as &dyn IsMenuItem).collect::<Vec<_>>();
-					let popup_menu = Menu::with_items(&menu_items).unwrap();
-					model_clone.show_popup_menu(popup_menu, point);
-				});
+			let popup_menu_items = model_clone.with_items_table_model(|x| {
+				x.context_commands(index)
+					.map(|x| x.into_menu_item())
+					.collect::<Vec<_>>()
 			});
-		}
-	});
-	let model_clone = model.clone();
-	app_window.on_items_row_pointer_event(move |_row, evt, point| {
-		let is_mouse_down_event = format!("{:?}", evt.kind) == "Down"; // hack
-		if evt.button == PointerEventButton::Right && is_mouse_down_event {
-			let popup_menu = Menu::with_items(&[
-				&MenuItem::new("Alpha", true, None),
-				&MenuItem::new("Bravo", true, None),
-				&MenuItem::new("Charlie", true, None),
-			])
-			.unwrap();
+			let popup_menu_items = popup_menu_items
+				.iter()
+				.map(|x| x as &dyn IsMenuItem)
+				.collect::<Vec<_>>();
+			let popup_menu = Menu::with_items(&popup_menu_items).unwrap();
 			model_clone.show_popup_menu(popup_menu, point);
 		}
 	});
@@ -412,10 +416,19 @@ fn update(model: &AppModel) {
 	for menu_item in iterate_menu_items(&model.menu_bar) {
 		match AppCommand::try_from(menu_item.id()) {
 			Ok(AppCommand::HelpRefreshInfoDb) => menu_item.set_enabled(has_mame_executable),
-			Ok(AppCommand::OptionsBuiltinCollections) => menu_item.set_enabled(true),
 			_ => {}
 		}
 	}
+
+	// update history buttons
+	update_ui_for_history(&model.app_window(), &model.preferences.borrow());
+}
+
+fn update_ui_for_history(app_window: &AppWindow, prefs: &Preferences) {
+	app_window.set_history_length(prefs.history.len().try_into().unwrap());
+	app_window.set_history_position(prefs.history_position.try_into().unwrap());
+
+	let _ = collection_for_current_history_item(&prefs.collections, &prefs.history, prefs.history_position);
 }
 
 fn update_prefs(model: &AppModel) -> Result<()> {
@@ -426,7 +439,7 @@ fn update_prefs(model: &AppModel) -> Result<()> {
 		prefs.window_size = Some(logical_size.into());
 
 		// update collections related prefs
-		prefs.collections = model.with_collections_tree_model(|x| x.get_prefs());
+		prefs.collections = model.with_collections_view_model(|x| x.get_all());
 	})
 }
 

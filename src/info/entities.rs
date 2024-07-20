@@ -51,7 +51,7 @@ impl<'a> Machine<'a> {
 }
 
 impl<'a> MachinesView<'a> {
-	pub fn find(&self, target: &str) -> Option<Machine<'a>> {
+	pub fn find_index(&self, target: &str) -> Option<usize> {
 		if self.len() == 0 {
 			return None;
 		}
@@ -64,7 +64,11 @@ impl<'a> MachinesView<'a> {
 			}
 		});
 		let machine = self.get(largest_low).unwrap();
-		(machine.name() == target).then_some(machine)
+		(machine.name() == target).then_some(largest_low)
+	}
+
+	pub fn find(&self, target: &str) -> Option<Machine<'a>> {
+		self.find_index(target).map(|index| self.get(index).unwrap())
 	}
 }
 

@@ -1,3 +1,2 @@
-pub mod collectionstree;
+pub mod collectionsview;
 pub mod itemstable;
-pub mod tree;

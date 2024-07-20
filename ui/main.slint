@@ -1,9 +1,8 @@
 import { HorizontalBox, VerticalBox, Button, StandardListView, StandardTableView, LineEdit, ListView } from "std-widgets.slint";
-import { TreeView, TreeNode } from "treeview.slint";
+import { MagicListView, MagicListViewItem, Icons, FilledButton } from "@vivi/magic.slint";
 import { LoadingDialog } from "loading.slint";
-import { BuiltinCollectionsDialog } from "builtincollections.slint";
 
-export { LoadingDialog, BuiltinCollectionsDialog }
+export { LoadingDialog, Icons }
 
 export component AppWindow inherits Window {
     min-width: 100px;
@@ -14,21 +13,20 @@ export component AppWindow inherits Window {
     callback find_mame_clicked();
     in property <bool> is_running;
     in property <bool> has_info_db;
+    in property <int> history-length;
+    in property <int> history-position;
+    in-out property <length> collections-list-view-preferred-height <=> collections-list-view.preferred-height;
     in-out property <string> items_search_text;
-    callback collections-tree-changed(int);
-    callback collections-tree-pointer-event(int, PointerEvent, Point);
+    callback collections-view-selected(int);
     callback items-search_text-changed(string);
     callback items-sort-ascending(int);
     callback items-sort-descending(int);
     callback items-row-pointer-event(int, PointerEvent, Point);
-    in property <[TreeNode]> collections_model;
-    in property <[[StandardListViewItem]]> items_model;
-    public function collections-bring-into-view(row: int) {
-        // disabling this functionality because we often do this after refrehsing
-        // the collections view, and it is possible that the notify has not been "taken"
-        // yet (https://github.com/slint-ui/slint/issues/5503#)
-        //
-        // collections-tree-view.bring-into-view(row);
+    callback history-advance-clicked(int);
+    in property <[MagicListViewItem]> collections-model;
+    in property <[[StandardListViewItem]]> items-model;
+    public function collections-view-select(index: int) {
+        collections-list-view.current_index = index;
     }
     VerticalBox {
         alignment: center;
@@ -51,20 +49,43 @@ export component AppWindow inherits Window {
 
     HorizontalBox {
         visible: has_info_db && !is_running;
-        collections-tree-view := TreeView {
+        collections-list-view := MagicListView {
             width: 250px;
             preferred-height: 100%;
-            nodes: collections_model;
-            item-pointer-event(item-index, event, absolute-mouse-position) => {
-                root.collections-tree-pointer-event(item-index, event, absolute-mouse-position);
+            model: collections-model;
+            selected(index) => {
+                collections-view-selected(index)
             }
         }
 
         VerticalBox {
-            LineEdit {
-                text: items_search_text;
-                edited(text) => {
-                    items-search-text-changed(text)
+            HorizontalBox {
+                FilledButton {
+                    icon: Icons.arrow_back;
+                    enabled: history-position + 1 < history-length;
+                    clicked => {
+                        history-advance-clicked(+1)
+                    }
+                }
+
+                FilledButton {
+                    icon: Icons.book;
+                    enabled: false;
+                }
+
+                FilledButton {
+                    icon: Icons.arrow_forward;
+                    enabled: history-position > 0;
+                    clicked => {
+                        history-advance-clicked(-1)
+                    }
+                }
+
+                LineEdit {
+                    text: items_search_text;
+                    edited(text) => {
+                        items-search-text-changed(text)
+                    }
                 }
             }
 

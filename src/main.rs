@@ -4,6 +4,7 @@ mod diagnostics;
 mod dialogs;
 mod error;
 mod guiutils;
+mod history;
 mod info;
 mod models;
 mod prefs;
