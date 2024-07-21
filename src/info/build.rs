@@ -220,7 +220,10 @@ impl State {
 
 impl Debug for State {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-		write!(f, "[phase={:?} machine.len()={}]", self.phase, self.machines.len(),)
+		f.debug_struct("State")
+			.field("phase", &self.phase)
+			.field("machines.len()", &self.machines.len())
+			.finish()
 	}
 }
 

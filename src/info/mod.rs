@@ -29,7 +29,6 @@ use crate::Result;
 pub use self::binary::ChipType;
 pub use self::binary::SoftwareListStatus;
 pub use self::entities::ChipsView;
-pub use self::entities::Machine;
 pub use self::entities::MachinesView;
 pub use self::entities::SoftwareListsView;
 pub use self::smallstr::SmallStrRef;
@@ -427,6 +426,25 @@ mod test {
 		let expected = expected
 			.into_iter()
 			.map(|(chip_type, tag)| (*chip_type, tag.to_string()))
+			.collect::<Vec<_>>();
+		assert_eq!(expected, actual);
+	}
+
+	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", &[("coco_cart_list", "coco_cart"), ("coco_flop_list", "coco_flop"), ("dragon_cart_list", "dragon_cart")])]
+	pub fn software_lists(_index: usize, xml: &str, machine: &str, expected: &[(&str, &str)]) {
+		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
+		let actual = db
+			.machines()
+			.find(machine)
+			.unwrap()
+			.software_lists()
+			.iter()
+			.map(|software_list| (software_list.tag().to_string(), software_list.name().to_string()))
+			.collect::<Vec<_>>();
+
+		let expected = expected
+			.into_iter()
+			.map(|(tag, name)| (tag.to_string(), name.to_string()))
 			.collect::<Vec<_>>();
 		assert_eq!(expected, actual);
 	}

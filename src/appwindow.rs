@@ -129,7 +129,7 @@ impl AppModel {
 
 	pub fn advance(&self, delta: isize) {
 		let _ = self.modify_prefs(|prefs| {
-			history_advance(&mut prefs.history, &mut prefs.history_position, delta);
+			history_advance(&prefs.history, &mut prefs.history_position, delta);
 			update_ui_for_history(&self.app_window(), prefs);
 
 			let (collection, _) =
@@ -229,7 +229,10 @@ pub fn create() -> AppWindow {
 			collection_for_current_history_item(&prefs.collections, &prefs.history, prefs.history_position).unwrap();
 		collection
 	};
-	let items_model = ItemsTableModel::new(current_collection);
+	let items_model = ItemsTableModel::new(
+		current_collection,
+		model.preferences.borrow().paths.software_lists.clone(),
+	);
 	let items_model_clone = items_model.clone();
 	model.subscribe_to_info_db_changes(move |info_db, _| items_model_clone.info_db_changed(info_db));
 	let items_model_clone = items_model.clone();
@@ -347,15 +350,9 @@ fn setup_menu_handler(model: &Rc<AppModel>, callback: impl Fn(&Rc<AppModel>, App
 
 async fn try_load_persisted_info_db(model: Rc<AppModel>) {
 	// load MAME info from persisted data
-	let info_db_result = model
-		.preferences
-		.borrow()
-		.paths
-		.mame_executable
-		.as_deref()
-		.map(InfoDb::load);
+	if !model.preferences.borrow().paths.mame_executable.is_empty() {
+		let info_db_result = InfoDb::load(&model.preferences.borrow().paths.mame_executable);
 
-	if let Some(info_db_result) = info_db_result {
 		// so... we did indeed try to load the InfoDb... but did we succeed?
 		if let Ok(info_db) = info_db_result {
 			// we did!  set it up
@@ -371,18 +368,10 @@ async fn try_load_persisted_info_db(model: Rc<AppModel>) {
 /// loads MAME by launching `mame -listxml`
 async fn process_mame_listxml(model: Rc<AppModel>, new_mame_executable: Option<String>) {
 	// identify the MAME executable (which can be passed to us or in preferences)
-	let mame_executable = new_mame_executable.as_ref().map(Cow::Borrowed).unwrap_or_else(|| {
-		Cow::Owned(
-			model
-				.preferences
-				.borrow()
-				.paths
-				.mame_executable
-				.as_ref()
-				.unwrap()
-				.clone(),
-		)
-	});
+	let mame_executable = new_mame_executable
+		.as_ref()
+		.map(Cow::Borrowed)
+		.unwrap_or_else(|| Cow::Owned(model.preferences.borrow().paths.mame_executable.clone()));
 
 	// present the loading dialog
 	let Some(info_db) = dialog_load_mame_info(model.app_window().as_weak(), &mame_executable).await else {
@@ -391,7 +380,7 @@ async fn process_mame_listxml(model: Rc<AppModel>, new_mame_executable: Option<S
 
 	// we've succeeded; if appropriate, update the path
 	if let Some(new_mame_executable) = new_mame_executable.as_ref() {
-		let _ = model.modify_prefs(|prefs| prefs.paths.mame_executable = Some(new_mame_executable.clone()));
+		let _ = model.modify_prefs(|prefs| prefs.paths.mame_executable.clone_from(new_mame_executable));
 	}
 
 	// save the info DB
@@ -407,7 +396,7 @@ async fn process_mame_listxml(model: Rc<AppModel>, new_mame_executable: Option<S
 fn update(model: &AppModel) {
 	// calculate properties
 	let has_info_db = model.info_db.borrow().is_some();
-	let has_mame_executable = model.preferences.borrow().paths.mame_executable.is_some();
+	let has_mame_executable = !model.preferences.borrow().paths.mame_executable.is_empty();
 
 	// update the Slint model
 	model.app_window().set_has_info_db(has_info_db);

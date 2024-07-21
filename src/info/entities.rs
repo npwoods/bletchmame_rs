@@ -86,6 +86,16 @@ impl<'a> Chip<'a> {
 	}
 }
 
+impl<'a> SoftwareList<'a> {
+	pub fn tag(&self) -> SmallStrRef<'a> {
+		self.string(|x| x.tag_strindex)
+	}
+
+	pub fn name(&self) -> SmallStrRef<'a> {
+		self.string(|x| x.name_strindex)
+	}
+}
+
 #[cfg(test)]
 mod test {
 	use std::marker::PhantomData;

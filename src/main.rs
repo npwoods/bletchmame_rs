@@ -52,7 +52,7 @@ fn main() {
 
 	// are we doing diagnostics
 	if let Some(path) = opts.process_xml_path() {
-		info_db_from_xml_file(&path);
+		info_db_from_xml_file(path);
 		return;
 	}
 

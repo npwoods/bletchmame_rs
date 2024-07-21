@@ -1,8 +1,10 @@
 use std::any::Any;
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::cmp::Reverse;
 use std::rc::Rc;
 
+use derive_enum_all_values::AllValues;
 use itertools::Either;
 use itertools::Itertools;
 use levenshtein::levenshtein;
@@ -19,9 +21,12 @@ use crate::info::InfoDb;
 use crate::prefs::BuiltinCollection;
 use crate::prefs::PrefsCollection;
 use crate::prefs::PrefsItem;
+use crate::software::Software;
+use crate::software::SoftwareListDispenser;
 
 pub struct ItemsTableModel {
 	info_db: RefCell<Option<Rc<InfoDb>>>,
+	software_list_paths: Vec<String>,
 	items: RefCell<Rc<[Item]>>,
 	items_map: RefCell<Box<[u32]>>,
 	sorting_searching: RefCell<SortingSearching>,
@@ -30,7 +35,7 @@ pub struct ItemsTableModel {
 }
 
 impl ItemsTableModel {
-	pub fn new(current_collection: Rc<PrefsCollection>) -> Rc<Self> {
+	pub fn new(current_collection: Rc<PrefsCollection>, software_list_paths: Vec<String>) -> Rc<Self> {
 		let sorting_searching = SortingSearching {
 			column: Column::Name,
 			order: SortOrder::Ascending,
@@ -38,10 +43,12 @@ impl ItemsTableModel {
 		};
 		let result = Self {
 			info_db: RefCell::new(None),
+			software_list_paths,
 			items: RefCell::new([].into()),
 			items_map: RefCell::new([].into()),
 			sorting_searching: RefCell::new(sorting_searching),
 			current_collection: RefCell::new(current_collection),
+
 			notify: ModelNotify::default(),
 		};
 		Rc::new(result)
@@ -68,13 +75,24 @@ impl ItemsTableModel {
 					.map(|machine_index| Item::Machine { machine_index })
 					.collect::<Rc<[_]>>()
 			}
-			PrefsCollection::MachineSoftware { machine_name: _ } => todo!(),
+			PrefsCollection::MachineSoftware { machine_name } => {
+				let mut dispenser = SoftwareListDispenser::new(&self.software_list_paths);
+				info_db
+					.machines()
+					.find(machine_name)
+					.into_iter()
+					.flat_map(|x| x.software_lists().iter())
+					.filter_map(|x| dispenser.get(&x.name()))
+					.flat_map(|x| x.software.clone())
+					.map(|software| Item::Software { software })
+					.collect::<Rc<[_]>>()
+			}
 			PrefsCollection::Folder { name: _, items } => items
 				.iter()
 				.filter_map(|item| match item {
 					PrefsItem::Machine { machine_name } => info_db
 						.machines()
-						.find_index(&machine_name)
+						.find_index(machine_name)
 						.map(|machine_index| Item::Machine { machine_index }),
 				})
 				.collect::<Rc<[_]>>(),
@@ -87,6 +105,8 @@ impl ItemsTableModel {
 	pub fn context_commands(&self, index: usize) -> impl Iterator<Item = AppCommand> {
 		let items = self.items.borrow();
 		let info_db = self.info_db.borrow();
+		let index = *self.items_map.borrow().get(index).unwrap();
+		let index = usize::try_from(index).unwrap();
 		let item = items.get(index);
 
 		let commands = match item.as_ref() {
@@ -98,6 +118,7 @@ impl ItemsTableModel {
 					vec![AppCommand::Browse(collection)]
 				})
 			}
+			Some(Item::Software { .. }) => todo!(),
 			None => None,
 		};
 
@@ -121,7 +142,7 @@ impl ItemsTableModel {
 	fn sort(&self, index: i32, order: SortOrder) {
 		let Some(column) = usize::try_from(index)
 			.ok()
-			.and_then(|index| COLUMNS.get(index).cloned())
+			.and_then(|index| Column::all_values().get(index).cloned())
 		else {
 			return;
 		};
@@ -172,8 +193,7 @@ impl Model for ItemsTableModel {
 
 	fn row_data(&self, row: usize) -> Option<Self::Data> {
 		let info_db = self.info_db.borrow().as_ref().unwrap().clone();
-		let items_map = self.items_map.borrow();
-		let row = *items_map.get(row)?;
+		let row = *self.items_map.borrow().get(row)?;
 		let row = row.try_into().unwrap();
 		let items = self.items.borrow().clone();
 		let row_model = RowModel::new(info_db, items, row);
@@ -189,8 +209,9 @@ impl Model for ItemsTableModel {
 	}
 }
 
-pub enum Item {
+enum Item {
 	Machine { machine_index: usize },
+	Software { software: Rc<Software> },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -206,22 +227,14 @@ struct SortingSearching {
 	search: SharedString,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(AllValues, Clone, Copy, Debug, PartialEq, Eq)]
 enum Column {
 	Name,
 	SourceFile,
 	Description,
 	Year,
-	Manufacturer,
+	Provider,
 }
-
-const COLUMNS: [Column; 5] = [
-	Column::Name,
-	Column::SourceFile,
-	Column::Description,
-	Column::Year,
-	Column::Manufacturer,
-];
 
 struct RowModel {
 	info_db: Rc<InfoDb>,
@@ -239,11 +252,11 @@ impl Model for RowModel {
 	type Data = StandardListViewItem;
 
 	fn row_count(&self) -> usize {
-		COLUMNS.len()
+		Column::all_values().len()
 	}
 
 	fn row_data(&self, column: usize) -> Option<Self::Data> {
-		let column = *COLUMNS.get(column)?;
+		let column = *Column::all_values().get(column)?;
 		let item = self.items.get(self.row).unwrap();
 		let text = column_text(&self.info_db, item, column);
 		let text = String::from(text.as_ref());
@@ -292,9 +305,9 @@ fn builds_item_map_search(info_db: &InfoDb, items: &[Item], search_string: &str)
 		.iter()
 		.enumerate()
 		.filter_map(|(index, item)| {
-			let distance = COLUMNS
-				.into_iter()
-				.filter_map(|column| {
+			let distance = Column::all_values()
+				.iter()
+				.filter_map(|&column| {
 					let text = column_text(info_db, item, column);
 					contains_and_distance(text.as_ref(), search_string)
 				})
@@ -313,17 +326,28 @@ fn contains_and_distance(text: &str, target: &str) -> Option<usize> {
 		.then(|| levenshtein(text, target))
 }
 
-fn column_text<'a>(info_db: &'a InfoDb, item: &Item, column: Column) -> impl AsRef<str> + 'a {
+fn column_text<'a>(info_db: &'a InfoDb, item: &'a Item, column: Column) -> Cow<'a, str> {
 	match item {
 		Item::Machine { machine_index } => {
-			let machine = info_db.machines().get(*machine_index as usize).unwrap();
-			match column {
+			let machine = info_db.machines().get(*machine_index).unwrap();
+			let text = match column {
 				Column::Name => machine.name(),
 				Column::SourceFile => machine.source_file(),
 				Column::Description => machine.description(),
 				Column::Year => machine.year(),
-				Column::Manufacturer => machine.manufacturer(),
-			}
+				Column::Provider => machine.manufacturer(),
+			};
+			text.into()
+		}
+		Item::Software { software } => {
+			let text = match column {
+				Column::Name => &software.name,
+				Column::SourceFile => "",
+				Column::Description => &software.description,
+				Column::Year => &software.year,
+				Column::Provider => &software.publisher,
+			};
+			text.into()
 		}
 	}
 }

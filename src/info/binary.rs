@@ -54,9 +54,9 @@ pub struct SoftwareList {
 #[derive(Clone, Copy, Debug, Deserialize, BinarySerde, EnumString, PartialEq, Eq)]
 #[repr(u8)]
 pub enum SoftwareListStatus {
-	#[strum(serialize = "cpu")]
+	#[strum(serialize = "original")]
 	Original,
-	#[strum(serialize = "audio")]
+	#[strum(serialize = "compatible")]
 	Compatible,
 }
 

@@ -20,7 +20,7 @@ pub fn history_push(history: &mut Vec<HistoryEntry>, history_position: &mut usiz
 	}
 }
 
-pub fn history_advance(history: &mut Vec<HistoryEntry>, history_position: &mut usize, delta: isize) {
+pub fn history_advance(history: &[HistoryEntry], history_position: &mut usize, delta: isize) {
 	*history_position = min(
 		history_position.saturating_add_signed(delta),
 		history.len().saturating_sub(1),

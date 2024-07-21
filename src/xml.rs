@@ -119,8 +119,8 @@ where
 
 	pub fn start_unknown_tag(&mut self) {
 		assert_eq!(self.unknown_depth, 0);
-		self.known_depth = self.known_depth - 1;
-		self.unknown_depth = self.unknown_depth + 1;
+		self.known_depth -= 1;
+		self.unknown_depth += 1;
 	}
 
 	pub fn start_text_capture(&mut self) {

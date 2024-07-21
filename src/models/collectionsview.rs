@@ -30,7 +30,7 @@ impl CollectionsViewModel {
 	}
 
 	pub fn update(&self, items: &[Rc<PrefsCollection>]) {
-		self.items.replace(items.iter().cloned().collect());
+		self.items.replace(items.to_vec());
 		self.notify.reset();
 	}
 
