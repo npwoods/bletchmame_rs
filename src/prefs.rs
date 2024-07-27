@@ -8,7 +8,6 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use derive_enum_all_values::AllValues;
-use dirs::config_dir;
 use num::clamp;
 use serde::Deserialize;
 use serde::Serialize;
@@ -20,14 +19,21 @@ use crate::Result;
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Preferences {
+	#[serde(skip)]
+	pub prefs_path: Option<PathBuf>,
+
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub paths: PrefsPaths,
+
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub window_size: Option<PrefsSize>,
+
 	#[serde(default)]
 	pub collections: Vec<Rc<PrefsCollection>>,
+
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub history: Vec<HistoryEntry>,
+
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub history_position: usize,
 }
@@ -118,25 +124,31 @@ pub enum PrefsItem {
 const PREFS: Option<&str> = Some("BletchMAME.json");
 
 impl Preferences {
-	pub fn load() -> Result<Self> {
-		let path = prefs_filename(PREFS).map_err(prefs_load_error)?;
-		load_prefs(&path)
+	pub fn load(prefs_path: Option<impl AsRef<Path> + Copy>) -> Result<Self> {
+		let path = prefs_filename(prefs_path, PREFS).map_err(prefs_load_error)?;
+		let mut result = load_prefs(&path)?;
+		result.prefs_path = prefs_path.map(|x| x.as_ref().to_path_buf());
+		Ok(result)
 	}
 
 	pub fn save(&self) -> Result<()> {
-		let path = prefs_filename(PREFS).map_err(prefs_save_error)?;
+		let path = prefs_filename(self.prefs_path.as_ref(), PREFS).map_err(prefs_save_error)?;
 		save_prefs(self, &path)
 	}
 
-	pub fn fresh() -> Self {
+	pub fn fresh(prefs_path: Option<PathBuf>) -> Self {
 		let json = include_str!("prefs_fresh.json");
-		load_prefs_from_reader(json.as_bytes()).unwrap()
+		let mut result = load_prefs_from_reader(json.as_bytes()).unwrap();
+		result.prefs_path = prefs_path;
+		result
 	}
 }
 
-pub fn prefs_filename(filename: Option<&str>) -> Result<PathBuf> {
-	let mut pathbuf = config_dir().ok_or(Error::CantFindPreferencesDirectory)?;
-	pathbuf.push("BletchMAME");
+pub fn prefs_filename(prefs_path: Option<impl AsRef<Path>>, filename: Option<&str>) -> Result<PathBuf> {
+	let mut pathbuf = prefs_path
+		.ok_or(Error::CantFindPreferencesDirectory)?
+		.as_ref()
+		.to_path_buf();
 	if let Some(filename) = filename {
 		pathbuf.push(filename);
 	}
@@ -155,7 +167,7 @@ fn load_prefs_from_reader(reader: impl Read) -> Result<Preferences> {
 
 	// special treatments
 	if prefs.history.is_empty() {
-		prefs.history = Preferences::fresh().history;
+		prefs.history = Preferences::fresh(None).history;
 	}
 	prefs.history_position = clamp(prefs.history_position, 0, prefs.history.len() - 1);
 
@@ -194,7 +206,7 @@ mod test {
 
 	#[test]
 	pub fn test() {
-		let prefs = Preferences::fresh();
+		let prefs = Preferences::fresh(None);
 		let json = save_prefs_to_string(&prefs).expect("Failed to save fresh prefs");
 
 		let fresh_json = include_str!("prefs_fresh.json");

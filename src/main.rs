@@ -14,6 +14,7 @@ mod xml;
 
 use std::path::PathBuf;
 
+use dirs::config_local_dir;
 use slint::ComponentHandle;
 use structopt::StructOpt;
 
@@ -33,6 +34,9 @@ struct Opt {
 	#[cfg(feature = "diagnostics")]
 	#[structopt(long, parse(from_os_str))]
 	process_xml: Option<PathBuf>,
+
+	#[structopt(long, parse(from_os_str))]
+	prefs_path: Option<PathBuf>,
 }
 
 impl Opt {
@@ -56,6 +60,15 @@ fn main() {
 		return;
 	}
 
+	// identify the preferences directory
+	let prefs_path = opts.prefs_path.or_else(|| {
+		let mut path = config_local_dir();
+		if let Some(path) = &mut path {
+			path.push("BletchMAME");
+		}
+		path
+	});
+
 	// set up the tokio runtime
 	let tokio_runtime = tokio::runtime::Builder::new_current_thread().build().unwrap();
 	let _guard = tokio_runtime.enter();
@@ -64,7 +77,7 @@ fn main() {
 	init_gui_utils();
 
 	// create the application winodw...
-	let app_window = appwindow::create();
+	let app_window = appwindow::create(prefs_path);
 
 	// ...and run run run!
 	app_window.run().unwrap();

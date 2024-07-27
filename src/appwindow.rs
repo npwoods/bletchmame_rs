@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::cell::RefCell;
+use std::path::PathBuf;
 use std::rc::Rc;
 
 use muda::IsMenuItem;
@@ -140,7 +141,7 @@ impl AppModel {
 	}
 }
 
-pub fn create() -> AppWindow {
+pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 	let app_window = AppWindow::new().unwrap();
 
 	// Menu bar
@@ -192,7 +193,7 @@ pub fn create() -> AppWindow {
 	setup_window_menu_bar(app_window.window(), &menu_bar);
 
 	// get preferences
-	let preferences = Preferences::load().unwrap_or_else(|_| Preferences::fresh());
+	let preferences = Preferences::load(prefs_path.as_ref()).unwrap_or_else(|_| Preferences::fresh(prefs_path));
 
 	// update window preferences
 	if let Some(window_size) = &preferences.window_size {
@@ -351,7 +352,10 @@ fn setup_menu_handler(model: &Rc<AppModel>, callback: impl Fn(&Rc<AppModel>, App
 async fn try_load_persisted_info_db(model: Rc<AppModel>) {
 	// load MAME info from persisted data
 	if !model.preferences.borrow().paths.mame_executable.is_empty() {
-		let info_db_result = InfoDb::load(&model.preferences.borrow().paths.mame_executable);
+		let info_db_result = {
+			let prefs = model.preferences.borrow();
+			InfoDb::load(prefs.prefs_path.as_ref(), &prefs.paths.mame_executable)
+		};
 
 		// so... we did indeed try to load the InfoDb... but did we succeed?
 		if let Ok(info_db) = info_db_result {
@@ -384,7 +388,10 @@ async fn process_mame_listxml(model: Rc<AppModel>, new_mame_executable: Option<S
 	}
 
 	// save the info DB
-	let _ = info_db.save(&mame_executable);
+	let _ = {
+		let prefs = model.preferences.borrow();
+		info_db.save(prefs.prefs_path.as_ref(), &mame_executable)
+	};
 
 	// set the model to use the new Info DB
 	model.set_info_db(Some(info_db));
