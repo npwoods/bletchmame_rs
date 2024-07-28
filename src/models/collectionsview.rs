@@ -1,7 +1,11 @@
 use std::any::Any;
+use std::cell::Cell;
 use std::cell::RefCell;
+use std::future::Future;
+use std::pin::Pin;
 use std::rc::Rc;
 
+use slint::spawn_local;
 use slint::Global;
 use slint::Model;
 use slint::ModelNotify;
@@ -17,6 +21,7 @@ use crate::ui::MagicListViewItem;
 pub struct CollectionsViewModel {
 	app_window_weak: Weak<AppWindow>,
 	items: RefCell<Vec<Rc<PrefsCollection>>>,
+	after_refresh_callback: Cell<Option<Box<dyn Future<Output = ()> + 'static>>>,
 	notify: ModelNotify,
 }
 
@@ -25,6 +30,7 @@ impl CollectionsViewModel {
 		Self {
 			app_window_weak,
 			items: RefCell::new(Vec::new()),
+			after_refresh_callback: Cell::new(None),
 			notify: ModelNotify::default(),
 		}
 	}
@@ -43,12 +49,18 @@ impl CollectionsViewModel {
 		let items = self.items.borrow();
 		items.get(index).cloned()
 	}
+
+	pub fn callback_after_refresh(&self, callback: impl Future<Output = ()> + 'static) {
+		let callback = Box::new(callback) as Box<dyn Future<Output = ()> + 'static>;
+		self.after_refresh_callback.set(Some(callback.into()));
+	}
 }
 
 impl Model for CollectionsViewModel {
 	type Data = MagicListViewItem;
 
 	fn row_count(&self) -> usize {
+		invoke_after_refresh_callback(&self.after_refresh_callback);
 		self.items.borrow().len()
 	}
 
@@ -74,4 +86,11 @@ fn item_display(app_window_weak: &Weak<AppWindow>, collection: &PrefsCollection)
 		PrefsCollection::Folder { name, items: _ } => (icons.get_folder(), SharedString::from(name)),
 	};
 	MagicListViewItem { prefix_icon, text }
+}
+
+fn invoke_after_refresh_callback(after_refresh_callback: &Cell<Option<Box<dyn Future<Output = ()> + 'static>>>) {
+	if let Some(callback) = after_refresh_callback.take() {
+		let callback = Pin::from(callback);
+		spawn_local(callback).unwrap();
+	}
 }

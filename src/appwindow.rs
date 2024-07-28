@@ -123,7 +123,7 @@ impl AppModel {
 	pub fn browse(&self, collection: Rc<PrefsCollection>) {
 		let _ = self.modify_prefs(|prefs| {
 			history_push(&mut prefs.history, &mut prefs.history_position, &collection);
-			update_ui_for_history(&self.app_window(), prefs);
+			update_ui_for_history(&self, prefs);
 		});
 		self.with_items_table_model(|x| x.browse(collection));
 	}
@@ -131,7 +131,7 @@ impl AppModel {
 	pub fn advance(&self, delta: isize) {
 		let _ = self.modify_prefs(|prefs| {
 			history_advance(&prefs.history, &mut prefs.history_position, delta);
-			update_ui_for_history(&self.app_window(), prefs);
+			update_ui_for_history(&self, prefs);
 
 			let (collection, _) =
 				collection_for_current_history_item(&prefs.collections, &prefs.history, prefs.history_position)
@@ -417,14 +417,28 @@ fn update(model: &AppModel) {
 	}
 
 	// update history buttons
-	update_ui_for_history(&model.app_window(), &model.preferences.borrow());
+	update_ui_for_history(&model, &model.preferences.borrow());
 }
 
-fn update_ui_for_history(app_window: &AppWindow, prefs: &Preferences) {
+fn update_ui_for_history(model: &AppModel, prefs: &Preferences) {
+	let app_window = model.app_window();
 	app_window.set_history_length(prefs.history.len().try_into().unwrap());
 	app_window.set_history_position(prefs.history_position.try_into().unwrap());
 
-	let _ = collection_for_current_history_item(&prefs.collections, &prefs.history, prefs.history_position);
+	if let Some((_, collection_index)) =
+		collection_for_current_history_item(&prefs.collections, &prefs.history, prefs.history_position)
+	{
+		let collection_index = collection_index.and_then(|x| i32::try_from(x).ok()).unwrap_or(-1);
+
+		let app_window_weak = app_window.as_weak();
+		model.with_collections_view_model(|x| {
+			x.callback_after_refresh(async move {
+				app_window_weak
+					.unwrap()
+					.invoke_collections_view_select(collection_index);
+			})
+		});
+	}
 }
 
 fn update_prefs(model: &AppModel) -> Result<()> {
