@@ -52,7 +52,7 @@ impl CollectionsViewModel {
 
 	pub fn callback_after_refresh(&self, callback: impl Future<Output = ()> + 'static) {
 		let callback = Box::new(callback) as Box<dyn Future<Output = ()> + 'static>;
-		self.after_refresh_callback.set(Some(callback.into()));
+		self.after_refresh_callback.set(Some(callback));
 	}
 }
 

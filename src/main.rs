@@ -8,6 +8,7 @@ mod history;
 mod info;
 mod models;
 mod prefs;
+mod selection;
 mod software;
 mod threadlocalbubble;
 mod xml;

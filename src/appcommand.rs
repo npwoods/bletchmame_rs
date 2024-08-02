@@ -5,7 +5,9 @@ use serde::Serialize;
 
 use crate::error::BoxDynError;
 use crate::guiutils::menuing::accel;
+use crate::prefs::Column;
 use crate::prefs::PrefsCollection;
+use crate::prefs::SortOrder;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum AppCommand {
@@ -18,6 +20,9 @@ pub enum AppCommand {
 
 	// Other
 	Browse(PrefsCollection),
+	HistoryAdvance(isize),
+	SearchText(String),
+	ItemsSort(Column, SortOrder),
 }
 
 impl AppCommand {
@@ -27,6 +32,7 @@ impl AppCommand {
 			AppCommand::HelpRefreshInfoDb => ("Refresh MAME machine info...", false, None),
 			AppCommand::HelpWebSite => ("BlechMAME web site...", true, None),
 			AppCommand::Browse(_) => ("Browse", true, None),
+			_ => panic!("into_menu_item() not supported for {:?}", self),
 		};
 		let accelerator = accel_text.and_then(accel);
 		MenuItem::with_id(self, text, enabled, accelerator)

@@ -1,10 +1,10 @@
 use std::any::Any;
 use std::borrow::Cow;
+use std::cell::Cell;
 use std::cell::RefCell;
 use std::cmp::Reverse;
 use std::rc::Rc;
 
-use derive_enum_all_values::AllValues;
 use itertools::Either;
 use itertools::Itertools;
 use levenshtein::levenshtein;
@@ -19,8 +19,11 @@ use unicase::UniCase;
 use crate::appcommand::AppCommand;
 use crate::info::InfoDb;
 use crate::prefs::BuiltinCollection;
+use crate::prefs::Column;
 use crate::prefs::PrefsCollection;
 use crate::prefs::PrefsItem;
+use crate::prefs::SortOrder;
+use crate::selection::SelectionManager;
 use crate::software::Software;
 use crate::software::SoftwareListDispenser;
 
@@ -31,16 +34,22 @@ pub struct ItemsTableModel {
 	items_map: RefCell<Box<[u32]>>,
 	sorting_searching: RefCell<SortingSearching>,
 	current_collection: RefCell<Rc<PrefsCollection>>,
+	selected_index: Cell<Option<u32>>,
+
+	selection: SelectionManager,
 	notify: ModelNotify,
 }
 
 impl ItemsTableModel {
-	pub fn new(current_collection: Rc<PrefsCollection>, software_list_paths: Vec<String>) -> Rc<Self> {
-		let sorting_searching = SortingSearching {
-			column: Column::Name,
-			order: SortOrder::Ascending,
-			search: "".into(),
-		};
+	pub fn new(
+		current_collection: Rc<PrefsCollection>,
+		column: Column,
+		order: SortOrder,
+		search: String,
+		software_list_paths: Vec<String>,
+		selection: SelectionManager,
+	) -> Rc<Self> {
+		let sorting_searching = SortingSearching { column, order, search };
 		let result = Self {
 			info_db: RefCell::new(None),
 			software_list_paths,
@@ -48,7 +57,9 @@ impl ItemsTableModel {
 			items_map: RefCell::new([].into()),
 			sorting_searching: RefCell::new(sorting_searching),
 			current_collection: RefCell::new(current_collection),
+			selected_index: Cell::new(None),
 
+			selection,
 			notify: ModelNotify::default(),
 		};
 		Rc::new(result)
@@ -59,12 +70,14 @@ impl ItemsTableModel {
 		self.refresh();
 	}
 
-	pub fn browse(&self, collection: Rc<PrefsCollection>) {
+	pub fn set_current_collection(&self, collection: Rc<PrefsCollection>, search: String) {
 		self.current_collection.replace(collection);
+		self.sorting_searching.borrow_mut().search = search;
 		self.refresh();
 	}
 
 	fn refresh(&self) {
+		self.selected_index.set(None);
 		let info_db = self.info_db.borrow();
 		let collection = self.current_collection.borrow().clone();
 
@@ -125,13 +138,7 @@ impl ItemsTableModel {
 		commands.unwrap_or_default().into_iter()
 	}
 
-	pub fn sort_ascending(&self, index: i32) {
-		self.sort(index, SortOrder::Ascending);
-	}
-	pub fn sort_descending(&self, index: i32) {
-		self.sort(index, SortOrder::Descending);
-	}
-	pub fn search_text_changed(&self, search: SharedString) {
+	pub fn search_text_changed(&self, search: String) {
 		let new_sorting_searching = SortingSearching {
 			search,
 			..self.sorting_searching.borrow().clone()
@@ -139,13 +146,7 @@ impl ItemsTableModel {
 		self.change_sorting_searching(new_sorting_searching);
 	}
 
-	fn sort(&self, index: i32, order: SortOrder) {
-		let Some(column) = usize::try_from(index)
-			.ok()
-			.and_then(|index| Column::all_values().get(index).cloned())
-		else {
-			return;
-		};
+	pub fn set_sorting(&self, column: Column, order: SortOrder) {
 		let new_sorting_searching = SortingSearching {
 			column,
 			order,
@@ -169,6 +170,13 @@ impl ItemsTableModel {
 	}
 
 	fn update_items_map(&self) {
+		// get the selected index, because we're about to mess up all of the rows
+		let selected_index = self
+			.selection
+			.selected_index()
+			.and_then(|x| self.items_map.borrow().get(x).cloned())
+			.or_else(|| self.selected_index.get());
+
 		// borrow all the things
 		let info_db = self.info_db.borrow();
 		let info_db = info_db.as_ref().map(|x| x.as_ref());
@@ -181,6 +189,10 @@ impl ItemsTableModel {
 
 		// and notify
 		self.notify.reset();
+
+		// restore the selection
+		let index = selected_index.and_then(|index| self.items_map.borrow().iter().position(|&x| index == x));
+		self.selection.set_selected_index(index);
 	}
 }
 
@@ -188,6 +200,7 @@ impl Model for ItemsTableModel {
 	type Data = ModelRc<StandardListViewItem>;
 
 	fn row_count(&self) -> usize {
+		self.selection.model_accessed();
 		self.items_map.borrow().len()
 	}
 
@@ -214,26 +227,11 @@ enum Item {
 	Software { software: Rc<Software> },
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum SortOrder {
-	Ascending,
-	Descending,
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct SortingSearching {
 	column: Column,
 	order: SortOrder,
-	search: SharedString,
-}
-
-#[derive(AllValues, Clone, Copy, Debug, PartialEq, Eq)]
-enum Column {
-	Name,
-	SourceFile,
-	Description,
-	Year,
-	Provider,
+	search: String,
 }
 
 struct RowModel {

@@ -43,6 +43,9 @@ test-case = "3.3.1"
 slint-build = { version = "1.7.0" }
 vivi_ui = { version = "0.1" }
 
+[profile.dev]
+opt-level = 1
+
 [profile.release]
 lto = "fat"
 opt-level = "s"

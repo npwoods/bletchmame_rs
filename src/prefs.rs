@@ -16,7 +16,7 @@ use slint::LogicalSize;
 use crate::Error;
 use crate::Result;
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Preferences {
 	#[serde(skip)]
@@ -27,6 +27,12 @@ pub struct Preferences {
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub window_size: Option<PrefsSize>,
+
+	#[serde(default = "default_sort_order")]
+	pub items_sort_order: SortOrder,
+
+	#[serde(default = "default_column")]
+	pub items_sort_column: Column,
 
 	#[serde(default)]
 	pub collections: Vec<Rc<PrefsCollection>>,
@@ -72,6 +78,31 @@ impl From<PrefsSize> for LogicalSize {
 	}
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SortOrder {
+	Ascending,
+	Descending,
+}
+
+fn default_sort_order() -> SortOrder {
+	SortOrder::Ascending
+}
+
+#[derive(AllValues, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Column {
+	Name,
+	SourceFile,
+	Description,
+	Year,
+	Provider,
+}
+
+fn default_column() -> Column {
+	Column::Name
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", tag = "type")]
 pub enum PrefsCollection {
@@ -107,6 +138,9 @@ impl Display for BuiltinCollection {
 pub struct HistoryEntry {
 	#[serde(flatten)]
 	pub collection: Rc<PrefsCollection>,
+
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub search: String,
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub selection: Vec<PrefsItem>,
@@ -210,7 +244,7 @@ mod test {
 		let json = save_prefs_to_string(&prefs).expect("Failed to save fresh prefs");
 
 		let fresh_json = include_str!("prefs_fresh.json");
-		assert_eq!(fresh_json.replace("\r", ""), json.replace("\r", ""));
+		assert_eq!(fresh_json.replace('\r', ""), json.replace('\r', ""));
 
 		let new_prefs = load_prefs_from_reader(json.as_bytes()).expect("Failed to load saved fresh prefs");
 		assert_eq!(prefs, new_prefs);

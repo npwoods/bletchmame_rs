@@ -13,12 +13,12 @@ export component AppWindow inherits Window {
     callback find_mame_clicked();
     in property <bool> is_running;
     in property <bool> has_info_db;
-    in property <int> history-length;
-    in property <int> history-position;
-    in-out property <length> collections-list-view-preferred-height <=> collections-list-view.preferred-height;
-    in-out property <string> items_search_text;
+    in property <bool> history-can-go-back;
+    in property <bool> history-can-go-forward;
+    in-out property <int> items-view-selected-index <=> items-table-view.current-row;
+    in-out property <string> items-search-text;
     callback collections-view-selected(int);
-    callback items-search_text-changed(string);
+    callback items-search-text-changed(string);
     callback items-sort-ascending(int);
     callback items-sort-descending(int);
     callback items-row-pointer-event(int, PointerEvent, Point);
@@ -27,6 +27,9 @@ export component AppWindow inherits Window {
     in property <[[StandardListViewItem]]> items-model;
     public function collections-view-select(index: int) {
         collections-list-view.current_index = index;
+    }
+    public function items-view-select(index: int) {
+        items-table-view.set-current-row(index);
     }
     VerticalBox {
         alignment: center;
@@ -62,9 +65,9 @@ export component AppWindow inherits Window {
             HorizontalBox {
                 FilledButton {
                     icon: Icons.arrow_back;
-                    enabled: history-position + 1 < history-length;
+                    enabled: history-can-go-back;
                     clicked => {
-                        history-advance-clicked(+1)
+                        history-advance-clicked(-1)
                     }
                 }
 
@@ -75,21 +78,21 @@ export component AppWindow inherits Window {
 
                 FilledButton {
                     icon: Icons.arrow_forward;
-                    enabled: history-position > 0;
+                    enabled: history-can-go-forward;
                     clicked => {
-                        history-advance-clicked(-1)
+                        history-advance-clicked(+1)
                     }
                 }
 
                 LineEdit {
-                    text: items_search_text;
+                    text: items-search-text;
                     edited(text) => {
                         items-search-text-changed(text)
                     }
                 }
             }
 
-            StandardTableView {
+            items-table-view := StandardTableView {
                 columns: [
                     { title: @tr("Name") },
                     { title: @tr("Source File") },

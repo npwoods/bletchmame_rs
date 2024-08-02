@@ -1,4 +1,6 @@
 {
+  "itemsSortOrder": "ascending",
+  "itemsSortColumn": "name",
   "collections": [
     {
       "type": "builtin",

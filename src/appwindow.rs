@@ -20,6 +20,7 @@ use slint::LogicalPosition;
 use slint::LogicalSize;
 use slint::Model;
 use slint::ModelRc;
+use slint::SharedString;
 use slint::Weak;
 
 use crate::appcommand::AppCommand;
@@ -28,17 +29,16 @@ use crate::guiutils::menuing::accel;
 use crate::guiutils::menuing::iterate_menu_items;
 use crate::guiutils::menuing::setup_window_menu_bar;
 use crate::guiutils::menuing::show_popup_menu;
-use crate::history::collection_for_current_history_item;
-use crate::history::history_advance;
-use crate::history::history_push;
+use crate::history::History;
 use crate::info::InfoDb;
 use crate::models::collectionsview::CollectionsViewModel;
 use crate::models::itemstable::ItemsTableModel;
+use crate::prefs::Column;
 use crate::prefs::Preferences;
-use crate::prefs::PrefsCollection;
+use crate::prefs::SortOrder;
+use crate::selection::SelectionManager;
 use crate::threadlocalbubble::ThreadLocalBubble;
 use crate::ui::AppWindow;
-use crate::Result;
 
 type InfoDbSubscriberCallback = Box<dyn Fn(Option<Rc<InfoDb>>, &Preferences)>;
 
@@ -74,20 +74,14 @@ impl AppModel {
 		func(items_model)
 	}
 
-	pub fn modify_prefs(&self, func: impl FnOnce(&mut Preferences)) -> Result<()> {
+	pub fn modify_prefs(&self, func: impl FnOnce(&mut Preferences)) {
 		// modify actual preferences
 		let mut prefs = self.preferences.borrow_mut();
 		func(&mut prefs);
 		drop(prefs);
 
-		// update "in" properties
-		self.app_window()
-			.set_history_length(self.preferences.borrow().history.len().try_into().unwrap());
-		self.app_window()
-			.set_history_position(self.preferences.borrow().history_position.try_into().unwrap());
-
-		// and save
-		self.preferences.borrow().save()
+		// and save (ignore errors)
+		let _ = self.preferences.borrow().save();
 	}
 
 	pub fn subscribe_to_info_db_changes(&self, func: impl Fn(Option<Rc<InfoDb>>, &Preferences) + 'static) {
@@ -118,26 +112,6 @@ impl AppModel {
 		let window = window.window();
 		let popup_menu = current_popup_menu.as_ref().unwrap();
 		show_popup_menu(window, popup_menu, point);
-	}
-
-	pub fn browse(&self, collection: Rc<PrefsCollection>) {
-		let _ = self.modify_prefs(|prefs| {
-			history_push(&mut prefs.history, &mut prefs.history_position, &collection);
-			update_ui_for_history(&self, prefs);
-		});
-		self.with_items_table_model(|x| x.browse(collection));
-	}
-
-	pub fn advance(&self, delta: isize) {
-		let _ = self.modify_prefs(|prefs| {
-			history_advance(&prefs.history, &mut prefs.history_position, delta);
-			update_ui_for_history(&self, prefs);
-
-			let (collection, _) =
-				collection_for_current_history_item(&prefs.collections, &prefs.history, prefs.history_position)
-					.unwrap();
-			self.with_items_table_model(|x: &ItemsTableModel| x.browse(collection));
-		});
 	}
 }
 
@@ -226,14 +200,25 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 	// set up items view model
 	let current_collection = {
 		let prefs = model.preferences.borrow();
-		let (collection, _) =
-			collection_for_current_history_item(&prefs.collections, &prefs.history, prefs.history_position).unwrap();
+		let (collection, _) = prefs.current_collection();
 		collection
 	};
-	let items_model = ItemsTableModel::new(
-		current_collection,
-		model.preferences.borrow().paths.software_lists.clone(),
+	let selection = SelectionManager::new(
+		&app_window,
+		AppWindow::get_items_view_selected_index,
+		AppWindow::invoke_items_view_select,
 	);
+	let items_model = {
+		let prefs = model.preferences.borrow();
+		ItemsTableModel::new(
+			current_collection,
+			prefs.items_sort_column,
+			prefs.items_sort_order,
+			prefs.current_history_entry().search.clone(),
+			prefs.paths.software_lists.clone(),
+			selection,
+		)
+	};
 	let items_model_clone = items_model.clone();
 	model.subscribe_to_info_db_changes(move |info_db, _| items_model_clone.info_db_changed(info_db));
 	let items_model_clone = items_model.clone();
@@ -251,55 +236,54 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 	app_window.on_collections_view_selected(move |index| {
 		let index = index.try_into().unwrap();
 		if let Some(collection) = collections_view_model_clone.get(index) {
-			model_clone.browse(collection);
+			let collection = Rc::unwrap_or_clone(collection);
+			let command = AppCommand::Browse(collection);
+			handle_command(&model_clone, command);
 		}
 	});
 
 	// set up back/foward buttons
 	let model_clone = model.clone();
-	app_window.on_history_advance_clicked(move |delta| model_clone.advance(delta.try_into().unwrap()));
+	app_window.on_history_advance_clicked(move |delta| {
+		let delta = delta.try_into().unwrap();
+		handle_command(&model_clone, AppCommand::HistoryAdvance(delta));
+	});
 
 	// set up items filter
 	let model_clone = model.clone();
 	app_window.on_items_sort_ascending(move |index| {
-		model_clone.with_items_table_model(move |x| x.sort_ascending(index));
+		items_set_sorting(&model_clone, index, SortOrder::Ascending);
 	});
 	let model_clone = model.clone();
 	app_window.on_items_sort_descending(move |index| {
-		model_clone.with_items_table_model(move |x| x.sort_descending(index));
+		items_set_sorting(&model_clone, index, SortOrder::Descending);
 	});
 	let model_clone = model.clone();
-	app_window.on_items_search_text_changed(move |text| {
-		model_clone.with_items_table_model(move |x| x.search_text_changed(text));
+	app_window.on_items_search_text_changed(move |search| {
+		let command = AppCommand::SearchText(search.into());
+		handle_command(&model_clone, command);
 	});
+	app_window.set_items_search_text(SharedString::from(
+		&model.preferences.borrow().current_history_entry().search,
+	));
 
 	// set up menu handler
-	//let collections_tree_model_clone = collections_tree_model.clone();
-	setup_menu_handler(&model, move |model, menu_id| {
-		match menu_id {
-			AppCommand::FileExit => {
-				let _ = update_prefs(&model.clone());
-				quit_event_loop().unwrap()
-			}
-			AppCommand::HelpRefreshInfoDb => {
-				let model = model.clone();
-				spawn_local(process_mame_listxml(model, None)).unwrap();
-			}
-			AppCommand::HelpWebSite => {
-				let _ = open::that("https://www.bletchmame.org");
-			}
-			AppCommand::Browse(collection) => {
-				let model = model.clone();
-				let collection = Rc::new(collection);
-				model.browse(collection);
-			}
-		};
-	});
+	let packet = ThreadLocalBubble::new(model.clone());
+	MenuEvent::set_event_handler(Some(move |menu_event: MenuEvent| {
+		if let Ok(command) = AppCommand::try_from(&menu_event.id) {
+			let packet = packet.clone();
+			invoke_from_event_loop(move || {
+				let model = packet.unwrap();
+				handle_command(&model, command);
+			})
+			.unwrap();
+		}
+	}));
 
 	// for when we shut down
 	let model_clone = model.clone();
 	app_window.window().on_close_requested(move || {
-		let _ = update_prefs(&model_clone);
+		update_prefs(&model_clone);
 		CloseRequestResponse::HideWindow
 	});
 
@@ -333,20 +317,40 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 	app_window
 }
 
-fn setup_menu_handler(model: &Rc<AppModel>, callback: impl Fn(&Rc<AppModel>, AppCommand) + 'static + Clone) {
-	let packet = (model.clone(), callback);
-	let packet = ThreadLocalBubble::new(packet);
-
-	MenuEvent::set_event_handler(Some(move |menu_event: MenuEvent| {
-		if let Ok(menu_id) = AppCommand::try_from(&menu_event.id) {
-			let packet = packet.clone();
-			invoke_from_event_loop(move || {
-				let (model, callback) = packet.unwrap();
-				callback(&model, menu_id);
-			})
-			.unwrap();
+fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
+	match command {
+		AppCommand::FileExit => {
+			update_prefs(&model.clone());
+			quit_event_loop().unwrap()
 		}
-	}));
+		AppCommand::HelpRefreshInfoDb => {
+			let model = model.clone();
+			spawn_local(process_mame_listxml(model, None)).unwrap();
+		}
+		AppCommand::HelpWebSite => {
+			let _ = open::that("https://www.bletchmame.org");
+		}
+		AppCommand::Browse(collection) => {
+			let collection = Rc::new(collection);
+			model.modify_prefs(|prefs| prefs.history_push(collection));
+			update_ui_for_current_history_item(model);
+		}
+		AppCommand::HistoryAdvance(delta) => {
+			model.modify_prefs(|prefs| prefs.history_advance(delta));
+			update_ui_for_current_history_item(model);
+		}
+		AppCommand::SearchText(search) => {
+			model.modify_prefs(|prefs| prefs.current_history_entry_mut().search.clone_from(&search));
+			model.with_items_table_model(move |x| x.search_text_changed(search));
+		}
+		AppCommand::ItemsSort(column, order) => {
+			model.modify_prefs(|prefs| {
+				prefs.items_sort_column = column;
+				prefs.items_sort_order = order;
+			});
+			model.with_items_table_model(move |x| x.set_sorting(column, order));
+		}
+	};
 }
 
 async fn try_load_persisted_info_db(model: Rc<AppModel>) {
@@ -384,7 +388,7 @@ async fn process_mame_listxml(model: Rc<AppModel>, new_mame_executable: Option<S
 
 	// we've succeeded; if appropriate, update the path
 	if let Some(new_mame_executable) = new_mame_executable.as_ref() {
-		let _ = model.modify_prefs(|prefs| prefs.paths.mame_executable.clone_from(new_mame_executable));
+		model.modify_prefs(|prefs| prefs.paths.mame_executable.clone_from(new_mame_executable));
 	}
 
 	// save the info DB
@@ -410,38 +414,49 @@ fn update(model: &AppModel) {
 
 	// update the menu bar
 	for menu_item in iterate_menu_items(&model.menu_bar) {
-		match AppCommand::try_from(menu_item.id()) {
-			Ok(AppCommand::HelpRefreshInfoDb) => menu_item.set_enabled(has_mame_executable),
-			_ => {}
+		if let Ok(AppCommand::HelpRefreshInfoDb) = AppCommand::try_from(menu_item.id()) {
+			menu_item.set_enabled(has_mame_executable)
 		}
 	}
 
 	// update history buttons
-	update_ui_for_history(&model, &model.preferences.borrow());
+	update_ui_for_current_history_item(model);
 }
 
-fn update_ui_for_history(model: &AppModel, prefs: &Preferences) {
+/// updates all UI elements to reflect the current history item
+fn update_ui_for_current_history_item(model: &AppModel) {
 	let app_window = model.app_window();
-	app_window.set_history_length(prefs.history.len().try_into().unwrap());
-	app_window.set_history_position(prefs.history_position.try_into().unwrap());
+	let prefs = model.preferences.borrow();
+	let search = prefs.current_history_entry().search.clone();
 
-	if let Some((_, collection_index)) =
-		collection_for_current_history_item(&prefs.collections, &prefs.history, prefs.history_position)
-	{
-		let collection_index = collection_index.and_then(|x| i32::try_from(x).ok()).unwrap_or(-1);
+	// update back/forward buttons
+	app_window.set_history_can_go_back(prefs.can_history_advance(-1));
+	app_window.set_history_can_go_forward(prefs.can_history_advance(1));
 
-		let app_window_weak = app_window.as_weak();
-		model.with_collections_view_model(|x| {
-			x.callback_after_refresh(async move {
-				app_window_weak
-					.unwrap()
-					.invoke_collections_view_select(collection_index);
-			})
-		});
-	}
+	// update search text bar
+	app_window.set_items_search_text(SharedString::from(&search));
+
+	// identify the currently selected collection
+	let (collection, collection_index) = prefs.current_collection();
+	let collection_index = collection_index.and_then(|x| i32::try_from(x).ok()).unwrap_or(-1);
+
+	// update the collections view
+	let app_window_weak = app_window.as_weak();
+	model.with_collections_view_model(|x| {
+		x.callback_after_refresh(async move {
+			app_window_weak
+				.unwrap()
+				.invoke_collections_view_select(collection_index);
+		})
+	});
+
+	// update the items view
+	model.with_items_table_model(|items_model| {
+		items_model.set_current_collection(collection, search);
+	});
 }
 
-fn update_prefs(model: &AppModel) -> Result<()> {
+fn update_prefs(model: &AppModel) {
 	model.modify_prefs(|prefs| {
 		// update window size
 		let physical_size = model.app_window().window().size();
@@ -450,7 +465,7 @@ fn update_prefs(model: &AppModel) -> Result<()> {
 
 		// update collections related prefs
 		prefs.collections = model.with_collections_view_model(|x| x.get_all());
-	})
+	});
 }
 
 fn on_find_mame_clicked(model: Rc<AppModel>) {
@@ -460,4 +475,11 @@ fn on_find_mame_clicked(model: Rc<AppModel>) {
 		let mame_executable = mame_executable.as_path().to_string_lossy().into_owned();
 		spawn_local(process_mame_listxml(model, Some(mame_executable))).unwrap();
 	}
+}
+
+fn items_set_sorting(model: &Rc<AppModel>, column: i32, order: SortOrder) {
+	let column = usize::try_from(column).unwrap();
+	let column = Column::all_values()[column];
+	let command = AppCommand::ItemsSort(column, order);
+	handle_command(model, command);
 }
