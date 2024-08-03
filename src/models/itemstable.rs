@@ -19,8 +19,9 @@ use unicase::UniCase;
 use crate::appcommand::AppCommand;
 use crate::info::InfoDb;
 use crate::prefs::BuiltinCollection;
-use crate::prefs::Column;
+use crate::prefs::ColumnType;
 use crate::prefs::PrefsCollection;
+use crate::prefs::PrefsColumn;
 use crate::prefs::PrefsItem;
 use crate::prefs::SortOrder;
 use crate::selection::SelectionManager;
@@ -30,8 +31,10 @@ use crate::software::SoftwareListDispenser;
 pub struct ItemsTableModel {
 	info_db: RefCell<Option<Rc<InfoDb>>>,
 	software_list_paths: Vec<String>,
+	columns: RefCell<Rc<[ColumnType]>>,
 	items: RefCell<Rc<[Item]>>,
 	items_map: RefCell<Box<[u32]>>,
+
 	sorting_searching: RefCell<SortingSearching>,
 	current_collection: RefCell<Rc<PrefsCollection>>,
 	selected_index: Cell<Option<u32>>,
@@ -43,16 +46,21 @@ pub struct ItemsTableModel {
 impl ItemsTableModel {
 	pub fn new(
 		current_collection: Rc<PrefsCollection>,
-		column: Column,
-		order: SortOrder,
+		columns: &[PrefsColumn],
 		search: String,
 		software_list_paths: Vec<String>,
 		selection: SelectionManager,
 	) -> Rc<Self> {
-		let sorting_searching = SortingSearching { column, order, search };
+		let (column_types, sort_column, sort_order) = columns_info(columns);
+		let sorting_searching = SortingSearching {
+			column: sort_column,
+			order: sort_order,
+			search,
+		};
 		let result = Self {
 			info_db: RefCell::new(None),
 			software_list_paths,
+			columns: RefCell::new(column_types),
 			items: RefCell::new([].into()),
 			items_map: RefCell::new([].into()),
 			sorting_searching: RefCell::new(sorting_searching),
@@ -146,7 +154,9 @@ impl ItemsTableModel {
 		self.change_sorting_searching(new_sorting_searching);
 	}
 
-	pub fn set_sorting(&self, column: Column, order: SortOrder) {
+	pub fn set_columns(&self, columns: &[PrefsColumn]) {
+		let (column_types, column, order) = columns_info(columns);
+		self.columns.replace(column_types);
 		let new_sorting_searching = SortingSearching {
 			column,
 			order,
@@ -184,7 +194,7 @@ impl ItemsTableModel {
 		let sorting_searching = self.sorting_searching.borrow();
 
 		// build the new items map
-		let new_items_map = build_items_map(info_db, &items, &sorting_searching);
+		let new_items_map = build_items_map(info_db, &self.columns.borrow(), &items, &sorting_searching);
 		self.items_map.replace(new_items_map);
 
 		// and notify
@@ -208,8 +218,9 @@ impl Model for ItemsTableModel {
 		let info_db = self.info_db.borrow().as_ref().unwrap().clone();
 		let row = *self.items_map.borrow().get(row)?;
 		let row = row.try_into().unwrap();
+		let columns = self.columns.borrow().clone();
 		let items = self.items.borrow().clone();
-		let row_model = RowModel::new(info_db, items, row);
+		let row_model = RowModel::new(info_db, columns, items, row);
 		Some(ModelRc::from(row_model))
 	}
 
@@ -229,20 +240,26 @@ enum Item {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct SortingSearching {
-	column: Column,
+	column: ColumnType,
 	order: SortOrder,
 	search: String,
 }
 
 struct RowModel {
 	info_db: Rc<InfoDb>,
+	columns: Rc<[ColumnType]>,
 	items: Rc<[Item]>,
 	row: usize,
 }
 
 impl RowModel {
-	pub fn new(info_db: Rc<InfoDb>, items: Rc<[Item]>, row: usize) -> Rc<Self> {
-		Rc::new(Self { info_db, items, row })
+	pub fn new(info_db: Rc<InfoDb>, columns: Rc<[ColumnType]>, items: Rc<[Item]>, row: usize) -> Rc<Self> {
+		Rc::new(Self {
+			info_db,
+			columns,
+			items,
+			row,
+		})
 	}
 }
 
@@ -250,11 +267,11 @@ impl Model for RowModel {
 	type Data = StandardListViewItem;
 
 	fn row_count(&self) -> usize {
-		Column::all_values().len()
+		self.columns.len()
 	}
 
 	fn row_data(&self, column: usize) -> Option<Self::Data> {
-		let column = *Column::all_values().get(column)?;
+		let column = *self.columns.get(column)?;
 		let item = self.items.get(self.row).unwrap();
 		let text = column_text(&self.info_db, item, column);
 		let text = String::from(text.as_ref());
@@ -266,7 +283,12 @@ impl Model for RowModel {
 	}
 }
 
-fn build_items_map(info_db: Option<&InfoDb>, items: &[Item], sorting_searching: &SortingSearching) -> Box<[u32]> {
+fn build_items_map(
+	info_db: Option<&InfoDb>,
+	column_types: &[ColumnType],
+	items: &[Item],
+	sorting_searching: &SortingSearching,
+) -> Box<[u32]> {
 	// if we have no InfoDB, we have no rows
 	let Some(info_db) = info_db else {
 		return [].into();
@@ -278,11 +300,11 @@ fn build_items_map(info_db: Option<&InfoDb>, items: &[Item], sorting_searching: 
 		builds_item_map_sorted(info_db, items, sorting_searching.column, sorting_searching.order)
 	} else {
 		// sort by search string
-		builds_item_map_search(info_db, items, search_string)
+		builds_item_map_search(info_db, column_types, items, search_string)
 	}
 }
 
-fn builds_item_map_sorted(info_db: &InfoDb, items: &[Item], column: Column, order: SortOrder) -> Box<[u32]> {
+fn builds_item_map_sorted(info_db: &InfoDb, items: &[Item], column: ColumnType, order: SortOrder) -> Box<[u32]> {
 	// prepare a sorting function as a lambda
 	let func = |item| UniCase::new(column_text(info_db, item, column));
 
@@ -298,12 +320,17 @@ fn builds_item_map_sorted(info_db: &InfoDb, items: &[Item], column: Column, orde
 		.collect()
 }
 
-fn builds_item_map_search(info_db: &InfoDb, items: &[Item], search_string: &str) -> Box<[u32]> {
+fn builds_item_map_search(
+	info_db: &InfoDb,
+	column_types: &[ColumnType],
+	items: &[Item],
+	search_string: &str,
+) -> Box<[u32]> {
 	items
 		.iter()
 		.enumerate()
 		.filter_map(|(index, item)| {
-			let distance = Column::all_values()
+			let distance = column_types
 				.iter()
 				.filter_map(|&column| {
 					let text = column_text(info_db, item, column);
@@ -324,28 +351,36 @@ fn contains_and_distance(text: &str, target: &str) -> Option<usize> {
 		.then(|| levenshtein(text, target))
 }
 
-fn column_text<'a>(info_db: &'a InfoDb, item: &'a Item, column: Column) -> Cow<'a, str> {
+fn column_text<'a>(info_db: &'a InfoDb, item: &'a Item, column: ColumnType) -> Cow<'a, str> {
 	match item {
 		Item::Machine { machine_index } => {
 			let machine = info_db.machines().get(*machine_index).unwrap();
 			let text = match column {
-				Column::Name => machine.name(),
-				Column::SourceFile => machine.source_file(),
-				Column::Description => machine.description(),
-				Column::Year => machine.year(),
-				Column::Provider => machine.manufacturer(),
+				ColumnType::Name => machine.name(),
+				ColumnType::SourceFile => machine.source_file(),
+				ColumnType::Description => machine.description(),
+				ColumnType::Year => machine.year(),
+				ColumnType::Provider => machine.manufacturer(),
 			};
 			text.into()
 		}
 		Item::Software { software } => {
 			let text = match column {
-				Column::Name => &software.name,
-				Column::SourceFile => "",
-				Column::Description => &software.description,
-				Column::Year => &software.year,
-				Column::Provider => &software.publisher,
+				ColumnType::Name => &software.name,
+				ColumnType::SourceFile => "",
+				ColumnType::Description => &software.description,
+				ColumnType::Year => &software.year,
+				ColumnType::Provider => &software.publisher,
 			};
 			text.into()
 		}
 	}
+}
+
+fn columns_info(columns: &[PrefsColumn]) -> (Rc<[ColumnType]>, ColumnType, SortOrder) {
+	assert!(!columns.is_empty(), "columns is expected to not be empty");
+	let column_types = columns.iter().map(|x| x.column_type).collect();
+	let sort_column = columns.iter().find(|x| x.sort.is_some()).unwrap_or(&columns[0]);
+	let sort_order = sort_column.sort.unwrap_or(SortOrder::Ascending);
+	(column_types, sort_column.column_type, sort_order)
 }

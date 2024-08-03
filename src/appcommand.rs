@@ -5,7 +5,6 @@ use serde::Serialize;
 
 use crate::error::BoxDynError;
 use crate::guiutils::menuing::accel;
-use crate::prefs::Column;
 use crate::prefs::PrefsCollection;
 use crate::prefs::SortOrder;
 
@@ -22,7 +21,7 @@ pub enum AppCommand {
 	Browse(PrefsCollection),
 	HistoryAdvance(isize),
 	SearchText(String),
-	ItemsSort(Column, SortOrder),
+	ItemsSort(usize, SortOrder),
 }
 
 impl AppCommand {

@@ -33,7 +33,6 @@ use crate::history::History;
 use crate::info::InfoDb;
 use crate::models::collectionsview::CollectionsViewModel;
 use crate::models::itemstable::ItemsTableModel;
-use crate::prefs::Column;
 use crate::prefs::Preferences;
 use crate::prefs::SortOrder;
 use crate::selection::SelectionManager;
@@ -212,8 +211,7 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 		let prefs = model.preferences.borrow();
 		ItemsTableModel::new(
 			current_collection,
-			prefs.items_sort_column,
-			prefs.items_sort_order,
+			&prefs.items_columns,
 			prefs.current_history_entry().search.clone(),
 			prefs.paths.software_lists.clone(),
 			selection,
@@ -248,6 +246,24 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 		let delta = delta.try_into().unwrap();
 		handle_command(&model_clone, AppCommand::HistoryAdvance(delta));
 	});
+
+	// set up items columns
+	{
+		let prefs = model.preferences.borrow();
+		let items_columns = app_window.get_items_columns();
+		for (index, column) in prefs.items_columns.iter().enumerate() {
+			if let Some(mut data) = items_columns.row_data(index) {
+				data.title = format!("{}", column.column_type).into();
+				data.sort_order = match column.sort {
+					None => i_slint_core::items::SortOrder::Unsorted,
+					Some(SortOrder::Ascending) => i_slint_core::items::SortOrder::Ascending,
+					Some(SortOrder::Descending) => i_slint_core::items::SortOrder::Descending,
+				};
+				data.width = column.width;
+				items_columns.set_row_data(index, data);
+			}
+		}
+	}
 
 	// set up items filter
 	let model_clone = model.clone();
@@ -343,12 +359,15 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			model.modify_prefs(|prefs| prefs.current_history_entry_mut().search.clone_from(&search));
 			model.with_items_table_model(move |x| x.search_text_changed(search));
 		}
-		AppCommand::ItemsSort(column, order) => {
+		AppCommand::ItemsSort(column_index, order) => {
 			model.modify_prefs(|prefs| {
-				prefs.items_sort_column = column;
-				prefs.items_sort_order = order;
+				for (index, column) in prefs.items_columns.iter_mut().enumerate() {
+					column.sort = (index == column_index).then_some(order);
+				}
 			});
-			model.with_items_table_model(move |x| x.set_sorting(column, order));
+
+			let prefs = model.preferences.borrow();
+			model.with_items_table_model(move |x| x.set_columns(&prefs.items_columns));
 		}
 	};
 }
@@ -463,6 +482,13 @@ fn update_prefs(model: &AppModel) {
 		let logical_size = physical_size.to_logical(model.app_window().window().scale_factor());
 		prefs.window_size = Some(logical_size.into());
 
+		let items_columns = model.app_window().get_items_columns();
+		for (index, column) in prefs.items_columns.iter_mut().enumerate() {
+			if let Some(data) = items_columns.row_data(index) {
+				column.width = data.width;
+			}
+		}
+
 		// update collections related prefs
 		prefs.collections = model.with_collections_view_model(|x| x.get_all());
 	});
@@ -479,7 +505,6 @@ fn on_find_mame_clicked(model: Rc<AppModel>) {
 
 fn items_set_sorting(model: &Rc<AppModel>, column: i32, order: SortOrder) {
 	let column = usize::try_from(column).unwrap();
-	let column = Column::all_values()[column];
 	let command = AppCommand::ItemsSort(column, order);
 	handle_command(model, command);
 }

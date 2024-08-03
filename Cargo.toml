@@ -7,8 +7,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-slint = { version = "1.7.0", features = ["raw-window-handle-06"] }
-i-slint-backend-winit = { version = "1.7.0" }
+slint = { version = "1.7.1", features = ["raw-window-handle-06"] }
+i-slint-core = { version = "1.7.1" }
+i-slint-backend-winit = { version = "1.7.1" }
 muda = "=0.13.5"
 raw-window-handle = "0.6.2"
 rfd = "0.14.1"
@@ -40,7 +41,7 @@ assert_matches = "1.5.0"
 test-case = "3.3.1"
 
 [build-dependencies]
-slint-build = { version = "1.7.0" }
+slint-build = { version = "1.7.1" }
 vivi_ui = { version = "0.1" }
 
 [profile.dev]

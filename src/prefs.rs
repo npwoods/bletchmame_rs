@@ -28,11 +28,8 @@ pub struct Preferences {
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub window_size: Option<PrefsSize>,
 
-	#[serde(default = "default_sort_order")]
-	pub items_sort_order: SortOrder,
-
-	#[serde(default = "default_column")]
-	pub items_sort_column: Column,
+	#[serde(default)]
+	pub items_columns: Vec<PrefsColumn>,
 
 	#[serde(default)]
 	pub collections: Vec<Rc<PrefsCollection>>,
@@ -78,6 +75,18 @@ impl From<PrefsSize> for LogicalSize {
 	}
 }
 
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PrefsColumn {
+	#[serde(rename = "type")]
+	pub column_type: ColumnType,
+
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub sort: Option<SortOrder>,
+
+	pub width: f32,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum SortOrder {
@@ -85,22 +94,19 @@ pub enum SortOrder {
 	Descending,
 }
 
-fn default_sort_order() -> SortOrder {
-	SortOrder::Ascending
-}
-
-#[derive(AllValues, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(AllValues, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, strum_macros::Display)]
 #[serde(rename_all = "camelCase")]
-pub enum Column {
+pub enum ColumnType {
+	#[strum(to_string = "Name")]
 	Name,
+	#[strum(to_string = "Source File")]
 	SourceFile,
+	#[strum(to_string = "Description")]
 	Description,
+	#[strum(to_string = "Year")]
 	Year,
+	#[strum(to_string = "Provider")]
 	Provider,
-}
-
-fn default_column() -> Column {
-	Column::Name
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -200,13 +206,27 @@ fn load_prefs_from_reader(reader: impl Read) -> Result<Preferences> {
 	let mut prefs: Preferences = serde_json::from_reader(reader).map_err(prefs_load_error)?;
 
 	// special treatments
-	if prefs.history.is_empty() {
-		prefs.history = Preferences::fresh(None).history;
-	}
-	prefs.history_position = clamp(prefs.history_position, 0, prefs.history.len() - 1);
+	prefs_treatments(&mut prefs);
 
 	// and return!
 	Ok(prefs)
+}
+
+/// special treatments to enforce variants
+fn prefs_treatments(prefs: &mut Preferences) {
+	// ensure that history is not empty
+	if prefs.history.is_empty() {
+		prefs.history = Preferences::fresh(None).history;
+	}
+
+	// enforce that history_position points to a valid entry
+	prefs.history_position = clamp(prefs.history_position, 0, prefs.history.len() - 1);
+
+	// enforce that we have at least one column
+	if prefs.items_columns.is_empty() {
+		prefs.items_columns = Preferences::fresh(None).items_columns;
+		assert!(!prefs.items_columns.is_empty());
+	}
 }
 
 fn save_prefs(prefs: &Preferences, path: &Path) -> Result<()> {

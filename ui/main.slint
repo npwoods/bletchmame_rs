@@ -17,6 +17,7 @@ export component AppWindow inherits Window {
     in property <bool> history-can-go-forward;
     in-out property <int> items-view-selected-index <=> items-table-view.current-row;
     in-out property <string> items-search-text;
+    in-out property <[TableColumn]> items-columns <=> items-table-view.columns;
     callback collections-view-selected(int);
     callback items-search-text-changed(string);
     callback items-sort-ascending(int);
@@ -93,13 +94,7 @@ export component AppWindow inherits Window {
             }
 
             items-table-view := StandardTableView {
-                columns: [
-                    { title: @tr("Name") },
-                    { title: @tr("Source File") },
-                    { title: @tr("Description") },
-                    { title: @tr("Year") },
-                    { title: @tr("Provider") }
-                ];
+                columns: [{ }, { }, { }, { }, { }];
                 rows: items_model;
                 preferred-width: 100%;
                 preferred-height: 100%;

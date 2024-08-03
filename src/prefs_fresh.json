@@ -1,6 +1,27 @@
 {
-  "itemsSortOrder": "ascending",
-  "itemsSortColumn": "name",
+  "itemsColumns": [
+    {
+      "type": "name",
+      "sort": "ascending",
+      "width": 100.0
+    },
+    {
+      "type": "sourceFile",
+      "width": 155.0
+    },
+    {
+      "type": "description",
+      "width": 400.0
+    },
+    {
+      "type": "year",
+      "width": 80.0
+    },
+    {
+      "type": "provider",
+      "width": 180.0
+    }
+  ],
   "collections": [
     {
       "type": "builtin",
