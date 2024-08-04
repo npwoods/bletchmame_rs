@@ -209,13 +209,7 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 	);
 	let items_model = {
 		let prefs = model.preferences.borrow();
-		ItemsTableModel::new(
-			current_collection,
-			&prefs.items_columns,
-			prefs.current_history_entry().search.clone(),
-			prefs.paths.software_lists.clone(),
-			selection,
-		)
+		ItemsTableModel::new(current_collection, prefs.paths.software_lists.clone(), selection)
 	};
 	let items_model_clone = items_model.clone();
 	model.subscribe_to_info_db_changes(move |info_db, _| items_model_clone.info_db_changed(info_db));
@@ -254,11 +248,6 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 		for (index, column) in prefs.items_columns.iter().enumerate() {
 			if let Some(mut data) = items_columns.row_data(index) {
 				data.title = format!("{}", column.column_type).into();
-				data.sort_order = match column.sort {
-					None => i_slint_core::items::SortOrder::Unsorted,
-					Some(SortOrder::Ascending) => i_slint_core::items::SortOrder::Ascending,
-					Some(SortOrder::Descending) => i_slint_core::items::SortOrder::Descending,
-				};
 				data.width = column.width;
 				items_columns.set_row_data(index, data);
 			}
@@ -282,6 +271,11 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 	app_window.set_items_search_text(SharedString::from(
 		&model.preferences.borrow().current_history_entry().search,
 	));
+	let model_clone = model.clone();
+	app_window.on_items_current_row_changed(move || {
+		let command = AppCommand::ItemsSelectedChanged;
+		handle_command(&model_clone, command);
+	});
 
 	// set up menu handler
 	let packet = ThreadLocalBubble::new(model.clone());
@@ -348,7 +342,9 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 		}
 		AppCommand::Browse(collection) => {
 			let collection = Rc::new(collection);
-			model.modify_prefs(|prefs| prefs.history_push(collection));
+			model.modify_prefs(|prefs| {
+				prefs.history_push(collection);
+			});
 			update_ui_for_current_history_item(model);
 		}
 		AppCommand::HistoryAdvance(delta) => {
@@ -356,18 +352,29 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			update_ui_for_current_history_item(model);
 		}
 		AppCommand::SearchText(search) => {
-			model.modify_prefs(|prefs| prefs.current_history_entry_mut().search.clone_from(&search));
-			model.with_items_table_model(move |x| x.search_text_changed(search));
+			model.modify_prefs(|prefs| {
+				// modify the search text
+				let current_entry = prefs.current_history_entry_mut();
+				current_entry.sort_suppressed = !search.is_empty();
+				current_entry.search = search;
+			});
+			update_ui_for_sort_changes(model);
+			update_items_model_for_columns_and_search(model);
 		}
 		AppCommand::ItemsSort(column_index, order) => {
 			model.modify_prefs(|prefs| {
 				for (index, column) in prefs.items_columns.iter_mut().enumerate() {
 					column.sort = (index == column_index).then_some(order);
 				}
+				prefs.current_history_entry_mut().sort_suppressed = false;
 			});
-
-			let prefs = model.preferences.borrow();
-			model.with_items_table_model(move |x| x.set_columns(&prefs.items_columns));
+			update_items_model_for_columns_and_search(model);
+		}
+		AppCommand::ItemsSelectedChanged => {
+			let selection = model.with_items_table_model(|x| x.current_selection());
+			model.modify_prefs(|prefs| {
+				prefs.current_history_entry_mut().selection = selection;
+			});
 		}
 	};
 }
@@ -440,6 +447,7 @@ fn update(model: &AppModel) {
 
 	// update history buttons
 	update_ui_for_current_history_item(model);
+	update_items_model_for_columns_and_search(model);
 }
 
 /// updates all UI elements to reflect the current history item
@@ -471,7 +479,37 @@ fn update_ui_for_current_history_item(model: &AppModel) {
 
 	// update the items view
 	model.with_items_table_model(|items_model| {
-		items_model.set_current_collection(collection, search);
+		items_model.set_current_collection(collection, search, &prefs.current_history_entry().selection);
+	});
+
+	drop(prefs);
+	update_ui_for_sort_changes(model);
+}
+
+fn update_ui_for_sort_changes(model: &AppModel) {
+	let app_window = model.app_window();
+	let prefs = model.preferences.borrow();
+
+	let items_columns = app_window.get_items_columns();
+	let sort_suppressed = prefs.current_history_entry().sort_suppressed;
+	for (index, column) in prefs.items_columns.iter().enumerate() {
+		if let Some(mut data) = items_columns.row_data(index) {
+			let sort_order = (!sort_suppressed).then_some(column.sort).flatten();
+			data.sort_order = match sort_order {
+				None => i_slint_core::items::SortOrder::Unsorted,
+				Some(SortOrder::Ascending) => i_slint_core::items::SortOrder::Ascending,
+				Some(SortOrder::Descending) => i_slint_core::items::SortOrder::Descending,
+			};
+			items_columns.set_row_data(index, data);
+		}
+	}
+}
+
+fn update_items_model_for_columns_and_search(model: &AppModel) {
+	model.with_items_table_model(move |x| {
+		let prefs = model.preferences.borrow();
+		let entry = prefs.current_history_entry();
+		x.set_columns_and_search(&prefs.items_columns, &entry.search, entry.sort_suppressed);
 	});
 }
 

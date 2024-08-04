@@ -149,6 +149,9 @@ pub struct HistoryEntry {
 	pub search: String,
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub sort_suppressed: bool,
+
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub selection: Vec<PrefsItem>,
 }
 
@@ -158,6 +161,10 @@ pub enum PrefsItem {
 	Machine {
 		#[serde(rename = "machine")]
 		machine_name: String,
+	},
+	Software {
+		software_list: String,
+		software: String,
 	},
 }
 

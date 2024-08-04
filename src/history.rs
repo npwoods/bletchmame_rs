@@ -31,6 +31,7 @@ where
 		let history_entry: HistoryEntry = HistoryEntry {
 			collection: sanitize_collection(collection),
 			search: "".into(),
+			sort_suppressed: false,
 			selection: Vec::default(),
 		};
 

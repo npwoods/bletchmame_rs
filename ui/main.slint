@@ -22,6 +22,7 @@ export component AppWindow inherits Window {
     callback items-search-text-changed(string);
     callback items-sort-ascending(int);
     callback items-sort-descending(int);
+    callback items-current-row-changed();
     callback items-row-pointer-event(int, PointerEvent, Point);
     callback history-advance-clicked(int);
     in property <[MagicListViewItem]> collections-model;
@@ -103,6 +104,9 @@ export component AppWindow inherits Window {
                 }
                 sort-descending(index) => {
                     items-sort-descending(index)
+                }
+                current-row-changed(index) => {
+                    items-current-row-changed()
                 }
                 row-pointer-event(row, event, point) => {
                     items-row-pointer-event(row, event, point)

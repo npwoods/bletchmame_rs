@@ -22,6 +22,7 @@ pub enum AppCommand {
 	HistoryAdvance(isize),
 	SearchText(String),
 	ItemsSort(usize, SortOrder),
+	ItemsSelectedChanged,
 }
 
 impl AppCommand {
