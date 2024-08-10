@@ -5063,9 +5063,9 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 
 [[package]]
 name = "vivi_ui"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7c66b9d1eacb3b7bd8f98163ca9ec84f02d7ec1bb374a46dcf9a8fbbdd01c94"
+checksum = "54e0c6ba7a274ff1848b6d05da2053143a3808a78fdcd372ad6bb1ce165bdfb1"
 
 [[package]]
 name = "vtable"

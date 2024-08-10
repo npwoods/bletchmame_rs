@@ -1,11 +1,11 @@
 use muda::MenuId;
-use muda::MenuItem;
 use serde::Deserialize;
 use serde::Serialize;
 
 use crate::error::BoxDynError;
-use crate::guiutils::menuing::accel;
+use crate::prefs::BuiltinCollection;
 use crate::prefs::PrefsCollection;
+use crate::prefs::PrefsItem;
 use crate::prefs::SortOrder;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -13,9 +13,13 @@ pub enum AppCommand {
 	// File menu
 	FileExit,
 
+	// Settings menu
+	SettingsToggleBuiltinCollection(BuiltinCollection),
+
 	// Help menu
 	HelpRefreshInfoDb,
 	HelpWebSite,
+	HelpAbout,
 
 	// Other
 	Browse(PrefsCollection),
@@ -23,20 +27,9 @@ pub enum AppCommand {
 	SearchText(String),
 	ItemsSort(usize, SortOrder),
 	ItemsSelectedChanged,
-}
-
-impl AppCommand {
-	pub fn into_menu_item(self) -> MenuItem {
-		let (text, enabled, accel_text) = match &self {
-			AppCommand::FileExit => ("Exit", true, Some("Ctrl+Alt+X")),
-			AppCommand::HelpRefreshInfoDb => ("Refresh MAME machine info...", false, None),
-			AppCommand::HelpWebSite => ("BlechMAME web site...", true, None),
-			AppCommand::Browse(_) => ("Browse", true, None),
-			_ => panic!("into_menu_item() not supported for {:?}", self),
-		};
-		let accelerator = accel_text.and_then(accel);
-		MenuItem::with_id(self, text, enabled, accelerator)
-	}
+	AddToExistingFolder(usize, Vec<PrefsItem>),
+	AddToNewFolder(String, Vec<PrefsItem>),
+	AddToNewFolderDialog(Vec<PrefsItem>),
 }
 
 const MENU_PREFIX: &str = "MENU_";

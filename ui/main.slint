@@ -1,8 +1,10 @@
-import { HorizontalBox, VerticalBox, Button, StandardListView, StandardTableView, LineEdit, ListView } from "std-widgets.slint";
+import { HorizontalBox, VerticalBox, Button, StandardListView, StandardTableView, LineEdit, ListView, ScrollView } from "std-widgets.slint";
 import { MagicListView, MagicListViewItem, Icons, FilledButton } from "@vivi/magic.slint";
+import { AboutDialog } from "about.slint";
 import { LoadingDialog } from "loading.slint";
+import { NewCollectionDialog } from "newcollection.slint";
 
-export { LoadingDialog, Icons }
+export { AboutDialog, LoadingDialog, NewCollectionDialog, Icons }
 
 export component AppWindow inherits Window {
     min-width: 100px;
@@ -66,7 +68,7 @@ export component AppWindow inherits Window {
         VerticalBox {
             HorizontalBox {
                 FilledButton {
-                    icon: Icons.arrow_back;
+                    prefix_icon: Icons.arrow_back;
                     enabled: history-can-go-back;
                     clicked => {
                         history-advance-clicked(-1)
@@ -74,12 +76,12 @@ export component AppWindow inherits Window {
                 }
 
                 FilledButton {
-                    icon: Icons.book;
+                    prefix_icon: Icons.book;
                     enabled: false;
                 }
 
                 FilledButton {
-                    icon: Icons.arrow_forward;
+                    prefix_icon: Icons.arrow_forward;
                     enabled: history-can-go-forward;
                     clicked => {
                         history-advance-clicked(+1)
@@ -95,7 +97,6 @@ export component AppWindow inherits Window {
             }
 
             items-table-view := StandardTableView {
-                columns: [{ }, { }, { }, { }, { }];
                 rows: items_model;
                 preferred-width: 100%;
                 preferred-height: 100%;

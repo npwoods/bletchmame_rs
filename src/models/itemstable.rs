@@ -8,6 +8,7 @@ use std::rc::Rc;
 use itertools::Either;
 use itertools::Itertools;
 use levenshtein::levenshtein;
+use muda::Menu;
 use slint::Model;
 use slint::ModelNotify;
 use slint::ModelRc;
@@ -17,6 +18,7 @@ use slint::StandardListViewItem;
 use unicase::UniCase;
 
 use crate::appcommand::AppCommand;
+use crate::guiutils::menuing::MenuDesc;
 use crate::info::InfoDb;
 use crate::prefs::BuiltinCollection;
 use crate::prefs::ColumnType;
@@ -72,21 +74,21 @@ impl ItemsTableModel {
 
 	pub fn info_db_changed(&self, info_db: Option<Rc<InfoDb>>) {
 		self.info_db.replace(info_db);
-		self.refresh();
+		self.refresh(&[]);
 	}
 
 	pub fn set_current_collection(&self, collection: Rc<PrefsCollection>, search: String, selection: &[PrefsItem]) {
 		self.current_collection.replace(collection);
 		self.search.replace(search);
-		self.refresh();
-
-		self.set_current_selection(selection);
+		self.refresh(selection);
 	}
 
-	fn refresh(&self) {
+	fn refresh(&self, selection: &[PrefsItem]) {
 		self.selected_index.set(None);
 		let info_db = self.info_db.borrow();
 		let collection = self.current_collection.borrow().clone();
+
+		let mut dispenser = SoftwareListDispenser::new(&self.software_list_paths);
 
 		let items = info_db.as_ref().map(|info_db| match collection.as_ref() {
 			PrefsCollection::Builtin(BuiltinCollection::All) => {
@@ -95,26 +97,39 @@ impl ItemsTableModel {
 					.map(|machine_index| Item::Machine { machine_index })
 					.collect::<Rc<[_]>>()
 			}
-			PrefsCollection::MachineSoftware { machine_name } => {
-				let mut dispenser = SoftwareListDispenser::new(&self.software_list_paths);
-				info_db
-					.machines()
-					.find(machine_name)
-					.into_iter()
-					.flat_map(|x| x.software_lists().iter())
-					.filter_map(|x| dispenser.get(&x.name()))
-					.flat_map(|list| {
-						list.software
-							.iter()
-							.map(|s| (list.clone(), s.clone()))
-							.collect::<Vec<_>>()
-					})
-					.map(|(software_list, software)| Item::Software {
-						software_list,
-						software,
-					})
-					.collect::<Rc<[_]>>()
-			}
+			PrefsCollection::Builtin(BuiltinCollection::AllSoftware) => info_db
+				.software_lists()
+				.iter()
+				.filter_map(|x| dispenser.get(&x.name()))
+				.flat_map(|list| {
+					list.software
+						.iter()
+						.map(|s| (list.clone(), s.clone()))
+						.collect::<Vec<_>>()
+				})
+				.map(|(software_list, software)| Item::Software {
+					software_list,
+					software,
+				})
+				.collect::<Rc<[_]>>(),
+
+			PrefsCollection::MachineSoftware { machine_name } => info_db
+				.machines()
+				.find(machine_name)
+				.into_iter()
+				.flat_map(|x| x.software_lists().iter())
+				.filter_map(|x| dispenser.get(&x.name()))
+				.flat_map(|list| {
+					list.software
+						.iter()
+						.map(|s| (list.clone(), s.clone()))
+						.collect::<Vec<_>>()
+				})
+				.map(|(software_list, software)| Item::Software {
+					software_list,
+					software,
+				})
+				.collect::<Rc<[_]>>(),
 			PrefsCollection::Folder { name: _, items } => items
 				.iter()
 				.filter_map(|item| match item {
@@ -129,29 +144,76 @@ impl ItemsTableModel {
 		let items = items.unwrap_or_else(|| Rc::new([]));
 		self.items.replace(items);
 		self.update_items_map();
+
+		self.set_current_selection(selection);
 	}
 
-	pub fn context_commands(&self, index: usize) -> impl Iterator<Item = AppCommand> {
-		let items = self.items.borrow();
+	pub fn context_commands(&self, index: usize, folder_info: &[(usize, Rc<PrefsCollection>)]) -> Option<Menu> {
+		// access the InfoDB
 		let info_db = self.info_db.borrow();
+		let info_db = info_db.as_ref()?;
+
+		// access the selection
+		let items = self.items.borrow();
 		let index = *self.items_map.borrow().get(index).unwrap();
 		let index = usize::try_from(index).unwrap();
-		let item = items.get(index);
+		let item = items.get(index)?;
+		let items = vec![make_prefs_item(info_db, item)];
 
-		let commands = match item.as_ref() {
-			Some(Item::Machine { machine_index }) => {
-				info_db.as_ref().unwrap().machines().get(*machine_index).map(|machine| {
-					let collection = PrefsCollection::MachineSoftware {
-						machine_name: machine.name().into(),
-					};
-					vec![AppCommand::Browse(collection)]
-				})
+		// get the critical information - the description and where (if anyplace) "Browse" would go to
+		let (description, browse_target) = match item {
+			Item::Machine { machine_index } => {
+				let machine = info_db.machines().get(*machine_index).unwrap();
+				let description = Cow::from(machine.description());
+				let browse_target = (!machine.software_lists().is_empty()).then(|| PrefsCollection::MachineSoftware {
+					machine_name: machine.name().to_string(),
+				});
+				(description, browse_target)
 			}
-			Some(Item::Software { .. }) => todo!(),
-			None => None,
+			Item::Software { software, .. } => {
+				let description = Cow::from(&*software.description);
+				(description, None)
+			}
 		};
 
-		commands.unwrap_or_default().into_iter()
+		// basics of
+		let mut menu_items = Vec::new();
+		let text = format!("Run \"{}\"", description);
+		menu_items.push(MenuDesc::Item(text, None));
+		menu_items.push(MenuDesc::Separator);
+
+		if let Some(browse_target) = browse_target {
+			let id = AppCommand::Browse(browse_target).into();
+			menu_items.push(MenuDesc::Item("Browse Software".to_string(), Some(id)));
+		}
+
+		let mut folder_menu_items = folder_info
+			.iter()
+			.map(|(index, col)| {
+				let PrefsCollection::Folder {
+					name,
+					items: folder_items,
+				} = &**col
+				else {
+					panic!("Expected PrefsCollection::Folder");
+				};
+
+				let folder_contains_all_items = items.iter().all(|x| folder_items.contains(x));
+				let command =
+					(!folder_contains_all_items).then(|| AppCommand::AddToExistingFolder(*index, items.clone()).into());
+
+				MenuDesc::Item(name.clone(), command)
+			})
+			.collect::<Vec<_>>();
+		if !folder_menu_items.is_empty() {
+			folder_menu_items.push(MenuDesc::Separator);
+		}
+		folder_menu_items.push(MenuDesc::Item(
+			"New Folder...".into(),
+			Some(AppCommand::AddToNewFolderDialog(items).into()),
+		));
+		menu_items.push(MenuDesc::SubMenu("Add To Folder".into(), true, folder_menu_items));
+		Some(MenuDesc::make_popup_menu(menu_items))
 	}
 
 	pub fn set_columns_and_search(&self, columns: &[PrefsColumn], search: &str, sort_suppressed: bool) {
@@ -187,14 +249,18 @@ impl ItemsTableModel {
 
 		// if anything changed, update our map
 		if search_changed || sorting_changed {
+			// get the selected index, because we're about to mess up all of the rows
+			let selected_index = self.current_selected_index();
+
 			self.update_items_map();
+
+			// restore the selection
+			let index = selected_index.and_then(|index| self.items_map.borrow().iter().position(|&x| index == x));
+			self.selection.set_selected_index(index);
 		}
 	}
 
 	fn update_items_map(&self) {
-		// get the selected index, because we're about to mess up all of the rows
-		let selected_index = self.current_selected_index();
-
 		// borrow all the things
 		let info_db = self.info_db.borrow();
 		let info_db = info_db.as_ref().map(|x| x.as_ref());
@@ -212,10 +278,6 @@ impl ItemsTableModel {
 
 		// and notify
 		self.notify.reset();
-
-		// restore the selection
-		let index = selected_index.and_then(|index| self.items_map.borrow().iter().position(|&x| index == x));
-		self.selection.set_selected_index(index);
 	}
 
 	pub fn current_selection(&self) -> Vec<PrefsItem> {
@@ -228,24 +290,7 @@ impl ItemsTableModel {
 		let result = self.current_selected_index().map(|index| {
 			let items = self.items.borrow();
 			let index = usize::try_from(index).unwrap();
-
-			match &items[index] {
-				Item::Machine { machine_index } => {
-					let machine_name = info_db.machines().get(*machine_index).unwrap().name().to_string();
-					PrefsItem::Machine { machine_name }
-				}
-				Item::Software {
-					software_list,
-					software,
-				} => {
-					let software_list = software_list.name.to_string();
-					let software = software.name.to_string();
-					PrefsItem::Software {
-						software_list,
-						software,
-					}
-				}
-			}
+			make_prefs_item(info_db, &items[index])
 		});
 
 		result.into_iter().collect()
@@ -313,6 +358,7 @@ impl Model for ItemsTableModel {
 	}
 }
 
+#[derive(Clone)]
 enum Item {
 	Machine {
 		machine_index: usize,
@@ -321,6 +367,26 @@ enum Item {
 		software_list: Rc<SoftwareList>,
 		software: Rc<Software>,
 	},
+}
+
+fn make_prefs_item(info_db: &InfoDb, item: &Item) -> PrefsItem {
+	match item {
+		Item::Machine { machine_index } => {
+			let machine_name = info_db.machines().get(*machine_index).unwrap().name().to_string();
+			PrefsItem::Machine { machine_name }
+		}
+		Item::Software {
+			software_list,
+			software,
+		} => {
+			let software_list = software_list.name.to_string();
+			let software = software.name.to_string();
+			PrefsItem::Software {
+				software_list,
+				software,
+			}
+		}
+	}
 }
 
 struct RowModel {
@@ -448,7 +514,7 @@ fn column_text<'a>(info_db: &'a InfoDb, item: &'a Item, column: ColumnType) -> C
 fn is_item_match(info_db: &InfoDb, prefs_item: &PrefsItem, item: &Item) -> bool {
 	match (prefs_item, item) {
 		(PrefsItem::Machine { machine_name }, Item::Machine { machine_index }) => {
-			machine_name == &info_db.machines().get(*machine_index).unwrap().name().to_string()
+			**machine_name == *info_db.machines().get(*machine_index).unwrap().name()
 		}
 		(
 			PrefsItem::Software {

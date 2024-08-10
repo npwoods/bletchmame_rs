@@ -1,0 +1,37 @@
+import { AboutSlint, Button, VerticalBox, HorizontalBox, LineEdit } from "std-widgets.slint";
+
+export component NewCollectionDialog inherits Window {
+    title: "Create New Collection";
+    width: 400px;
+    height: 100px;
+    callback ok-clicked();
+    callback cancel-clicked();
+    in-out property <string> text;
+    VerticalBox {
+        LineEdit {
+            text <=> root.text;
+            height: 30px;
+        }
+
+        HorizontalBox {
+            alignment: end;
+            Button {
+                text: "Cancel";
+                clicked => {
+                    root.cancel-clicked();
+                }
+                width: 80px;
+                height: 30px;
+            }
+
+            Button {
+                text: "Ok";
+                clicked => {
+                    root.ok-clicked();
+                }
+                width: 80px;
+                height: 30px;
+            }
+        }
+    }
+}

@@ -4,9 +4,13 @@ use muda::accelerator::Accelerator;
 use muda::accelerator::Code;
 use muda::accelerator::Modifiers;
 use muda::ContextMenu;
+use muda::IsMenuItem;
 use muda::Menu;
+use muda::MenuId;
 use muda::MenuItem;
 use muda::MenuItemKind;
+use muda::PredefinedMenuItem;
+use muda::Submenu;
 use raw_window_handle::HasWindowHandle;
 use raw_window_handle::RawWindowHandle;
 use slint::LogicalPosition;
@@ -64,6 +68,43 @@ fn iterate_menu_items_internal(items: Vec<MenuItemKind>) -> impl Iterator<Item =
 		),
 		_ => Either::Right(Vec::new().into_iter()),
 	})
+}
+
+pub enum MenuDesc {
+	Item(String, Option<MenuId>),
+	SubMenu(String, bool, Vec<MenuDesc>),
+	Separator,
+}
+
+impl MenuDesc {
+	pub fn into_boxed_menu_item(self) -> Box<dyn IsMenuItem + 'static> {
+		match self {
+			MenuDesc::Item(text, id) => {
+				let menu_item = if let Some(id) = id {
+					MenuItem::with_id(id, text, true, None)
+				} else {
+					MenuItem::new(text, false, None)
+				};
+				Box::new(menu_item)
+			}
+			MenuDesc::SubMenu(text, enabled, items) => {
+				let items = items.into_iter().map(|x| x.into_boxed_menu_item()).collect::<Vec<_>>();
+				let items = items.iter().map(|x| &**x as &dyn IsMenuItem).collect::<Vec<_>>();
+				let submenu = Submenu::with_items(&text, enabled, &items).unwrap();
+				Box::new(submenu)
+			}
+			MenuDesc::Separator => {
+				let menu_item = PredefinedMenuItem::separator();
+				Box::new(menu_item)
+			}
+		}
+	}
+
+	pub fn make_popup_menu(items: Vec<Self>) -> Menu {
+		let items = items.into_iter().map(|x| x.into_boxed_menu_item()).collect::<Vec<_>>();
+		let items = items.iter().map(|x| &**x as &dyn IsMenuItem).collect::<Vec<_>>();
+		Menu::with_items(&items).unwrap()
+	}
 }
 
 pub fn show_popup_menu(window: &Window, popup_menu: &Menu, _point: LogicalPosition) {

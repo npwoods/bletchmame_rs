@@ -52,7 +52,7 @@ impl<'a> Machine<'a> {
 
 impl<'a> MachinesView<'a> {
 	pub fn find_index(&self, target: &str) -> Option<usize> {
-		if self.len() == 0 {
+		if self.is_empty() {
 			return None;
 		}
 

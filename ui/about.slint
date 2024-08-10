@@ -1,0 +1,16 @@
+import { AboutSlint, Button, VerticalBox, HorizontalBox } from "std-widgets.slint";
+
+export component AboutDialog inherits Window {
+    title: "About BletchMAME";
+    VerticalBox {
+        Text {
+            text: "BletchMAME";
+            font-size: 24px;
+            horizontal-alignment: center;
+        }
+
+        AboutSlint {
+            height: 100px;
+        }
+    }
+}

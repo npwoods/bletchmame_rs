@@ -85,7 +85,11 @@ fn item_display(app_window_weak: &Weak<AppWindow>, collection: &PrefsCollection)
 		PrefsCollection::MachineSoftware { machine_name: _ } => todo!(),
 		PrefsCollection::Folder { name, items: _ } => (icons.get_folder(), SharedString::from(name)),
 	};
-	MagicListViewItem { prefix_icon, text }
+	MagicListViewItem {
+		prefix_icon,
+		text,
+		supporting_text: Default::default(),
+	}
 }
 
 fn invoke_after_refresh_callback(after_refresh_callback: &Cell<Option<Box<dyn Future<Output = ()> + 'static>>>) {

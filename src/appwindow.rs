@@ -21,22 +21,33 @@ use slint::LogicalSize;
 use slint::Model;
 use slint::ModelRc;
 use slint::SharedString;
+use slint::TableColumn;
+use slint::VecModel;
 use slint::Weak;
 
 use crate::appcommand::AppCommand;
+use crate::collections::add_items_to_existing_folder_collection;
+use crate::collections::add_items_to_new_folder_collection;
+use crate::collections::get_folder_collection_names;
+use crate::collections::get_folder_collections;
+use crate::collections::toggle_builtin_collection;
 use crate::dialogs::loading::dialog_load_mame_info;
+use crate::dialogs::newcollection::dialog_new_collection;
 use crate::guiutils::menuing::accel;
 use crate::guiutils::menuing::iterate_menu_items;
 use crate::guiutils::menuing::setup_window_menu_bar;
 use crate::guiutils::menuing::show_popup_menu;
+use crate::guiutils::windowing::with_modal_parent;
 use crate::history::History;
 use crate::info::InfoDb;
 use crate::models::collectionsview::CollectionsViewModel;
 use crate::models::itemstable::ItemsTableModel;
+use crate::prefs::BuiltinCollection;
 use crate::prefs::Preferences;
 use crate::prefs::SortOrder;
 use crate::selection::SelectionManager;
 use crate::threadlocalbubble::ThreadLocalBubble;
+use crate::ui::AboutDialog;
 use crate::ui::AppWindow;
 
 type InfoDbSubscriberCallback = Box<dyn Fn(Option<Rc<InfoDb>>, &Preferences)>;
@@ -117,6 +128,18 @@ impl AppModel {
 pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 	let app_window = AppWindow::new().unwrap();
 
+	let toggle_builtin_menu_items = BuiltinCollection::all_values()
+		.iter()
+		.map(|x| {
+			let id = AppCommand::SettingsToggleBuiltinCollection(*x);
+			MenuItem::with_id(id, &format!("{}", x), true, None)
+		})
+		.collect::<Vec<_>>();
+	let toggle_builtin_menu_items = toggle_builtin_menu_items
+		.iter()
+		.map(|x| x as &dyn IsMenuItem)
+		.collect::<Vec<_>>();
+
 	// Menu bar
 	#[rustfmt::skip]
 	let menu_bar = Menu::with_items(&[
@@ -144,18 +167,20 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 					],
 				)
 				.unwrap(),
-				&AppCommand::FileExit.into_menu_item()
+				&MenuItem::with_id(AppCommand::FileExit, "Exit", true, accel("Ctrl+Alt+X"))
 			],
 		)
 		.unwrap(),
-		&Submenu::with_items("Settings", true, &[]).unwrap(),
+		&Submenu::with_items("Settings", true, &[
+			&Submenu::with_items("Builtin Collections", true, &toggle_builtin_menu_items).unwrap()
+		]).unwrap(),
 		&Submenu::with_items(
 			"Help",
 			true,
 			&[
-				&AppCommand::HelpRefreshInfoDb.into_menu_item(),
-				&AppCommand::HelpWebSite.into_menu_item(),
-				&MenuItem::new("About...", false, None),
+				&MenuItem::with_id(AppCommand::HelpRefreshInfoDb, "Refresh MAME machine info...", false, None),
+				&MenuItem::with_id(AppCommand::HelpWebSite, "BlechMAME web site...", true, None),
+				&MenuItem::with_id(AppCommand::HelpAbout, "About...", true, None),
 			],
 		)
 		.unwrap(),
@@ -242,17 +267,23 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 	});
 
 	// set up items columns
-	{
-		let prefs = model.preferences.borrow();
-		let items_columns = app_window.get_items_columns();
-		for (index, column) in prefs.items_columns.iter().enumerate() {
-			if let Some(mut data) = items_columns.row_data(index) {
-				data.title = format!("{}", column.column_type).into();
-				data.width = column.width;
-				items_columns.set_row_data(index, data);
-			}
-		}
-	}
+	let items_columns = model
+		.preferences
+		.borrow()
+		.items_columns
+		.iter()
+		.map(|column| {
+			let mut table_column = TableColumn::default();
+			table_column.title = format!("{}", column.column_type).into();
+			table_column.horizontal_stretch = 1.0;
+			table_column.width = column.width;
+			table_column
+		})
+		.collect::<Vec<_>>();
+	let items_columns = VecModel::from(items_columns);
+	let items_columns = Rc::new(items_columns);
+	let items_columns = ModelRc::from(items_columns);
+	app_window.set_items_columns(items_columns);
 
 	// set up items filter
 	let model_clone = model.clone();
@@ -304,17 +335,10 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 		let is_mouse_down_event = format!("{:?}", evt.kind) == "Down"; // hack
 
 		if evt.button == PointerEventButton::Right && is_mouse_down_event {
-			let popup_menu_items = model_clone.with_items_table_model(|x| {
-				x.context_commands(index)
-					.map(|x| x.into_menu_item())
-					.collect::<Vec<_>>()
-			});
-			let popup_menu_items = popup_menu_items
-				.iter()
-				.map(|x| x as &dyn IsMenuItem)
-				.collect::<Vec<_>>();
-			let popup_menu = Menu::with_items(&popup_menu_items).unwrap();
-			model_clone.show_popup_menu(popup_menu, point);
+			let folder_info = get_folder_collections(&model_clone.preferences.borrow().collections);
+			if let Some(popup_menu) = model_clone.with_items_table_model(|x| x.context_commands(index, &folder_info)) {
+				model_clone.show_popup_menu(popup_menu, point);
+			}
 		}
 	});
 
@@ -333,12 +357,22 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			update_prefs(&model.clone());
 			quit_event_loop().unwrap()
 		}
+		AppCommand::SettingsToggleBuiltinCollection(col) => {
+			model.modify_prefs(|prefs| {
+				toggle_builtin_collection(&mut prefs.collections, col);
+			});
+			model.with_collections_view_model(|x| x.update(&model.preferences.borrow().collections));
+		}
 		AppCommand::HelpRefreshInfoDb => {
 			let model = model.clone();
 			spawn_local(process_mame_listxml(model, None)).unwrap();
 		}
 		AppCommand::HelpWebSite => {
 			let _ = open::that("https://www.bletchmame.org");
+		}
+		AppCommand::HelpAbout => {
+			let dialog = with_modal_parent(&model.app_window(), || AboutDialog::new().unwrap());
+			dialog.show().unwrap();
 		}
 		AppCommand::Browse(collection) => {
 			let collection = Rc::new(collection);
@@ -375,6 +409,29 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			model.modify_prefs(|prefs| {
 				prefs.current_history_entry_mut().selection = selection;
 			});
+		}
+		AppCommand::AddToExistingFolder(folder_index, new_items) => {
+			model.modify_prefs(|prefs| {
+				add_items_to_existing_folder_collection(&mut prefs.collections, folder_index, new_items);
+			});
+		}
+		AppCommand::AddToNewFolder(name, items) => {
+			model.modify_prefs(|prefs| {
+				add_items_to_new_folder_collection(&mut prefs.collections, name, items);
+			});
+			model.with_collections_view_model(|x| x.update(&model.preferences.borrow().collections));
+		}
+		AppCommand::AddToNewFolderDialog(items) => {
+			let existing_names = get_folder_collection_names(&model.preferences.borrow().collections);
+			let parent = model.app_window().as_weak();
+			let model_clone = model.clone();
+			let fut = async move {
+				if let Some(name) = dialog_new_collection(parent, existing_names).await {
+					let command = AppCommand::AddToNewFolder(name, items);
+					handle_command(&model_clone, command);
+				}
+			};
+			spawn_local(fut).unwrap();
 		}
 	};
 }

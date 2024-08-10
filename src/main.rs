@@ -1,5 +1,6 @@
 mod appcommand;
 mod appwindow;
+mod collections;
 mod diagnostics;
 mod dialogs;
 mod error;

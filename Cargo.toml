@@ -8,8 +8,8 @@ edition = "2021"
 
 [dependencies]
 slint = { version = "1.7.1", features = ["raw-window-handle-06"] }
-i-slint-core = { version = "1.7.1" }
-i-slint-backend-winit = { version = "1.7.1" }
+i-slint-core = "1.7.1"
+i-slint-backend-winit = "1.7.1"
 muda = "=0.13.5"
 raw-window-handle = "0.6.2"
 rfd = "0.14.1"
@@ -32,8 +32,8 @@ smallvec = "1.13.2"
 derive-enum-all-values = "=0.1.0"
 default-ext = "0.1.0"
 num = "=0.4.3"
-strum = "0.26"
-strum_macros = "0.26"
+strum = "0.26.3"
+strum_macros = "0.26.3"
 structopt = "0.3.26"
 
 [dev-dependencies]
@@ -41,8 +41,8 @@ assert_matches = "1.5.0"
 test-case = "3.3.1"
 
 [build-dependencies]
-slint-build = { version = "1.7.1" }
-vivi_ui = { version = "0.1" }
+slint-build = "1.7.1"
+vivi_ui = "0.2"
 
 [profile.dev]
 opt-level = 1
