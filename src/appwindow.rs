@@ -352,6 +352,10 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 }
 
 fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
+	// somewhat of a hack; if we have a command than its probably time to get rid of the popup menu (and ensure
+	// that it isn't subclassing our window)
+	model.current_popup_menu.replace(None);
+
 	match command {
 		AppCommand::FileExit => {
 			update_prefs(&model.clone());
