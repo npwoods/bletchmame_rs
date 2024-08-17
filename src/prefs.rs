@@ -1,3 +1,4 @@
+use std::fs;
 use std::fs::File;
 use std::io::BufReader;
 use std::io::Read;
@@ -172,6 +173,9 @@ impl Preferences {
 	}
 
 	pub fn save(&self) -> Result<()> {
+		if let Some(prefs_path) = &self.prefs_path {
+			ensure_directory(prefs_path);
+		}
 		let path = prefs_filename(self.prefs_path.as_ref(), PREFS).map_err(prefs_save_error)?;
 		save_prefs(self, &path)
 	}
@@ -250,6 +254,12 @@ fn prefs_load_error(e: impl std::error::Error + Send + Sync + 'static) -> Error 
 
 fn prefs_save_error(e: impl std::error::Error + Send + Sync + 'static) -> Error {
 	Error::PreferencesSave(e.into())
+}
+
+fn ensure_directory(path: &impl AsRef<Path>) {
+	if !fs::metadata(path).is_ok_and(|m| m.is_dir()) {
+		let _ = fs::create_dir(path);
+	}
 }
 
 #[cfg(test)]
