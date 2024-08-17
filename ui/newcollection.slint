@@ -6,11 +6,16 @@ export component NewCollectionDialog inherits Window {
     height: 100px;
     callback ok-clicked();
     callback cancel-clicked();
+    callback text-edited(string);
     in-out property <string> text;
+    in-out property <bool> ok-enabled;
     VerticalBox {
         LineEdit {
             text <=> root.text;
             height: 30px;
+            edited(new-text) => {
+                text-edited(new-text);
+            }
         }
 
         HorizontalBox {
@@ -31,6 +36,7 @@ export component NewCollectionDialog inherits Window {
                 }
                 width: 80px;
                 height: 30px;
+                enabled <=> ok-enabled;
             }
         }
     }

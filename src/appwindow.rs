@@ -16,7 +16,6 @@ use slint::quit_event_loop;
 use slint::spawn_local;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
-use slint::LogicalPosition;
 use slint::LogicalSize;
 use slint::Model;
 use slint::ModelRc;
@@ -58,7 +57,6 @@ struct AppModel {
 	preferences: RefCell<Preferences>,
 	info_db: RefCell<Option<Rc<InfoDb>>>,
 	info_db_subscribers: RefCell<Vec<InfoDbSubscriberCallback>>,
-	current_popup_menu: RefCell<Option<Menu>>,
 }
 
 impl AppModel {
@@ -112,16 +110,6 @@ impl AppModel {
 			let info_db = self.info_db.borrow().clone();
 			func(info_db, &prefs);
 		}
-	}
-
-	pub fn show_popup_menu(&self, popup_menu: Menu, point: LogicalPosition) {
-		let mut current_popup_menu = self.current_popup_menu.borrow_mut();
-		*current_popup_menu = Some(popup_menu);
-
-		let window = self.app_window();
-		let window = window.window();
-		let popup_menu = current_popup_menu.as_ref().unwrap();
-		show_popup_menu(window, popup_menu, point);
 	}
 }
 
@@ -206,7 +194,6 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 		preferences: RefCell::new(preferences),
 		info_db: RefCell::new(None),
 		info_db_subscribers: RefCell::new(Vec::new()),
-		current_popup_menu: RefCell::new(None),
 	};
 	let model = Rc::new(model);
 
@@ -337,7 +324,8 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 		if evt.button == PointerEventButton::Right && is_mouse_down_event {
 			let folder_info = get_folder_collections(&model_clone.preferences.borrow().collections);
 			if let Some(popup_menu) = model_clone.with_items_table_model(|x| x.context_commands(index, &folder_info)) {
-				model_clone.show_popup_menu(popup_menu, point);
+				let app_window = model_clone.app_window();
+				show_popup_menu(app_window.window(), &popup_menu, point);
 			}
 		}
 	});
@@ -352,10 +340,6 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 }
 
 fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
-	// somewhat of a hack; if we have a command than its probably time to get rid of the popup menu (and ensure
-	// that it isn't subclassing our window)
-	model.current_popup_menu.replace(None);
-
 	match command {
 		AppCommand::FileExit => {
 			update_prefs(&model.clone());
