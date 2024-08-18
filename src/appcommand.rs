@@ -14,6 +14,7 @@ pub enum AppCommand {
 	FileExit,
 
 	// Settings menu
+	SettingsPaths,
 	SettingsToggleBuiltinCollection(BuiltinCollection),
 
 	// Help menu

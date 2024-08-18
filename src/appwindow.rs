@@ -32,6 +32,7 @@ use crate::collections::get_folder_collections;
 use crate::collections::toggle_builtin_collection;
 use crate::dialogs::loading::dialog_load_mame_info;
 use crate::dialogs::newcollection::dialog_new_collection;
+use crate::dialogs::paths::dialog_paths;
 use crate::guiutils::menuing::accel;
 use crate::guiutils::menuing::iterate_menu_items;
 use crate::guiutils::menuing::setup_window_menu_bar;
@@ -160,6 +161,7 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 		)
 		.unwrap(),
 		&Submenu::with_items("Settings", true, &[
+			&MenuItem::with_id(AppCommand::SettingsPaths, "Paths...", true, None),
 			&Submenu::with_items("Builtin Collections", true, &toggle_builtin_menu_items).unwrap()
 		]).unwrap(),
 		&Submenu::with_items(
@@ -344,6 +346,17 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 		AppCommand::FileExit => {
 			update_prefs(&model.clone());
 			quit_event_loop().unwrap()
+		}
+		AppCommand::SettingsPaths => {
+			let parent = model.app_window().as_weak();
+			let paths = model.preferences.borrow().paths.clone();
+			let model_clone = model.clone();
+			let fut = async move {
+				if let Some(new_paths) = dialog_paths(parent, paths).await {
+					model_clone.modify_prefs(|prefs| prefs.paths = new_paths);
+				}
+			};
+			spawn_local(fut).unwrap();
 		}
 		AppCommand::SettingsToggleBuiltinCollection(col) => {
 			model.modify_prefs(|prefs| {

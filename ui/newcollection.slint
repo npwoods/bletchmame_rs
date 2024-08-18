@@ -7,10 +7,14 @@ export component NewCollectionDialog inherits Window {
     callback ok-clicked();
     callback cancel-clicked();
     callback text-edited(string);
-    in-out property <string> text;
+    out property <string> text;
     in-out property <bool> ok-enabled;
+    public function set-text(text: string) {
+        line-edit.text = text;
+        line-edit.select-all();
+    }
     VerticalBox {
-        LineEdit {
+        line-edit := LineEdit {
             text <=> root.text;
             height: 30px;
             edited(new-text) => {

@@ -1,12 +1,11 @@
 use std::borrow::Cow;
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::default::Default;
 
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
 use slint::Weak;
-use tokio::sync::Notify;
 
+use crate::dialogs::SingleResult;
 use crate::guiutils::windowing::with_modal_parent;
 use crate::ui::NewCollectionDialog;
 
@@ -16,33 +15,30 @@ pub async fn dialog_new_collection(
 ) -> Option<String> {
 	// prepare the dialog
 	let dialog = with_modal_parent(&parent.unwrap(), || NewCollectionDialog::new().unwrap());
-	let notify = Rc::new(Notify::new());
-	let result = Rc::new(RefCell::new(None));
+	let single_result = SingleResult::default();
 
 	// set the intial name
 	let new_collection_name = create_new_name(&existing_names);
-	dialog.set_text(new_collection_name.as_ref().into());
+	dialog.invoke_set_text(new_collection_name.as_ref().into());
 
 	// set up the "ok" button
-	let notify_clone = notify.clone();
-	let result_clone = result.clone();
+	let signaller = single_result.signaller();
 	let dialog_weak = dialog.as_weak();
 	dialog.on_ok_clicked(move || {
 		let text = dialog_weak.unwrap().get_text().to_string();
-		result_clone.replace(Some(text));
-		notify_clone.notify_one();
+		signaller.signal(Some(text));
 	});
 
 	// set up the "cancel" button
-	let notify_clone = notify.clone();
+	let signaller = single_result.signaller();
 	dialog.on_cancel_clicked(move || {
-		notify_clone.notify_one();
+		signaller.signal(None);
 	});
 
 	// set up the close handler
-	let notify_clone = notify.clone();
+	let signaller = single_result.signaller();
 	dialog.window().on_close_requested(move || {
-		notify_clone.notify_one();
+		signaller.signal(None);
 		CloseRequestResponse::HideWindow
 	});
 
@@ -55,10 +51,10 @@ pub async fn dialog_new_collection(
 
 	// show the dialog and wait for completion
 	dialog.show().unwrap();
-	notify.notified().await;
+	let result = single_result.wait().await;
 	dialog.hide().unwrap();
 
-	Rc::unwrap_or_clone(result).into_inner()
+	result
 }
 
 fn create_new_name(existing_names: &[String]) -> Cow<'static, str> {

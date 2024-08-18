@@ -1,0 +1,73 @@
+import { AboutSlint, Button, VerticalBox, HorizontalBox, ComboBox, StandardListView } from "std-widgets.slint";
+export component PathsDialog inherits Window {
+    title: "Paths";
+    in property <[string]> path-labels;
+    in property <[StandardListViewItem]> path-entries;
+    out property <int> path-label-index;
+    callback ok-clicked();
+    callback cancel-clicked();
+    callback browse-clicked();
+    callback insert-clicked();
+    callback delete-clicked();
+    HorizontalBox {
+        VerticalBox {
+            Text {
+                text: "Show Paths For:";
+            }
+
+            ComboBox {
+                model: path-labels;
+                current-index <=> path-label-index;
+            }
+
+            Text {
+                text: "Paths:";
+            }
+
+            StandardListView {
+                model: path-entries;
+            }
+        }
+
+        VerticalBox {
+            Button {
+                text: "Ok";
+                clicked => {
+                    root.ok-clicked();
+                }
+                enabled: false;
+            }
+
+            Button {
+                text: "Cancel";
+                clicked => {
+                    root.cancel-clicked();
+                }
+            }
+
+            Button {
+                text: "Browse";
+                clicked => {
+                    root.browse-clicked();
+                }
+                enabled: false;
+            }
+
+            Button {
+                text: "Insert";
+                clicked => {
+                    root.insert-clicked();
+                }
+                enabled: false;
+            }
+
+            Button {
+                text: "Delete";
+                clicked => {
+                    root.delete-clicked();
+                }
+                enabled: false;
+            }
+        }
+    }
+}
