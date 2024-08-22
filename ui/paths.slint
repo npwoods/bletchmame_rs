@@ -1,16 +1,25 @@
 import { AboutSlint, Button, VerticalBox, HorizontalBox, ComboBox, StandardListView } from "std-widgets.slint";
+import { MagicListView, MagicListViewItem, Icons, FilledButton } from "@vivi/magic.slint";
+
 export component PathsDialog inherits Window {
     title: "Paths";
     in property <[string]> path-labels;
-    in property <[StandardListViewItem]> path-entries;
+    in property <[MagicListViewItem]> path-entries;
+    in property <bool> ok-enabled;
+    in property <bool> browse-enabled;
+    in property <bool> delete-enabled;
     out property <int> path-label-index;
+    out property <int> path-entry-index <=> entries-view.current-index;
     callback ok-clicked();
     callback cancel-clicked();
     callback browse-clicked();
     callback insert-clicked();
     callback delete-clicked();
+    callback path-label-index-changed();
+    callback path-entries-index-changed();
     HorizontalBox {
         VerticalBox {
+            preferred-width: 300px;
             Text {
                 text: "Show Paths For:";
             }
@@ -18,24 +27,33 @@ export component PathsDialog inherits Window {
             ComboBox {
                 model: path-labels;
                 current-index <=> path-label-index;
+                selected => {
+                    root.path-label-index-changed();
+                }
             }
 
             Text {
                 text: "Paths:";
             }
 
-            StandardListView {
+            entries-view := MagicListView {
                 model: path-entries;
+                selected => {
+                    path-entries-index-changed();
+                }
             }
         }
 
         VerticalBox {
+            min-width: 100px;
+            max-width: 100px;
+            alignment: start;
             Button {
                 text: "Ok";
+                enabled: ok-enabled;
                 clicked => {
                     root.ok-clicked();
                 }
-                enabled: false;
             }
 
             Button {
@@ -47,26 +65,26 @@ export component PathsDialog inherits Window {
 
             Button {
                 text: "Browse";
+                enabled: browse-enabled;
                 clicked => {
                     root.browse-clicked();
                 }
-                enabled: false;
             }
 
             Button {
                 text: "Insert";
+                enabled: false;
                 clicked => {
                     root.insert-clicked();
                 }
-                enabled: false;
             }
 
             Button {
                 text: "Delete";
+                enabled: delete-enabled;
                 clicked => {
                     root.delete-clicked();
                 }
-                enabled: false;
             }
         }
     }

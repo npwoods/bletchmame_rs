@@ -45,7 +45,8 @@ pub struct Preferences {
 #[serde(rename_all = "camelCase")]
 pub struct PrefsPaths {
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
-	pub mame_executable: String,
+	pub mame_executable: Option<String>,
+
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub software_lists: Vec<String>,
 }

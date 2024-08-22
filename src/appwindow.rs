@@ -9,7 +9,6 @@ use muda::MenuEvent;
 use muda::MenuItem;
 use muda::PredefinedMenuItem;
 use muda::Submenu;
-use rfd::FileDialog;
 use slint::invoke_from_event_loop;
 use slint::platform::PointerEventButton;
 use slint::quit_event_loop;
@@ -30,6 +29,8 @@ use crate::collections::add_items_to_new_folder_collection;
 use crate::collections::get_folder_collection_names;
 use crate::collections::get_folder_collections;
 use crate::collections::toggle_builtin_collection;
+use crate::dialogs::file::file_dialog;
+use crate::dialogs::file::PathType;
 use crate::dialogs::loading::dialog_load_mame_info;
 use crate::dialogs::newcollection::dialog_new_collection;
 use crate::dialogs::paths::dialog_paths;
@@ -348,14 +349,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			quit_event_loop().unwrap()
 		}
 		AppCommand::SettingsPaths => {
-			let parent = model.app_window().as_weak();
-			let paths = model.preferences.borrow().paths.clone();
-			let model_clone = model.clone();
-			let fut = async move {
-				if let Some(new_paths) = dialog_paths(parent, paths).await {
-					model_clone.modify_prefs(|prefs| prefs.paths = new_paths);
-				}
-			};
+			let fut = show_paths_dialog(model.clone());
 			spawn_local(fut).unwrap();
 		}
 		AppCommand::SettingsToggleBuiltinCollection(col) => {
@@ -439,59 +433,87 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 
 async fn try_load_persisted_info_db(model: Rc<AppModel>) {
 	// load MAME info from persisted data
-	if !model.preferences.borrow().paths.mame_executable.is_empty() {
-		let info_db_result = {
-			let prefs = model.preferences.borrow();
-			InfoDb::load(prefs.prefs_path.as_ref(), &prefs.paths.mame_executable)
+	let info_db_result = {
+		let prefs = model.preferences.borrow();
+		let Some(mame_executable_path) = prefs.paths.mame_executable.as_ref() else {
+			return;
 		};
+		InfoDb::load(prefs.prefs_path.as_ref(), mame_executable_path)
+	};
 
-		// so... we did indeed try to load the InfoDb... but did we succeed?
-		if let Ok(info_db) = info_db_result {
-			// we did!  set it up
-			model.set_info_db(Some(info_db));
-			update(&model);
-		} else {
-			// we errored for whatever reason; kick off a process to read it
-			process_mame_listxml(model, None).await;
-		}
+	// so... we did indeed try to load the InfoDb... but did we succeed?
+	if let Ok(info_db) = info_db_result {
+		// we did!  set it up
+		model.set_info_db(Some(info_db));
+		update(&model);
+	} else {
+		// we errored for whatever reason; kick off a process to read it
+		process_mame_listxml(model, None).await;
 	}
 }
 
 /// loads MAME by launching `mame -listxml`
-async fn process_mame_listxml(model: Rc<AppModel>, new_mame_executable: Option<String>) {
-	// identify the MAME executable (which can be passed to us or in preferences)
-	let mame_executable = new_mame_executable
-		.as_ref()
-		.map(Cow::Borrowed)
-		.unwrap_or_else(|| Cow::Owned(model.preferences.borrow().paths.mame_executable.clone()));
-
-	// present the loading dialog
-	let Some(info_db) = dialog_load_mame_info(model.app_window().as_weak(), &mame_executable).await else {
-		return; // cancelled
+async fn process_mame_listxml(model: Rc<AppModel>, new_mame_executable: Option<Option<String>>) {
+	// identify the (optional) MAME executable (which can be passed to us or in preferences)
+	let mame_executable = if let Some(new_mame_executable) = new_mame_executable.as_ref() {
+		new_mame_executable.as_ref().map(Cow::Borrowed)
+	} else {
+		let prefs = model.preferences.borrow();
+		prefs.paths.mame_executable.as_ref().cloned().map(Cow::Owned)
 	};
 
-	// we've succeeded; if appropriate, update the path
+	// do we have a MAME executable?  if so show the dialog
+	let info_db = if let Some(mame_executable) = mame_executable {
+		// present the loading dialog
+		let Some(info_db) = dialog_load_mame_info(model.app_window().as_weak(), &mame_executable).await else {
+			return; // cancelled or errored
+		};
+
+		// the processing succeeded; save the Info DB
+		let _ = {
+			let prefs = model.preferences.borrow();
+			info_db.save(prefs.prefs_path.as_ref(), &mame_executable)
+		};
+
+		// lastly we have an Info DB
+		Some(info_db)
+	} else {
+		// no executable!  no Info DB I guess :-|
+		None
+	};
+
+	// since we've gotten this far (Info DB or not), its time to save the path
 	if let Some(new_mame_executable) = new_mame_executable.as_ref() {
 		model.modify_prefs(|prefs| prefs.paths.mame_executable.clone_from(new_mame_executable));
 	}
 
-	// save the info DB
-	let _ = {
-		let prefs = model.preferences.borrow();
-		info_db.save(prefs.prefs_path.as_ref(), &mame_executable)
-	};
-
 	// set the model to use the new Info DB
-	model.set_info_db(Some(info_db));
+	model.set_info_db(info_db);
 
 	// and update all the things
 	update(&model);
 }
 
+async fn show_paths_dialog(model: Rc<AppModel>) {
+	let parent = model.app_window_weak.clone();
+	let paths = model.preferences.borrow().paths.clone();
+	let Some(result) = dialog_paths(parent, paths).await else {
+		return;
+	};
+
+	model.modify_prefs(|prefs| prefs.paths = result.paths);
+	if result.mame_executable_changed {
+		spawn_local(process_mame_listxml(model, None)).unwrap();
+	}
+	if result.software_lists_changed {
+		// not yet implemented
+	}
+}
+
 fn update(model: &AppModel) {
 	// calculate properties
 	let has_info_db = model.info_db.borrow().is_some();
-	let has_mame_executable = !model.preferences.borrow().paths.mame_executable.is_empty();
+	let has_mame_executable = !model.preferences.borrow().paths.mame_executable.is_some();
 
 	// update the Slint model
 	model.app_window().set_has_info_db(has_info_db);
@@ -592,11 +614,11 @@ fn update_prefs(model: &AppModel) {
 
 fn on_find_mame_clicked(model: Rc<AppModel>) {
 	// find MAME
-	let mame_executable = FileDialog::new().add_filter("MAME Executable", &["exe"]).pick_file();
-	if let Some(mame_executable) = mame_executable {
-		let mame_executable = mame_executable.as_path().to_string_lossy().into_owned();
-		spawn_local(process_mame_listxml(model, Some(mame_executable))).unwrap();
-	}
+	let Some(mame_executable) = file_dialog(&model.app_window(), PathType::MameExecutable) else {
+		return;
+	};
+
+	spawn_local(process_mame_listxml(model, Some(Some(mame_executable)))).unwrap();
 }
 
 fn items_set_sorting(model: &Rc<AppModel>, column: i32, order: SortOrder) {

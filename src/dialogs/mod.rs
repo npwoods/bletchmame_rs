@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 use tokio::sync::Notify;
 
+pub mod file;
 pub mod loading;
 pub mod newcollection;
 pub mod paths;

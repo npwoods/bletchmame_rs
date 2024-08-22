@@ -10,7 +10,7 @@ edition = "2021"
 slint = { version = "1.7.2", features = ["raw-window-handle-06"] }
 i-slint-core = "1.7.2"
 i-slint-backend-winit = "1.7.2"
-muda = { git = "https://github.com/npwoods/muda.git", branch = "win32_context_menu_fixes" }
+muda = "0.14.1"
 raw-window-handle = "0.6.2"
 rfd = "0.14.1"
 serde = { version = "1.0.204", features = ["rc"] }

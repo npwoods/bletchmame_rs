@@ -25,6 +25,9 @@ pub async fn dialog_load_mame_info(
 	parent: Weak<impl ComponentHandle + 'static>,
 	mame_executable: &str,
 ) -> Option<InfoDb> {
+	// sanity checks
+	assert!(!mame_executable.is_empty());
+
 	// present the dialog
 	let dialog = with_modal_parent(&parent.unwrap(), || LoadingDialog::new().unwrap());
 	dialog.set_current_status("Retrieving machine info from MAME...".into());
