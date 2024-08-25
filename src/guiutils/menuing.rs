@@ -100,7 +100,7 @@ impl MenuDesc {
 		}
 	}
 
-	pub fn make_popup_menu(items: Vec<Self>) -> Menu {
+	pub fn make_popup_menu(items: impl IntoIterator<Item = Self>) -> Menu {
 		let items = items.into_iter().map(|x| x.into_boxed_menu_item()).collect::<Vec<_>>();
 		let items = items.iter().map(|x| &**x as &dyn IsMenuItem).collect::<Vec<_>>();
 		Menu::with_items(&items).unwrap()

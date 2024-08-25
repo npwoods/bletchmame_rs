@@ -5,7 +5,10 @@ pub mod windowing;
 use std::cell::Cell;
 
 use i_slint_backend_winit::Backend;
+use i_slint_core::items::PointerEvent;
+use i_slint_core::items::PointerEventKind;
 use raw_window_handle::Win32WindowHandle;
+use slint::platform::PointerEventButton;
 use winit::platform::windows::WindowAttributesExtWindows;
 
 thread_local! {
@@ -24,4 +27,8 @@ pub fn init_gui_utils() {
 	let mut backend = Backend::new().unwrap();
 	backend.window_builder_hook = Some(Box::new(window_builder_hook));
 	slint::platform::set_platform(Box::new(backend)).unwrap();
+}
+
+pub fn is_context_menu_event(evt: &PointerEvent) -> bool {
+	evt.button == PointerEventButton::Right && evt.kind == PointerEventKind::Down
 }

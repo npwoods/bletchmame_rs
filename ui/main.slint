@@ -22,6 +22,7 @@ export component AppWindow inherits Window {
     in-out property <string> items-search-text;
     in-out property <[TableColumn]> items-columns <=> items-table-view.columns;
     callback collections-view-selected(int);
+    callback collections-row-pointer-event(int, PointerEvent, Point);
     callback items-search-text-changed(string);
     callback items-sort-ascending(int);
     callback items-sort-descending(int);
@@ -63,6 +64,9 @@ export component AppWindow inherits Window {
             model: collections-model;
             selected(index) => {
                 collections-view-selected(index)
+            }
+            row-pointer-event(row, event, point) => {
+                collections-row-pointer-event(row, event, point)
             }
         }
 

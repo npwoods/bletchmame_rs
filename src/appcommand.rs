@@ -31,6 +31,7 @@ pub enum AppCommand {
 	AddToExistingFolder(usize, Vec<PrefsItem>),
 	AddToNewFolder(String, Vec<PrefsItem>),
 	AddToNewFolderDialog(Vec<PrefsItem>),
+	MoveCollection { old_index: usize, new_index: Option<usize> },
 }
 
 const MENU_PREFIX: &str = "MENU_";

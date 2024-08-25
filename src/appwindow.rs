@@ -10,7 +10,6 @@ use muda::MenuItem;
 use muda::PredefinedMenuItem;
 use muda::Submenu;
 use slint::invoke_from_event_loop;
-use slint::platform::PointerEventButton;
 use slint::quit_event_loop;
 use slint::spawn_local;
 use slint::CloseRequestResponse;
@@ -34,6 +33,7 @@ use crate::dialogs::file::PathType;
 use crate::dialogs::loading::dialog_load_mame_info;
 use crate::dialogs::newcollection::dialog_new_collection;
 use crate::dialogs::paths::dialog_paths;
+use crate::guiutils::is_context_menu_event;
 use crate::guiutils::menuing::accel;
 use crate::guiutils::menuing::iterate_menu_items;
 use crate::guiutils::menuing::setup_window_menu_bar;
@@ -50,6 +50,8 @@ use crate::selection::SelectionManager;
 use crate::threadlocalbubble::ThreadLocalBubble;
 use crate::ui::AboutDialog;
 use crate::ui::AppWindow;
+
+const LOG_COMMANDS: bool = false;
 
 type InfoDbSubscriberCallback = Box<dyn Fn(Option<Rc<InfoDb>>, &Preferences)>;
 
@@ -318,13 +320,23 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 		CloseRequestResponse::HideWindow
 	});
 
-	// popup menus
+	// collections popup menus
+	let model_clone = model.clone();
+	app_window.on_collections_row_pointer_event(move |index, evt, point| {
+		if is_context_menu_event(&evt) {
+			let index = usize::try_from(index).unwrap();
+			if let Some(popup_menu) = model_clone.with_collections_view_model(|x| x.context_commands(index)) {
+				let app_window = model_clone.app_window();
+				show_popup_menu(app_window.window(), &popup_menu, point);
+			}
+		}
+	});
+
+	// items popup menus
 	let model_clone = model.clone();
 	app_window.on_items_row_pointer_event(move |index, evt, point| {
-		let index: usize = index.try_into().unwrap();
-		let is_mouse_down_event = format!("{:?}", evt.kind) == "Down"; // hack
-
-		if evt.button == PointerEventButton::Right && is_mouse_down_event {
+		if is_context_menu_event(&evt) {
+			let index = usize::try_from(index).unwrap();
 			let folder_info = get_folder_collections(&model_clone.preferences.borrow().collections);
 			if let Some(popup_menu) = model_clone.with_items_table_model(|x| x.context_commands(index, &folder_info)) {
 				let app_window = model_clone.app_window();
@@ -343,6 +355,9 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 }
 
 fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
+	if LOG_COMMANDS {
+		println!("handle_command(): command={:?}", &command);
+	}
 	match command {
 		AppCommand::FileExit => {
 			update_prefs(&model.clone());
@@ -427,6 +442,14 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				}
 			};
 			spawn_local(fut).unwrap();
+		}
+		AppCommand::MoveCollection { old_index, new_index } => {
+			let mut prefs = model.preferences.borrow_mut();
+			let collection = prefs.collections.remove(old_index);
+			if let Some(new_index) = new_index {
+				prefs.collections.insert(new_index, collection);
+			}
+			model.with_collections_view_model(|x| x.update(&prefs.collections));
 		}
 	};
 }
@@ -513,7 +536,7 @@ async fn show_paths_dialog(model: Rc<AppModel>) {
 fn update(model: &AppModel) {
 	// calculate properties
 	let has_info_db = model.info_db.borrow().is_some();
-	let has_mame_executable = !model.preferences.borrow().paths.mame_executable.is_some();
+	let has_mame_executable = model.preferences.borrow().paths.mame_executable.is_some();
 
 	// update the Slint model
 	model.app_window().set_has_info_db(has_info_db);

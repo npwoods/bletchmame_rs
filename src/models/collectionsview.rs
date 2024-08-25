@@ -5,6 +5,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
 
+use muda::Menu;
 use slint::spawn_local;
 use slint::Global;
 use slint::Model;
@@ -13,6 +14,9 @@ use slint::ModelTracker;
 use slint::SharedString;
 use slint::Weak;
 
+use crate::appcommand::AppCommand;
+use crate::guiutils::menuing::MenuDesc;
+use crate::prefs::BuiltinCollection;
 use crate::prefs::PrefsCollection;
 use crate::ui::AppWindow;
 use crate::ui::Icons;
@@ -53,6 +57,28 @@ impl CollectionsViewModel {
 	pub fn callback_after_refresh(&self, callback: impl Future<Output = ()> + 'static) {
 		let callback = Box::new(callback) as Box<dyn Future<Output = ()> + 'static>;
 		self.after_refresh_callback.set(Some(callback));
+	}
+
+	pub fn context_commands(&self, index: usize) -> Option<Menu> {
+		let items_len = self.items.borrow().len();
+		let is_all = self.items.borrow()[index].as_ref() == &PrefsCollection::Builtin(BuiltinCollection::All);
+
+		let menu_items = [
+			(index > 0).then(|| ("Move Up", Some(index - 1))),
+			(index < items_len - 1).then(|| ("Move Down", Some(index + 1))),
+			(!is_all).then_some(("Remove", None)),
+		]
+		.into_iter()
+		.flatten()
+		.map(|(text, new_index)| {
+			let command = AppCommand::MoveCollection {
+				old_index: index,
+				new_index,
+			};
+			MenuDesc::Item(text.into(), Some(command.into()))
+		});
+
+		Some(MenuDesc::make_popup_menu(menu_items))
 	}
 }
 
