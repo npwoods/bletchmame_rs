@@ -42,6 +42,7 @@ use crate::guiutils::windowing::with_modal_parent;
 use crate::history::History;
 use crate::info::InfoDb;
 use crate::models::collectionsview::CollectionsViewModel;
+use crate::models::itemstable::EmptyReason;
 use crate::models::itemstable::ItemsTableModel;
 use crate::prefs::BuiltinCollection;
 use crate::prefs::Preferences;
@@ -61,6 +62,7 @@ struct AppModel {
 	preferences: RefCell<Preferences>,
 	info_db: RefCell<Option<Rc<InfoDb>>>,
 	info_db_subscribers: RefCell<Vec<InfoDbSubscriberCallback>>,
+	empty_button_command: RefCell<Option<AppCommand>>,
 }
 
 impl AppModel {
@@ -199,13 +201,19 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 		preferences: RefCell::new(preferences),
 		info_db: RefCell::new(None),
 		info_db_subscribers: RefCell::new(Vec::new()),
+		empty_button_command: RefCell::new(None),
 	};
 	let model = Rc::new(model);
 
-	// the "Find MAME" button
+	// the "empty reason action" button
 	let model_clone = model.clone();
-	app_window.on_find_mame_clicked(move || {
-		on_find_mame_clicked(model_clone.clone());
+	app_window.on_empty_action_clicked(move || {
+		let command = model_clone
+			.empty_button_command
+			.borrow()
+			.clone()
+			.expect("Button should not be clickable if None");
+		handle_command(&model_clone, command);
 	});
 
 	// set up the collections view model
@@ -224,9 +232,18 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 		AppWindow::get_items_view_selected_index,
 		AppWindow::invoke_items_view_select,
 	);
+	let model_clone = model.clone();
+	let empty_callback = move |empty_reason| {
+		update_empty_reason(&model_clone, empty_reason);
+	};
 	let items_model = {
 		let prefs = model.preferences.borrow();
-		ItemsTableModel::new(current_collection, prefs.paths.software_lists.clone(), selection)
+		ItemsTableModel::new(
+			current_collection,
+			prefs.paths.software_lists.clone(),
+			selection,
+			empty_callback,
+		)
 	};
 	let items_model_clone = items_model.clone();
 	model.subscribe_to_info_db_changes(move |info_db, _| items_model_clone.info_db_changed(info_db));
@@ -451,6 +468,9 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			}
 			model.with_collections_view_model(|x| x.update(&prefs.collections));
 		}
+		AppCommand::ChoosePath(path_type) => {
+			choose_path(model.clone(), path_type);
+		}
 	};
 }
 
@@ -526,20 +546,17 @@ async fn show_paths_dialog(model: Rc<AppModel>) {
 
 	model.modify_prefs(|prefs| prefs.paths = result.paths);
 	if result.mame_executable_changed {
+		let model = model.clone();
 		spawn_local(process_mame_listxml(model, None)).unwrap();
 	}
 	if result.software_lists_changed {
-		// not yet implemented
+		software_paths_updated(&model);
 	}
 }
 
 fn update(model: &AppModel) {
 	// calculate properties
-	let has_info_db = model.info_db.borrow().is_some();
 	let has_mame_executable = model.preferences.borrow().paths.mame_executable.is_some();
-
-	// update the Slint model
-	model.app_window().set_has_info_db(has_info_db);
 
 	// update the menu bar
 	for menu_item in iterate_menu_items(&model.menu_bar) {
@@ -635,13 +652,39 @@ fn update_prefs(model: &AppModel) {
 	});
 }
 
-fn on_find_mame_clicked(model: Rc<AppModel>) {
-	// find MAME
-	let Some(mame_executable) = file_dialog(&model.app_window(), PathType::MameExecutable) else {
+fn update_empty_reason(model: &AppModel, empty_reason: Option<EmptyReason>) {
+	let app_window = model.app_window();
+	let reason_string = empty_reason.map(|x| format!("{x}")).unwrap_or_default().into();
+	let (button_command, button_text) = empty_reason.and_then(|x| x.action()).unzip();
+	let button_text = button_text.unwrap_or_default().into();
+	app_window.set_is_empty(empty_reason.is_some());
+	app_window.set_is_empty_reason(reason_string);
+	app_window.set_is_empty_button_text(button_text);
+	model.empty_button_command.replace(button_command);
+}
+
+fn choose_path(model: Rc<AppModel>, path_type: PathType) {
+	// open the file dialog
+	let Some(path) = file_dialog(&model.app_window(), path_type) else {
 		return;
 	};
 
-	spawn_local(process_mame_listxml(model, Some(Some(mame_executable)))).unwrap();
+	// and respond to the change
+	match path_type {
+		PathType::MameExecutable => {
+			let new_mame_executable = Some(Some(path));
+			spawn_local(process_mame_listxml(model, new_mame_executable)).unwrap();
+		}
+		PathType::SoftwareLists => {
+			model.preferences.borrow_mut().paths.software_lists = vec![path];
+			software_paths_updated(&model);
+		}
+	}
+}
+
+fn software_paths_updated(model: &AppModel) {
+	let software_list_paths = model.preferences.borrow().paths.software_lists.clone();
+	model.with_items_table_model(|x| x.set_software_list_paths(software_list_paths));
 }
 
 fn items_set_sorting(model: &Rc<AppModel>, column: i32, order: SortOrder) {

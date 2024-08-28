@@ -2,6 +2,7 @@ use muda::MenuId;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::dialogs::file::PathType;
 use crate::error::BoxDynError;
 use crate::prefs::BuiltinCollection;
 use crate::prefs::PrefsCollection;
@@ -32,6 +33,7 @@ pub enum AppCommand {
 	AddToNewFolder(String, Vec<PrefsItem>),
 	AddToNewFolderDialog(Vec<PrefsItem>),
 	MoveCollection { old_index: usize, new_index: Option<usize> },
+	ChoosePath(PathType),
 }
 
 const MENU_PREFIX: &str = "MENU_";

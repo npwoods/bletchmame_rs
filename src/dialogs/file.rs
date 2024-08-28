@@ -2,11 +2,15 @@ use std::path::Path;
 
 use derive_enum_all_values::AllValues;
 use rfd::FileDialog;
+use serde::Deserialize;
+use serde::Serialize;
 use slint::ComponentHandle;
 
 const EXE_EXTENSION: &str = if cfg!(target_os = "windows") { "exe" } else { "" };
 
-#[derive(AllValues, Clone, Copy, Debug, Default, strum_macros::Display, PartialEq, Eq, Hash)]
+#[derive(
+	AllValues, Clone, Copy, Debug, Default, strum_macros::Display, PartialEq, Eq, Hash, Serialize, Deserialize,
+)]
 pub enum PathType {
 	#[default]
 	#[strum(to_string = "MAME Executable")]

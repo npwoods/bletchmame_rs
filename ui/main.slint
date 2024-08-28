@@ -1,4 +1,4 @@
-import { HorizontalBox, VerticalBox, Button, StandardListView, StandardTableView, LineEdit, ListView, ScrollView } from "std-widgets.slint";
+import { HorizontalBox, VerticalBox, Button, StandardListView, StandardTableView, LineEdit, ListView, ScrollView, GridBox } from "std-widgets.slint";
 import { MagicListView, MagicListViewItem, Icons, FilledButton } from "@vivi/magic.slint";
 import { AboutDialog } from "about.slint";
 import { LoadingDialog } from "loading.slint";
@@ -13,9 +13,12 @@ export component AppWindow inherits Window {
     max-width: 10000px;
     max-height: 10000px;
     title: @tr("BletchMAME 3.0 prototype");
-    callback find_mame_clicked();
-    in property <bool> is_running;
-    in property <bool> has_info_db;
+    callback empty-action-clicked();
+    callback find-software-lists-clicked();
+    in property <bool> is-running;
+    in property <bool> is-empty;
+    in property <string> is-empty-reason;
+    in property <string> is-empty-button-text;
     in property <bool> history-can-go-back;
     in property <bool> history-can-go-forward;
     in-out property <int> items-view-selected-index <=> items-table-view.current-row;
@@ -37,30 +40,13 @@ export component AppWindow inherits Window {
     public function items-view-select(index: int) {
         items-table-view.set-current-row(index);
     }
-    VerticalBox {
-        alignment: center;
-        Text {
-            text: @tr("BletchMAME needs a working MAME to function");
-            font-size: 24px;
-            wrap: word-wrap;
-        }
-
-        Button {
-            text: @tr("Find MAME...");
-            clicked => {
-                root.find_mame_clicked();
-            }
-        }
-
-        width: 300px;
-        visible: !has_info_db;
-    }
-
     HorizontalBox {
-        visible: has_info_db && !is_running;
+        visible: !is_running;
+        alignment: stretch;
         collections-list-view := MagicListView {
             width: 250px;
-            preferred-height: 100%;
+            horizontal-stretch: 0;
+            vertical-stretch: 1;
             model: collections-model;
             selected(index) => {
                 collections-view-selected(index)
@@ -71,7 +57,13 @@ export component AppWindow inherits Window {
         }
 
         VerticalBox {
+            alignment: stretch;
             HorizontalBox {
+                height: 50px;
+                alignment: stretch;
+                horizontal-stretch: 1;
+                vertical-stretch: 0;
+                preferred-width: 100%;
                 FilledButton {
                     prefix_icon: Icons.arrow_back;
                     enabled: history-can-go-back;
@@ -95,27 +87,54 @@ export component AppWindow inherits Window {
 
                 LineEdit {
                     text: items-search-text;
+                    enabled: !is-empty;
                     edited(text) => {
                         items-search-text-changed(text)
                     }
                 }
             }
 
-            items-table-view := StandardTableView {
-                rows: items_model;
-                preferred-width: 100%;
-                preferred-height: 100%;
-                sort-ascending(index) => {
-                    items-sort-ascending(index)
+            VerticalBox {
+                alignment: stretch;
+                if is-empty-reason != "": HorizontalBox {
+                    horizontal-stretch: 0;
+                    vertical-stretch: 1;
+                    preferred-height: 100%;
+                    alignment: center;
+                    VerticalBox {
+                        width: 300px;
+                        alignment: center;
+                        Text {
+                            text: is-empty-reason;
+                            font-size: 24px;
+                            wrap: word-wrap;
+                        }
+
+                        Button {
+                            text: is-empty-button-text;
+                            visible: is-empty-button-text != "";
+                            clicked => {
+                                root.empty-action-clicked();
+                            }
+                        }
+                    }
                 }
-                sort-descending(index) => {
-                    items-sort-descending(index)
-                }
-                current-row-changed(index) => {
-                    items-current-row-changed()
-                }
-                row-pointer-event(row, event, point) => {
-                    items-row-pointer-event(row, event, point)
+                items-table-view := StandardTableView {
+                    visible: !is-empty;
+                    horizontal-stretch: 1;
+                    rows: items-model;
+                    sort-ascending(index) => {
+                        items-sort-ascending(index)
+                    }
+                    sort-descending(index) => {
+                        items-sort-descending(index)
+                    }
+                    current-row-changed(index) => {
+                        items-current-row-changed()
+                    }
+                    row-pointer-event(row, event, point) => {
+                        items-row-pointer-event(row, event, point)
+                    }
                 }
             }
         }

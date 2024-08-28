@@ -72,6 +72,10 @@ impl<'a> SoftwareListDispenser<'a> {
 			.ok()
 			.cloned()
 	}
+
+	pub fn any_failures(&self) -> bool {
+		self.map.values().any(|x| x.is_err())
+	}
 }
 
 fn load_software_list(paths: &[String], name: &str) -> Result<Rc<SoftwareList>> {

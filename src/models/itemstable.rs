@@ -18,6 +18,7 @@ use slint::StandardListViewItem;
 use unicase::UniCase;
 
 use crate::appcommand::AppCommand;
+use crate::dialogs::file::PathType;
 use crate::guiutils::menuing::MenuDesc;
 use crate::info::InfoDb;
 use crate::prefs::BuiltinCollection;
@@ -35,7 +36,7 @@ const LOG: bool = false;
 
 pub struct ItemsTableModel {
 	info_db: RefCell<Option<Rc<InfoDb>>>,
-	software_list_paths: Vec<String>,
+	software_list_paths: RefCell<Vec<String>>,
 	columns: RefCell<Rc<[ColumnType]>>,
 	sorting: Cell<Option<(ColumnType, SortOrder)>>,
 	search: RefCell<String>,
@@ -46,6 +47,7 @@ pub struct ItemsTableModel {
 	selected_index: Cell<Option<u32>>,
 
 	selection: SelectionManager,
+	empty_callback: Box<dyn Fn(Option<EmptyReason>) + 'static>,
 	notify: ModelNotify,
 }
 
@@ -54,10 +56,11 @@ impl ItemsTableModel {
 		current_collection: Rc<PrefsCollection>,
 		software_list_paths: Vec<String>,
 		selection: SelectionManager,
+		empty_callback: impl Fn(Option<EmptyReason>) + 'static,
 	) -> Rc<Self> {
 		let result = Self {
 			info_db: RefCell::new(None),
-			software_list_paths,
+			software_list_paths: RefCell::new(software_list_paths),
 			columns: RefCell::new([].into()),
 			sorting: Cell::new(None),
 			search: RefCell::new("".into()),
@@ -67,6 +70,7 @@ impl ItemsTableModel {
 			selected_index: Cell::new(None),
 
 			selection,
+			empty_callback: Box::new(empty_callback),
 			notify: ModelNotify::default(),
 		};
 		Rc::new(result)
@@ -83,68 +87,95 @@ impl ItemsTableModel {
 		self.refresh(selection);
 	}
 
+	pub fn set_software_list_paths(&self, software_list_paths: Vec<String>) {
+		let selection = self.current_selection();
+		self.software_list_paths.replace(software_list_paths);
+		self.refresh(&selection);
+	}
+
 	fn refresh(&self, selection: &[PrefsItem]) {
 		self.selected_index.set(None);
 		let info_db = self.info_db.borrow();
 		let collection = self.current_collection.borrow().clone();
 
-		let mut dispenser = SoftwareListDispenser::new(&self.software_list_paths);
+		let (items, any_dispenser_failures) = {
+			let software_list_paths = self.software_list_paths.borrow();
+			let mut dispenser = SoftwareListDispenser::new(&software_list_paths);
 
-		let items = info_db.as_ref().map(|info_db| match collection.as_ref() {
-			PrefsCollection::Builtin(BuiltinCollection::All) => {
-				let machine_count = info_db.machines().len();
-				(0..machine_count)
-					.map(|machine_index| Item::Machine { machine_index })
-					.collect::<Rc<[_]>>()
+			let items = info_db.as_ref().map(|info_db| match collection.as_ref() {
+				PrefsCollection::Builtin(BuiltinCollection::All) => {
+					let machine_count = info_db.machines().len();
+					(0..machine_count)
+						.map(|machine_index| Item::Machine { machine_index })
+						.collect::<Rc<[_]>>()
+				}
+				PrefsCollection::Builtin(BuiltinCollection::AllSoftware) => info_db
+					.software_lists()
+					.iter()
+					.filter_map(|x| dispenser.get(&x.name()))
+					.flat_map(|list| {
+						list.software
+							.iter()
+							.map(|s| (list.clone(), s.clone()))
+							.collect::<Vec<_>>()
+					})
+					.map(|(software_list, software)| Item::Software {
+						software_list,
+						software,
+					})
+					.collect::<Rc<[_]>>(),
+
+				PrefsCollection::MachineSoftware { machine_name } => info_db
+					.machines()
+					.find(machine_name)
+					.into_iter()
+					.flat_map(|x| x.software_lists().iter())
+					.filter_map(|x| dispenser.get(&x.name()))
+					.flat_map(|list| {
+						list.software
+							.iter()
+							.map(|s| (list.clone(), s.clone()))
+							.collect::<Vec<_>>()
+					})
+					.map(|(software_list, software)| Item::Software {
+						software_list,
+						software,
+					})
+					.collect::<Rc<[_]>>(),
+				PrefsCollection::Folder { name: _, items } => items
+					.iter()
+					.filter_map(|item| match item {
+						PrefsItem::Machine { machine_name } => info_db
+							.machines()
+							.find_index(machine_name)
+							.map(|machine_index| Item::Machine { machine_index }),
+						PrefsItem::Software { .. } => todo!(),
+					})
+					.collect::<Rc<[_]>>(),
+			});
+			let items = items.unwrap_or_else(|| Rc::new([]));
+			(items, dispenser.any_failures())
+		};
+
+		// if we're empty, try to gauge why and broadcast the result
+		let empty_reason = items.is_empty().then(|| {
+			if info_db.is_none() {
+				EmptyReason::NoInfoDb
+			} else if any_dispenser_failures {
+				EmptyReason::NoSoftwareLists
+			} else if matches!(collection.as_ref(), PrefsCollection::Folder { name: _, items } if items.is_empty() ) {
+				EmptyReason::Folder
+			} else {
+				EmptyReason::Unknown
 			}
-			PrefsCollection::Builtin(BuiltinCollection::AllSoftware) => info_db
-				.software_lists()
-				.iter()
-				.filter_map(|x| dispenser.get(&x.name()))
-				.flat_map(|list| {
-					list.software
-						.iter()
-						.map(|s| (list.clone(), s.clone()))
-						.collect::<Vec<_>>()
-				})
-				.map(|(software_list, software)| Item::Software {
-					software_list,
-					software,
-				})
-				.collect::<Rc<[_]>>(),
-
-			PrefsCollection::MachineSoftware { machine_name } => info_db
-				.machines()
-				.find(machine_name)
-				.into_iter()
-				.flat_map(|x| x.software_lists().iter())
-				.filter_map(|x| dispenser.get(&x.name()))
-				.flat_map(|list| {
-					list.software
-						.iter()
-						.map(|s| (list.clone(), s.clone()))
-						.collect::<Vec<_>>()
-				})
-				.map(|(software_list, software)| Item::Software {
-					software_list,
-					software,
-				})
-				.collect::<Rc<[_]>>(),
-			PrefsCollection::Folder { name: _, items } => items
-				.iter()
-				.filter_map(|item| match item {
-					PrefsItem::Machine { machine_name } => info_db
-						.machines()
-						.find_index(machine_name)
-						.map(|machine_index| Item::Machine { machine_index }),
-					PrefsItem::Software { .. } => todo!(),
-				})
-				.collect::<Rc<[_]>>(),
 		});
-		let items = items.unwrap_or_else(|| Rc::new([]));
+		(self.empty_callback)(empty_reason);
+
+		// update the items
 		self.items.replace(items);
 		self.update_items_map();
 
+		// and reset the collection
 		self.set_current_selection(selection);
 	}
 
@@ -355,6 +386,32 @@ impl Model for ItemsTableModel {
 
 	fn as_any(&self) -> &dyn Any {
 		self
+	}
+}
+
+/// Sometimes, the items view is empty - we can (try to) report why
+#[derive(Clone, Copy, Debug, strum_macros::Display)]
+pub enum EmptyReason {
+	#[strum(to_string = "BletchMAME needs a working MAME to function")]
+	NoInfoDb,
+	#[strum(to_string = "Unable to find any software lists")]
+	NoSoftwareLists,
+	#[strum(to_string = "This folder is empty")]
+	Folder,
+	#[strum(to_string = "Nothing to show for some reason!")]
+	Unknown,
+}
+
+impl EmptyReason {
+	pub fn action(&self) -> Option<(AppCommand, &'static str)> {
+		match self {
+			EmptyReason::NoInfoDb => Some((AppCommand::ChoosePath(PathType::MameExecutable), "Find MAME")),
+			EmptyReason::NoSoftwareLists => Some((
+				AppCommand::ChoosePath(PathType::SoftwareLists),
+				"Find Software Lists...",
+			)),
+			_ => None,
+		}
 	}
 }
 
