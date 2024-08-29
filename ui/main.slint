@@ -86,7 +86,7 @@ export component AppWindow inherits Window {
                 }
 
                 LineEdit {
-                    text: items-search-text;
+                    text <=> items-search-text;
                     enabled: !is-empty;
                     edited(text) => {
                         items-search-text-changed(text)

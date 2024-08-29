@@ -714,6 +714,7 @@ dependencies = [
  "tokio",
  "unicase",
  "vivi_ui",
+ "winapi",
  "winit",
 ]
 

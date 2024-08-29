@@ -1,3 +1,4 @@
+#![windows_subsystem = "windows"]
 mod appcommand;
 mod appwindow;
 mod collections;
@@ -15,6 +16,8 @@ mod threadlocalbubble;
 mod xml;
 
 use std::path::PathBuf;
+use winapi::um::wincon::AttachConsole;
+use winapi::um::wincon::ATTACH_PARENT_PROCESS;
 
 use dirs::config_local_dir;
 use slint::ComponentHandle;
@@ -70,6 +73,12 @@ fn main() {
 		}
 		path
 	});
+
+	// on Windows, attach to the parent's console - debugging is hell if we don't do this
+	#[cfg(target_os = "windows")]
+	unsafe {
+		AttachConsole(ATTACH_PARENT_PROCESS);
+	}
 
 	// set up the tokio runtime
 	let tokio_runtime = tokio::runtime::Builder::new_current_thread().build().unwrap();
