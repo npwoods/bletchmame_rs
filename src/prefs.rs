@@ -13,6 +13,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use slint::LogicalSize;
 
+use crate::history::History;
 use crate::Error;
 use crate::Result;
 
@@ -23,7 +24,7 @@ pub struct Preferences {
 	pub prefs_path: Option<PathBuf>,
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
-	pub paths: PrefsPaths,
+	pub paths: Rc<PrefsPaths>,
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub window_size: Option<PrefsSize>,
@@ -41,7 +42,7 @@ pub struct Preferences {
 	pub history_position: usize,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct PrefsPaths {
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
@@ -219,6 +220,9 @@ fn load_prefs_from_reader(reader: impl Read) -> Result<Preferences> {
 
 /// special treatments to enforce variants
 fn prefs_treatments(prefs: &mut Preferences) {
+	// purge irrelevant history entries
+	prefs.purge_stray_entries();
+
 	// ensure that history is not empty
 	if prefs.history.is_empty() {
 		prefs.history = Preferences::fresh(None).history;

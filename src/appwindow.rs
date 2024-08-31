@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -88,14 +87,41 @@ impl AppModel {
 		func(items_model)
 	}
 
-	pub fn modify_prefs(&self, func: impl FnOnce(&mut Preferences)) {
-		// modify actual preferences
-		let mut prefs = self.preferences.borrow_mut();
-		func(&mut prefs);
-		drop(prefs);
+	pub fn modify_prefs(self: &Rc<Self>, func: impl FnOnce(&mut Preferences)) {
+		// modify actual preferences, and while we're at it get the old prefs for comparison
+		// purposes
+		let old_prefs = {
+			let mut prefs = self.preferences.borrow_mut();
+			let old_prefs = prefs.clone();
+			func(&mut prefs);
+			old_prefs
+		};
 
-		// and save (ignore errors)
+		// reborrow prefs (but not mutably)
+		let prefs = self.preferences.borrow();
+
+		// save (ignore errors)
 		let _ = self.preferences.borrow().save();
+
+		// react to all of the possible changes
+		if prefs.collections != old_prefs.collections {
+			self.with_collections_view_model(|x| x.update(&prefs.collections));
+		}
+		if prefs.current_history_entry() != old_prefs.current_history_entry() {
+			update_ui_for_current_history_item(self);
+		}
+		if prefs.items_columns != old_prefs.items_columns {
+			update_ui_for_sort_changes(self);
+		}
+		if prefs.paths != old_prefs.paths {
+			if prefs.paths.mame_executable != old_prefs.paths.mame_executable {
+				let fut = process_mame_listxml(self.clone());
+				spawn_local(fut).unwrap();
+			}
+			if prefs.paths.software_lists != old_prefs.paths.software_lists {
+				software_paths_updated(self);
+			}
+		}
 	}
 
 	pub fn subscribe_to_info_db_changes(&self, func: impl Fn(Option<Rc<InfoDb>>, &Preferences) + 'static) {
@@ -388,11 +414,10 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			model.modify_prefs(|prefs| {
 				toggle_builtin_collection(&mut prefs.collections, col);
 			});
-			model.with_collections_view_model(|x| x.update(&model.preferences.borrow().collections));
 		}
 		AppCommand::HelpRefreshInfoDb => {
 			let model = model.clone();
-			spawn_local(process_mame_listxml(model, None)).unwrap();
+			spawn_local(process_mame_listxml(model)).unwrap();
 		}
 		AppCommand::HelpWebSite => {
 			let _ = open::that("https://www.bletchmame.org");
@@ -406,11 +431,9 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			model.modify_prefs(|prefs| {
 				prefs.history_push(collection);
 			});
-			update_ui_for_current_history_item(model);
 		}
 		AppCommand::HistoryAdvance(delta) => {
 			model.modify_prefs(|prefs| prefs.history_advance(delta));
-			update_ui_for_current_history_item(model);
 		}
 		AppCommand::SearchText(search) => {
 			model.modify_prefs(|prefs| {
@@ -419,8 +442,6 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				current_entry.sort_suppressed = !search.is_empty();
 				current_entry.search = search;
 			});
-			update_ui_for_sort_changes(model);
-			update_items_model_for_columns_and_search(model);
 		}
 		AppCommand::ItemsSort(column_index, order) => {
 			model.modify_prefs(|prefs| {
@@ -429,7 +450,6 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				}
 				prefs.current_history_entry_mut().sort_suppressed = false;
 			});
-			update_items_model_for_columns_and_search(model);
 		}
 		AppCommand::ItemsSelectedChanged => {
 			let selection = model.with_items_table_model(|x| x.current_selection());
@@ -446,7 +466,6 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			model.modify_prefs(|prefs| {
 				add_items_to_new_folder_collection(&mut prefs.collections, name, items);
 			});
-			model.with_collections_view_model(|x| x.update(&model.preferences.borrow().collections));
 		}
 		AppCommand::AddToNewFolderDialog(items) => {
 			let existing_names = get_folder_collection_names(&model.preferences.borrow().collections);
@@ -461,15 +480,23 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			spawn_local(fut).unwrap();
 		}
 		AppCommand::MoveCollection { old_index, new_index } => {
-			let mut prefs = model.preferences.borrow_mut();
-			let collection = prefs.collections.remove(old_index);
-			if let Some(new_index) = new_index {
-				prefs.collections.insert(new_index, collection);
-			}
-			model.with_collections_view_model(|x| x.update(&prefs.collections));
+			model.modify_prefs(|prefs| {
+				// detach the collection we're moving
+				let collection = prefs.collections.remove(old_index);
+
+				if let Some(new_index) = new_index {
+					// and readd it
+					prefs.collections.insert(new_index, collection);
+				}
+				else {
+					// the colleciton is being removed; we need to remove any entries that
+					// might be referenced
+					prefs.purge_stray_entries();
+				}
+			});
 		}
 		AppCommand::ChoosePath(path_type) => {
-			choose_path(model.clone(), path_type);
+			choose_path(model, path_type);
 		}
 	};
 }
@@ -491,19 +518,14 @@ async fn try_load_persisted_info_db(model: Rc<AppModel>) {
 		update(&model);
 	} else {
 		// we errored for whatever reason; kick off a process to read it
-		process_mame_listxml(model, None).await;
+		process_mame_listxml(model).await;
 	}
 }
 
 /// loads MAME by launching `mame -listxml`
-async fn process_mame_listxml(model: Rc<AppModel>, new_mame_executable: Option<Option<String>>) {
+async fn process_mame_listxml(model: Rc<AppModel>) {
 	// identify the (optional) MAME executable (which can be passed to us or in preferences)
-	let mame_executable = if let Some(new_mame_executable) = new_mame_executable.as_ref() {
-		new_mame_executable.as_ref().map(Cow::Borrowed)
-	} else {
-		let prefs = model.preferences.borrow();
-		prefs.paths.mame_executable.as_ref().cloned().map(Cow::Owned)
-	};
+	let mame_executable = model.preferences.borrow().paths.mame_executable.clone();
 
 	// do we have a MAME executable?  if so show the dialog
 	let info_db = if let Some(mame_executable) = mame_executable {
@@ -525,11 +547,6 @@ async fn process_mame_listxml(model: Rc<AppModel>, new_mame_executable: Option<O
 		None
 	};
 
-	// since we've gotten this far (Info DB or not), its time to save the path
-	if let Some(new_mame_executable) = new_mame_executable.as_ref() {
-		model.modify_prefs(|prefs| prefs.paths.mame_executable.clone_from(new_mame_executable));
-	}
-
 	// set the model to use the new Info DB
 	model.set_info_db(info_db);
 
@@ -540,17 +557,9 @@ async fn process_mame_listxml(model: Rc<AppModel>, new_mame_executable: Option<O
 async fn show_paths_dialog(model: Rc<AppModel>) {
 	let parent = model.app_window_weak.clone();
 	let paths = model.preferences.borrow().paths.clone();
-	let Some(result) = dialog_paths(parent, paths).await else {
-		return;
-	};
-
-	model.modify_prefs(|prefs| prefs.paths = result.paths);
-	if result.mame_executable_changed {
-		let model = model.clone();
-		spawn_local(process_mame_listxml(model, None)).unwrap();
-	}
-	if result.software_lists_changed {
-		software_paths_updated(&model);
+	if let Some(new_paths) = dialog_paths(parent, paths).await {
+		let new_paths = Rc::new(new_paths);
+		model.modify_prefs(|prefs| prefs.paths = new_paths);
 	}
 }
 
@@ -633,7 +642,7 @@ fn update_items_model_for_columns_and_search(model: &AppModel) {
 	});
 }
 
-fn update_prefs(model: &AppModel) {
+fn update_prefs(model: &Rc<AppModel>) {
 	model.modify_prefs(|prefs| {
 		// update window size
 		let physical_size = model.app_window().window().size();
@@ -663,23 +672,25 @@ fn update_empty_reason(model: &AppModel, empty_reason: Option<EmptyReason>) {
 	model.empty_button_command.replace(button_command);
 }
 
-fn choose_path(model: Rc<AppModel>, path_type: PathType) {
+fn choose_path(model: &Rc<AppModel>, path_type: PathType) {
 	// open the file dialog
 	let Some(path) = file_dialog(&model.app_window(), path_type) else {
 		return;
 	};
 
 	// and respond to the change
-	match path_type {
-		PathType::MameExecutable => {
-			let new_mame_executable = Some(Some(path));
-			spawn_local(process_mame_listxml(model, new_mame_executable)).unwrap();
-		}
-		PathType::SoftwareLists => {
-			model.preferences.borrow_mut().paths.software_lists = vec![path];
-			software_paths_updated(&model);
-		}
-	}
+	model.modify_prefs(|prefs| {
+		let mut paths = (*prefs.paths).clone();
+		match path_type {
+			PathType::MameExecutable => {
+				paths.mame_executable = Some(path);
+			}
+			PathType::SoftwareLists => {
+				paths.software_lists = vec![path];
+			}
+		};
+		prefs.paths = Rc::new(paths);
+	});
 }
 
 fn software_paths_updated(model: &AppModel) {

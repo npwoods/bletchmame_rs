@@ -1,3 +1,5 @@
+use std::cmp::min;
+use std::collections::HashSet;
 use std::rc::Rc;
 
 use crate::prefs::HistoryEntry;
@@ -13,6 +15,7 @@ pub trait History {
 	fn current_collection(&self) -> (Rc<PrefsCollection>, Option<usize>);
 	fn current_history_entry(&self) -> &HistoryEntry;
 	fn current_history_entry_mut(&mut self) -> &mut HistoryEntry;
+	fn purge_stray_entries(&mut self);
 }
 
 pub trait HistoryContainer {
@@ -79,6 +82,29 @@ where
 		let history_len = history.len();
 		&mut history[history_len - *position - 1]
 	}
+
+	fn purge_stray_entries(&mut self) {
+		// get a list of all folder names
+		let folder_names = self
+			.collections()
+			.iter()
+			.filter_map(|collection| collection_folder_name(&collection))
+			.map(|x| x.to_string())
+			.collect::<HashSet<_>>();
+
+		// access the history
+		let (history, position) = self.entries_mut();
+
+		// and retain everything - except folders that are no longer named
+		let history_entries = history.drain(..).collect::<Vec<_>>();
+		let (new_history, new_position) = retain_with_position(history_entries, *position, |entry| {
+			!collection_folder_name(&entry.collection).is_some_and(|x| !folder_names.contains(x))
+		});
+
+		// override the old history
+		*history = new_history;
+		*position = new_position;
+	}
 }
 
 fn advance_position(position: usize, length: usize, delta: isize) -> Option<usize> {
@@ -98,6 +124,25 @@ fn sanitize_collection(collection: Rc<PrefsCollection>) -> Rc<PrefsCollection> {
 	} else {
 		collection
 	}
+}
+
+fn collection_folder_name(collection: &PrefsCollection) -> Option<&str> {
+	if let PrefsCollection::Folder { name, items: _ } = collection {
+		Some(name)
+	} else {
+		None
+	}
+}
+
+fn retain_with_position<T>(mut vec: Vec<T>, position: usize, mut f: impl FnMut(&T) -> bool) -> (Vec<T>, usize) {
+	let new_position = if f(&vec[position]) {
+		vec.iter().take(position).filter(|&x| f(x)).count()
+	} else {
+		position
+	};
+	vec.retain(f);
+	let new_position = min(new_position, vec.len() - 1);
+	(vec, new_position)
 }
 
 impl HistoryContainer for Preferences {
@@ -127,5 +172,22 @@ mod test {
 	pub fn advance_position(_index: usize, position: usize, length: usize, delta: isize, expected: Option<usize>) {
 		let actual = super::advance_position(position, length, delta);
 		assert_eq!(expected, actual);
+	}
+
+	#[test_case(0, &['A', 'B', 'C', 'D'], 2, &['A', 'B', 'C', 'D'], 2)]
+	#[test_case(1, &['A', 'X', 'C', 'D'], 2, &['A', 'C', 'D'], 1)]
+	#[test_case(2, &['A', 'B', 'X', 'D'], 2, &['A', 'B', 'D'], 2)]
+	#[test_case(3, &['A', 'B', 'C', 'X'], 2, &['A', 'B', 'C'], 2)]
+	#[test_case(4, &['A', 'B', 'C', 'X'], 3, &['A', 'B', 'C'], 2)]
+	pub fn retain_with_position(
+		_index: usize,
+		input: &[char],
+		input_position: usize,
+		expected: &[char],
+		expected_position: usize,
+	) {
+		let input = input.to_vec();
+		let (actual, actual_position) = super::retain_with_position(input, input_position, |&x| x != 'X');
+		assert_eq!((expected.to_vec(), expected_position), (actual, actual_position));
 	}
 }

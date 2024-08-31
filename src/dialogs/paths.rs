@@ -25,16 +25,10 @@ use crate::ui::Icons;
 use crate::ui::MagicListViewItem;
 use crate::ui::PathsDialog;
 
-pub struct PathsDialogResult {
-	pub paths: PrefsPaths,
-	pub mame_executable_changed: bool,
-	pub software_lists_changed: bool,
-}
-
 struct State {
 	dialog_weak: Weak<PathsDialog>,
 	paths: RefCell<PrefsPaths>,
-	original_paths: PrefsPaths,
+	original_paths: Rc<PrefsPaths>,
 }
 
 impl Debug for State {
@@ -46,16 +40,13 @@ impl Debug for State {
 	}
 }
 
-pub async fn dialog_paths(
-	parent: Weak<impl ComponentHandle + 'static>,
-	paths: PrefsPaths,
-) -> Option<PathsDialogResult> {
+pub async fn dialog_paths(parent: Weak<impl ComponentHandle + 'static>, paths: Rc<PrefsPaths>) -> Option<PrefsPaths> {
 	// prepare the dialog
 	let dialog = with_modal_parent(&parent.unwrap(), || PathsDialog::new().unwrap());
 	let single_result = SingleResult::default();
 	let state = State {
 		dialog_weak: dialog.as_weak(),
-		paths: RefCell::new(paths.clone()),
+		paths: RefCell::new((*paths).clone()),
 		original_paths: paths,
 	};
 	let state = Rc::new(state);
@@ -132,18 +123,7 @@ pub async fn dialog_paths(
 	drop(dialog);
 
 	// if the user hit "ok", return
-	accepted.then(|| {
-		let state = Rc::try_unwrap(state).unwrap();
-		let paths = state.paths.into_inner();
-		let original_paths = state.original_paths;
-		let mame_executable_changed = paths.mame_executable != original_paths.mame_executable;
-		let software_lists_changed = paths.software_lists != original_paths.software_lists;
-		PathsDialogResult {
-			paths,
-			mame_executable_changed,
-			software_lists_changed,
-		}
-	})
+	accepted.then(|| Rc::try_unwrap(state).unwrap().paths.into_inner())
 }
 
 fn path_type(dialog: &PathsDialog) -> PathType {
@@ -226,7 +206,7 @@ fn model_contents_changed(state: &State) {
 		PathType::SoftwareLists => paths.software_lists = entries_iter.collect(),
 	}
 
-	dialog.set_ok_enabled(*paths != *original_paths);
+	dialog.set_ok_enabled(*paths != **original_paths);
 }
 
 fn assign_if_changed<T>(target: &mut T, source: T) -> bool

@@ -149,7 +149,20 @@ impl ItemsTableModel {
 							.machines()
 							.find_index(machine_name)
 							.map(|machine_index| Item::Machine { machine_index }),
-						PrefsItem::Software { .. } => todo!(),
+						PrefsItem::Software {
+							software_list,
+							software,
+						} => dispenser.get(software_list).and_then(|software_list| {
+							software_list
+								.software
+								.iter()
+								.find(|x| x.name.as_ref() == software)
+								.cloned()
+								.map(|software| Item::Software {
+									software_list,
+									software,
+								})
+						}),
 					})
 					.collect::<Rc<[_]>>(),
 			});
