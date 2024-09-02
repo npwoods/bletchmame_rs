@@ -3,7 +3,12 @@ use serde::Deserialize;
 use strum::EnumString;
 
 pub trait Fixup {
-	fn identify_machine_indexes(&mut self) -> impl IntoIterator<Item = &mut u32>;
+	fn identify_machine_indexes(&mut self) -> impl IntoIterator<Item = &mut u32> {
+		[]
+	}
+	fn identify_software_list_indexes(&mut self) -> impl IntoIterator<Item = &mut u32> {
+		[]
+	}
 }
 
 #[derive(Clone, Copy, Debug, Default, BinarySerde)]
@@ -13,7 +18,9 @@ pub struct Header {
 	pub build_strindex: u32,
 	pub machine_count: u32,
 	pub chips_count: u32,
-	pub software_lists_count: u32,
+	pub software_list_count: u32,
+	pub software_list_machine_count: u32,
+	pub machine_software_lists_count: u32,
 }
 
 #[derive(Clone, Copy, Debug, Default, BinarySerde)]
@@ -27,8 +34,8 @@ pub struct Machine {
 	pub manufacturer_strindex: u32,
 	pub chips_index: u32,
 	pub chips_count: u32,
-	pub software_lists_index: u32,
-	pub software_lists_count: u32,
+	pub machine_software_lists_index: u32,
+	pub machine_software_lists_count: u32,
 	pub runnable: bool,
 }
 
@@ -56,11 +63,17 @@ pub enum ChipType {
 }
 
 #[derive(Clone, Copy, Debug, BinarySerde)]
-pub struct SoftwareList {
+pub struct MachineSoftwareList {
 	pub tag_strindex: u32,
-	pub name_strindex: u32,
+	pub software_list_index: u32,
 	pub status: SoftwareListStatus,
 	pub filter_strindex: u32,
+}
+
+impl Fixup for MachineSoftwareList {
+	fn identify_software_list_indexes(&mut self) -> impl IntoIterator<Item = &mut u32> {
+		[&mut self.software_list_index]
+	}
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, BinarySerde, EnumString, PartialEq, Eq)]
@@ -70,6 +83,14 @@ pub enum SoftwareListStatus {
 	Original,
 	#[strum(serialize = "compatible")]
 	Compatible,
+}
+
+#[derive(Clone, Copy, Debug, BinarySerde)]
+pub struct SoftwareList {
+	pub name_strindex: u32,
+	pub software_list_machines_index: u32,
+	pub software_list_original_machines_count: u32,
+	pub software_list_compatible_machines_count: u32,
 }
 
 #[cfg(test)]

@@ -29,8 +29,9 @@ use crate::Result;
 pub use self::binary::ChipType;
 pub use self::binary::SoftwareListStatus;
 pub use self::entities::ChipsView;
+pub use self::entities::MachineSoftwareListsView;
 pub use self::entities::MachinesView;
-pub use self::entities::SoftwareListsView;
+pub use self::entities::SoftwareListView;
 pub use self::smallstr::SmallStrRef;
 
 use self::build::calculate_sizes_hash;
@@ -46,6 +47,8 @@ pub struct InfoDb {
 	machines: RootView<binary::Machine>,
 	chips: RootView<binary::Chip>,
 	software_lists: RootView<binary::SoftwareList>,
+	software_list_machines: RootView<u32>,
+	machine_software_lists: RootView<binary::MachineSoftwareList>,
 	strings_offset: usize,
 	build_strindex: u32,
 }
@@ -63,7 +66,9 @@ impl InfoDb {
 		let mut cursor = binary::Header::SERIALIZED_SIZE..data.len();
 		let machines = next_root_view(&mut cursor, hdr.machine_count)?;
 		let chips = next_root_view(&mut cursor, hdr.chips_count)?;
-		let software_lists = next_root_view(&mut cursor, hdr.software_lists_count)?;
+		let software_lists = next_root_view(&mut cursor, hdr.software_list_count)?;
+		let software_list_machines = next_root_view(&mut cursor, hdr.software_list_machine_count)?;
+		let machine_software_lists = next_root_view(&mut cursor, hdr.machine_software_lists_count)?;
 
 		// validations we want to skip if we're creating things ourselves
 		if !skip_validations {
@@ -76,6 +81,8 @@ impl InfoDb {
 			machines,
 			chips,
 			software_lists,
+			software_list_machines,
+			machine_software_lists,
 			strings_offset: cursor.start,
 			build_strindex: hdr.build_strindex,
 		};
@@ -127,8 +134,12 @@ impl InfoDb {
 		self.make_view(&self.chips)
 	}
 
-	pub fn software_lists(&self) -> SoftwareListsView<'_> {
+	pub fn software_lists(&self) -> SoftwareListView<'_> {
 		self.make_view(&self.software_lists)
+	}
+
+	pub fn machine_software_lists(&self) -> MachineSoftwareListsView<'_> {
+		self.make_view(&self.machine_software_lists)
 	}
 
 	fn string(&self, offset: u32) -> SmallStrRef<'_> {
@@ -473,15 +484,15 @@ mod test {
 	}
 
 	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", &[("coco_cart_list", "coco_cart"), ("coco_flop_list", "coco_flop"), ("dragon_cart_list", "dragon_cart")])]
-	pub fn software_lists(_index: usize, xml: &str, machine: &str, expected: &[(&str, &str)]) {
+	pub fn machine_software_lists(_index: usize, xml: &str, machine: &str, expected: &[(&str, &str)]) {
 		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
 		let actual = db
 			.machines()
 			.find(machine)
 			.unwrap()
-			.software_lists()
+			.machine_software_lists()
 			.iter()
-			.map(|software_list| (software_list.tag().to_string(), software_list.name().to_string()))
+			.map(|msl| (msl.tag().to_string(), msl.software_list().name().to_string()))
 			.collect::<Vec<_>>();
 
 		let expected = expected

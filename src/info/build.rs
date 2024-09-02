@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Formatter;
@@ -46,9 +47,16 @@ struct State {
 	phase: Phase,
 	machines: BinBuilder<binary::Machine>,
 	chips: BinBuilder<binary::Chip>,
-	software_lists: BinBuilder<binary::SoftwareList>,
+	machine_software_lists: BinBuilder<binary::MachineSoftwareList>,
 	strings: StringTableBuilder,
+	software_lists: BTreeMap<String, SoftwareListBuild>,
 	build_strindex: u32,
+}
+
+#[derive(Debug, Default)]
+struct SoftwareListBuild {
+	pub originals: Vec<u32>,
+	pub compatibles: Vec<u32>,
 }
 
 impl State {
@@ -62,9 +70,10 @@ impl State {
 		// reserve space based the same MAME version as above
 		Self {
 			phase: Phase::Root,
-			machines: BinBuilder::new(48000),      // 44092 machines,
-			chips: BinBuilder::new(190000),        // 174679 chips
-			software_lists: BinBuilder::new(6800), // 6337 software lists
+			machines: BinBuilder::new(48000),              // 44092 machines,
+			chips: BinBuilder::new(190000),                // 174679 chips
+			machine_software_lists: BinBuilder::new(6800), // 6337 software lists
+			software_lists: BTreeMap::new(),
 			strings,
 			build_strindex,
 		}
@@ -105,7 +114,7 @@ impl State {
 					clone_of_machine_index,
 					rom_of_machine_index,
 					chips_index: self.chips.len(),
-					software_lists_index: self.software_lists.len(),
+					machine_software_lists_index: self.machine_software_lists.len(),
 					runnable,
 					..Default::default()
 				};
@@ -138,17 +147,28 @@ impl State {
 				let Some(status) = status.and_then(|x| x.as_ref().parse::<SoftwareListStatus>().ok()) else {
 					return Ok(None);
 				};
+				let Some(name) = name else {
+					return Ok(None);
+				};
 				let tag_strindex = self.strings.lookup(&tag.unwrap_or_default());
-				let name_strindex = self.strings.lookup(&name.unwrap_or_default());
+				let name_strindex = self.strings.lookup(&name);
 				let filter_strindex = self.strings.lookup(&filter.unwrap_or_default());
-				let software_list = binary::SoftwareList {
+				let machine_software_list = binary::MachineSoftwareList {
 					tag_strindex,
-					name_strindex,
+					software_list_index: name_strindex,
 					status,
 					filter_strindex,
 				};
-				self.software_lists.push(software_list);
-				self.machines.increment(|m| &mut m.software_lists_count)?;
+				self.machine_software_lists.push(machine_software_list);
+				self.machines.increment(|m| &mut m.machine_software_lists_count)?;
+
+				// add this machine to the global software list
+				let software_list = self.software_lists.entry(name.to_string()).or_default();
+				let list = match status {
+					SoftwareListStatus::Original => &mut software_list.originals,
+					SoftwareListStatus::Compatible => &mut software_list.compatibles,
+				};
+				list.push(self.machines.items().next_back().unwrap().name_strindex);
 				Some(Phase::MachineSubtag)
 			}
 			_ => None,
@@ -230,8 +250,52 @@ impl State {
 				.or_else(|| self.strings.lookup_immut(&self.strings.index(strindex)))
 		};
 
+		// software lists require special processing
+		let mut software_list_machines = BinBuilder::<u32>::new(0);
+		let mut software_list_indexmap = HashMap::new();
+		let software_lists = self
+			.software_lists
+			.into_iter()
+			.enumerate()
+			.map(|(index, (software_list_name, data))| {
+				let index = u32::try_from(index).unwrap();
+				let name_strindex = self.strings.lookup_immut(&software_list_name).unwrap();
+				let software_list_machines_index = software_list_machines.len();
+				let software_list_original_machines_count = data.originals.len().try_into().unwrap();
+				let software_list_compatible_machines_count = data.compatibles.len().try_into().unwrap();
+				let entry = binary::SoftwareList {
+					name_strindex,
+					software_list_machines_index,
+					software_list_original_machines_count,
+					software_list_compatible_machines_count,
+				};
+				software_list_machines.extend(data.originals);
+				software_list_machines.extend(data.compatibles);
+				software_list_indexmap.insert(name_strindex, index);
+				entry
+			})
+			.collect::<BinBuilder<_>>();
+		let software_list_indexmap = |software_list_index| {
+			software_list_indexmap
+				.get(&software_list_index)
+				.copied()
+				.or_else(|| self.strings.lookup_immut(&self.strings.index(software_list_index)))
+				.unwrap()
+		};
+
 		// and run the fixups
-		fixup(&mut self.machines, &self.strings, machines_indexmap)?;
+		fixup(
+			&mut self.machines,
+			&self.strings,
+			machines_indexmap,
+			software_list_indexmap,
+		)?;
+		fixup(
+			&mut self.machine_software_lists,
+			&self.strings,
+			machines_indexmap,
+			software_list_indexmap,
+		)?;
 
 		// assemble the header
 		let header = binary::Header {
@@ -240,9 +304,11 @@ impl State {
 			build_strindex: self.build_strindex,
 			machine_count: self.machines.len(),
 			chips_count: self.chips.len(),
-			software_lists_count: self.software_lists.len(),
+			software_list_count: software_lists.len(),
+			software_list_machine_count: software_list_machines.len(),
+			machine_software_lists_count: self.machine_software_lists.len(),
 		};
-		let mut header_bytes: [u8; binary::Header::SERIALIZED_SIZE] = Default::default();
+		let mut header_bytes = [0u8; binary::Header::SERIALIZED_SIZE];
 		header.binary_serialize(&mut header_bytes, ENDIANNESS);
 
 		// get all bytes and return
@@ -250,7 +316,9 @@ impl State {
 			.into_iter()
 			.chain(self.machines.into_iter())
 			.chain(self.chips.into_iter())
-			.chain(self.software_lists.into_iter())
+			.chain(software_lists.into_iter())
+			.chain(software_list_machines.into_iter())
+			.chain(self.machine_software_lists.into_iter())
 			.chain(self.strings.into_iter())
 			.collect();
 		Ok(bytes)
@@ -262,6 +330,7 @@ impl Debug for State {
 		f.debug_struct("State")
 			.field("phase", &self.phase)
 			.field("machines.len()", &self.machines.len())
+			.field("chips.len()", &self.chips.len())
 			.finish()
 	}
 }
@@ -270,6 +339,7 @@ fn fixup(
 	bin_builder: &mut BinBuilder<impl Fixup + BinarySerde>,
 	strings: &StringTableBuilder,
 	machines_indexmap: impl Fn(u32) -> Option<u32>,
+	software_list_indexmap: impl Fn(u32) -> u32,
 ) -> Result<()> {
 	bin_builder.tweak_all(|x| {
 		for machine_index in x.identify_machine_indexes() {
@@ -282,6 +352,9 @@ fn fixup(
 				!0
 			};
 			*machine_index = new_machine_index;
+		}
+		for software_list_index in x.identify_software_list_indexes() {
+			*software_list_index = software_list_indexmap(*software_list_index);
 		}
 		Ok(())
 	})
@@ -405,7 +478,7 @@ where
 		(self.vec.len() / T::SERIALIZED_SIZE).try_into().unwrap()
 	}
 
-	fn items(&self) -> impl Iterator<Item = T> + '_ {
+	fn items(&self) -> impl DoubleEndedIterator<Item = T> + '_ {
 		self.vec
 			.chunks(T::SERIALIZED_SIZE)
 			.map(|slice| T::binary_deserialize(slice, ENDIANNESS).unwrap())
@@ -430,6 +503,33 @@ where
 	}
 }
 
+impl<T> FromIterator<T> for BinBuilder<T>
+where
+	T: BinarySerde,
+{
+	fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+		let iter = iter.into_iter();
+		let (_, capacity) = iter.size_hint();
+		let capacity = capacity.unwrap_or_default();
+		let mut bin_builder = Self::new(capacity);
+		for obj in iter {
+			bin_builder.push(obj);
+		}
+		bin_builder
+	}
+}
+
+impl<T> Extend<T> for BinBuilder<T>
+where
+	T: BinarySerde,
+{
+	fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+		for obj in iter {
+			self.push(obj);
+		}
+	}
+}
+
 fn bool_attribute(text: impl AsRef<str>) -> bool {
 	let text = text.as_ref();
 	text == "yes" || text == "1" || text == "true"
@@ -442,6 +542,7 @@ pub fn calculate_sizes_hash() -> u64 {
 		binary::Machine::SERIALIZED_SIZE,
 		binary::Chip::SERIALIZED_SIZE,
 		binary::SoftwareList::SERIALIZED_SIZE,
+		binary::MachineSoftwareList::SERIALIZED_SIZE,
 	]
 	.into_iter()
 	.fold(0, |value, item| (value * multiplicand) ^ (item as u64))

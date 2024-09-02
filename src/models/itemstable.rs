@@ -110,9 +110,9 @@ impl ItemsTableModel {
 						.collect::<Rc<[_]>>()
 				}
 				PrefsCollection::Builtin(BuiltinCollection::AllSoftware) => info_db
-					.software_lists()
+					.machine_software_lists()
 					.iter()
-					.filter_map(|x| dispenser.get(&x.name()))
+					.filter_map(|x| dispenser.get(&x.software_list().name()))
 					.flat_map(|list| {
 						list.software
 							.iter()
@@ -129,8 +129,8 @@ impl ItemsTableModel {
 					.machines()
 					.find(machine_name)
 					.into_iter()
-					.flat_map(|x| x.software_lists().iter())
-					.filter_map(|x| dispenser.get(&x.name()))
+					.flat_map(|x| x.machine_software_lists().iter())
+					.filter_map(|x| dispenser.get(&x.software_list().name()))
 					.flat_map(|list| {
 						list.software
 							.iter()
@@ -209,9 +209,10 @@ impl ItemsTableModel {
 			Item::Machine { machine_index } => {
 				let machine = info_db.machines().get(*machine_index).unwrap();
 				let description = Cow::from(machine.description());
-				let browse_target = (!machine.software_lists().is_empty()).then(|| PrefsCollection::MachineSoftware {
-					machine_name: machine.name().to_string(),
-				});
+				let browse_target =
+					(!machine.machine_software_lists().is_empty()).then(|| PrefsCollection::MachineSoftware {
+						machine_name: machine.name().to_string(),
+					});
 				(description, browse_target)
 			}
 			Item::Software { software, .. } => {
