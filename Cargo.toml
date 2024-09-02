@@ -48,10 +48,12 @@ vivi_ui = { git = "https://seed.radicle.garden/z3oxAZSLcyXgpa7fcvgtueF49jHpH.git
 
 [profile.dev]
 opt-level = 1
+panic = "abort"
 
 [profile.release]
 lto = "fat"
 opt-level = "s"
+panic = "abort"
 
 [features]
 diagnostics = []

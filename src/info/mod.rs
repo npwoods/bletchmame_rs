@@ -334,23 +334,21 @@ where
 mod test {
 	use test_case::test_case;
 
-	use super::{ChipType, InfoDb};
+	use super::ChipType;
+	use super::InfoDb;
 
-	#[test_case(0, include_str!("test_data/listxml_alienar.xml"), "0.229 (mame0229)", 13, 1, &[("alienar", "1985"),("ipt_merge_any_hi", ""),("ls157", "")])]
-	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "0.229 (mame0229)", 104, 15, &[("acia6850", ""), ("address_map_bank", ""), ("ay8910", "")])]
-	#[test_case(2, include_str!("test_data/listxml_fake.xml"), "<<fake build>>", 2, 1, &[("fake", "2021"),("mc6809e", "")])]
+	#[test_case(0, include_str!("test_data/listxml_alienar.xml"), "0.229 (mame0229)", 13, 1, &["alienar", "ipt_merge_any_hi", "ls157"])]
+	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "0.229 (mame0229)", 104, 15, &["acia6850", "address_map_bank", "ay8910"])]
+	#[test_case(2, include_str!("test_data/listxml_fake.xml"), "<<fake build>>", 4, 3, &["blah", "fake", "fakefake", "mc6809e"])]
 	pub fn test(
 		_index: usize,
 		xml: &str,
 		expected_build: &str,
 		expected_machines_count: usize,
 		expected_runnable_machine_count: usize,
-		initial_expected: &[(&str, &str)],
+		initial_expected: &[&str],
 	) {
-		let initial_expected = initial_expected
-			.iter()
-			.map(|(name, year)| (name.to_string(), year.to_string()))
-			.collect::<Vec<_>>();
+		let initial_expected = initial_expected.iter().map(|name| name.to_string()).collect::<Vec<_>>();
 		let expected = (
 			expected_build.to_string(),
 			expected_machines_count,
@@ -363,7 +361,7 @@ mod test {
 			.machines()
 			.iter()
 			.take(initial_expected.len())
-			.map(|m| (m.name().to_string(), m.year().to_string()))
+			.map(|m| m.name().to_string())
 			.collect::<Vec<_>>();
 		let actual_runnable_machine_count = db.machines().iter().filter(|m| m.runnable()).count();
 		let actual = (
@@ -372,6 +370,46 @@ mod test {
 			actual_runnable_machine_count,
 			actual_initial_machines.as_slice(),
 		);
+		assert_eq!(expected, actual);
+	}
+
+	#[allow(clippy::too_many_arguments)]
+	#[test_case(0, include_str!("test_data/listxml_alienar.xml"), "alienar", "Alien Arena", "1985", "Duncan Brown", "williams.cpp", None, None)]
+	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "coco2b", "Color Computer 2B", "1985?", "Tandy Radio Shack", "coco12.cpp", Some("coco"), Some("coco"))]
+	#[test_case(2, include_str!("test_data/listxml_fake.xml"), "fake", "Fake Machine", "2021", "<Bletch>", "fake_machine.cpp", None, None)]
+	pub fn machine(
+		_index: usize,
+		xml: &str,
+		name: &str,
+		expected_description: &str,
+		expected_year: &str,
+		expected_manufacturer: &str,
+		expected_source_file: &str,
+		expected_clone_of: Option<&str>,
+		expected_rom_of: Option<&str>,
+	) {
+		let expected = (
+			name.to_string(),
+			expected_description.to_string(),
+			expected_year.to_string(),
+			expected_manufacturer.to_string(),
+			expected_source_file.to_string(),
+			expected_clone_of.map(|x| x.to_string()),
+			expected_rom_of.map(|x| x.to_string()),
+		);
+
+		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
+		let machine = db.machines().find(name).unwrap();
+		let actual = (
+			machine.name().to_string(),
+			machine.description().to_string(),
+			machine.year().to_string(),
+			machine.manufacturer().to_string(),
+			machine.source_file().to_string(),
+			machine.clone_of().map(|x| x.name().to_string()),
+			machine.rom_of().map(|x| x.name().to_string()),
+		);
+
 		assert_eq!(expected, actual);
 	}
 

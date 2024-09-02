@@ -6,6 +6,8 @@ pub type BoxDynError = Box<dyn std::error::Error + Send + Sync>;
 pub enum Error {
 	#[error("Error processing MAME -listxml output at position {0}: {1}")]
 	ListXmlProcessing(u64, BoxDynError),
+	#[error("Bad machine reference in MAME -listxml output")]
+	BadMachineReference(String),
 	#[error("Error loading preferences: {0}")]
 	PreferencesLoad(BoxDynError),
 	#[error("Error saving preferences: {0}")]

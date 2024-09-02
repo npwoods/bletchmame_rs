@@ -35,6 +35,16 @@ impl<'a> Machine<'a> {
 		self.string(|x| x.manufacturer_strindex)
 	}
 
+	pub fn clone_of(&self) -> Option<Machine<'a>> {
+		let clone_of_machine_index = self.obj().clone_of_machine_index.try_into().unwrap();
+		self.db.machines().get(clone_of_machine_index)
+	}
+
+	pub fn rom_of(&self) -> Option<Machine<'a>> {
+		let rom_of_machine_index = self.obj().rom_of_machine_index.try_into().unwrap();
+		self.db.machines().get(rom_of_machine_index)
+	}
+
 	pub fn runnable(&self) -> bool {
 		self.obj().runnable
 	}

@@ -2,6 +2,10 @@ use binary_serde::BinarySerde;
 use serde::Deserialize;
 use strum::EnumString;
 
+pub trait Fixup {
+	fn identify_machine_indexes(&mut self) -> impl IntoIterator<Item = &mut u32>;
+}
+
 #[derive(Clone, Copy, Debug, Default, BinarySerde)]
 pub struct Header {
 	pub magic: [u8; 8],
@@ -16,6 +20,8 @@ pub struct Header {
 pub struct Machine {
 	pub name_strindex: u32,
 	pub source_file_strindex: u32,
+	pub clone_of_machine_index: u32,
+	pub rom_of_machine_index: u32,
 	pub description_strindex: u32,
 	pub year_strindex: u32,
 	pub manufacturer_strindex: u32,
@@ -24,6 +30,12 @@ pub struct Machine {
 	pub software_lists_index: u32,
 	pub software_lists_count: u32,
 	pub runnable: bool,
+}
+
+impl Fixup for Machine {
+	fn identify_machine_indexes(&mut self) -> impl IntoIterator<Item = &mut u32> {
+		[&mut self.clone_of_machine_index, &mut self.rom_of_machine_index]
+	}
 }
 
 #[derive(Clone, Copy, Debug, BinarySerde)]

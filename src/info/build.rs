@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::io::BufRead;
@@ -10,6 +11,7 @@ use num::CheckedAdd;
 
 use crate::error::BoxDynError;
 use crate::info::binary;
+use crate::info::binary::Fixup;
 use crate::info::strings::StringTableBuilder;
 use crate::info::ChipType;
 use crate::info::SoftwareListStatus;
@@ -81,7 +83,8 @@ impl State {
 				Some(Phase::Mame)
 			}
 			(Phase::Mame, b"machine") => {
-				let [name, source_file, runnable] = evt.find_attributes([b"name", b"sourcefile", b"runnable"])?;
+				let [name, source_file, clone_of, rom_of, runnable] =
+					evt.find_attributes([b"name", b"sourcefile", b"cloneof", b"romof", b"runnable"])?;
 
 				if LOG {
 					println!(
@@ -93,10 +96,14 @@ impl State {
 				let Some(name) = name else { return Ok(None) };
 				let name_strindex = self.strings.lookup(&name);
 				let source_file_strindex = self.strings.lookup(&source_file.unwrap_or_default());
+				let clone_of_machine_index = self.strings.lookup(&clone_of.unwrap_or_default());
+				let rom_of_machine_index = self.strings.lookup(&rom_of.unwrap_or_default());
 				let runnable = runnable.map(bool_attribute).unwrap_or(true);
 				let machine = binary::Machine {
 					name_strindex,
 					source_file_strindex,
+					clone_of_machine_index,
+					rom_of_machine_index,
 					chips_index: self.chips.len(),
 					software_lists_index: self.software_lists.len(),
 					runnable,
@@ -187,13 +194,44 @@ impl State {
 		Ok(Some(new_phase))
 	}
 
-	pub fn into_data(mut self) -> Box<[u8]> {
+	pub fn into_data(mut self) -> Result<Box<[u8]>> {
+		// canonicalize name_strindex, so we don't have both inline and indexed
+		// small sting references
+		self.machines
+			.tweak_all(|machine| {
+				let old_strindex = machine.name_strindex;
+				let new_strindex = self
+					.strings
+					.lookup_immut(&self.strings.index(old_strindex))
+					.unwrap_or(old_strindex);
+				machine.name_strindex = new_strindex;
+				Ok::<(), ()>(())
+			})
+			.unwrap();
+
 		// sort machines
 		self.machines.sort_by(|a, b| {
 			let a = self.strings.index(a.name_strindex);
 			let b = self.strings.index(b.name_strindex);
 			a.cmp(&b)
 		});
+
+		// build a "machine.name_strindex" ==> "machine_index" map in preparations for fixups
+		let machines_indexmap = self
+			.machines
+			.items()
+			.enumerate()
+			.map(|(index, obj)| (obj.name_strindex, u32::try_from(index).unwrap()))
+			.collect::<HashMap<_, _>>();
+		let machines_indexmap = |strindex| {
+			machines_indexmap
+				.get(&strindex)
+				.copied()
+				.or_else(|| self.strings.lookup_immut(&self.strings.index(strindex)))
+		};
+
+		// and run the fixups
+		fixup(&mut self.machines, &self.strings, machines_indexmap)?;
 
 		// assemble the header
 		let header = binary::Header {
@@ -208,13 +246,14 @@ impl State {
 		header.binary_serialize(&mut header_bytes, ENDIANNESS);
 
 		// get all bytes and return
-		header_bytes
+		let bytes = header_bytes
 			.into_iter()
 			.chain(self.machines.into_iter())
 			.chain(self.chips.into_iter())
 			.chain(self.software_lists.into_iter())
 			.chain(self.strings.into_iter())
-			.collect()
+			.collect();
+		Ok(bytes)
 	}
 }
 
@@ -225,6 +264,27 @@ impl Debug for State {
 			.field("machines.len()", &self.machines.len())
 			.finish()
 	}
+}
+
+fn fixup(
+	bin_builder: &mut BinBuilder<impl Fixup + BinarySerde>,
+	strings: &StringTableBuilder,
+	machines_indexmap: impl Fn(u32) -> Option<u32>,
+) -> Result<()> {
+	bin_builder.tweak_all(|x| {
+		for machine_index in x.identify_machine_indexes() {
+			let new_machine_index = if *machine_index != 0 {
+				machines_indexmap(*machine_index).ok_or_else(|| {
+					let bad_reference = strings.index(*machine_index).to_string();
+					Error::BadMachineReference(bad_reference)
+				})?
+			} else {
+				!0
+			};
+			*machine_index = new_machine_index;
+		}
+		Ok(())
+	})
 }
 
 fn listxml_err(reader: &XmlReader<impl BufRead>, e: BoxDynError) -> crate::error::Error {
@@ -273,7 +333,7 @@ pub fn data_from_listxml_output(
 	assert_eq!(Phase::Root, state.phase);
 
 	// get all bytes and return
-	let data = state.into_data();
+	let data = state.into_data()?;
 	Ok(Some(data))
 }
 
@@ -317,6 +377,15 @@ where
 		result
 	}
 
+	fn tweak_all<E>(&mut self, func: impl Fn(&mut T) -> std::result::Result<(), E>) -> std::result::Result<(), E> {
+		for slice in self.vec.chunks_mut(T::SERIALIZED_SIZE) {
+			let mut obj = T::binary_deserialize(slice, ENDIANNESS).unwrap();
+			func(&mut obj)?;
+			obj.binary_serialize(slice, ENDIANNESS);
+		}
+		Ok(())
+	}
+
 	fn increment<N>(&mut self, func: impl FnOnce(&mut T) -> &mut N) -> std::result::Result<(), BoxDynError>
 	where
 		N: CheckedAdd<Output = N> + Clone + From<u8> + Ord,
@@ -334,6 +403,12 @@ where
 
 	fn len(&self) -> u32 {
 		(self.vec.len() / T::SERIALIZED_SIZE).try_into().unwrap()
+	}
+
+	fn items(&self) -> impl Iterator<Item = T> + '_ {
+		self.vec
+			.chunks(T::SERIALIZED_SIZE)
+			.map(|slice| T::binary_deserialize(slice, ENDIANNESS).unwrap())
 	}
 
 	fn into_iter(self) -> impl Iterator<Item = u8> {

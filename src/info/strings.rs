@@ -35,21 +35,23 @@ impl StringTableBuilder {
 	}
 
 	pub fn lookup(&mut self, s: &str) -> u32 {
-		self.map_lookup(s)
-			.or_else(|| lookup_small(s.as_bytes()))
-			.unwrap_or_else(|| {
-				if !self.data.len() > MAGIC_STRINGTABLE_BEGIN.len() {
-					self.data.push(0x80);
-				}
-				let result = self.data.len().try_into().unwrap();
-				self.data.extend(s.as_bytes().iter());
+		self.lookup_immut(s).unwrap_or_else(|| {
+			if !self.data.len() > MAGIC_STRINGTABLE_BEGIN.len() {
+				self.data.push(0x80);
+			}
+			let result = self.data.len().try_into().unwrap();
+			self.data.extend(s.as_bytes().iter());
 
-				for (pos, _) in s.char_indices() {
-					let element = result + u32::try_from(pos).unwrap();
-					self.map_insert(&s[pos..], element);
-				}
-				result
-			})
+			for (pos, _) in s.char_indices() {
+				let element = result + u32::try_from(pos).unwrap();
+				self.map_insert(&s[pos..], element);
+			}
+			result
+		})
+	}
+
+	pub fn lookup_immut(&self, s: &str) -> Option<u32> {
+		self.map_lookup(s).or_else(|| lookup_small(s.as_bytes()))
 	}
 
 	pub fn index(&self, offset: u32) -> SmallStrRef<'_> {
