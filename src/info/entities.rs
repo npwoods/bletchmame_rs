@@ -3,18 +3,17 @@ use binary_search::Direction;
 
 use crate::info::binary;
 use crate::info::ChipType;
+use crate::info::IndirectView;
 use crate::info::Object;
+use crate::info::SimpleView;
 use crate::info::SmallStrRef;
 use crate::info::View;
 
 pub type Machine<'a> = Object<'a, binary::Machine>;
-pub type MachinesView<'a> = View<'a, binary::Machine>;
+pub type MachinesView<'a> = SimpleView<'a, binary::Machine>;
 pub type Chip<'a> = Object<'a, binary::Chip>;
-pub type ChipsView<'a> = View<'a, binary::Chip>;
 pub type SoftwareList<'a> = Object<'a, binary::SoftwareList>;
-pub type SoftwareListView<'a> = View<'a, binary::SoftwareList>;
 pub type MachineSoftwareList<'a> = Object<'a, binary::MachineSoftwareList>;
-pub type MachineSoftwareListsView<'a> = View<'a, binary::MachineSoftwareList>;
 
 impl<'a> Machine<'a> {
 	pub fn name(&self) -> SmallStrRef<'a> {
@@ -51,15 +50,14 @@ impl<'a> Machine<'a> {
 		self.obj().runnable
 	}
 
-	pub fn chips(&self) -> ChipsView<'a> {
-		self.db.chips().sub_view(self.obj().chips_index, self.obj().chips_count)
+	pub fn chips(&self) -> impl View<'a, Chip<'a>> {
+		self.db.chips().sub_view(self.obj().chips_start..self.obj().chips_end)
 	}
 
-	pub fn machine_software_lists(&self) -> MachineSoftwareListsView<'a> {
-		self.db.machine_software_lists().sub_view(
-			self.obj().machine_software_lists_index,
-			self.obj().machine_software_lists_count,
-		)
+	pub fn machine_software_lists(&self) -> impl View<'a, MachineSoftwareList<'a>> {
+		self.db
+			.machine_software_lists()
+			.sub_view(self.obj().machine_software_lists_start..self.obj().machine_software_lists_end)
 	}
 }
 
@@ -103,6 +101,28 @@ impl<'a> SoftwareList<'a> {
 	pub fn name(&self) -> SmallStrRef<'a> {
 		self.string(|x| x.name_strindex)
 	}
+
+	pub fn original_for_machines(&self) -> impl View<'a, Machine<'a>> {
+		let start = self.obj().software_list_original_machines_start;
+		let end = self.obj().software_list_compatible_machines_start;
+		self.make_machine_view(start, end)
+	}
+
+	pub fn compatible_for_machines(&self) -> impl View<'a, Machine<'a>> {
+		let start = self.obj().software_list_compatible_machines_start;
+		let end = self.obj().software_list_compatible_machines_end;
+		self.make_machine_view(start, end)
+	}
+
+	fn make_machine_view(&self, start: u32, end: u32) -> impl View<'a, Machine<'a>> {
+		let range = start..end;
+		let index_view = self.db.software_list_machine_indexes().sub_view(range);
+		let object_view = self.db.machines();
+		IndirectView {
+			index_view,
+			object_view,
+		}
+	}
 }
 
 impl<'a> MachineSoftwareList<'a> {
@@ -131,8 +151,9 @@ mod test {
 
 		let machines_view = MachinesView {
 			db: &bogus_db,
-			offset: 0,
-			count: 0,
+			byte_offset: bogus_db.machines().byte_offset,
+			start: 0,
+			end: 0,
 			phantom: PhantomData,
 		};
 

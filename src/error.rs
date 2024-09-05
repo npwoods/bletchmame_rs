@@ -32,4 +32,6 @@ pub enum Error {
 	BadInfoDbSizesHash,
 	#[error("Corrupt String Table")]
 	CorruptStringTable,
+	#[error("Corrupt Software List Machine Index")]
+	CorruptSoftwareListMachineIndex,
 }

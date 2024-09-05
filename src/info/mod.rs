@@ -28,10 +28,10 @@ use crate::Result;
 
 pub use self::binary::ChipType;
 pub use self::binary::SoftwareListStatus;
-pub use self::entities::ChipsView;
-pub use self::entities::MachineSoftwareListsView;
+pub use self::entities::Chip;
+pub use self::entities::MachineSoftwareList;
 pub use self::entities::MachinesView;
-pub use self::entities::SoftwareListView;
+pub use self::entities::SoftwareList;
 pub use self::smallstr::SmallStrRef;
 
 use self::build::calculate_sizes_hash;
@@ -47,7 +47,7 @@ pub struct InfoDb {
 	machines: RootView<binary::Machine>,
 	chips: RootView<binary::Chip>,
 	software_lists: RootView<binary::SoftwareList>,
-	software_list_machines: RootView<u32>,
+	software_list_machine_indexes: RootView<u32>,
 	machine_software_lists: RootView<binary::MachineSoftwareList>,
 	strings_offset: usize,
 	build_strindex: u32,
@@ -67,7 +67,7 @@ impl InfoDb {
 		let machines = next_root_view(&mut cursor, hdr.machine_count)?;
 		let chips = next_root_view(&mut cursor, hdr.chips_count)?;
 		let software_lists = next_root_view(&mut cursor, hdr.software_list_count)?;
-		let software_list_machines = next_root_view(&mut cursor, hdr.software_list_machine_count)?;
+		let software_list_machine_indexes = next_root_view(&mut cursor, hdr.software_list_machine_count)?;
 		let machine_software_lists = next_root_view(&mut cursor, hdr.machine_software_lists_count)?;
 
 		// validations we want to skip if we're creating things ourselves
@@ -81,11 +81,22 @@ impl InfoDb {
 			machines,
 			chips,
 			software_lists,
-			software_list_machines,
+			software_list_machine_indexes,
 			machine_software_lists,
 			strings_offset: cursor.start,
 			build_strindex: hdr.build_strindex,
 		};
+
+		// more validations
+		if !skip_validations {
+			result
+				.software_list_machine_indexes()
+				.iter()
+				.all(|x| x.obj() < result.machines().len().try_into().unwrap())
+				.then_some(())
+				.ok_or(Error::CorruptSoftwareListMachineIndex)?;
+		}
+
 		Ok(result)
 	}
 
@@ -130,32 +141,37 @@ impl InfoDb {
 		self.make_view(&self.machines)
 	}
 
-	pub fn chips(&self) -> ChipsView<'_> {
+	pub fn chips(&self) -> impl View<'_, Chip<'_>> {
 		self.make_view(&self.chips)
 	}
 
-	pub fn software_lists(&self) -> SoftwareListView<'_> {
+	pub fn software_lists(&self) -> impl View<'_, SoftwareList<'_>> {
 		self.make_view(&self.software_lists)
 	}
 
-	pub fn machine_software_lists(&self) -> MachineSoftwareListsView<'_> {
+	pub fn machine_software_lists(&self) -> impl View<'_, MachineSoftwareList<'_>> {
 		self.make_view(&self.machine_software_lists)
+	}
+
+	pub fn software_list_machine_indexes(&self) -> impl View<'_, Object<'_, u32>> {
+		self.make_view(&self.software_list_machine_indexes)
 	}
 
 	fn string(&self, offset: u32) -> SmallStrRef<'_> {
 		read_string(&self.data[self.strings_offset..], offset).unwrap_or_default()
 	}
 
-	fn make_view<B>(&self, root_view: &RootView<B>) -> View<'_, B>
+	fn make_view<B>(&self, root_view: &RootView<B>) -> SimpleView<'_, B>
 	where
 		B: BinarySerde,
 	{
-		let offset = root_view.offset.try_into().unwrap();
+		let byte_offset = root_view.offset.try_into().unwrap();
 		let count = root_view.count.try_into().unwrap();
-		View {
+		SimpleView {
 			db: self,
-			offset,
-			count,
+			byte_offset,
+			start: 0,
+			end: count,
 			phantom: PhantomData,
 		}
 	}
@@ -234,78 +250,40 @@ fn decode_header(data: &[u8]) -> Result<binary::Header> {
 	Ok(header)
 }
 
-#[derive(Clone, Copy)]
-pub struct View<'a, B>
+pub trait View<'a, T>: Clone
 where
-	B: BinarySerde,
+	T: 'a,
 {
-	db: &'a InfoDb,
-	offset: usize,
-	count: usize,
-	phantom: PhantomData<B>,
-}
+	fn get(&self, index: usize) -> Option<T>;
+	fn len(&self) -> usize;
+	fn sub_view(&self, range: Range<u32>) -> Self;
 
-impl<'a, B> View<'a, B>
-where
-	B: BinarySerde,
-{
-	pub fn iter(&self) -> impl Iterator<Item = Object<'a, B>> {
+	fn iter(&self) -> impl Iterator<Item = T> {
 		ViewIter {
-			view: View {
-				db: self.db,
-				offset: self.offset,
-				count: self.count,
-				phantom: PhantomData,
-			},
+			view: self.clone(),
 			pos: 0,
-		}
-	}
-
-	pub fn len(&self) -> usize {
-		self.count
-	}
-
-	pub fn is_empty(&self) -> bool {
-		self.count == 0
-	}
-
-	pub fn get(&self, index: usize) -> Option<Object<'a, B>> {
-		(index < self.count).then(|| Object {
-			db: self.db,
-			offset: self.offset + index * B::SERIALIZED_SIZE,
-			phantom: PhantomData,
-		})
-	}
-
-	pub fn sub_view(&self, index: u32, count: u32) -> View<'a, B> {
-		let index = usize::try_from(index).unwrap();
-		let count = usize::try_from(count).unwrap();
-		let offset = self.offset + index * B::SERIALIZED_SIZE;
-		assert!(offset <= self.db.data.len());
-		assert!(offset + count * B::SERIALIZED_SIZE <= self.db.data.len());
-		View {
-			db: self.db,
-			offset,
-			count,
 			phantom: PhantomData,
 		}
+	}
+
+	fn is_empty(&self) -> bool {
+		self.len() == 0
 	}
 }
 
 #[derive(Clone, Copy)]
-struct ViewIter<'a, B>
-where
-	B: BinarySerde,
-{
-	view: View<'a, B>,
+struct ViewIter<V, T> {
+	view: V,
 	pos: usize,
+	phantom: PhantomData<T>,
 }
 
-impl<'a, B> Iterator for ViewIter<'a, B>
+impl<'a, V, T> Iterator for ViewIter<V, T>
 where
-	B: BinarySerde,
+	V: View<'a, T>,
+	T: 'a,
 {
-	type Item = Object<'a, B>;
+	type Item = T;
 
 	fn next(&mut self) -> Option<Self::Item> {
 		let result = (self.view).get(self.pos);
@@ -316,13 +294,87 @@ where
 	}
 }
 
-#[derive(Clone, Copy)]
-pub struct Object<'a, B>
-where
-	B: BinarySerde,
-{
+#[derive(Clone, Copy, Debug)]
+pub struct SimpleView<'a, B> {
 	db: &'a InfoDb,
-	offset: usize,
+	byte_offset: usize,
+	start: usize,
+	end: usize,
+	phantom: PhantomData<&'a B>,
+}
+
+impl<'a, B> View<'a, Object<'a, B>> for SimpleView<'a, B>
+where
+	B: BinarySerde + Clone,
+{
+	fn len(&self) -> usize {
+		self.end - self.start
+	}
+
+	fn get(&self, index: usize) -> Option<Object<'a, B>> {
+		(index < self.len()).then(|| Object {
+			db: self.db,
+			byte_offset: self.byte_offset,
+			index: self.start + index,
+			phantom: PhantomData,
+		})
+	}
+
+	fn sub_view(&self, range: Range<u32>) -> Self {
+		let range = usize::try_from(range.start).unwrap()..usize::try_from(range.end).unwrap();
+
+		assert!(range.start <= range.end);
+		assert!(range.start <= self.end - self.start);
+		assert!(range.end <= self.end - self.start);
+
+		Self {
+			start: self.start + range.start,
+			end: self.start + range.end,
+			..*self
+		}
+	}
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct IndirectView<V, W> {
+	index_view: V,
+	object_view: W,
+}
+
+impl<'a, B, VI, VO> View<'a, Object<'a, B>> for IndirectView<VI, VO>
+where
+	B: BinarySerde + Clone + 'a,
+	VI: View<'a, Object<'a, u32>> + 'a,
+	VO: View<'a, Object<'a, B>> + 'a,
+{
+	fn len(&self) -> usize {
+		self.index_view.len()
+	}
+
+	fn get(&self, index: usize) -> Option<Object<'a, B>> {
+		let object_index = self.index_view.get(index)?.obj().try_into().unwrap();
+		let obj = self
+			.object_view
+			.get(object_index)
+			.expect("IndirectView::get(): object_index out of range");
+		Some(obj)
+	}
+
+	fn sub_view(&self, range: Range<u32>) -> Self {
+		let index_view = self.index_view.sub_view(range);
+		let object_view = self.object_view.clone();
+		Self {
+			index_view,
+			object_view,
+		}
+	}
+}
+
+#[derive(Clone, Copy)]
+pub struct Object<'a, B> {
+	db: &'a InfoDb,
+	byte_offset: usize,
+	index: usize,
 	phantom: PhantomData<B>,
 }
 
@@ -331,22 +383,44 @@ where
 	B: BinarySerde,
 {
 	fn obj(&self) -> B {
-		let data = &self.db.data[self.offset..(self.offset + B::SERIALIZED_SIZE)];
-		B::binary_deserialize(data, ENDIANNESS).unwrap()
+		let start = self.byte_offset + self.index * B::SERIALIZED_SIZE;
+		let end = start + B::SERIALIZED_SIZE;
+		let buf = &self.db.data[start..end];
+		B::binary_deserialize(buf, ENDIANNESS).unwrap()
 	}
 
 	fn string(&self, func: impl FnOnce(B) -> u32) -> SmallStrRef<'a> {
 		let offset = func(self.obj());
 		self.db.string(offset)
 	}
+
+	pub fn index(&self) -> usize {
+		self.index
+	}
+}
+
+impl<'a, B> Debug for Object<'a, B>
+where
+	B: BinarySerde + Debug,
+{
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("Object")
+			.field("byte_offset", &self.byte_offset)
+			.field("index", &self.index)
+			.field("obj", &self.obj())
+			.finish()
+	}
 }
 
 #[cfg(test)]
 mod test {
+	use std::cmp::max;
+
 	use test_case::test_case;
 
 	use super::ChipType;
 	use super::InfoDb;
+	use super::View;
 
 	#[test_case(0, include_str!("test_data/listxml_alienar.xml"), "0.229 (mame0229)", 13, 1, &["alienar", "ipt_merge_any_hi", "ls157"])]
 	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "0.229 (mame0229)", 104, 15, &["acia6850", "address_map_bank", "ay8910"])]
@@ -500,5 +574,42 @@ mod test {
 			.map(|(tag, name)| (tag.to_string(), name.to_string()))
 			.collect::<Vec<_>>();
 		assert_eq!(expected, actual);
+	}
+
+	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco_cart", &["coco", "coco2", "coco2b", "coco2bh"], &[])]
+	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "dragon_cart", &[], &["coco", "coco2", "coco2b", "coco2bh"])]
+	pub fn software_lists(
+		_index: usize,
+		xml: &str,
+		software_list_name: &str,
+		expected_originals: &[&str],
+		expected_compatibles: &[&str],
+	) {
+		let expected_originals = expected_originals.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+		let expected_compatibles = expected_compatibles.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+
+		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
+		let software_list = db
+			.software_lists()
+			.iter()
+			.find(|x| x.name() == software_list_name)
+			.expect("Could not find software list");
+
+		let actual_originals = software_list
+			.original_for_machines()
+			.iter()
+			.take(max(expected_originals.len(), expected_compatibles.len()))
+			.map(|x| x.name().to_string())
+			.collect::<Vec<_>>();
+		let actual_compatibles = software_list
+			.compatible_for_machines()
+			.iter()
+			.take(max(expected_originals.len(), expected_compatibles.len()))
+			.map(|x| x.name().to_string())
+			.collect::<Vec<_>>();
+		assert_eq!(
+			(expected_originals, expected_compatibles),
+			(actual_originals, actual_compatibles)
+		);
 	}
 }

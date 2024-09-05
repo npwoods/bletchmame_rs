@@ -4,6 +4,7 @@ use std::cell::Cell;
 use std::cell::RefCell;
 use std::cmp::Reverse;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use itertools::Either;
 use itertools::Itertools;
@@ -21,6 +22,7 @@ use crate::appcommand::AppCommand;
 use crate::dialogs::file::PathType;
 use crate::guiutils::menuing::MenuDesc;
 use crate::info::InfoDb;
+use crate::info::View;
 use crate::prefs::BuiltinCollection;
 use crate::prefs::ColumnType;
 use crate::prefs::PrefsCollection;
@@ -109,19 +111,32 @@ impl ItemsTableModel {
 						.map(|machine_index| Item::Machine { machine_index })
 						.collect::<Rc<[_]>>()
 				}
-				PrefsCollection::Builtin(BuiltinCollection::AllSoftware) => info_db
-					.machine_software_lists()
-					.iter()
-					.filter_map(|x| dispenser.get(&x.software_list().name()))
-					.flat_map(|list| {
+				PrefsCollection::Builtin(BuiltinCollection::AllSoftware) => dispenser
+					.get_multiple(&info_db.software_lists().iter().map(|x| x.name()).collect::<Vec<_>>())
+					.into_iter()
+					.enumerate()
+					.filter_map(|(index, software_list)| {
+						software_list.map(|x| (info_db.software_lists().get(index).unwrap(), x))
+					})
+					.flat_map(|(info, list)| {
 						list.software
 							.iter()
-							.map(|s| (list.clone(), s.clone()))
+							.map(|s| (list.clone(), s.clone(), info))
 							.collect::<Vec<_>>()
 					})
-					.map(|(software_list, software)| Item::Software {
-						software_list,
-						software,
+					.map(|(software_list, software, info)| {
+						let machine_indexes = Iterator::chain(
+							info.original_for_machines().iter(),
+							info.compatible_for_machines().iter(),
+						)
+						.map(|x| x.index())
+						.collect::<Vec<_>>();
+
+						Item::Software {
+							software_list,
+							software,
+							machine_indexes,
+						}
 					})
 					.collect::<Rc<[_]>>(),
 
@@ -129,7 +144,7 @@ impl ItemsTableModel {
 					.machines()
 					.find(machine_name)
 					.into_iter()
-					.flat_map(|x| x.machine_software_lists().iter())
+					.flat_map(|x| x.machine_software_lists().iter().collect::<Vec<_>>())
 					.filter_map(|x| dispenser.get(&x.software_list().name()))
 					.flat_map(|list| {
 						list.software
@@ -140,6 +155,7 @@ impl ItemsTableModel {
 					.map(|(software_list, software)| Item::Software {
 						software_list,
 						software,
+						machine_indexes: Vec::default(),
 					})
 					.collect::<Rc<[_]>>(),
 				PrefsCollection::Folder { name: _, items } => items
@@ -152,15 +168,24 @@ impl ItemsTableModel {
 						PrefsItem::Software {
 							software_list,
 							software,
+							machine_names,
 						} => dispenser.get(software_list).and_then(|software_list| {
 							software_list
 								.software
 								.iter()
 								.find(|x| x.name.as_ref() == software)
 								.cloned()
-								.map(|software| Item::Software {
-									software_list,
-									software,
+								.map(|software| {
+									let machine_indexes = machine_names
+										.iter()
+										.filter_map(|x| info_db.machines().find(x))
+										.map(|x| x.index())
+										.collect::<Vec<_>>();
+									Item::Software {
+										software_list,
+										software,
+										machine_indexes,
+									}
 								})
 						}),
 					})
@@ -174,7 +199,7 @@ impl ItemsTableModel {
 		let empty_reason = items.is_empty().then(|| {
 			if info_db.is_none() {
 				EmptyReason::NoInfoDb
-			} else if any_dispenser_failures {
+			} else if any_dispenser_failures || self.software_list_paths.borrow().is_empty() {
 				EmptyReason::NoSoftwareLists
 			} else if matches!(collection.as_ref(), PrefsCollection::Folder { name: _, items } if items.is_empty() ) {
 				EmptyReason::Folder
@@ -205,7 +230,7 @@ impl ItemsTableModel {
 		let items = vec![make_prefs_item(info_db, item)];
 
 		// get the critical information - the description and where (if anyplace) "Browse" would go to
-		let (description, browse_target) = match item {
+		let (description, machine_descriptions, browse_target) = match item {
 			Item::Machine { machine_index } => {
 				let machine = info_db.machines().get(*machine_index).unwrap();
 				let description = Cow::from(machine.description());
@@ -213,18 +238,35 @@ impl ItemsTableModel {
 					(!machine.machine_software_lists().is_empty()).then(|| PrefsCollection::MachineSoftware {
 						machine_name: machine.name().to_string(),
 					});
-				(description, browse_target)
+				(description, None, browse_target)
 			}
-			Item::Software { software, .. } => {
+			Item::Software {
+				software,
+				machine_indexes,
+				..
+			} => {
 				let description = Cow::from(&*software.description);
-				(description, None)
+				let machine_descriptions = machine_indexes
+					.iter()
+					.map(|&index| info_db.machines().get(index).unwrap().description().to_string())
+					.collect::<Vec<_>>();
+				(description, Some(machine_descriptions), None)
 			}
 		};
 
 		// basics of
 		let mut menu_items = Vec::new();
 		let text = format!("Run \"{}\"", description);
-		menu_items.push(MenuDesc::Item(text, None));
+		let item = if let Some(machine_descriptions) = machine_descriptions {
+			let items = machine_descriptions
+				.into_iter()
+				.map(|text| MenuDesc::Item(text, None))
+				.collect::<Vec<_>>();
+			MenuDesc::SubMenu(text, true, items)
+		} else {
+			MenuDesc::Item(text, None)
+		};
+		menu_items.push(item);
 		menu_items.push(MenuDesc::Separator);
 
 		if let Some(browse_target) = browse_target {
@@ -435,8 +477,9 @@ enum Item {
 		machine_index: usize,
 	},
 	Software {
-		software_list: Rc<SoftwareList>,
-		software: Rc<Software>,
+		software_list: Arc<SoftwareList>,
+		software: Arc<Software>,
+		machine_indexes: Vec<usize>,
 	},
 }
 
@@ -449,12 +492,18 @@ fn make_prefs_item(info_db: &InfoDb, item: &Item) -> PrefsItem {
 		Item::Software {
 			software_list,
 			software,
+			machine_indexes,
 		} => {
 			let software_list = software_list.name.to_string();
 			let software = software.name.to_string();
+			let machine_names = machine_indexes
+				.iter()
+				.map(|&index| info_db.machines().get(index).unwrap().name().to_string())
+				.collect::<Vec<_>>();
 			PrefsItem::Software {
 				software_list,
 				software,
+				machine_names,
 			}
 		}
 	}
@@ -583,20 +632,5 @@ fn column_text<'a>(info_db: &'a InfoDb, item: &'a Item, column: ColumnType) -> C
 }
 
 fn is_item_match(info_db: &InfoDb, prefs_item: &PrefsItem, item: &Item) -> bool {
-	match (prefs_item, item) {
-		(PrefsItem::Machine { machine_name }, Item::Machine { machine_index }) => {
-			**machine_name == *info_db.machines().get(*machine_index).unwrap().name()
-		}
-		(
-			PrefsItem::Software {
-				software_list: a_software_list,
-				software: a_software,
-			},
-			Item::Software {
-				software_list: b_software_list,
-				software: b_software,
-			},
-		) => (a_software_list == &*b_software_list.name) && (a_software == &*b_software.name),
-		_ => false,
-	}
+	make_prefs_item(info_db, item) == *prefs_item
 }

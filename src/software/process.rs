@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use std::io::BufRead;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::error::BoxDynError;
 use crate::software::Software;
@@ -29,8 +29,8 @@ const TEXT_CAPTURE_PHASES: &[Phase] = &[
 
 struct State {
 	phase: Phase,
-	strings: HashSet<Rc<str>>,
-	empty_str: Rc<str>,
+	strings: HashSet<Arc<str>>,
+	empty_str: Arc<str>,
 	software_list: SoftwareList,
 	current_software: Option<Software>,
 }
@@ -38,7 +38,7 @@ struct State {
 impl State {
 	pub fn new() -> Self {
 		let mut strings = HashSet::new();
-		let empty_str = Rc::<str>::from("");
+		let empty_str = Arc::<str>::from("");
 		strings.insert(empty_str.clone());
 
 		Self {
@@ -88,7 +88,7 @@ impl State {
 			Phase::Root => panic!(),
 			Phase::SoftwareList => Phase::Root,
 			Phase::Software => {
-				let software = Rc::new(self.current_software.take().unwrap());
+				let software = self.current_software.take().unwrap().into();
 				self.software_list.software.push(software);
 				Phase::SoftwareList
 			}
@@ -112,9 +112,9 @@ impl State {
 		Ok(new_phase)
 	}
 
-	fn string(&mut self, s: &str) -> Rc<str> {
+	fn string(&mut self, s: &str) -> Arc<str> {
 		self.strings.get(s).cloned().unwrap_or_else(|| {
-			let result = Rc::<str>::from(s);
+			let result = Arc::<str>::from(s);
 			self.strings.insert(result.clone());
 			result
 		})

@@ -113,8 +113,10 @@ impl State {
 					source_file_strindex,
 					clone_of_machine_index,
 					rom_of_machine_index,
-					chips_index: self.chips.len(),
-					machine_software_lists_index: self.machine_software_lists.len(),
+					chips_start: self.chips.len(),
+					chips_end: self.chips.len(),
+					machine_software_lists_start: self.machine_software_lists.len(),
+					machine_software_lists_end: self.machine_software_lists.len(),
 					runnable,
 					..Default::default()
 				};
@@ -139,7 +141,7 @@ impl State {
 					clock,
 				};
 				self.chips.push(chip);
-				self.machines.increment(|m| &mut m.chips_count)?;
+				self.machines.increment(|m| &mut m.chips_end)?;
 				Some(Phase::MachineSubtag)
 			}
 			(Phase::Machine, b"softwarelist") => {
@@ -160,7 +162,7 @@ impl State {
 					filter_strindex,
 				};
 				self.machine_software_lists.push(machine_software_list);
-				self.machines.increment(|m| &mut m.machine_software_lists_count)?;
+				self.machines.increment(|m| &mut m.machine_software_lists_end)?;
 
 				// add this machine to the global software list
 				let software_list = self.software_lists.entry(name.to_string()).or_default();
@@ -243,34 +245,59 @@ impl State {
 			.enumerate()
 			.map(|(index, obj)| (obj.name_strindex, u32::try_from(index).unwrap()))
 			.collect::<HashMap<_, _>>();
+		let machine_count = self.machines.len();
 		let machines_indexmap = |strindex| {
-			machines_indexmap
+			let result = machines_indexmap
 				.get(&strindex)
-				.copied()
-				.or_else(|| self.strings.lookup_immut(&self.strings.index(strindex)))
+				.or_else(|| {
+					let new_strindex = self.strings.lookup_immut(&self.strings.index(strindex));
+					new_strindex.and_then(|x| machines_indexmap.get(&x))
+				})
+				.copied();
+
+			// sanity check and return
+			assert!(!result.is_some_and(|x| x >= machine_count), "Invalid machine");
+			result
 		};
 
 		// software lists require special processing
-		let mut software_list_machines = BinBuilder::<u32>::new(0);
+		let mut software_list_machine_indexes = BinBuilder::<u32>::new(0);
 		let mut software_list_indexmap = HashMap::new();
 		let software_lists = self
 			.software_lists
 			.into_iter()
 			.enumerate()
 			.map(|(index, (software_list_name, data))| {
+				let originals = data
+					.originals
+					.into_iter()
+					.filter_map(machines_indexmap)
+					.sorted()
+					.collect::<Vec<_>>();
+				let compatibles = data
+					.compatibles
+					.into_iter()
+					.filter_map(machines_indexmap)
+					.sorted()
+					.collect::<Vec<_>>();
 				let index = u32::try_from(index).unwrap();
 				let name_strindex = self.strings.lookup_immut(&software_list_name).unwrap();
-				let software_list_machines_index = software_list_machines.len();
-				let software_list_original_machines_count = data.originals.len().try_into().unwrap();
-				let software_list_compatible_machines_count = data.compatibles.len().try_into().unwrap();
+				let software_list_original_machines_start = software_list_machine_indexes.len();
+				let software_list_compatible_machines_start =
+					software_list_original_machines_start + u32::try_from(originals.len()).unwrap();
+				let software_list_compatible_machines_end =
+					software_list_compatible_machines_start + u32::try_from(compatibles.len()).unwrap();
 				let entry = binary::SoftwareList {
 					name_strindex,
-					software_list_machines_index,
-					software_list_original_machines_count,
-					software_list_compatible_machines_count,
+					software_list_original_machines_start,
+					software_list_compatible_machines_start,
+					software_list_compatible_machines_end,
 				};
-				software_list_machines.extend(data.originals);
-				software_list_machines.extend(data.compatibles);
+				assert!(originals.iter().all(|&x| x < self.machines.len()));
+				assert!(compatibles.iter().all(|&x| x < self.machines.len()));
+
+				software_list_machine_indexes.extend(originals);
+				software_list_machine_indexes.extend(compatibles);
 				software_list_indexmap.insert(name_strindex, index);
 				entry
 			})
@@ -305,7 +332,7 @@ impl State {
 			machine_count: self.machines.len(),
 			chips_count: self.chips.len(),
 			software_list_count: software_lists.len(),
-			software_list_machine_count: software_list_machines.len(),
+			software_list_machine_count: software_list_machine_indexes.len(),
 			machine_software_lists_count: self.machine_software_lists.len(),
 		};
 		let mut header_bytes = [0u8; binary::Header::SERIALIZED_SIZE];
@@ -317,7 +344,7 @@ impl State {
 			.chain(self.machines.into_iter())
 			.chain(self.chips.into_iter())
 			.chain(software_lists.into_iter())
-			.chain(software_list_machines.into_iter())
+			.chain(software_list_machine_indexes.into_iter())
 			.chain(self.machine_software_lists.into_iter())
 			.chain(self.strings.into_iter())
 			.collect();

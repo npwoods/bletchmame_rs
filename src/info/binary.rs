@@ -32,10 +32,10 @@ pub struct Machine {
 	pub description_strindex: u32,
 	pub year_strindex: u32,
 	pub manufacturer_strindex: u32,
-	pub chips_index: u32,
-	pub chips_count: u32,
-	pub machine_software_lists_index: u32,
-	pub machine_software_lists_count: u32,
+	pub chips_start: u32,
+	pub chips_end: u32,
+	pub machine_software_lists_start: u32,
+	pub machine_software_lists_end: u32,
 	pub runnable: bool,
 }
 
@@ -88,9 +88,9 @@ pub enum SoftwareListStatus {
 #[derive(Clone, Copy, Debug, BinarySerde)]
 pub struct SoftwareList {
 	pub name_strindex: u32,
-	pub software_list_machines_index: u32,
-	pub software_list_original_machines_count: u32,
-	pub software_list_compatible_machines_count: u32,
+	pub software_list_original_machines_start: u32,
+	pub software_list_compatible_machines_start: u32,
+	pub software_list_compatible_machines_end: u32,
 }
 
 #[cfg(test)]
