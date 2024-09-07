@@ -193,7 +193,8 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 		.unwrap(),
 		&Submenu::with_items("Settings", true, &[
 			&MenuItem::with_id(AppCommand::SettingsPaths, "Paths...", true, None),
-			&Submenu::with_items("Builtin Collections", true, &toggle_builtin_menu_items).unwrap()
+			&Submenu::with_items("Builtin Collections", true, &toggle_builtin_menu_items).unwrap(),
+			&MenuItem::with_id(AppCommand::SettingsReset, "Reset Settings To Default", true, None)
 		]).unwrap(),
 		&Submenu::with_items(
 			"Help",
@@ -415,6 +416,10 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				toggle_builtin_collection(&mut prefs.collections, col);
 			});
 		}
+		AppCommand::SettingsReset => model.modify_prefs(|prefs| {
+			let prefs_path = prefs.prefs_path.take();
+			*prefs = Preferences::fresh(prefs_path);
+		}),
 		AppCommand::HelpRefreshInfoDb => {
 			let model = model.clone();
 			spawn_local(process_mame_listxml(model)).unwrap();
@@ -487,8 +492,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				if let Some(new_index) = new_index {
 					// and readd it
 					prefs.collections.insert(new_index, collection);
-				}
-				else {
+				} else {
 					// the colleciton is being removed; we need to remove any entries that
 					// might be referenced
 					prefs.purge_stray_entries();

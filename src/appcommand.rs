@@ -17,6 +17,7 @@ pub enum AppCommand {
 	// Settings menu
 	SettingsPaths,
 	SettingsToggleBuiltinCollection(BuiltinCollection),
+	SettingsReset,
 
 	// Help menu
 	HelpRefreshInfoDb,
