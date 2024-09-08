@@ -26,6 +26,7 @@ use crate::collections::add_items_to_existing_folder_collection;
 use crate::collections::add_items_to_new_folder_collection;
 use crate::collections::get_folder_collection_names;
 use crate::collections::get_folder_collections;
+use crate::collections::remove_items_from_folder_collection;
 use crate::collections::toggle_builtin_collection;
 use crate::dialogs::file::file_dialog;
 use crate::dialogs::file::PathType;
@@ -107,7 +108,9 @@ impl AppModel {
 		if prefs.collections != old_prefs.collections {
 			self.with_collections_view_model(|x| x.update(&prefs.collections));
 		}
-		if prefs.current_history_entry() != old_prefs.current_history_entry() {
+		if prefs.current_history_entry() != old_prefs.current_history_entry()
+			|| prefs.current_collection() != old_prefs.current_collection()
+		{
 			update_ui_for_current_history_item(self);
 		}
 		if prefs.items_columns != old_prefs.items_columns {
@@ -483,6 +486,11 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				}
 			};
 			spawn_local(fut).unwrap();
+		}
+		AppCommand::RemoveFromFolder(name, items) => {
+			model.modify_prefs(|prefs| {
+				remove_items_from_folder_collection(&mut prefs.collections, name, &items);
+			});
 		}
 		AppCommand::MoveCollection { old_index, new_index } => {
 			model.modify_prefs(|prefs| {

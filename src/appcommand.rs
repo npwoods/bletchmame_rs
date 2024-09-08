@@ -33,6 +33,7 @@ pub enum AppCommand {
 	AddToExistingFolder(usize, Vec<PrefsItem>),
 	AddToNewFolder(String, Vec<PrefsItem>),
 	AddToNewFolderDialog(Vec<PrefsItem>),
+	RemoveFromFolder(String, Vec<PrefsItem>),
 	MoveCollection { old_index: usize, new_index: Option<usize> },
 	ChoosePath(PathType),
 }

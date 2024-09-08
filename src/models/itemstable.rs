@@ -158,6 +158,7 @@ impl ItemsTableModel {
 						machine_indexes: Vec::default(),
 					})
 					.collect::<Rc<[_]>>(),
+
 				PrefsCollection::Folder { name: _, items } => items
 					.iter()
 					.filter_map(|item| match item {
@@ -222,6 +223,13 @@ impl ItemsTableModel {
 		let info_db = self.info_db.borrow();
 		let info_db = info_db.as_ref()?;
 
+		// find the current folder (if any)
+		let folder_name = if let PrefsCollection::Folder { name, .. } = &self.current_collection.borrow().as_ref() {
+			Some(name.clone())
+		} else {
+			None
+		};
+
 		// access the selection
 		let items = self.items.borrow();
 		let index = *self.items_map.borrow().get(index).unwrap();
@@ -274,6 +282,7 @@ impl ItemsTableModel {
 			menu_items.push(MenuDesc::Item("Browse Software".to_string(), Some(id)));
 		}
 
+		// add to folder
 		let mut folder_menu_items = folder_info
 			.iter()
 			.map(|(index, col)| {
@@ -297,9 +306,18 @@ impl ItemsTableModel {
 		}
 		folder_menu_items.push(MenuDesc::Item(
 			"New Folder...".into(),
-			Some(AppCommand::AddToNewFolderDialog(items).into()),
+			Some(AppCommand::AddToNewFolderDialog(items.clone()).into()),
 		));
 		menu_items.push(MenuDesc::SubMenu("Add To Folder".into(), true, folder_menu_items));
+
+		// remove from this folder
+		if let Some(folder_name) = folder_name {
+			let text = format!("Remove From \"{}\"", folder_name);
+			let command = AppCommand::RemoveFromFolder(folder_name, items.clone());
+			menu_items.push(MenuDesc::Item(text.into(), Some(command.into())));
+		};
+
+		// and return!
 		Some(MenuDesc::make_popup_menu(menu_items))
 	}
 

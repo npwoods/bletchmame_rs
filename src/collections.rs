@@ -49,6 +49,37 @@ pub fn add_items_to_existing_folder_collection(
 	collections[folder_index] = Rc::new(col);
 }
 
+pub fn remove_items_from_folder_collection(
+	collections: &mut [Rc<PrefsCollection>],
+	folder_name: String,
+	items: &[PrefsItem],
+) {
+	let (index, old_items) = collections
+		.iter()
+		.enumerate()
+		.filter_map(|(index, col)| {
+			if let PrefsCollection::Folder { name, items } = col.as_ref() {
+				(name == &folder_name).then_some((index, items))
+			} else {
+				None
+			}
+		})
+		.next()
+		.unwrap();
+
+	let new_items = old_items
+		.iter()
+		.filter(|x| !items.contains(x))
+		.cloned()
+		.collect::<Vec<_>>();
+
+	let new_collection = PrefsCollection::Folder {
+		name: folder_name,
+		items: new_items,
+	};
+	collections[index] = Rc::new(new_collection);
+}
+
 pub fn toggle_builtin_collection(collections: &mut Vec<Rc<PrefsCollection>>, builtin: BuiltinCollection) {
 	let old_len = collections.len();
 	collections.retain(|x| !matches!(&**x, PrefsCollection::Builtin(x) if *x == builtin));
