@@ -1,4 +1,6 @@
 //! Helpers for Menu handling; which Sling does not handle yet
+use std::mem::zeroed;
+
 use itertools::Either;
 use muda::accelerator::Accelerator;
 use muda::accelerator::Code;
@@ -15,6 +17,9 @@ use raw_window_handle::HasWindowHandle;
 use raw_window_handle::RawWindowHandle;
 use slint::LogicalPosition;
 use slint::Window;
+use winapi::shared::windef::HWND;
+use winapi::um::winuser::GetWindowRect;
+use winapi::um::winuser::SetWindowPos;
 
 /// Helper function to declare accelerators
 pub fn accel(text: &str) -> Option<Accelerator> {
@@ -112,9 +117,46 @@ pub fn show_popup_menu(window: &Window, popup_menu: &Menu, _point: LogicalPositi
 	match raw_window {
 		#[cfg(target_os = "windows")]
 		RawWindowHandle::Win32(win32_window) => {
+			// use tauri to show the popup menu
 			popup_menu.show_context_menu_for_hwnd(win32_window.hwnd.into(), None);
+
+			// very gross hack
+			unfreeze_slint_after_popup_menu_hack(isize::from(win32_window.hwnd) as HWND);
 		}
 		_ => panic!("Unknown RawWindowHandle type"),
+	}
+}
+
+/// gross hack to work around Slint freezes
+fn unfreeze_slint_after_popup_menu_hack(hwnd: HWND) {
+	// see https://github.com/slint-ui/slint/issues/5863 for details
+	unsafe {
+		// get the HWND's rectangle
+		let mut rect = zeroed();
+		GetWindowRect(hwnd, &mut rect);
+
+		// make the window a single pixel wider - the act of changing the size
+		// seems to "tickle" Slint into unfreezing
+		SetWindowPos(
+			hwnd,
+			0 as HWND,
+			rect.left,
+			rect.top,
+			rect.right - rect.left + 1,
+			rect.bottom - rect.top,
+			0,
+		);
+
+		// and restore the old size
+		SetWindowPos(
+			hwnd,
+			0 as HWND,
+			rect.left,
+			rect.top,
+			rect.right - rect.left,
+			rect.bottom - rect.top,
+			0,
+		);
 	}
 }
 

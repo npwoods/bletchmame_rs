@@ -16,7 +16,6 @@ use slint::Weak;
 
 use crate::appcommand::AppCommand;
 use crate::guiutils::menuing::MenuDesc;
-use crate::prefs::BuiltinCollection;
 use crate::prefs::PrefsCollection;
 use crate::ui::AppWindow;
 use crate::ui::Icons;
@@ -59,25 +58,34 @@ impl CollectionsViewModel {
 		self.after_refresh_callback.set(Some(callback));
 	}
 
-	pub fn context_commands(&self, index: usize) -> Option<Menu> {
-		let items_len = self.items.borrow().len();
-		let is_all = self.items.borrow()[index].as_ref() == &PrefsCollection::Builtin(BuiltinCollection::All);
+	pub fn context_commands(&self, index: Option<usize>) -> Option<Menu> {
+		let mut menu_items = Vec::new();
 
-		let menu_items = [
-			(index > 0).then(|| ("Move Up", Some(index - 1))),
-			(index < items_len - 1).then(|| ("Move Down", Some(index + 1))),
-			(!is_all).then_some(("Remove", None)),
-		]
-		.into_iter()
-		.flatten()
-		.map(|(text, new_index)| {
-			let command = AppCommand::MoveCollection {
-				old_index: index,
-				new_index,
-			};
-			MenuDesc::Item(text.into(), Some(command.into()))
-		});
+		// menu items pertaining to selected collections
+		if let Some(old_index) = index {
+			if old_index > 0 {
+				let new_index = Some(old_index - 1);
+				let command = AppCommand::MoveCollection { old_index, new_index };
+				menu_items.push(MenuDesc::Item("Move Up".into(), Some(command.into())));
+			}
+			if old_index < self.items.borrow().len() - 1 {
+				let new_index = Some(old_index + 1);
+				let command = AppCommand::MoveCollection { old_index, new_index };
+				menu_items.push(MenuDesc::Item("Move Down".into(), Some(command.into())));
+			}
+			if self.items.borrow().len() > 1 {
+				let new_index = None;
+				let command = AppCommand::MoveCollection { old_index, new_index };
+				menu_items.push(MenuDesc::Item("Remove".into(), Some(command.into())));
+			}
+			menu_items.push(MenuDesc::Separator);
+		}
 
+		// new collection
+		let command = AppCommand::AddToNewFolderDialog([].into());
+		menu_items.push(MenuDesc::Item("New Collection".into(), Some(command.into())));
+
+		// make the popup menu
 		Some(MenuDesc::make_popup_menu(menu_items))
 	}
 }

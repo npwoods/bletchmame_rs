@@ -371,7 +371,7 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 	let model_clone = model.clone();
 	app_window.on_collections_row_pointer_event(move |index, evt, point| {
 		if is_context_menu_event(&evt) {
-			let index = usize::try_from(index).unwrap();
+			let index = usize::try_from(index).ok();
 			if let Some(popup_menu) = model_clone.with_collections_view_model(|x| x.context_commands(index)) {
 				let app_window = model_clone.app_window();
 				show_popup_menu(app_window.window(), &popup_menu, point);
