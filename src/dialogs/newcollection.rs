@@ -6,6 +6,7 @@ use slint::ComponentHandle;
 use slint::Weak;
 
 use crate::dialogs::SingleResult;
+use crate::guiutils::windowing::run_modal_dialog;
 use crate::guiutils::windowing::with_modal_parent;
 use crate::ui::NewCollectionDialog;
 
@@ -39,7 +40,7 @@ pub async fn dialog_new_collection(
 	let signaller = single_result.signaller();
 	dialog.window().on_close_requested(move || {
 		signaller.signal(None);
-		CloseRequestResponse::HideWindow
+		CloseRequestResponse::KeepWindowShown
 	});
 
 	// we want the "ok" button to be disabled when bad names are proposed
@@ -50,11 +51,7 @@ pub async fn dialog_new_collection(
 	});
 
 	// show the dialog and wait for completion
-	dialog.show().unwrap();
-	let result = single_result.wait().await;
-	dialog.hide().unwrap();
-
-	result
+	run_modal_dialog(&parent.unwrap(), &dialog, async { single_result.wait().await }).await
 }
 
 fn create_new_name(existing_names: &[String]) -> Cow<'static, str> {

@@ -19,6 +19,7 @@ use slint::Weak;
 use crate::dialogs::file::file_dialog;
 use crate::dialogs::file::PathType;
 use crate::dialogs::SingleResult;
+use crate::guiutils::windowing::run_modal_dialog;
 use crate::guiutils::windowing::with_modal_parent;
 use crate::prefs::PrefsPaths;
 use crate::ui::Icons;
@@ -92,7 +93,7 @@ pub async fn dialog_paths(parent: Weak<impl ComponentHandle + 'static>, paths: R
 	let signaller = single_result.signaller();
 	dialog.window().on_close_requested(move || {
 		signaller.signal(false);
-		CloseRequestResponse::HideWindow
+		CloseRequestResponse::KeepWindowShown
 	});
 
 	// ensure paths entries are updated
@@ -117,9 +118,7 @@ pub async fn dialog_paths(parent: Weak<impl ComponentHandle + 'static>, paths: R
 	});
 
 	// present the modal dialog
-	dialog.show().unwrap();
-	let accepted = single_result.wait().await;
-	dialog.hide().unwrap();
+	let accepted = run_modal_dialog(&parent.unwrap(), &dialog, async { single_result.wait().await }).await;
 	drop(dialog);
 
 	// if the user hit "ok", return

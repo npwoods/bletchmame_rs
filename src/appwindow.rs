@@ -501,7 +501,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 					// and readd it
 					prefs.collections.insert(new_index, collection);
 				} else {
-					// the colleciton is being removed; we need to remove any entries that
+					// the collection is being removed; we need to remove any entries that
 					// might be referenced
 					prefs.purge_stray_entries();
 				}

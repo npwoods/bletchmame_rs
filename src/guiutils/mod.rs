@@ -2,25 +2,27 @@
 pub mod menuing;
 pub mod windowing;
 
-use std::cell::Cell;
+use std::cell::RefCell;
 
 use i_slint_backend_winit::Backend;
 use i_slint_core::items::PointerEvent;
 use i_slint_core::items::PointerEventKind;
-use raw_window_handle::Win32WindowHandle;
 use slint::platform::PointerEventButton;
-use winit::platform::windows::WindowAttributesExtWindows;
+use winit::window::WindowAttributes;
 
+type WindowBuilderHookCallback = Box<dyn Fn(WindowAttributes) -> WindowAttributes + 'static>;
 thread_local! {
-	static MODAL_PARENT: Cell<Option<Win32WindowHandle>> = const { Cell::new(None) }
+	static WINDOW_BUILDER_HOOK_CALLBACK: RefCell<Option<WindowBuilderHookCallback>> = const { RefCell::new(None) }
 }
 
-fn window_builder_hook(window_builder: winit::window::WindowAttributes) -> winit::window::WindowAttributes {
-	if let Some(modal_parent) = MODAL_PARENT.get() {
-		window_builder.with_owner_window(modal_parent.hwnd.into())
-	} else {
-		window_builder
-	}
+fn window_builder_hook(attrs: WindowAttributes) -> WindowAttributes {
+	WINDOW_BUILDER_HOOK_CALLBACK.with_borrow(|callback| {
+		if let Some(callback) = callback {
+			callback(attrs)
+		} else {
+			attrs
+		}
+	})
 }
 
 pub fn init_gui_utils() {

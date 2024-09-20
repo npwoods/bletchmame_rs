@@ -20,6 +20,10 @@ use slint::Window;
 use winapi::shared::windef::HWND;
 use winapi::um::winuser::GetWindowRect;
 use winapi::um::winuser::SetWindowPos;
+use winapi::um::winuser::SWP_NOACTIVATE;
+use winapi::um::winuser::SWP_NOMOVE;
+use winapi::um::winuser::SWP_NOOWNERZORDER;
+use winapi::um::winuser::SWP_NOSENDCHANGING;
 
 /// Helper function to declare accelerators
 pub fn accel(text: &str) -> Option<Accelerator> {
@@ -131,32 +135,18 @@ pub fn show_popup_menu(window: &Window, popup_menu: &Menu, _point: LogicalPositi
 fn unfreeze_slint_after_popup_menu_hack(hwnd: HWND) {
 	// see https://github.com/slint-ui/slint/issues/5863 for details
 	unsafe {
-		// get the HWND's rectangle
-		let mut rect = zeroed();
-		GetWindowRect(hwnd, &mut rect);
+		// get the HWND's width/height
+		let (width, height) = {
+			let mut rect = zeroed();
+			GetWindowRect(hwnd, &mut rect);
+			(rect.right - rect.left, rect.bottom - rect.top)
+		};
 
-		// make the window a single pixel wider - the act of changing the size
+		// make the window a single pixel wider, and flip it back - the act of changing the size
 		// seems to "tickle" Slint into unfreezing
-		SetWindowPos(
-			hwnd,
-			0 as HWND,
-			rect.left,
-			rect.top,
-			rect.right - rect.left + 1,
-			rect.bottom - rect.top,
-			0,
-		);
-
-		// and restore the old size
-		SetWindowPos(
-			hwnd,
-			0 as HWND,
-			rect.left,
-			rect.top,
-			rect.right - rect.left,
-			rect.bottom - rect.top,
-			0,
-		);
+		let flags = SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOSENDCHANGING;
+		SetWindowPos(hwnd, 0 as HWND, 0, 0, width + 1, height, flags);
+		SetWindowPos(hwnd, 0 as HWND, 0, 0, width, height, flags);
 	}
 }
 
