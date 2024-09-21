@@ -3,24 +3,27 @@ use std::default::Default;
 
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
+use slint::SharedString;
 use slint::Weak;
 
 use crate::dialogs::SingleResult;
 use crate::guiutils::windowing::run_modal_dialog;
 use crate::guiutils::windowing::with_modal_parent;
-use crate::ui::NewCollectionDialog;
+use crate::ui::NameCollectionDialog;
 
-pub async fn dialog_new_collection(
+async fn dialog_name_collection(
 	parent: Weak<impl ComponentHandle + 'static>,
+	title: impl Into<SharedString>,
 	existing_names: Vec<String>,
+	default_name: impl Into<SharedString>,
 ) -> Option<String> {
 	// prepare the dialog
-	let dialog = with_modal_parent(&parent.unwrap(), || NewCollectionDialog::new().unwrap());
+	let dialog = with_modal_parent(&parent.unwrap(), || NameCollectionDialog::new().unwrap());
 	let single_result = SingleResult::default();
 
-	// set the intial name
-	let new_collection_name = create_new_name(&existing_names);
-	dialog.invoke_set_text(new_collection_name.as_ref().into());
+	// set the title and default name
+	dialog.set_title_text(title.into());
+	dialog.invoke_set_text(default_name.into());
 
 	// set up the "ok" button
 	let signaller = single_result.signaller();
@@ -54,7 +57,16 @@ pub async fn dialog_new_collection(
 	run_modal_dialog(&parent.unwrap(), &dialog, async { single_result.wait().await }).await
 }
 
-fn create_new_name(existing_names: &[String]) -> Cow<'static, str> {
+pub async fn dialog_new_collection(
+	parent: Weak<impl ComponentHandle + 'static>,
+	existing_names: Vec<String>,
+) -> Option<String> {
+	let default_name = create_new_name(&existing_names);
+	let title = "Create New Collection";
+	dialog_name_collection(parent, title, existing_names, default_name.as_ref()).await
+}
+
+fn create_new_name(existing_names: &[String]) -> impl AsRef<str> {
 	let mut count = 1u32;
 	loop {
 		let new_name: Cow<str> = if count > 1 {
@@ -71,6 +83,15 @@ fn create_new_name(existing_names: &[String]) -> Cow<'static, str> {
 
 fn is_good_new_name(existing_names: &[String], new_name: &str) -> bool {
 	!new_name.is_empty() && !existing_names.iter().any(|x| x.eq(new_name))
+}
+
+pub async fn dialog_rename_collection(
+	parent: Weak<impl ComponentHandle + 'static>,
+	existing_names: Vec<String>,
+	old_name: String,
+) -> Option<String> {
+	let title = format!("Rename Folder \"{}\"", old_name);
+	dialog_name_collection(parent, title, existing_names, old_name).await
 }
 
 #[cfg(test)]

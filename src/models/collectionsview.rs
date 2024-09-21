@@ -63,20 +63,29 @@ impl CollectionsViewModel {
 
 		// menu items pertaining to selected collections
 		if let Some(old_index) = index {
+			let items = self.items.borrow();
 			if old_index > 0 {
 				let new_index = Some(old_index - 1);
 				let command = AppCommand::MoveCollection { old_index, new_index };
 				menu_items.push(MenuDesc::Item("Move Up".into(), Some(command.into())));
 			}
-			if old_index < self.items.borrow().len() - 1 {
+			if old_index < items.len() - 1 {
 				let new_index = Some(old_index + 1);
 				let command = AppCommand::MoveCollection { old_index, new_index };
 				menu_items.push(MenuDesc::Item("Move Down".into(), Some(command.into())));
 			}
-			if self.items.borrow().len() > 1 {
+			if items.len() > 1 {
 				let new_index = None;
 				let command = AppCommand::MoveCollection { old_index, new_index };
 				menu_items.push(MenuDesc::Item("Remove".into(), Some(command.into())));
+			}
+			if items
+				.get(old_index)
+				.map(|x| matches!(x.as_ref(), PrefsCollection::Folder { .. }))
+				.unwrap_or_default()
+			{
+				let command = AppCommand::RenameCollectionDialog { index: old_index };
+				menu_items.push(MenuDesc::Item("Rename...".into(), Some(command.into())));
 			}
 			menu_items.push(MenuDesc::Separator);
 		}

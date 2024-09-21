@@ -26,12 +26,15 @@ use crate::collections::add_items_to_existing_folder_collection;
 use crate::collections::add_items_to_new_folder_collection;
 use crate::collections::get_folder_collection_names;
 use crate::collections::get_folder_collections;
+use crate::collections::get_folder_name;
 use crate::collections::remove_items_from_folder_collection;
+use crate::collections::rename_folder;
 use crate::collections::toggle_builtin_collection;
 use crate::dialogs::file::file_dialog;
 use crate::dialogs::file::PathType;
 use crate::dialogs::loading::dialog_load_mame_info;
-use crate::dialogs::newcollection::dialog_new_collection;
+use crate::dialogs::namecollection::dialog_new_collection;
+use crate::dialogs::namecollection::dialog_rename_collection;
 use crate::dialogs::paths::dialog_paths;
 use crate::guiutils::is_context_menu_event;
 use crate::guiutils::menuing::accel;
@@ -155,7 +158,7 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 		.iter()
 		.map(|x| {
 			let id = AppCommand::SettingsToggleBuiltinCollection(*x);
-			MenuItem::with_id(id, &format!("{}", x), true, None)
+			MenuItem::with_id(id, format!("{}", x), true, None)
 		})
 		.collect::<Vec<_>>();
 	let toggle_builtin_menu_items = toggle_builtin_menu_items
@@ -507,6 +510,22 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				}
 			});
 		}
+		AppCommand::RenameCollectionDialog { index } => {
+			let existing_names = get_folder_collection_names(&model.preferences.borrow().collections);
+			let parent = model.app_window().as_weak();
+			let model_clone = model.clone();
+			let old_name = get_folder_name(&model.preferences.borrow().collections, index).to_string();
+			let fut = async move {
+				if let Some(new_name) = dialog_rename_collection(parent, existing_names, old_name).await {
+					let command = AppCommand::RenameCollection { index, new_name };
+					handle_command(&model_clone, command);
+				}
+			};
+			spawn_local(fut).unwrap();
+		}
+		AppCommand::RenameCollection { index, new_name } => model.modify_prefs(|prefs| {
+			rename_folder(&mut prefs.collections, index, new_name);
+		}),
 		AppCommand::ChoosePath(path_type) => {
 			choose_path(model, path_type);
 		}

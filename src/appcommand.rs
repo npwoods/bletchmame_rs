@@ -35,6 +35,8 @@ pub enum AppCommand {
 	AddToNewFolderDialog(Vec<PrefsItem>),
 	RemoveFromFolder(String, Vec<PrefsItem>),
 	MoveCollection { old_index: usize, new_index: Option<usize> },
+	RenameCollectionDialog { index: usize },
+	RenameCollection { index: usize, new_name: String },
 	ChoosePath(PathType),
 }
 

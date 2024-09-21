@@ -314,7 +314,7 @@ impl ItemsTableModel {
 		if let Some(folder_name) = folder_name {
 			let text = format!("Remove From \"{}\"", folder_name);
 			let command = AppCommand::RemoveFromFolder(folder_name, items.clone());
-			menu_items.push(MenuDesc::Item(text.into(), Some(command.into())));
+			menu_items.push(MenuDesc::Item(text, Some(command.into())));
 		};
 
 		// and return!

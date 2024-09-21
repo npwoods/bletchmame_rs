@@ -89,3 +89,22 @@ pub fn toggle_builtin_collection(collections: &mut Vec<Rc<PrefsCollection>>, bui
 		collections.push(new_collection);
 	}
 }
+
+pub fn get_folder_name(collections: &[Rc<PrefsCollection>], index: usize) -> &'_ str {
+	let PrefsCollection::Folder { name, .. } = collections[index].as_ref() else {
+		panic!()
+	};
+	name
+}
+
+pub fn rename_folder(collections: &mut [Rc<PrefsCollection>], index: usize, new_folder_name: String) {
+	let PrefsCollection::Folder { items, .. } = collections[index].as_ref() else {
+		panic!("Expected PrefsCollection::Folder")
+	};
+	let new_collection = PrefsCollection::Folder {
+		name: new_folder_name,
+		items: items.clone(),
+	};
+	let new_collection = Rc::new(new_collection);
+	collections[index] = new_collection;
+}

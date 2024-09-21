@@ -5,7 +5,7 @@ use tokio::sync::Notify;
 
 pub mod file;
 pub mod loading;
-pub mod newcollection;
+pub mod namecollection;
 pub mod paths;
 
 struct SingleResult<T>(Rc<(Notify, RefCell<Option<T>>)>);

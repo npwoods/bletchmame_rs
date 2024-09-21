@@ -1,13 +1,14 @@
 import { AboutSlint, Button, VerticalBox, HorizontalBox, LineEdit } from "std-widgets.slint";
 
-export component NewCollectionDialog inherits Window {
-    title: "Create New Collection";
+export component NameCollectionDialog inherits Window {
+    title: title-text;
     width: 400px;
     height: 100px;
     callback ok-clicked();
     callback cancel-clicked();
     callback text-edited(string);
     out property <string> text;
+    in property <string> title-text;
     in-out property <bool> ok-enabled;
     public function set-text(text: string) {
         line-edit.text = text;

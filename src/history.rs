@@ -1,5 +1,6 @@
 use std::cmp::min;
 use std::collections::HashSet;
+use std::mem::take;
 use std::rc::Rc;
 
 use crate::prefs::HistoryEntry;
@@ -88,7 +89,7 @@ where
 		let folder_names = self
 			.collections()
 			.iter()
-			.filter_map(|collection| collection_folder_name(&collection))
+			.filter_map(|collection| collection_folder_name(collection))
 			.map(|x| x.to_string())
 			.collect::<HashSet<_>>();
 
@@ -96,7 +97,7 @@ where
 		let (history, position) = self.entries_mut();
 
 		// and retain everything - except folders that are no longer named
-		let history_entries = history.drain(..).collect::<Vec<_>>();
+		let history_entries = take(history);
 		let (new_history, new_position) = retain_with_position(history_entries, *position, |entry| {
 			!collection_folder_name(&entry.collection).is_some_and(|x| !folder_names.contains(x))
 		});
