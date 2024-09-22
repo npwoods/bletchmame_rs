@@ -5,6 +5,7 @@ use tokio::sync::Notify;
 
 pub mod file;
 pub mod loading;
+pub mod messagebox;
 pub mod namecollection;
 pub mod paths;
 

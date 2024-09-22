@@ -26,14 +26,16 @@ use tracing::Level;
 use crate::appcommand::AppCommand;
 use crate::collections::add_items_to_existing_folder_collection;
 use crate::collections::add_items_to_new_folder_collection;
+use crate::collections::get_collection_name;
 use crate::collections::get_folder_collection_names;
 use crate::collections::get_folder_collections;
-use crate::collections::get_folder_name;
 use crate::collections::remove_items_from_folder_collection;
 use crate::collections::toggle_builtin_collection;
 use crate::dialogs::file::file_dialog;
 use crate::dialogs::file::PathType;
 use crate::dialogs::loading::dialog_load_mame_info;
+use crate::dialogs::messagebox::dialog_message_box;
+use crate::dialogs::messagebox::OkCancel;
 use crate::dialogs::namecollection::dialog_new_collection;
 use crate::dialogs::namecollection::dialog_rename_collection;
 use crate::dialogs::paths::dialog_paths;
@@ -516,11 +518,27 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				}
 			});
 		}
+		AppCommand::DeleteCollectionDialog { index } => {
+			let parent = model.app_window().as_weak();
+			let model_clone = model.clone();
+			let old_name = get_collection_name(&model.preferences.borrow().collections, index).to_string();
+			let fut = async move {
+				let message = format!("Are you sure you want to delete \"{}\"", old_name);
+				if dialog_message_box::<OkCancel>(parent, "Delete", message).await == OkCancel::Ok {
+					let command = AppCommand::MoveCollection {
+						old_index: index,
+						new_index: None,
+					};
+					handle_command(&model_clone, command);
+				}
+			};
+			spawn_local(fut).unwrap();
+		}
 		AppCommand::RenameCollectionDialog { index } => {
 			let existing_names = get_folder_collection_names(&model.preferences.borrow().collections);
 			let parent = model.app_window().as_weak();
 			let model_clone = model.clone();
-			let old_name = get_folder_name(&model.preferences.borrow().collections, index).to_string();
+			let old_name = get_collection_name(&model.preferences.borrow().collections, index).to_string();
 			let fut = async move {
 				if let Some(new_name) = dialog_rename_collection(parent, existing_names, old_name).await {
 					let command = AppCommand::RenameCollection { index, new_name };

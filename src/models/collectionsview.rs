@@ -75,9 +75,8 @@ impl CollectionsViewModel {
 				menu_items.push(MenuDesc::Item("Move Down".into(), Some(command.into())));
 			}
 			if items.len() > 1 {
-				let new_index = None;
-				let command = AppCommand::MoveCollection { old_index, new_index };
-				menu_items.push(MenuDesc::Item("Remove".into(), Some(command.into())));
+				let command = AppCommand::DeleteCollectionDialog { index: old_index };
+				menu_items.push(MenuDesc::Item("Delete".into(), Some(command.into())));
 			}
 			if items
 				.get(old_index)

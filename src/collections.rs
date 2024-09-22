@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::rc::Rc;
 
 use crate::prefs::BuiltinCollection;
@@ -90,9 +91,10 @@ pub fn toggle_builtin_collection(collections: &mut Vec<Rc<PrefsCollection>>, bui
 	}
 }
 
-pub fn get_folder_name(collections: &[Rc<PrefsCollection>], index: usize) -> &'_ str {
-	let PrefsCollection::Folder { name, .. } = collections[index].as_ref() else {
-		panic!()
-	};
-	name
+pub fn get_collection_name(collections: &[Rc<PrefsCollection>], index: usize) -> Cow<'_, String> {
+	match collections[index].as_ref() {
+		PrefsCollection::Folder { name, .. } => Cow::Borrowed(name),
+		PrefsCollection::Builtin(x) => Cow::Owned(format!("{}", x)),
+		PrefsCollection::MachineSoftware { machine_name } => Cow::Borrowed(machine_name),
+	}
 }

@@ -1,0 +1,24 @@
+import { Button, VerticalBox, HorizontalBox } from "std-widgets.slint";
+
+export component MessageBoxDialog inherits Window {
+    in property <string> title-text;
+    in property <string> message-text;
+    in property <[string]> button-texts;
+    callback button-clicked(int);
+    title: title-text;
+    VerticalBox {
+        Text {
+            text: message-text;
+            horizontal-alignment: center;
+        }
+
+        HorizontalBox {
+            for text[index] in button-texts: Button {
+                text: text;
+                clicked => {
+                    button-clicked(index);
+                }
+            }
+        }
+    }
+}
