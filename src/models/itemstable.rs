@@ -16,6 +16,8 @@ use slint::ModelRc;
 use slint::ModelTracker;
 use slint::SharedString;
 use slint::StandardListViewItem;
+use tracing::event;
+use tracing::Level;
 use unicase::UniCase;
 
 use crate::appcommand::AppCommand;
@@ -34,7 +36,7 @@ use crate::software::Software;
 use crate::software::SoftwareList;
 use crate::software::SoftwareListDispenser;
 
-const LOG: bool = false;
+const LOG: Level = Level::TRACE;
 
 pub struct ItemsTableModel {
 	info_db: RefCell<Option<Rc<InfoDb>>>,
@@ -345,12 +347,14 @@ impl ItemsTableModel {
 			self.sorting.set(sorting);
 		}
 
-		if LOG {
-			println!(
-				"set_columns_and_search(): search={:?} sorting={:?} search_changed={} sorting_changed={:?}",
-				search, sorting, search_changed, sorting_changed
-			);
-		}
+		event!(
+			LOG,
+			"set_columns_and_search(): search={:?} sorting={:?} search_changed={} sorting_changed={:?}",
+			search,
+			sorting,
+			search_changed,
+			sorting_changed
+		);
 
 		// if anything changed, update our map
 		if search_changed || sorting_changed {

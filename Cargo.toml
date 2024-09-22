@@ -7,6 +7,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+tracing = { version = "0.1.40", features = [
+    "max_level_trace",
+    "release_max_level_info",
+] }
+tracing-subscriber = "0.3.18"
 slint = { version = "1.7.2", features = ["raw-window-handle-06"] }
 i-slint-core = "1.7.2"
 i-slint-common = "1.7.2"
@@ -56,4 +61,4 @@ opt-level = "s"
 panic = "abort"
 
 [features]
-diagnostics = []
+no-diagnostics = []

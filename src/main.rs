@@ -16,6 +16,7 @@ mod threadlocalbubble;
 mod xml;
 
 use std::path::PathBuf;
+use tracing::Level;
 use winapi::um::wincon::AttachConsole;
 use winapi::um::wincon::ATTACH_PARENT_PROCESS;
 
@@ -36,31 +37,34 @@ type Result<T> = std::result::Result<T, Box<crate::error::Error>>;
 #[derive(StructOpt, Debug)]
 #[structopt(name = "basic")]
 struct Opt {
-	#[cfg(feature = "diagnostics")]
-	#[structopt(long, parse(from_os_str))]
+	#[cfg_attr(not(feature = "no-diagnostics"), structopt(long, parse(from_os_str)))]
 	process_xml: Option<PathBuf>,
 
 	#[structopt(long, parse(from_os_str))]
 	prefs_path: Option<PathBuf>,
-}
 
-impl Opt {
-	#[cfg(feature = "diagnostics")]
-	pub fn process_xml_path(&self) -> Option<&PathBuf> {
-		self.process_xml.as_ref()
-	}
-
-	#[cfg(not(feature = "diagnostics"))]
-	pub fn process_xml_path(&self) -> Option<&PathBuf> {
-		None
-	}
+	#[cfg_attr(not(feature = "no-diagnostics"), structopt(long))]
+	log_level: Option<Level>,
 }
 
 fn main() {
+	// on Windows, attach to the parent's console - debugging is hell if we don't do this
+	#[cfg(target_os = "windows")]
+	unsafe {
+		AttachConsole(ATTACH_PARENT_PROCESS);
+	}
+
+	// get the command line arguments
 	let opts = Opt::from_args();
 
+	// set up logging
+	tracing_subscriber::fmt()
+		.with_max_level(opts.log_level.unwrap_or(Level::INFO))
+		.with_target(false)
+		.init();
+
 	// are we doing diagnostics
-	if let Some(path) = opts.process_xml_path() {
+	if let Some(path) = opts.process_xml {
 		info_db_from_xml_file(path);
 		return;
 	}
@@ -74,12 +78,6 @@ fn main() {
 		path
 	});
 
-	// on Windows, attach to the parent's console - debugging is hell if we don't do this
-	#[cfg(target_os = "windows")]
-	unsafe {
-		AttachConsole(ATTACH_PARENT_PROCESS);
-	}
-
 	// set up the tokio runtime
 	let tokio_runtime = tokio::runtime::Builder::new_current_thread().build().unwrap();
 	let _guard = tokio_runtime.enter();
@@ -92,4 +90,19 @@ fn main() {
 
 	// ...and run run run!
 	app_window.run().unwrap();
+}
+
+#[cfg(test)]
+mod test {
+	use assert_matches::assert_matches;
+	use structopt::StructOpt;
+
+	use super::Opt;
+
+	#[test]
+	fn opts_from_args() {
+		let empty_args = Vec::<&str>::new();
+		let attrs = Opt::from_iter_safe(empty_args.iter());
+		assert_matches!(attrs, Ok(_));
+	}
 }

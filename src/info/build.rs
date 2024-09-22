@@ -9,6 +9,8 @@ use std::marker::PhantomData;
 use binary_serde::BinarySerde;
 use itertools::Itertools;
 use num::CheckedAdd;
+use tracing::event;
+use tracing::Level;
 
 use crate::error::BoxDynError;
 use crate::info::binary;
@@ -24,7 +26,7 @@ use crate::xml::XmlReader;
 use crate::Error;
 use crate::Result;
 
-const LOG: bool = false;
+const LOG: Level = Level::TRACE;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Phase {
@@ -80,10 +82,8 @@ impl State {
 	}
 
 	pub fn handle_start(&mut self, evt: XmlElement<'_>) -> std::result::Result<Option<Phase>, BoxDynError> {
-		if LOG {
-			println!("handle_start(): self={:?}", self);
-			println!("handle_start(): {:?}", evt);
-		}
+		event!(LOG, "handle_start(): self={:?}", self);
+		event!(LOG, "handle_start(): {:?}", evt);
 
 		let new_phase = match (self.phase, evt.name().as_ref()) {
 			(Phase::Root, b"mame") => {
@@ -95,12 +95,13 @@ impl State {
 				let [name, source_file, clone_of, rom_of, runnable] =
 					evt.find_attributes([b"name", b"sourcefile", b"cloneof", b"romof", b"runnable"])?;
 
-				if LOG {
-					println!(
-						"handle_start(): name={:?} source_file={:?} runnable={:?}",
-						name, source_file, runnable
-					);
-				}
+				event!(
+					LOG,
+					"handle_start(): name={:?} source_file={:?} runnable={:?}",
+					name,
+					source_file,
+					runnable
+				);
 
 				let Some(name) = name else { return Ok(None) };
 				let name_strindex = self.strings.lookup(&name);
@@ -183,9 +184,7 @@ impl State {
 		callback: &mut impl FnMut(&str) -> bool,
 		text: Option<String>,
 	) -> std::result::Result<Option<Phase>, BoxDynError> {
-		if LOG {
-			println!("handle_end(): self={:?}", self);
-		}
+		event!(LOG, "handle_end(): self={:?}", self);
 
 		let new_phase = match self.phase {
 			Phase::Root => panic!(),

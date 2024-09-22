@@ -20,6 +20,8 @@ use slint::SharedString;
 use slint::TableColumn;
 use slint::VecModel;
 use slint::Weak;
+use tracing::event;
+use tracing::Level;
 
 use crate::appcommand::AppCommand;
 use crate::collections::add_items_to_existing_folder_collection;
@@ -28,7 +30,6 @@ use crate::collections::get_folder_collection_names;
 use crate::collections::get_folder_collections;
 use crate::collections::get_folder_name;
 use crate::collections::remove_items_from_folder_collection;
-use crate::collections::rename_folder;
 use crate::collections::toggle_builtin_collection;
 use crate::dialogs::file::file_dialog;
 use crate::dialogs::file::PathType;
@@ -55,7 +56,8 @@ use crate::threadlocalbubble::ThreadLocalBubble;
 use crate::ui::AboutDialog;
 use crate::ui::AppWindow;
 
-const LOG_COMMANDS: bool = false;
+const LOG_COMMANDS: Level = Level::TRACE;
+const LOG_PREFS: Level = Level::TRACE;
 
 type InfoDbSubscriberCallback = Box<dyn Fn(Option<Rc<InfoDb>>, &Preferences)>;
 
@@ -109,22 +111,27 @@ impl AppModel {
 
 		// react to all of the possible changes
 		if prefs.collections != old_prefs.collections {
+			event!(LOG_PREFS, "modify_prefs(): prefs.collection changed");
 			self.with_collections_view_model(|x| x.update(&prefs.collections));
 		}
 		if prefs.current_history_entry() != old_prefs.current_history_entry()
 			|| prefs.current_collection() != old_prefs.current_collection()
 		{
+			event!(LOG_PREFS, "modify_prefs(): current history_entry/collection] changed");
 			update_ui_for_current_history_item(self);
 		}
 		if prefs.items_columns != old_prefs.items_columns {
+			event!(LOG_PREFS, "modify_prefs(): items_columns changed");
 			update_ui_for_sort_changes(self);
 		}
 		if prefs.paths != old_prefs.paths {
 			if prefs.paths.mame_executable != old_prefs.paths.mame_executable {
+				event!(LOG_PREFS, "modify_prefs(): paths.mame_executable changed");
 				let fut = process_mame_listxml(self.clone());
 				spawn_local(fut).unwrap();
 			}
 			if prefs.paths.software_lists != old_prefs.paths.software_lists {
+				event!(LOG_PREFS, "modify_prefs(): paths.software_lists changed");
 				software_paths_updated(self);
 			}
 		}
@@ -329,12 +336,12 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 
 	// set up items filter
 	let model_clone = model.clone();
-	app_window.on_items_sort_ascending(move |index| {
-		items_set_sorting(&model_clone, index, SortOrder::Ascending);
+	app_window.on_items_sort_ascending(move |column| {
+		items_set_sorting(&model_clone, column, SortOrder::Ascending);
 	});
 	let model_clone = model.clone();
-	app_window.on_items_sort_descending(move |index| {
-		items_set_sorting(&model_clone, index, SortOrder::Descending);
+	app_window.on_items_sort_descending(move |column| {
+		items_set_sorting(&model_clone, column, SortOrder::Descending);
 	});
 	let model_clone = model.clone();
 	app_window.on_items_search_text_changed(move |search| {
@@ -366,8 +373,9 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 	// for when we shut down
 	let model_clone = model.clone();
 	app_window.window().on_close_requested(move || {
-		update_prefs(&model_clone);
-		CloseRequestResponse::HideWindow
+		let command = AppCommand::FileExit;
+		handle_command(&model_clone, command);
+		CloseRequestResponse::KeepWindowShown
 	});
 
 	// collections popup menus
@@ -405,9 +413,7 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 }
 
 fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
-	if LOG_COMMANDS {
-		println!("handle_command(): command={:?}", &command);
-	}
+	event!(LOG_COMMANDS, "handle_command(): command={:?}", &command);
 	match command {
 		AppCommand::FileExit => {
 			update_prefs(&model.clone());
@@ -524,7 +530,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			spawn_local(fut).unwrap();
 		}
 		AppCommand::RenameCollection { index, new_name } => model.modify_prefs(|prefs| {
-			rename_folder(&mut prefs.collections, index, new_name);
+			prefs.rename_folder(index, new_name);
 		}),
 		AppCommand::ChoosePath(path_type) => {
 			choose_path(model, path_type);
@@ -663,6 +669,8 @@ fn update_ui_for_sort_changes(model: &AppModel) {
 			items_columns.set_row_data(index, data);
 		}
 	}
+
+	update_items_model_for_columns_and_search(model);
 }
 
 fn update_items_model_for_columns_and_search(model: &AppModel) {

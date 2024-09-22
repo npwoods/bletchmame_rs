@@ -16,6 +16,7 @@ pub trait History {
 	fn current_collection(&self) -> (Rc<PrefsCollection>, Option<usize>);
 	fn current_history_entry(&self) -> &HistoryEntry;
 	fn current_history_entry_mut(&mut self) -> &mut HistoryEntry;
+	fn rename_folder(&mut self, collection_index: usize, new_folder_name: String);
 	fn purge_stray_entries(&mut self);
 }
 
@@ -23,6 +24,7 @@ pub trait HistoryContainer {
 	fn entries(&self) -> (&[HistoryEntry], usize);
 	fn entries_mut(&mut self) -> (&mut Vec<HistoryEntry>, &mut usize);
 	fn collections(&self) -> &[Rc<PrefsCollection>];
+	fn collections_mut(&mut self) -> &mut [Rc<PrefsCollection>];
 }
 
 impl<T> History for T
@@ -82,6 +84,28 @@ where
 		let (history, position) = self.entries_mut();
 		let history_len = history.len();
 		&mut history[history_len - *position - 1]
+	}
+
+	fn rename_folder(&mut self, collection_index: usize, new_folder_name: String) {
+		// its weird that this is on "history", but it requires simultaneous changes to history and collections
+		let collections = self.collections_mut();
+		let PrefsCollection::Folder { items, name: old_name } = collections[collection_index].as_ref() else {
+			panic!("Expected PrefsCollection::Folder")
+		};
+		let old_name = old_name.to_string();
+		let new_collection = PrefsCollection::Folder {
+			name: new_folder_name,
+			items: items.clone(),
+		};
+		let new_collection = Rc::new(new_collection);
+		collections[collection_index] = new_collection.clone();
+
+		let (entries, _) = self.entries_mut();
+		for entry in entries.iter_mut() {
+			if matches!(entry.collection.as_ref(), PrefsCollection::Folder { name, .. } if name == &old_name) {
+				entry.collection = sanitize_collection(new_collection.clone());
+			}
+		}
 	}
 
 	fn purge_stray_entries(&mut self) {
@@ -157,6 +181,10 @@ impl HistoryContainer for Preferences {
 
 	fn collections(&self) -> &[Rc<PrefsCollection>] {
 		&self.collections
+	}
+
+	fn collections_mut(&mut self) -> &mut [Rc<PrefsCollection>] {
+		&mut self.collections
 	}
 }
 

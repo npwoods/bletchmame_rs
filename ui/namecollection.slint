@@ -13,6 +13,7 @@ export component NameCollectionDialog inherits Window {
     public function set-text(text: string) {
         line-edit.text = text;
         line-edit.select-all();
+        line-edit.focus();
     }
     VerticalBox {
         line-edit := LineEdit {
@@ -20,6 +21,11 @@ export component NameCollectionDialog inherits Window {
             height: 30px;
             edited(new-text) => {
                 text-edited(new-text);
+            }
+            accepted(new-text) => {
+                if ok-enabled {
+                    root.ok-clicked();
+                }
             }
         }
 
