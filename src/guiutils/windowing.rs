@@ -11,7 +11,7 @@ use slint::WindowHandle;
 use winit::platform::windows::WindowAttributesExtWindows;
 use winit::window::WindowAttributes;
 
-use super::WINDOW_BUILDER_HOOK_CALLBACK;
+use super::WINDOW_ATTRIBUTE_HOOK_CALLBACK;
 
 /// Very hackish function to hook into window creation to create a window as
 pub fn with_modal_parent<T>(parent: &(impl ComponentHandle + 'static), func: impl FnOnce() -> T) -> T
@@ -25,11 +25,11 @@ where
 		(window.window_handle().clone(), window.position())
 	};
 
-	// set up a callback and stow it in WINDOW_BUILDER_HOOK_CALLBACK
+	// set up a callback and stow it in WINDOW_ATTRIBUTE_HOOK_CALLBACK
 	let callback = move |window_attributes| {
 		set_window_attributes_for_modal_parent(window_attributes, &parent_handle, parent_position)
 	};
-	WINDOW_BUILDER_HOOK_CALLBACK.set(Some(Box::new(callback)));
+	WINDOW_ATTRIBUTE_HOOK_CALLBACK.set(Some(Box::new(callback)));
 
 	// invoke the callback
 	let result = func();
@@ -37,9 +37,9 @@ where
 	// force the window to be created
 	let _ = result.window().size();
 
-	// clear out WINDOW_BUILDER_HOOK_CALLBACK
-	let old_hook = WINDOW_BUILDER_HOOK_CALLBACK.take();
-	assert!(old_hook.is_some(), "WINDOW_BUILDER_HOOK_CALLBACK was lost");
+	// clear out WINDOW_ATTRIBUTE_HOOK_CALLBACK
+	let old_hook = WINDOW_ATTRIBUTE_HOOK_CALLBACK.take();
+	assert!(old_hook.is_some(), "WINDOW_ATTRIBUTE_HOOK_CALLBACK was lost");
 
 	// by default install an `on_close_requested` handle that will reenable the modal parent
 	let parent_weak = parent.as_weak();

@@ -7,6 +7,7 @@ mod dialogs;
 mod error;
 mod guiutils;
 mod history;
+mod icon;
 mod info;
 mod models;
 mod prefs;

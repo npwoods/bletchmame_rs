@@ -12,10 +12,10 @@ tracing = { version = "0.1.40", features = [
     "release_max_level_info",
 ] }
 tracing-subscriber = "0.3.18"
-slint = { version = "1.7.2", features = ["raw-window-handle-06"] }
-i-slint-core = "1.7.2"
-i-slint-common = "1.7.2"
-i-slint-backend-winit = "1.7.2"
+slint = { version = "1.8", features = ["raw-window-handle-06"] }
+i-slint-core = "1.8"
+i-slint-common = "1.8"
+i-slint-backend-winit = "1.8"
 muda = "0.14.1"
 raw-window-handle = "0.6.2"
 rfd = "0.14.1"
@@ -48,7 +48,7 @@ assert_matches = "1.5.0"
 test-case = "3.3.1"
 
 [build-dependencies]
-slint-build = "1.7.2"
+slint-build = "1.8"
 vivi_ui = { git = "https://seed.radicle.garden/z3oxAZSLcyXgpa7fcvgtueF49jHpH.git", rev = "76a83bc993ce625822182e629034e54496a3bc20" }
 
 [profile.dev]

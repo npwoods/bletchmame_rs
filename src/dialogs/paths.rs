@@ -7,7 +7,6 @@ use std::rc::Rc;
 use itertools::Itertools;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
-use slint::Global;
 use slint::Model;
 use slint::ModelNotify;
 use slint::ModelRc;
@@ -21,8 +20,8 @@ use crate::dialogs::file::PathType;
 use crate::dialogs::SingleResult;
 use crate::guiutils::windowing::run_modal_dialog;
 use crate::guiutils::windowing::with_modal_parent;
+use crate::icon::Icon;
 use crate::prefs::PrefsPaths;
-use crate::ui::Icons;
 use crate::ui::MagicListViewItem;
 use crate::ui::PathsDialog;
 
@@ -284,11 +283,8 @@ impl PathEntriesModel {
 	}
 
 	fn make_entry(&self, text: impl Into<SharedString>, exists: bool) -> MagicListViewItem {
-		let prefix_icon = (!exists).then(|| {
-			let dialog = self.dialog_weak.unwrap();
-			Icons::get(&dialog).get_clear()
-		});
-		let prefix_icon = prefix_icon.unwrap_or_default();
+		let prefix_icon = if exists { Icon::Clear } else { Icon::Blank };
+		let prefix_icon = prefix_icon.slint_icon(&self.dialog_weak.unwrap());
 		let text = text.into();
 		MagicListViewItem {
 			prefix_icon,

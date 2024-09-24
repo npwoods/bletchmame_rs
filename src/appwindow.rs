@@ -61,14 +61,11 @@ use crate::ui::AppWindow;
 const LOG_COMMANDS: Level = Level::TRACE;
 const LOG_PREFS: Level = Level::TRACE;
 
-type InfoDbSubscriberCallback = Box<dyn Fn(Option<Rc<InfoDb>>, &Preferences)>;
-
 struct AppModel {
 	menu_bar: Menu,
 	app_window_weak: Weak<AppWindow>,
 	preferences: RefCell<Preferences>,
 	info_db: RefCell<Option<Rc<InfoDb>>>,
-	info_db_subscribers: RefCell<Vec<InfoDbSubscriberCallback>>,
 	empty_button_command: RefCell<Option<AppCommand>>,
 }
 
@@ -114,7 +111,8 @@ impl AppModel {
 		// react to all of the possible changes
 		if prefs.collections != old_prefs.collections {
 			event!(LOG_PREFS, "modify_prefs(): prefs.collection changed");
-			self.with_collections_view_model(|x| x.update(&prefs.collections));
+			let info_db = self.info_db.borrow().clone();
+			self.with_collections_view_model(|x| x.update(info_db, &prefs.collections));
 		}
 		if prefs.current_history_entry() != old_prefs.current_history_entry()
 			|| prefs.current_collection() != old_prefs.current_collection()
@@ -139,24 +137,18 @@ impl AppModel {
 		}
 	}
 
-	pub fn subscribe_to_info_db_changes(&self, func: impl Fn(Option<Rc<InfoDb>>, &Preferences) + 'static) {
-		let mut subscribers = self.info_db_subscribers.borrow_mut();
-		let func = Box::new(func);
-		subscribers.push(func);
-	}
-
 	pub fn set_info_db(&self, info_db: Option<InfoDb>) {
 		let info_db = info_db.map(Rc::new);
-		self.info_db.replace(info_db);
+		self.info_db.replace(info_db.clone());
 
-		// borrow prefs
-		let prefs = self.preferences.borrow();
-
-		// reset the items view model to reflect the change
-		for func in self.info_db_subscribers.borrow().iter() {
-			let info_db = self.info_db.borrow().clone();
-			func(info_db, &prefs);
-		}
+		self.with_items_table_model(|items_model| {
+			let info_db = info_db.clone();
+			items_model.info_db_changed(info_db);
+		});
+		self.with_collections_view_model(|collections_model| {
+			let prefs = self.preferences.borrow();
+			collections_model.update(info_db, &prefs.collections);
+		});
 	}
 }
 
@@ -242,7 +234,6 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 		app_window_weak: app_window.as_weak(),
 		preferences: RefCell::new(preferences),
 		info_db: RefCell::new(None),
-		info_db_subscribers: RefCell::new(Vec::new()),
 		empty_button_command: RefCell::new(None),
 	};
 	let model = Rc::new(model);
@@ -288,15 +279,7 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 		)
 	};
 	let items_model_clone = items_model.clone();
-	model.subscribe_to_info_db_changes(move |info_db, _| items_model_clone.info_db_changed(info_db));
-	let items_model_clone = items_model.clone();
 	app_window.set_items_model(ModelRc::new(items_model_clone));
-
-	// InfoDB changes
-	let collections_view_model_clone = collections_view_model.clone();
-	model.subscribe_to_info_db_changes(move |_, prefs| {
-		collections_view_model_clone.update(&prefs.collections);
-	});
 
 	// bind collection selection changes to the items view model
 	let collections_view_model_clone = collections_view_model.clone();
@@ -315,6 +298,12 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 	app_window.on_history_advance_clicked(move |delta| {
 		let delta = delta.try_into().unwrap();
 		handle_command(&model_clone, AppCommand::HistoryAdvance(delta));
+	});
+
+	// set up bookmark collection button
+	let model_clone = model.clone();
+	app_window.on_bookmark_collection_clicked(move || {
+		handle_command(&model_clone, AppCommand::BookmarkCurrentCollection);
 	});
 
 	// set up items columns
@@ -553,6 +542,12 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 		AppCommand::ChoosePath(path_type) => {
 			choose_path(model, path_type);
 		}
+		AppCommand::BookmarkCurrentCollection => {
+			let (collection, _) = model.preferences.borrow().current_collection();
+			model.modify_prefs(|prefs| {
+				prefs.collections.push(collection);
+			})
+		}
 	};
 }
 
@@ -650,6 +645,10 @@ fn update_ui_for_current_history_item(model: &AppModel) {
 	// identify the currently selected collection
 	let (collection, collection_index) = prefs.current_collection();
 	let collection_index = collection_index.and_then(|x| i32::try_from(x).ok()).unwrap_or(-1);
+
+	// update the bookmark this collection icon
+	let is_collection_in_list = prefs.collections.contains(&collection);
+	app_window.set_bookmark_collection_enabled(!is_collection_in_list);
 
 	// update the collections view
 	let app_window_weak = app_window.as_weak();

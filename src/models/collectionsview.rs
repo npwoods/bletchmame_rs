@@ -7,22 +7,21 @@ use std::rc::Rc;
 
 use muda::Menu;
 use slint::spawn_local;
-use slint::Global;
 use slint::Model;
 use slint::ModelNotify;
 use slint::ModelTracker;
-use slint::SharedString;
 use slint::Weak;
 
 use crate::appcommand::AppCommand;
 use crate::guiutils::menuing::MenuDesc;
+use crate::info::InfoDb;
 use crate::prefs::PrefsCollection;
 use crate::ui::AppWindow;
-use crate::ui::Icons;
 use crate::ui::MagicListViewItem;
 
 pub struct CollectionsViewModel {
 	app_window_weak: Weak<AppWindow>,
+	info_db: RefCell<Option<Rc<InfoDb>>>,
 	items: RefCell<Vec<Rc<PrefsCollection>>>,
 	after_refresh_callback: Cell<Option<Box<dyn Future<Output = ()> + 'static>>>,
 	notify: ModelNotify,
@@ -32,13 +31,15 @@ impl CollectionsViewModel {
 	pub fn new(app_window_weak: Weak<AppWindow>) -> Self {
 		Self {
 			app_window_weak,
+			info_db: RefCell::new(None),
 			items: RefCell::new(Vec::new()),
 			after_refresh_callback: Cell::new(None),
 			notify: ModelNotify::default(),
 		}
 	}
 
-	pub fn update(&self, items: &[Rc<PrefsCollection>]) {
+	pub fn update(&self, info_db: Option<Rc<InfoDb>>, items: &[Rc<PrefsCollection>]) {
+		self.info_db.replace(info_db);
 		self.items.replace(items.to_vec());
 		self.notify.reset();
 	}
@@ -103,11 +104,26 @@ impl Model for CollectionsViewModel {
 
 	fn row_count(&self) -> usize {
 		invoke_after_refresh_callback(&self.after_refresh_callback);
-		self.items.borrow().len()
+		if self.info_db.borrow().is_some() {
+			self.items.borrow().len()
+		} else {
+			0
+		}
 	}
 
 	fn row_data(&self, row: usize) -> Option<Self::Data> {
-		self.get(row).map(|item| item_display(&self.app_window_weak, &item))
+		self.get(row).map(|item| {
+			let info_db = self.info_db.borrow();
+			let info_db = info_db.as_ref().unwrap().as_ref();
+			let (prefix_icon, text) = item.display(info_db);
+			let prefix_icon = prefix_icon.slint_icon(&self.app_window_weak.unwrap());
+			let text = text.as_ref().into();
+			MagicListViewItem {
+				prefix_icon,
+				text,
+				supporting_text: Default::default(),
+			}
+		})
 	}
 
 	fn model_tracker(&self) -> &dyn ModelTracker {
@@ -116,21 +132,6 @@ impl Model for CollectionsViewModel {
 
 	fn as_any(&self) -> &dyn Any {
 		self
-	}
-}
-
-fn item_display(app_window_weak: &Weak<AppWindow>, collection: &PrefsCollection) -> MagicListViewItem {
-	let app_window = app_window_weak.unwrap();
-	let icons = Icons::get(&app_window);
-	let (prefix_icon, text) = match collection {
-		PrefsCollection::Builtin(x) => (icons.get_search(), format!("{x}").into()),
-		PrefsCollection::MachineSoftware { machine_name: _ } => todo!(),
-		PrefsCollection::Folder { name, items: _ } => (icons.get_folder(), SharedString::from(name)),
-	};
-	MagicListViewItem {
-		prefix_icon,
-		text,
-		supporting_text: Default::default(),
 	}
 }
 

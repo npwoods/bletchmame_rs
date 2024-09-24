@@ -22,6 +22,7 @@ export component AppWindow inherits Window {
     in property <string> is-empty-button-text;
     in property <bool> history-can-go-back;
     in property <bool> history-can-go-forward;
+    in property <bool> bookmark-collection-enabled;
     in-out property <int> items-view-selected-index <=> items-table-view.current-row;
     in-out property <string> items-search-text;
     in-out property <[TableColumn]> items-columns <=> items-table-view.columns;
@@ -33,6 +34,7 @@ export component AppWindow inherits Window {
     callback items-current-row-changed();
     callback items-row-pointer-event(int, PointerEvent, Point);
     callback history-advance-clicked(int);
+    callback bookmark-collection-clicked();
     in property <[MagicListViewItem]> collections-model;
     in property <[[StandardListViewItem]]> items-model;
     public function collections-view-select(index: int) {
@@ -75,7 +77,10 @@ export component AppWindow inherits Window {
 
                 FilledButton {
                     prefix_icon: Icons.book;
-                    enabled: false;
+                    enabled: bookmark-collection-enabled;
+                    clicked => {
+                        bookmark-collection-clicked();
+                    }
                 }
 
                 FilledButton {

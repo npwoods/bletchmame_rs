@@ -39,6 +39,7 @@ pub enum AppCommand {
 	RenameCollectionDialog { index: usize },
 	RenameCollection { index: usize, new_name: String },
 	ChoosePath(PathType),
+	BookmarkCurrentCollection,
 }
 
 const MENU_PREFIX: &str = "MENU_";

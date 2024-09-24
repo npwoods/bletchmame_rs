@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::fs;
 use std::fs::File;
 use std::io::BufReader;
@@ -14,6 +15,8 @@ use serde::Serialize;
 use slint::LogicalSize;
 
 use crate::history::History;
+use crate::icon::Icon;
+use crate::info::InfoDb;
 use crate::Error;
 use crate::Result;
 
@@ -125,6 +128,20 @@ pub enum PrefsCollection {
 		#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 		items: Vec<PrefsItem>,
 	},
+}
+
+impl PrefsCollection {
+	pub fn display(&self, info_db: &InfoDb) -> (Icon, Cow<'_, str>) {
+		match self {
+			PrefsCollection::Builtin(x) => (Icon::Search, Cow::Owned(format!("{x}"))),
+			PrefsCollection::MachineSoftware { machine_name } => {
+				let machine_desc = info_db.machines().find(machine_name).unwrap().description();
+				let text = format!("Software for \"{}\"", machine_desc);
+				(Icon::Search, Cow::Owned(text))
+			}
+			PrefsCollection::Folder { name, items: _ } => (Icon::Folder, Cow::Borrowed(name)),
+		}
+	}
 }
 
 #[derive(AllValues, Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, strum_macros::Display)]

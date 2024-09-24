@@ -10,13 +10,13 @@ use i_slint_core::items::PointerEventKind;
 use slint::platform::PointerEventButton;
 use winit::window::WindowAttributes;
 
-type WindowBuilderHookCallback = Box<dyn Fn(WindowAttributes) -> WindowAttributes + 'static>;
+type WindowAttributeHookCallback = Box<dyn Fn(WindowAttributes) -> WindowAttributes + 'static>;
 thread_local! {
-	static WINDOW_BUILDER_HOOK_CALLBACK: RefCell<Option<WindowBuilderHookCallback>> = const { RefCell::new(None) }
+	static WINDOW_ATTRIBUTE_HOOK_CALLBACK: RefCell<Option<WindowAttributeHookCallback>> = const { RefCell::new(None) }
 }
 
-fn window_builder_hook(attrs: WindowAttributes) -> WindowAttributes {
-	WINDOW_BUILDER_HOOK_CALLBACK.with_borrow(|callback| {
+fn window_attributes_hook(attrs: WindowAttributes) -> WindowAttributes {
+	WINDOW_ATTRIBUTE_HOOK_CALLBACK.with_borrow(|callback| {
 		if let Some(callback) = callback {
 			callback(attrs)
 		} else {
@@ -27,7 +27,7 @@ fn window_builder_hook(attrs: WindowAttributes) -> WindowAttributes {
 
 pub fn init_gui_utils() {
 	let mut backend = Backend::new().unwrap();
-	backend.window_builder_hook = Some(Box::new(window_builder_hook));
+	backend.window_attributes_hook = Some(Box::new(window_attributes_hook));
 	slint::platform::set_platform(Box::new(backend)).unwrap();
 }
 
