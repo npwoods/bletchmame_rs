@@ -23,6 +23,7 @@ export component AppWindow inherits Window {
     in property <bool> history-can-go-back;
     in property <bool> history-can-go-forward;
     in property <bool> bookmark-collection-enabled;
+    in property <string> current-collection-text;
     in-out property <int> items-view-selected-index <=> items-table-view.current-row;
     in-out property <string> items-search-text;
     in-out property <[TableColumn]> items-columns <=> items-table-view.columns;
@@ -61,6 +62,10 @@ export component AppWindow inherits Window {
 
         VerticalBox {
             alignment: stretch;
+            Text {
+                text: current-collection-text;
+            }
+
             HorizontalBox {
                 height: 50px;
                 alignment: stretch;

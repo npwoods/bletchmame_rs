@@ -131,15 +131,21 @@ pub enum PrefsCollection {
 }
 
 impl PrefsCollection {
-	pub fn display(&self, info_db: &InfoDb) -> (Icon, Cow<'_, str>) {
+	pub fn icon(&self) -> Icon {
 		match self {
-			PrefsCollection::Builtin(x) => (Icon::Search, Cow::Owned(format!("{x}"))),
+			PrefsCollection::Builtin(_) | PrefsCollection::MachineSoftware { .. } => Icon::Search,
+			PrefsCollection::Folder { .. } => Icon::Folder,
+		}
+	}
+
+	pub fn description(&self, info_db: &InfoDb) -> Cow<'_, str> {
+		match self {
+			PrefsCollection::Builtin(x) => format!("{x}").into(),
 			PrefsCollection::MachineSoftware { machine_name } => {
 				let machine_desc = info_db.machines().find(machine_name).unwrap().description();
-				let text = format!("Software for \"{}\"", machine_desc);
-				(Icon::Search, Cow::Owned(text))
+				format!("Software for \"{}\"", machine_desc).into()
 			}
-			PrefsCollection::Folder { name, items: _ } => (Icon::Folder, Cow::Borrowed(name)),
+			PrefsCollection::Folder { name, items: _ } => Cow::Borrowed(name),
 		}
 	}
 }

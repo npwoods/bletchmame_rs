@@ -646,6 +646,15 @@ fn update_ui_for_current_history_item(model: &AppModel) {
 	let (collection, collection_index) = prefs.current_collection();
 	let collection_index = collection_index.and_then(|x| i32::try_from(x).ok()).unwrap_or(-1);
 
+	// update current collection text
+	let current_collection_desc = model
+		.info_db
+		.borrow()
+		.as_ref()
+		.map(|info_db| collection.description(info_db.as_ref()))
+		.unwrap_or_default();
+	app_window.set_current_collection_text(current_collection_desc.as_ref().into());
+
 	// update the bookmark this collection icon
 	let is_collection_in_list = prefs.collections.contains(&collection);
 	app_window.set_bookmark_collection_enabled(!is_collection_in_list);

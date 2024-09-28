@@ -112,12 +112,11 @@ impl Model for CollectionsViewModel {
 	}
 
 	fn row_data(&self, row: usize) -> Option<Self::Data> {
+		let info_db = self.info_db.borrow();
+		let info_db = info_db.as_ref()?.as_ref();
 		self.get(row).map(|item| {
-			let info_db = self.info_db.borrow();
-			let info_db = info_db.as_ref().unwrap().as_ref();
-			let (prefix_icon, text) = item.display(info_db);
-			let prefix_icon = prefix_icon.slint_icon(&self.app_window_weak.unwrap());
-			let text = text.as_ref().into();
+			let prefix_icon = item.icon().slint_icon(&self.app_window_weak.unwrap());
+			let text = item.description(info_db).as_ref().into();
 			MagicListViewItem {
 				prefix_icon,
 				text,
