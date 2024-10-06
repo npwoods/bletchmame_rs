@@ -4,7 +4,6 @@ use std::default::Default;
 use std::fmt::Debug;
 use std::rc::Rc;
 
-use itertools::Itertools;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
 use slint::Model;
@@ -137,13 +136,7 @@ fn path_type(dialog: &PathsDialog) -> PathType {
 fn update_paths_entries(dialog: &PathsDialog, paths: &PrefsPaths) {
 	let path_type = path_type(dialog);
 
-	let path_entries = match path_type {
-		// MAME Executable
-		PathType::MameExecutable => paths.mame_executable.as_ref().into_iter().collect::<Vec<_>>(),
-
-		// Software Lists
-		PathType::SoftwareLists => paths.software_lists.iter().collect::<Vec<_>>(),
-	};
+	let path_entries = PathType::load_from_prefs_paths(paths, path_type);
 	let paths_entries = path_entries
 		.into_iter()
 		.map(|path| {
@@ -198,12 +191,7 @@ fn model_contents_changed(state: &State) {
 
 	let path_type = path_type(&dialog);
 	let entries_iter = model.entries().into_iter().map(|x| x.to_string());
-
-	match path_type {
-		PathType::MameExecutable => paths.mame_executable = entries_iter.at_most_one().unwrap(),
-		PathType::SoftwareLists => paths.software_lists = entries_iter.collect(),
-	}
-
+	PathType::store_in_prefs_paths(&mut paths, path_type, entries_iter);
 	dialog.set_ok_enabled(*paths != **original_paths);
 }
 

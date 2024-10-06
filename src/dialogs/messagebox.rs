@@ -23,6 +23,26 @@ pub trait MessageBoxDefaults {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, AllValues, strum_macros::Display)]
+pub enum OkOnly {
+	#[strum(to_string = "OK")]
+	Ok,
+}
+
+impl MessageBoxDefaults for OkOnly {
+	fn accept() -> Self {
+		Self::Ok
+	}
+
+	fn abort() -> Self {
+		Self::Ok
+	}
+
+	fn all_values() -> &'static [Self] {
+		Self::all_values()
+	}
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, AllValues, strum_macros::Display)]
 pub enum OkCancel {
 	#[strum(to_string = "OK")]
 	Ok,

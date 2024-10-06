@@ -220,7 +220,12 @@ impl ItemsTableModel {
 		self.set_current_selection(selection);
 	}
 
-	pub fn context_commands(&self, index: usize, folder_info: &[(usize, Rc<PrefsCollection>)]) -> Option<Menu> {
+	pub fn context_commands(
+		&self,
+		index: usize,
+		folder_info: &[(usize, Rc<PrefsCollection>)],
+		has_mame_initialized: bool,
+	) -> Option<Menu> {
 		// access the InfoDB
 		let info_db = self.info_db.borrow();
 		let info_db = info_db.as_ref()?;
@@ -240,43 +245,46 @@ impl ItemsTableModel {
 		let items = vec![make_prefs_item(info_db, item)];
 
 		// get the critical information - the description and where (if anyplace) "Browse" would go to
-		let (description, machine_descriptions, browse_target) = match item {
+		let (run_menu_item, browse_target) = match item {
 			Item::Machine { machine_index } => {
 				let machine = info_db.machines().get(*machine_index).unwrap();
-				let description = Cow::from(machine.description());
+				let command = has_mame_initialized.then(|| AppCommand::RunMame {
+					machine_name: machine.name().to_string(),
+					software_name: None,
+				});
+				let text = run_item_text(&machine.description());
+				let run_menu_item = MenuDesc::Item(text, command.map(|x| x.into()));
 				let browse_target =
 					(!machine.machine_software_lists().is_empty()).then(|| PrefsCollection::MachineSoftware {
 						machine_name: machine.name().to_string(),
 					});
-				(description, None, browse_target)
+				(run_menu_item, browse_target)
 			}
 			Item::Software {
 				software,
 				machine_indexes,
 				..
 			} => {
-				let description = Cow::from(&*software.description);
-				let machine_descriptions = machine_indexes
+				let sub_items = machine_indexes
 					.iter()
-					.map(|&index| info_db.machines().get(index).unwrap().description().to_string())
+					.map(|&index| {
+						let machine = info_db.machines().get(index).unwrap();
+						let command = AppCommand::RunMame {
+							machine_name: machine.name().to_string(),
+							software_name: Some(software.name.clone()),
+						};
+						MenuDesc::Item(machine.description().to_string(), Some(command.into()))
+					})
 					.collect::<Vec<_>>();
-				(description, Some(machine_descriptions), None)
+				let text = run_item_text(&software.description);
+				let run_menu_item = MenuDesc::SubMenu(text, true, sub_items);
+				(run_menu_item, None)
 			}
 		};
 
 		// basics of
 		let mut menu_items = Vec::new();
-		let text = format!("Run \"{}\"", description);
-		let item = if let Some(machine_descriptions) = machine_descriptions {
-			let items = machine_descriptions
-				.into_iter()
-				.map(|text| MenuDesc::Item(text, None))
-				.collect::<Vec<_>>();
-			MenuDesc::SubMenu(text, true, items)
-		} else {
-			MenuDesc::Item(text, None)
-		};
-		menu_items.push(item);
+		menu_items.push(run_menu_item);
 		menu_items.push(MenuDesc::Separator);
 
 		if let Some(browse_target) = browse_target {
@@ -655,4 +663,8 @@ fn column_text<'a>(info_db: &'a InfoDb, item: &'a Item, column: ColumnType) -> C
 
 fn is_item_match(info_db: &InfoDb, prefs_item: &PrefsItem, item: &Item) -> bool {
 	make_prefs_item(info_db, item) == *prefs_item
+}
+
+fn run_item_text(text: &str) -> String {
+	format!("Run {}", text)
 }

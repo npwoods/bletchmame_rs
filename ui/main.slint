@@ -13,10 +13,10 @@ export component AppWindow inherits Window {
     min-height: 100px;
     max-width: 10000px;
     max-height: 10000px;
-    title: @tr("BletchMAME 3.0 prototype");
+    title: @tr("BletchMAME 3.0 prototype: ") + (running-machine-description != "" ? ": " + running-machine-description : "");
     callback empty-action-clicked();
     callback find-software-lists-clicked();
-    in property <bool> is-running;
+    in property <string> running-machine-description;
     in property <bool> is-empty;
     in property <string> is-empty-reason;
     in property <string> is-empty-button-text;
@@ -45,7 +45,7 @@ export component AppWindow inherits Window {
         items-table-view.set-current-row(index);
     }
     HorizontalBox {
-        visible: !is_running;
+        visible: running-machine-description == "";
         alignment: stretch;
         collections-list-view := MagicListView {
             width: 250px;

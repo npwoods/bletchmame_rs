@@ -355,274 +355,308 @@ function emit_status(light, out)
 	-- we don't always want to send details
 	local emit_details = not light or machine().paused or is_polling_input_seq()
 
+	-- start emitting status
 	emit("<status");
 	emit("\tapp_name=\"" .. tostring(emu.app_name()) .. "\"");
 	emit("\tapp_version=\"" .. tostring(emu.app_version()) .. "\"");
-	emit("\tphase=\"running\"");
-	emit("\ttime=\"" .. tostring(emu.time()) .. "\"");
-	emit("\tpolling_input_seq=\"" .. tostring(is_polling_input_seq()) .. "\"");
-	emit("\tnatural_keyboard_in_use=\"" .. tostring(machine_natkeyboard().in_use) .. "\"");
-	emit("\tpaused=\"" .. tostring(machine().paused) .. "\"");
-	emit("\tstartup_text=\"\"");
-	emit("\tdebugger_present=\"" .. string_from_bool(machine_debugger()) .. "\"");
-	emit("\tshow_profiler=\"" .. tostring(ui().show_profiler) .. "\"");
-	if (not light) then
-		emit("\thas_input_using_mouse=\"" .. tostring(has_input_using_mouse()) .. "\"");
-	end
-	emit("\thas_mouse_enabled_problem=\"" .. tostring(has_mouse_enabled_problem) .. "\"");
-	emit(">");
 
-	-- <video> (video_manager)
-	emit("\t<video");
-	emit("\t\tspeed_percent=\"" .. tostring(get_speed_percent()) .. "\"");
-	emit("\t\tframeskip=\"" .. tostring(machine_video().frameskip) .. "\"");
-	emit("\t\teffective_frameskip=\"" .. tostring(get_effective_frameskip()) .. "\"");
-	emit("\t\tthrottled=\"" .. tostring(machine_video().throttled) .. "\"");
-	emit("\t\tthrottle_rate=\"" .. tostring(machine_video().throttle_rate) .. "\"");
-	emit("\t\tis_recording=\"" .. string_from_bool(get_is_recording()) .. "\"");
-	emit("\t/>");
+	-- most status is only relevant if we're running
+	if not is_running() then
+		emit("\tromname=\"\"");
+		emit("/>");
+	else
+		emit("\tgamename=\"" .. tostring(emu.gamename()) .. "\"");
+		emit("\tromname=\"" .. tostring(emu.romname()) .. "\"");
+		emit("\tsoftname=\"" .. tostring(emu.softname()) .. "\"");
+		emit("\ttime=\"" .. tostring(emu.time()) .. "\"");
+		emit("\tpid=\"" .. tostring(emu.pid()) .. "\"");
+		emit("\tpolling_input_seq=\"" .. tostring(is_polling_input_seq()) .. "\"");
+		emit("\tnatural_keyboard_in_use=\"" .. tostring(machine_natkeyboard().in_use) .. "\"");
+		emit("\tpaused=\"" .. tostring(machine().paused) .. "\"");
+		emit("\tstartup_text=\"\"");
+		emit("\tdebugger_present=\"" .. string_from_bool(machine_debugger()) .. "\"");
+		emit("\tshow_profiler=\"" .. tostring(ui().show_profiler) .. "\"");
+		if (not light) then
+			emit("\thas_input_using_mouse=\"" .. tostring(has_input_using_mouse()) .. "\"");
+		end
+		emit("\thas_mouse_enabled_problem=\"" .. tostring(has_mouse_enabled_problem) .. "\"");
+		emit(">");
 
-	-- <sound> (sound_manager)
-	emit("\t<sound");
-	emit("\t\tattenuation=\"" .. tostring(machine_sound().attenuation) .. "\"");
-	emit("\t/>");
+		-- <video> (video_manager)
+		emit("\t<video");
+		emit("\t\tspeed_percent=\"" .. tostring(get_speed_percent()) .. "\"");
+		emit("\t\tframeskip=\"" .. tostring(machine_video().frameskip) .. "\"");
+		emit("\t\teffective_frameskip=\"" .. tostring(get_effective_frameskip()) .. "\"");
+		emit("\t\tthrottled=\"" .. tostring(machine_video().throttled) .. "\"");
+		emit("\t\tthrottle_rate=\"" .. tostring(machine_video().throttle_rate) .. "\"");
+		emit("\t\tis_recording=\"" .. string_from_bool(get_is_recording()) .. "\"");
+		emit("\t/>");
 
-	-- <cheats> (cheat manager)
-	if (_G and _G.emu and  _G.emu.plugin and _G.emu.plugin.cheat) then
-		emit("\t<cheats>");
-		for id,desc in pairs(_G.emu.plugin.cheat:list()) do
-			local cheat = _G.emu.plugin.cheat.get(id)
-			emit(string.format("\t\t<cheat id=\"%s\" enabled=\"%s\" description=\"%s\"",
-				tostring(id),
-				string_from_bool(cheat.enabled),
-				xml_encode(desc)))
-			if (cheat.script) then
-				emit(string.format("\t\t\thas_run_script=\"%s\" has_on_script=\"%s\" has_off_script=\"%s\" has_change_script=\"%s\"",
-					string_from_bool(cheat.script.run),
-					string_from_bool(cheat.script.on),
-					string_from_bool(cheat.script.off),
-					string_from_bool(cheat.script.change)))
+		-- <sound> (sound_manager)
+		emit("\t<sound");
+		emit("\t\tattenuation=\"" .. tostring(machine_sound().attenuation) .. "\"");
+		emit("\t/>");
+
+		-- <cheats> (cheat manager)
+		if (_G and _G.emu and  _G.emu.plugin and _G.emu.plugin.cheat) then
+			emit("\t<cheats>");
+			for id,desc in pairs(_G.emu.plugin.cheat:list()) do
+				local cheat = _G.emu.plugin.cheat.get(id)
+				emit(string.format("\t\t<cheat id=\"%s\" enabled=\"%s\" description=\"%s\"",
+					tostring(id),
+					string_from_bool(cheat.enabled),
+					xml_encode(desc)))
+				if (cheat.script) then
+					emit(string.format("\t\t\thas_run_script=\"%s\" has_on_script=\"%s\" has_off_script=\"%s\" has_change_script=\"%s\"",
+						string_from_bool(cheat.script.run),
+						string_from_bool(cheat.script.on),
+						string_from_bool(cheat.script.off),
+						string_from_bool(cheat.script.change)))
+				end
+				if (cheat.comment) then
+					emit(string.format("\t\t\tcomment=\"%s\"", xml_encode(cheat.comment)))
+				end
+				emit("\t\t\t>")
+				if cheat.parameter then
+					emit(string.format("\t\t\t<parameter value=\"%s\" minimum=\"%s\" maximum=\"%s\" step=\"%s\">",
+						cheat.parameter.value,
+						cheat.parameter.min,
+						cheat.parameter.max,
+						cheat.parameter.step))
+					if cheat.parameter.item then
+						for item_value,item_obj in pairs(cheat.parameter.item) do
+							emit(string.format("\t\t\t\t<item value=\"%s\" text=\"%s\"/>",
+								tostring(item_value),
+								xml_encode(item_obj.text)))
+						end
+					end
+					emit("\t\t\t</parameter>")
+				end
+				emit("\t\t</cheat>")
 			end
-			if (cheat.comment) then
-				emit(string.format("\t\t\tcomment=\"%s\"", xml_encode(cheat.comment)))
+			emit("\t</cheats>");
+		end
+
+		-- <images>
+		emit("\t<images>")
+		for _,image in pairs(get_collection(machine().images)) do
+			local filename = get_image_filename(image)
+			if filename == nil then
+				filename = ""
 			end
-			emit("\t\t\t>")
-			if cheat.parameter then
-				emit(string.format("\t\t\t<parameter value=\"%s\" minimum=\"%s\" maximum=\"%s\" step=\"%s\">",
-					cheat.parameter.value,
-					cheat.parameter.min,
-					cheat.parameter.max,
-					cheat.parameter.step))
-				if cheat.parameter.item then
-					for item_value,item_obj in pairs(cheat.parameter.item) do
-						emit(string.format("\t\t\t\t<item value=\"%s\" text=\"%s\"/>",
-							tostring(item_value),
-							xml_encode(item_obj.text)))
+
+			-- basic image properties
+			emit(string.format("\t\t<image tag=\"%s\"", xml_encode(get_device_tag(image.device))))
+
+			-- filename
+			if filename ~= nil and filename ~= "" then
+				emit("\t\t\tfilename=\"" .. xml_encode(filename) .. "\"")
+			end
+			emit("\t\t>")
+			if emit_details then
+				-- basic image details
+				emit(string.format("\t\t\t<details instance_name=\"%s\" is_readable=\"%s\" is_writeable=\"%s\" is_creatable=\"%s\" must_be_loaded=\"%s\">",
+					xml_encode(image.instance_name),
+					string_from_bool(image.is_readable),
+					string_from_bool(image.is_writeable),
+					string_from_bool(image.is_creatable),
+					string_from_bool(image.must_be_loaded)))
+
+				-- formats
+				if pcall(function() return image.formatlist end) and image.formatlist ~= nil then
+					for _,format in pairs(image.formatlist) do
+						emit(string.format("\t\t\t\t<format name=\"%s\" description=\"%s\" option_spec=\"%s\">",
+							xml_encode(format.name),
+							xml_encode(format.description),
+							xml_encode(format.option_spec)))
+						for _,ext in pairs(format.extensions) do
+							emit(string.format("\t\t\t\t\t<extension>%s</extension>", xml_encode(ext)))
+						end
+						emit("\t\t\t\t</format>")
 					end
 				end
-				emit("\t\t\t</parameter>")
+
+				emit("\t\t\t</details>")
 			end
-			emit("\t\t</cheat>")
-		end
-		emit("\t</cheats>");
-	end
-
-	-- <images>
-	emit("\t<images>")
-	for _,image in pairs(get_collection(machine().images)) do
-		local filename = get_image_filename(image)
-		if filename == nil then
-			filename = ""
-		end
-
-		-- basic image properties
-		emit(string.format("\t\t<image tag=\"%s\"", xml_encode(get_device_tag(image.device))))
-
-		-- filename
-		if filename ~= nil and filename ~= "" then
-			emit("\t\t\tfilename=\"" .. xml_encode(filename) .. "\"")
-		end
-		emit("\t\t>")
-		if emit_details then
-			-- basic image details
-			emit(string.format("\t\t\t<details instance_name=\"%s\" is_readable=\"%s\" is_writeable=\"%s\" is_creatable=\"%s\" must_be_loaded=\"%s\">",
-				xml_encode(image.instance_name),
-				string_from_bool(image.is_readable),
-				string_from_bool(image.is_writeable),
-				string_from_bool(image.is_creatable),
-				string_from_bool(image.must_be_loaded)))
-
-			-- formats
-			if pcall(function() return image.formatlist end) and image.formatlist ~= nil then
-				for _,format in pairs(image.formatlist) do
-					emit(string.format("\t\t\t\t<format name=\"%s\" description=\"%s\" option_spec=\"%s\">",
-						xml_encode(format.name),
-						xml_encode(format.description),
-						xml_encode(format.option_spec)))
-					for _,ext in pairs(format.extensions) do
-						emit(string.format("\t\t\t\t\t<extension>%s</extension>", xml_encode(ext)))
-					end
-					emit("\t\t\t\t</format>")
-				end
-			end
-
-			emit("\t\t\t</details>")
-		end
-		emit("\t\t</image>")
-	end	
-	emit("\t</images>")
-
-	-- <cassettes>
-	if pcall(function() return machine().cassettes end) then
-		emit("\t<cassettes>")
-		for _,cassette in pairs(get_collection(machine().cassettes)) do
-			emit(string.format("\t\t<cassette tag=\"%s\" is_stopped=\"%s\" is_playing=\"%s\" is_recording=\"%s\" motor_state=\"%s\" speaker_state=\"%s\" position=\"%s\" length=\"%s\"/>",
-				xml_encode(get_device_tag(cassette.device)),
-				string_from_bool(cassette.is_stopped),
-				string_from_bool(cassette.is_playing),
-				string_from_bool(cassette.is_recording),
-				string_from_bool(cassette.motor_state),
-				string_from_bool(cassette.speaker_state),
-				tostring(cassette.position),
-				tostring(cassette.length)))
+			emit("\t\t</image>")
 		end	
-		emit("\t</cassettes>")
-	end	
+		emit("\t</images>")
 
-	if emit_details then
-		-- <slots>
-		if pcall(function() return machine().slots end) then
-			emit("\t<slots>");
-			for name,slot in pairs(machine().slots) do
-				-- perform logic equivalent to menu_slot_devices::get_current_option()
-				local current_option_name
-				if (slot.fixed) then
-					current_option_name = get_slot_default_option(slot)
-				else
-					local current_option = get_slot_option(name)
-					if current_option then
-						current_option_name = current_option.value
+		-- <cassettes>
+		if pcall(function() return machine().cassettes end) then
+			emit("\t<cassettes>")
+			for _,cassette in pairs(get_collection(machine().cassettes)) do
+				emit(string.format("\t\t<cassette tag=\"%s\" is_stopped=\"%s\" is_playing=\"%s\" is_recording=\"%s\" motor_state=\"%s\" speaker_state=\"%s\" position=\"%s\" length=\"%s\"/>",
+					xml_encode(get_device_tag(cassette.device)),
+					string_from_bool(cassette.is_stopped),
+					string_from_bool(cassette.is_playing),
+					string_from_bool(cassette.is_recording),
+					string_from_bool(cassette.motor_state),
+					string_from_bool(cassette.speaker_state),
+					tostring(cassette.position),
+					tostring(cassette.length)))
+			end	
+			emit("\t</cassettes>")
+		end	
+
+		if emit_details then
+			-- <slots>
+			if pcall(function() return machine().slots end) then
+				emit("\t<slots>");
+				for name,slot in pairs(machine().slots) do
+					-- perform logic equivalent to menu_slot_devices::get_current_option()
+					local current_option_name
+					if (slot.fixed) then
+						current_option_name = get_slot_default_option(slot)
+					else
+						local current_option = get_slot_option(name)
+						if current_option then
+							current_option_name = current_option.value
+						end
 					end
-				end
 
-				emit(string.format("\t\t<slot name=\"%s\" fixed=\"%s\" has_selectable_options=\"%s\"",
-					xml_encode(name),
-					string_from_bool(slot.fixed),
-					string_from_bool(slot.has_selectable_options)))
-				if (current_option_name) then
-					emit(string.format("\t\t\tcurrent_option=\"%s\"", xml_encode(current_option_name)))
+					emit(string.format("\t\t<slot name=\"%s\" fixed=\"%s\" has_selectable_options=\"%s\"",
+						xml_encode(name),
+						string_from_bool(slot.fixed),
+						string_from_bool(slot.has_selectable_options)))
+					if (current_option_name) then
+						emit(string.format("\t\t\tcurrent_option=\"%s\"", xml_encode(current_option_name)))
+					end
+					emit("\t\t>")				
+					for optname,option in pairs(slot.options) do
+						emit(string.format("\t\t\t<option name=\"%s\" selectable=\"%s\"/>",
+							xml_encode(optname),
+							string_from_bool(option.selectable)))
+					end
+					emit("\t\t</slot>")
 				end
-				emit("\t\t>")				
-				for optname,option in pairs(slot.options) do
-					emit(string.format("\t\t\t<option name=\"%s\" selectable=\"%s\"/>",
-						xml_encode(optname),
-						string_from_bool(option.selectable)))
-				end
-				emit("\t\t</slot>")
+				emit("\t</slots>");
 			end
-			emit("\t</slots>");
-		end
 
-		-- <inputs>
-		emit("\t<inputs>")
-		for _,port in pairs(machine_ioport().ports) do
-			for _,field in pairs(port.fields) do
-				if field.enabled then
-					local type_class = field.type_class
-					local is_switch = type_class == "dipswitch" or type_class == "config"
+			-- <inputs>
+			emit("\t<inputs>")
+			for _,port in pairs(machine_ioport().ports) do
+				for _,field in pairs(port.fields) do
+					if field.enabled then
+						local type_class = field.type_class
+						local is_switch = type_class == "dipswitch" or type_class == "config"
 
-					emit("\t\t<input"
-						.. " port_tag=\"" .. xml_encode(get_device_tag(port)) .. "\""
-						.. " mask=\"" .. tostring(field.mask) .. "\""
-						.. " class=\"" .. type_class .. "\""
-						.. " group=\"" .. tostring(machine_ioport():type_group(field.type, field.player)) .. "\""
-						.. " type=\"" .. field.type .. "\""
-						.. " player=\"" .. field.player .. "\""
-						.. " is_analog=\"" .. string_from_bool(field.is_analog) .. "\""
-						.. " name=\"" .. xml_encode(field.name) .. "\"")
+						emit("\t\t<input"
+							.. " port_tag=\"" .. xml_encode(get_device_tag(port)) .. "\""
+							.. " mask=\"" .. tostring(field.mask) .. "\""
+							.. " class=\"" .. type_class .. "\""
+							.. " group=\"" .. tostring(machine_ioport():type_group(field.type, field.player)) .. "\""
+							.. " type=\"" .. field.type .. "\""
+							.. " player=\"" .. field.player .. "\""
+							.. " is_analog=\"" .. string_from_bool(field.is_analog) .. "\""
+							.. " name=\"" .. xml_encode(field.name) .. "\"")
 
-					local first_keyboard_code = field:keyboard_codes(0)[1]
-					if first_keyboard_code then
-						local val
-						local callback = (function(x)
-							if (val == nil) then
-								val = x
+						local first_keyboard_code = field:keyboard_codes(0)[1]
+						if first_keyboard_code then
+							local val
+							local callback = (function(x)
+								if (val == nil) then
+									val = x
+								end
+							end)
+							utf8_process(first_keyboard_code, callback)
+
+							emit("\t\t\tfirst_keyboard_code=\"" .. tostring(val) .. "\"")
+						end
+
+						if is_switch then
+							-- DIP switches and configs have values
+							emit("\t\t\tvalue=\"" .. tostring(field.user_value) .. "\"")
+						end
+
+						emit("\t\t>")
+
+						-- emit input sequences for anything that is not DIP switches of configs
+						if not is_switch then
+							if field.is_analog then
+								-- analog sequences have increment/decrement in addition to "standard"
+								seq_types = {"standard", "increment", "decrement"}
+							else
+								-- digital sequences just have increment
+								seq_types = {"standard"}
 							end
-						end)
-						utf8_process(first_keyboard_code, callback)
 
-						emit("\t\t\tfirst_keyboard_code=\"" .. tostring(val) .. "\"")
-					end
-
-					if is_switch then
-						-- DIP switches and configs have values
-						emit("\t\t\tvalue=\"" .. tostring(field.user_value) .. "\"")
-					end
-
-					emit("\t\t>")
-
-					-- emit input sequences for anything that is not DIP switches of configs
-					if not is_switch then
-						if field.is_analog then
-							-- analog sequences have increment/decrement in addition to "standard"
-							seq_types = {"standard", "increment", "decrement"}
-						else
-							-- digital sequences just have increment
-							seq_types = {"standard"}
+							for _,seq_type in pairs(seq_types) do
+								emit("\t\t\t<seq type=\"" .. seq_type
+									.. "\" tokens=\"" .. xml_encode(machine_input():seq_to_tokens(field:input_seq(seq_type)))
+									.. "\"/>")
+							end
 						end
 
-						for _,seq_type in pairs(seq_types) do
-							emit("\t\t\t<seq type=\"" .. seq_type
-								.. "\" tokens=\"" .. xml_encode(machine_input():seq_to_tokens(field:input_seq(seq_type)))
-								.. "\"/>")
-						end
+						emit("\t\t</input>")
 					end
-
-					emit("\t\t</input>")
 				end
 			end
-		end
-		emit("\t</inputs>")
+			emit("\t</inputs>")
 
-		emit("\t<input_devices>")
-		for _,devclass in pairs(machine_input().device_classes) do
-			emit("\t\t<class name=\"" .. xml_encode(devclass.name)
-				.. "\" enabled=\"" .. string_from_bool(devclass.enabled)
-				.. "\" multi=\"" .. string_from_bool(devclass.multi) .. "\">")
-			for _,device in pairs(devclass.devices) do
-				emit("\t\t\t<device name=\"" .. xml_encode(device.name)
-					.. "\" id=\"" .. xml_encode(device.id)
-					.. "\" devindex=\"" .. device.devindex .. "\">")
-				for id,item in pairs(device.items) do
-					emit("\t\t\t\t<item name=\"" .. xml_encode(item.name)
-						.. "\" token=\"" .. xml_encode(item.token)
-						.. "\" code=\"" .. xml_encode(machine_input():code_to_token(get_item_code(item)))
-						.. "\"/>")
+			emit("\t<input_devices>")
+			for _,devclass in pairs(machine_input().device_classes) do
+				emit("\t\t<class name=\"" .. xml_encode(devclass.name)
+					.. "\" enabled=\"" .. string_from_bool(devclass.enabled)
+					.. "\" multi=\"" .. string_from_bool(devclass.multi) .. "\">")
+				for _,device in pairs(devclass.devices) do
+					emit("\t\t\t<device name=\"" .. xml_encode(device.name)
+						.. "\" id=\"" .. xml_encode(device.id)
+						.. "\" devindex=\"" .. device.devindex .. "\">")
+					for id,item in pairs(device.items) do
+						emit("\t\t\t\t<item name=\"" .. xml_encode(item.name)
+							.. "\" token=\"" .. xml_encode(item.token)
+							.. "\" code=\"" .. xml_encode(machine_input():code_to_token(get_item_code(item)))
+							.. "\"/>")
+					end
+					emit("\t\t\t</device>")
 				end
-				emit("\t\t\t</device>")
+				emit("\t\t</class>")
 			end
-			emit("\t\t</class>")
+			emit("\t</input_devices>")
 		end
-		emit("\t</input_devices>")
+
+		emit("</status>");
 	end
-
-	emit("</status>");
 
 	if opened_file then
 		opened_file:close()
 	end
 end
 
+function is_running()
+	return emu.romname() ~= "___empty" and machine_natkeyboard()
+end
+
+local session_starting = false
+local session_stopping = false
+local session_exiting = false
+
 -- START command
 function command_start(args)
 	emu.start(args[2])
-	print("@OK ### Start scheduled")
+	session_starting = true
+	pause_when_restarted = false
+end
+
+-- STOP command
+function command_stop(args)
+	if is_running() then
+		machine():exit()
+		session_stopping = true
+	else
+		print("@OK ### No running emulation")
+	end
 end
 
 -- EXIT command
 function command_exit(args)
 	machine():exit()
-	print("@OK ### Exit scheduled")
+	if is_running() then
+		session_exiting = true
+	else
+		print("@OK ### Exit scheduled")
+	end
 end
 
 -- PING command
@@ -1075,6 +1109,7 @@ end
 local commands =
 {
 	["start"]						= command_start,
+	["stop"]						= command_stop,
 	["exit"]						= command_exit,
 	["ping"]						= command_ping,
 	["sleep"]						= command_sleep,
@@ -1199,6 +1234,28 @@ function startplugin()
 
 	-- register another handler to handle commands after prestart
 	function callback_periodic()
+		-- are we starting, and has that start completed?
+		if session_starting and is_running() then
+			emu.unpause()
+			print "@OK STATUS ### Emulation has started"
+			emit_status()
+			session_starting = false
+		end
+
+		-- are we stopping, and has that stop completed?
+		if session_stopping and not is_running() then
+			print "@OK STATUS ### Emulation has stopped"
+			emit_status()
+			session_stopping = false
+		end
+
+		-- are we exiting, and has the first stop completed?
+		if session_exiting and not is_running() then
+			machine():exit()
+			print("@OK ### Exit scheduled")
+			session_exiting = false
+		end
+
 		-- it is essential that we only perform these activities when there
 		-- is an active session!
 		if session_active then

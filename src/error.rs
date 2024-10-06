@@ -34,4 +34,28 @@ pub enum Error {
 	CorruptStringTable,
 	#[error("Corrupt Software List Machine Index")]
 	CorruptSoftwareListMachineIndex,
+
+	// MAME preflights
+	#[error("No path to MAME specified")]
+	NoMamePathSpecified,
+	#[error("Cannot find MAME")]
+	CannotFindMame(BoxDynError),
+	#[error("MAME is not a file")]
+	MameIsNotAFile,
+
+	// Bad MAME interactions conditions
+	#[error("Error launching MAME: {0}")]
+	MameLaunchError(BoxDynError),
+	#[error("Unexpected EOF from MAME")]
+	EofFromMame,
+	#[error("Error reading from MAME: {0}")]
+	ErrorReadingFromMame(BoxDynError),
+	#[error("Error writing to MAME: {0}")]
+	ErrorWritingToMame(BoxDynError),
+	#[error("MAME Error Response: {0}")]
+	MameErrorResponse(String),
+	#[error("Response not understood: {0}")]
+	MameResponseNotUnderstood(String),
+	#[error("Error parsing status XML at position {0}: {1}")]
+	StatusXmlProcessing(u64, BoxDynError),
 }

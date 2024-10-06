@@ -395,7 +395,7 @@ pub fn data_from_listxml_output(
 	mut callback: impl FnMut(&str) -> bool,
 ) -> Result<Option<Box<[u8]>>> {
 	let mut state = State::new();
-	let mut reader = XmlReader::from_reader(reader);
+	let mut reader = XmlReader::from_reader(reader, true);
 	let mut buf = Vec::with_capacity(1024);
 
 	while let Some(evt) = reader.next(&mut buf).map_err(|e| listxml_err(&reader, e))? {

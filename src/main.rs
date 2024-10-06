@@ -11,13 +11,17 @@ mod icon;
 mod info;
 mod models;
 mod prefs;
+mod runtime;
 mod selection;
 mod software;
 mod threadlocalbubble;
 mod xml;
 
 use std::path::PathBuf;
+
 use tracing::Level;
+use win32job::Job;
+use win32job::JobError;
 use winapi::um::wincon::AttachConsole;
 use winapi::um::wincon::ATTACH_PARENT_PROCESS;
 
@@ -38,22 +42,36 @@ type Result<T> = std::result::Result<T, Box<crate::error::Error>>;
 #[derive(StructOpt, Debug)]
 #[structopt(name = "basic")]
 struct Opt {
-	#[cfg_attr(not(feature = "no-diagnostics"), structopt(long, parse(from_os_str)))]
-	process_xml: Option<PathBuf>,
-
 	#[structopt(long, parse(from_os_str))]
 	prefs_path: Option<PathBuf>,
 
-	#[cfg_attr(not(feature = "no-diagnostics"), structopt(long))]
+	#[cfg_attr(feature = "diagnostics", structopt(long, parse(from_os_str)))]
+	process_xml: Option<PathBuf>,
+
+	#[cfg_attr(feature = "diagnostics", structopt(long))]
 	log_level: Option<Level>,
 }
 
+#[cfg(target_os = "windows")]
+fn setup_win32_job() -> std::result::Result<Job, JobError> {
+	let job = Job::create()?;
+	let mut info = job.query_extended_limit_info()?;
+	info.limit_kill_on_job_close();
+	job.set_extended_limit_info(&info)?;
+	job.assign_current_process()?;
+	Ok(job)
+}
+
 fn main() {
-	// on Windows, attach to the parent's console - debugging is hell if we don't do this
+	// stuff specific to Windows
 	#[cfg(target_os = "windows")]
-	unsafe {
-		AttachConsole(ATTACH_PARENT_PROCESS);
-	}
+	let _job = {
+		// attach to the parent's console - debugging is hell if we don't do this
+		unsafe {
+			AttachConsole(ATTACH_PARENT_PROCESS);
+		}
+		setup_win32_job().unwrap()
+	};
 
 	// get the command line arguments
 	let opts = Opt::from_args();
@@ -80,7 +98,10 @@ fn main() {
 	});
 
 	// set up the tokio runtime
-	let tokio_runtime = tokio::runtime::Builder::new_current_thread().build().unwrap();
+	let tokio_runtime = tokio::runtime::Builder::new_multi_thread()
+		.enable_time()
+		.build()
+		.unwrap();
 	let _guard = tokio_runtime.enter();
 
 	// initialize our GUI utility code that will hopefully go away as Slint improves

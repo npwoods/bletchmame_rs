@@ -127,7 +127,7 @@ fn softlistxml_err(reader: &XmlReader<impl BufRead>, e: BoxDynError) -> crate::e
 
 pub fn process_xml(reader: impl BufRead) -> Result<SoftwareList> {
 	let mut state = State::new();
-	let mut reader = XmlReader::from_reader(reader);
+	let mut reader = XmlReader::from_reader(reader, true);
 	let mut buf = Vec::with_capacity(1024);
 
 	while let Some(evt) = reader.next(&mut buf).map_err(|e| softlistxml_err(&reader, e))? {

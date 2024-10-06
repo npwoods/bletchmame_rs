@@ -26,7 +26,12 @@ arrayvec = "0.7.4"
 lentrait = "0.2.3"
 itertools = "0.13.0"
 winit = "0.30.3"
-tokio = { version = "1.38.0", features = ["rt", "sync"] }
+tokio = { version = "1.38.0", features = [
+    "rt",
+    "rt-multi-thread",
+    "time",
+    "sync",
+] }
 serde_json = "1.0.120"
 thiserror = "1.0.61"
 dirs = "5.0.1"
@@ -42,6 +47,8 @@ strum = "0.26.3"
 strum_macros = "0.26.3"
 structopt = "0.3.26"
 winapi = "0.3.9"
+win32job = "=2.0.0"
+blockingqueue = "0.1.1"
 
 [dev-dependencies]
 assert_matches = "1.5.0"
@@ -61,4 +68,5 @@ opt-level = "s"
 panic = "abort"
 
 [features]
-no-diagnostics = []
+default = ["diagnostics"]
+diagnostics = []

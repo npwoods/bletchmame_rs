@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use muda::MenuId;
 use serde::Deserialize;
 use serde::Serialize;
@@ -8,10 +10,13 @@ use crate::prefs::BuiltinCollection;
 use crate::prefs::PrefsCollection;
 use crate::prefs::PrefsItem;
 use crate::prefs::SortOrder;
+use crate::runtime::status::StatusUpdate;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum AppCommand {
 	// File menu
+	FileStop,
+	FilePause,
 	FileExit,
 
 	// Settings menu
@@ -24,7 +29,19 @@ pub enum AppCommand {
 	HelpWebSite,
 	HelpAbout,
 
+	// MAME communication
+	MameSessionStarted,
+	MameSessionEnded,
+	MameStatusUpdate(StatusUpdate),
+	MamePing,
+	ErrorMessageBox(String),
+
 	// Other
+	Shutdown,
+	RunMame {
+		machine_name: String,
+		software_name: Option<Arc<str>>,
+	},
 	Browse(PrefsCollection),
 	HistoryAdvance(isize),
 	SearchText(String),
@@ -34,10 +51,20 @@ pub enum AppCommand {
 	AddToNewFolder(String, Vec<PrefsItem>),
 	AddToNewFolderDialog(Vec<PrefsItem>),
 	RemoveFromFolder(String, Vec<PrefsItem>),
-	MoveCollection { old_index: usize, new_index: Option<usize> },
-	DeleteCollectionDialog { index: usize },
-	RenameCollectionDialog { index: usize },
-	RenameCollection { index: usize, new_name: String },
+	MoveCollection {
+		old_index: usize,
+		new_index: Option<usize>,
+	},
+	DeleteCollectionDialog {
+		index: usize,
+	},
+	RenameCollectionDialog {
+		index: usize,
+	},
+	RenameCollection {
+		index: usize,
+		new_name: String,
+	},
 	ChoosePath(PathType),
 	BookmarkCurrentCollection,
 }

@@ -1,6 +1,9 @@
+use std::cell::Cell;
 use std::cell::RefCell;
+use std::iter::once;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::time::Duration;
 
 use muda::IsMenuItem;
 use muda::Menu;
@@ -36,6 +39,7 @@ use crate::dialogs::file::PathType;
 use crate::dialogs::loading::dialog_load_mame_info;
 use crate::dialogs::messagebox::dialog_message_box;
 use crate::dialogs::messagebox::OkCancel;
+use crate::dialogs::messagebox::OkOnly;
 use crate::dialogs::namecollection::dialog_new_collection;
 use crate::dialogs::namecollection::dialog_rename_collection;
 use crate::dialogs::paths::dialog_paths;
@@ -53,6 +57,10 @@ use crate::models::itemstable::ItemsTableModel;
 use crate::prefs::BuiltinCollection;
 use crate::prefs::Preferences;
 use crate::prefs::SortOrder;
+use crate::runtime::controller::MameCommand;
+use crate::runtime::controller::MameController;
+use crate::runtime::controller::MameEvent;
+use crate::runtime::status::Status;
 use crate::selection::SelectionManager;
 use crate::threadlocalbubble::ThreadLocalBubble;
 use crate::ui::AboutDialog;
@@ -60,6 +68,7 @@ use crate::ui::AppWindow;
 
 const LOG_COMMANDS: Level = Level::TRACE;
 const LOG_PREFS: Level = Level::TRACE;
+const LOG_PINGING: Level = Level::TRACE;
 
 struct AppModel {
 	menu_bar: Menu,
@@ -67,6 +76,16 @@ struct AppModel {
 	preferences: RefCell<Preferences>,
 	info_db: RefCell<Option<Rc<InfoDb>>>,
 	empty_button_command: RefCell<Option<AppCommand>>,
+	mame_controller: MameController,
+	running_state: Cell<MameRunningState>,
+	running_status: RefCell<Status>,
+}
+
+#[derive(Copy, Clone, Debug)]
+enum MameRunningState {
+	Normal,
+	Bouncing,
+	ShuttingDown,
 }
 
 impl AppModel {
@@ -125,6 +144,10 @@ impl AppModel {
 			update_ui_for_sort_changes(self);
 		}
 		if prefs.paths != old_prefs.paths {
+			if self.mame_controller.has_session() {
+				self.mame_controller.issue_command(MameCommand::Exit);
+				self.running_state.set(MameRunningState::Bouncing);
+			}
 			if prefs.paths.mame_executable != old_prefs.paths.mame_executable {
 				event!(LOG_PREFS, "modify_prefs(): paths.mame_executable changed");
 				let fut = process_mame_listxml(self.clone());
@@ -147,8 +170,18 @@ impl AppModel {
 		});
 		self.with_collections_view_model(|collections_model| {
 			let prefs = self.preferences.borrow();
+			let info_db = info_db.clone();
 			collections_model.update(info_db, &prefs.collections);
 		});
+		self.mame_controller
+			.reset(info_db.is_some().then_some(&self.preferences.borrow().paths));
+	}
+
+	pub fn update_from_status(&self) {
+		let status = self.running_status.borrow();
+		self.app_window()
+			.set_running_machine_description(status.machine_name.as_deref().unwrap_or_default().into());
+		update_menus(self);
 	}
 }
 
@@ -174,8 +207,8 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 			"File",
 			true,
 			&[
-				&MenuItem::new("Stop", false, None),
-				&MenuItem::new("Pause", false, accel("Pause")),
+				&MenuItem::with_id(AppCommand::FileStop, "Stop", false, None),
+				&MenuItem::with_id(AppCommand::FilePause, "Pause", false, accel("Pause")),
 				&PredefinedMenuItem::separator(),
 				&MenuItem::new("Devices and Images...", false, None),
 				&PredefinedMenuItem::separator(),
@@ -235,8 +268,32 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 		preferences: RefCell::new(preferences),
 		info_db: RefCell::new(None),
 		empty_button_command: RefCell::new(None),
+		mame_controller: MameController::new(),
+		running_state: Cell::new(MameRunningState::Normal),
+		running_status: RefCell::new(Status::default()),
 	};
 	let model = Rc::new(model);
+
+	// set up a callback for MAME events
+	let bubble = ThreadLocalBubble::new(model.clone());
+	model.mame_controller.set_event_callback(move |event| {
+		let bubble = bubble.clone();
+		invoke_from_event_loop(move || {
+			let model = bubble.unwrap();
+			let command = match event {
+				MameEvent::SessionStarted => AppCommand::MameSessionStarted,
+				MameEvent::SessionEnded => AppCommand::MameSessionEnded,
+				MameEvent::Error(e) => AppCommand::ErrorMessageBox(format!("{e:?}")),
+				MameEvent::StatusUpdate(update) => AppCommand::MameStatusUpdate(update),
+			};
+			handle_command(&model, command);
+		})
+		.unwrap();
+	});
+
+	// create a repeating future that will ping forever
+	let fut = ping_callback(Rc::downgrade(&model));
+	spawn_local(fut).unwrap();
 
 	// the "empty reason action" button
 	let model_clone = model.clone();
@@ -387,7 +444,10 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 		if is_context_menu_event(&evt) {
 			let index = usize::try_from(index).unwrap();
 			let folder_info = get_folder_collections(&model_clone.preferences.borrow().collections);
-			if let Some(popup_menu) = model_clone.with_items_table_model(|x| x.context_commands(index, &folder_info)) {
+			let has_mame_initialized = model_clone.running_status.borrow().has_initialized;
+			if let Some(popup_menu) =
+				model_clone.with_items_table_model(|x| x.context_commands(index, &folder_info, has_mame_initialized))
+			{
 				let app_window = model_clone.app_window();
 				show_popup_menu(app_window.window(), &popup_menu, point);
 			}
@@ -406,9 +466,19 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 	event!(LOG_COMMANDS, "handle_command(): command={:?}", &command);
 	match command {
+		AppCommand::FileStop => {
+			model.mame_controller.issue_command(MameCommand::Stop);
+		}
+		AppCommand::FilePause => {
+			model.mame_controller.issue_command(MameCommand::Pause);
+		}
 		AppCommand::FileExit => {
-			update_prefs(&model.clone());
-			quit_event_loop().unwrap()
+			if model.mame_controller.has_session() {
+				model.mame_controller.issue_command(MameCommand::Exit);
+				model.running_state.set(MameRunningState::ShuttingDown);
+			} else {
+				handle_command(model, AppCommand::Shutdown);
+			}
 		}
 		AppCommand::SettingsPaths => {
 			let fut = show_paths_dialog(model.clone());
@@ -433,6 +503,58 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 		AppCommand::HelpAbout => {
 			let dialog = with_modal_parent(&model.app_window(), || AboutDialog::new().unwrap());
 			dialog.show().unwrap();
+		}
+		AppCommand::MameSessionStarted => {
+			// do nothing
+		}
+		AppCommand::MameSessionEnded => {
+			let shutting_down = {
+				let prefs = model.preferences.borrow();
+				let (prefs_paths, shutting_down) = match model.running_state.get() {
+					MameRunningState::Normal => (None, false),
+					MameRunningState::Bouncing => (Some(prefs.paths.as_ref()), false),
+					MameRunningState::ShuttingDown => (None, true),
+				};
+				model.mame_controller.reset(prefs_paths);
+				model.running_state.set(MameRunningState::Normal);
+				*model.running_status.borrow_mut() = Status::default();
+				model.update_from_status();
+				shutting_down
+			};
+			if shutting_down {
+				handle_command(model, AppCommand::Shutdown);
+			}
+		}
+		AppCommand::MameStatusUpdate(update) => {
+			let mut status = model.running_status.borrow_mut();
+			status.merge(update);
+			drop(status);
+			model.update_from_status();
+		}
+		AppCommand::MamePing => {
+			model.mame_controller.issue_command(MameCommand::Ping);
+		}
+		AppCommand::ErrorMessageBox(message) => {
+			let parent = model.app_window().as_weak();
+			let fut = async move {
+				dialog_message_box::<OkOnly>(parent, "Error", message).await;
+			};
+			spawn_local(fut).unwrap();
+		}
+		AppCommand::Shutdown { .. } => {
+			update_prefs(&model.clone());
+			quit_event_loop().unwrap()
+		}
+		AppCommand::RunMame {
+			machine_name,
+			software_name,
+		} => {
+			assert!(software_name.is_none());
+			let command = MameCommand::Start {
+				machine_name: &machine_name,
+				software_name: software_name.as_ref().map(|x| x.as_ref()),
+			};
+			model.mame_controller.issue_command(command);
 		}
 		AppCommand::Browse(collection) => {
 			let collection = Rc::new(collection);
@@ -608,25 +730,37 @@ async fn show_paths_dialog(model: Rc<AppModel>) {
 	let parent = model.app_window_weak.clone();
 	let paths = model.preferences.borrow().paths.clone();
 	if let Some(new_paths) = dialog_paths(parent, paths).await {
-		let new_paths = Rc::new(new_paths);
-		model.modify_prefs(|prefs| prefs.paths = new_paths);
+		model.modify_prefs(|prefs| prefs.paths = new_paths.into());
 	}
 }
 
 fn update(model: &AppModel) {
+	update_menus(model);
+	update_ui_for_current_history_item(model);
+	update_items_model_for_columns_and_search(model);
+}
+
+fn update_menus(model: &AppModel) {
 	// calculate properties
 	let has_mame_executable = model.preferences.borrow().paths.mame_executable.is_some();
+	let is_running = model.running_status.borrow().machine_name.is_some();
 
 	// update the menu bar
 	for menu_item in iterate_menu_items(&model.menu_bar) {
-		if let Ok(AppCommand::HelpRefreshInfoDb) = AppCommand::try_from(menu_item.id()) {
-			menu_item.set_enabled(has_mame_executable)
+		let (enabled, checked) = match AppCommand::try_from(menu_item.id()) {
+			Ok(AppCommand::HelpRefreshInfoDb) => (Some(has_mame_executable), None),
+			Ok(AppCommand::FileStop) => (Some(is_running), None),
+			// TODO Ok(AppCommand::FilePause) => (Some(is_running), Some(false)),
+			_ => (None, None),
+		};
+
+		if let Some(enabled) = enabled {
+			menu_item.set_enabled(enabled);
+		}
+		if let Some(_checked) = checked {
+			// TODO
 		}
 	}
-
-	// update history buttons
-	update_ui_for_current_history_item(model);
-	update_items_model_for_columns_and_search(model);
 }
 
 /// updates all UI elements to reflect the current history item
@@ -746,15 +880,8 @@ fn choose_path(model: &Rc<AppModel>, path_type: PathType) {
 	// and respond to the change
 	model.modify_prefs(|prefs| {
 		let mut paths = (*prefs.paths).clone();
-		match path_type {
-			PathType::MameExecutable => {
-				paths.mame_executable = Some(path);
-			}
-			PathType::SoftwareLists => {
-				paths.software_lists = vec![path];
-			}
-		};
-		prefs.paths = Rc::new(paths);
+		PathType::store_in_prefs_paths(&mut paths, path_type, once(path));
+		prefs.paths = paths.into();
 	});
 }
 
@@ -767,4 +894,17 @@ fn items_set_sorting(model: &Rc<AppModel>, column: i32, order: SortOrder) {
 	let column = usize::try_from(column).unwrap();
 	let command = AppCommand::ItemsSort(column, order);
 	handle_command(model, command);
+}
+
+async fn ping_callback(model_weak: std::rc::Weak<AppModel>) {
+	// we really should be turning the timer on and off depending on what is running
+	while let Some(model) = model_weak.upgrade() {
+		event!(LOG_PINGING, "ping_callback(): pinging");
+		if model.running_status.borrow().machine_name.is_some() && model.mame_controller.is_queue_empty() {
+			handle_command(&model, AppCommand::MamePing);
+		}
+		drop(model);
+		tokio::time::sleep(Duration::from_secs(1)).await;
+	}
+	event!(LOG_PINGING, "ping_callback(): exiting");
 }

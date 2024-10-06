@@ -52,6 +52,15 @@ pub struct PrefsPaths {
 	pub mame_executable: Option<String>,
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub roms: Vec<String>,
+
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub samples: Vec<String>,
+
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub plugins: Vec<String>,
+
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub software_lists: Vec<String>,
 }
 

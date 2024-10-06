@@ -26,6 +26,7 @@ pub struct XmlReader<R> {
 	known_depth: u32,
 	unknown_depth: u32,
 	current_text: Option<String>,
+	read_to_end: bool,
 }
 
 enum CurrentReader<R> {
@@ -37,13 +38,14 @@ impl<R> XmlReader<R>
 where
 	R: BufRead,
 {
-	pub fn from_reader(reader: R) -> Self {
+	pub fn from_reader(reader: R, read_to_end: bool) -> Self {
 		Self {
 			reader: CurrentReader::Active(Reader::from_reader(reader)),
 			next_event_is_end: false,
 			known_depth: 0,
 			unknown_depth: 0,
 			current_text: None,
+			read_to_end,
 		}
 	}
 
@@ -105,6 +107,11 @@ where
 		*depth = depth
 			.checked_add_signed(depth_adjustment)
 			.ok_or_else(|| BoxDynError::from("Invalid close tag"))?;
+
+		// did we hit the last close tag, and we're not reading until the end?
+		let event = (self.read_to_end || self.known_depth > 0 || self.unknown_depth > 0 || depth_adjustment != -1)
+			.then_some(event)
+			.flatten();
 
 		// are we at the end of file, but still in a tag?
 		if event.is_none() && (self.known_depth > 0 || self.unknown_depth > 0) {
@@ -207,6 +214,7 @@ mod test {
 	use std::borrow::Cow;
 	use std::str::from_utf8;
 
+	use assert_matches::assert_matches;
 	use test_case::test_case;
 
 	use super::XmlEvent;
@@ -219,15 +227,17 @@ mod test {
 		Error,
 	}
 
-	#[test_case(0, "<foo><bar/></foo>", &[Part::Start("foo"), Part::Start("bar"), Part::End(None), Part::End(None)])]
-	#[test_case(1, "<blah><unknown/></blah>", &[Part::Start("blah"), Part::End(None)])]
-	#[test_case(2, "<alpha><bravo/><unknown/><charlie/></alpha>", &[Part::Start("alpha"), Part::Start("bravo"), Part::End(None), Part::Start("charlie"), Part::End(None), Part::End(None)])]
-	#[test_case(3, "<alpha><text>Hello</text></alpha>", &[Part::Start("alpha"), Part::Start("text"), Part::End(Some("Hello")), Part::End(None)])]
-	#[test_case(4, "<foo><bar/>", &[Part::Start("foo"), Part::Start("bar"), Part::End(None), Part::Error])]
-	#[test_case(5, "</foo>", &[Part::Error])]
-	#[test_case(6, "<foo/></bar>", &[Part::Start("foo"), Part::End(None), Part::Error])]
-	pub fn general(_index: usize, xml: &str, expected: &[Part]) {
-		let mut reader = XmlReader::from_reader(xml.as_bytes());
+	#[test_case(0, "<foo><bar/></foo>", true, &[Part::Start("foo"), Part::Start("bar"), Part::End(None), Part::End(None)])]
+	#[test_case(1, "<blah><unknown/></blah>", true, &[Part::Start("blah"), Part::End(None)])]
+	#[test_case(2, "<alpha><bravo/><unknown/><charlie/></alpha>", true, &[Part::Start("alpha"), Part::Start("bravo"), Part::End(None), Part::Start("charlie"), Part::End(None), Part::End(None)])]
+	#[test_case(3, "<alpha><text>Hello</text></alpha>", true, &[Part::Start("alpha"), Part::Start("text"), Part::End(Some("Hello")), Part::End(None)])]
+	#[test_case(4, "<foo><bar/>", true, &[Part::Start("foo"), Part::Start("bar"), Part::End(None), Part::Error])]
+	#[test_case(5, "</foo>", true, &[Part::Error])]
+	#[test_case(6, "<foo/></bar>", true, &[Part::Start("foo"), Part::End(None), Part::Error])]
+	#[test_case(7, "<foo/>BLAH", true, &[Part::Start("foo"), Part::End(None), Part::Error])]
+	#[test_case(8, "<foo/>BLAH", false, &[Part::Start("foo"), Part::End(None)])]
+	pub fn general(_index: usize, xml: &str, read_to_end: bool, expected: &[Part]) {
+		let mut reader = XmlReader::from_reader(xml.as_bytes(), read_to_end);
 		let mut buf = Vec::new();
 
 		let mut actual = Vec::new();
@@ -259,6 +269,20 @@ mod test {
 		assert_eq!(expected, &actual);
 	}
 
+	#[test_case(0, "<foo><bar/></foo>", "")]
+	#[test_case(1, "<foo><bar/></foo>BLAH", "BLAH")]
+	pub fn extra_data(_index: usize, xml: &str, expected: &str) {
+		let mut xml_bytes = xml.as_bytes();
+		let mut xml_reader = XmlReader::from_reader(&mut xml_bytes, false);
+		let mut buf = Vec::new();
+		while let Some(event) = xml_reader.next(&mut buf).transpose() {
+			assert_matches!(event, Ok(_));
+		}
+
+		let actual = from_utf8(xml_bytes);
+		assert_eq!(Ok(expected), actual);
+	}
+
 	#[test_case(0, Cow::Borrowed(b""), Ok(""))]
 	#[test_case(1, Cow::Owned(b"".into()), Ok(""))]
 	#[test_case(2, Cow::Borrowed(b"foo"), Ok("foo"))]
@@ -275,7 +299,7 @@ mod test {
 	#[test_case(1, "<root alpha=\"ddd\" bravo=\"eee\" charlie=\"fff\"/>", [b"alpha", b"delta", b"echo"], &[Some("ddd"), None, None])]
 	#[test_case(2, "<root alpha=\"ggg\"/>", [b"alpha", b"bravo", b"charlie"], &[Some("ggg"), None, None])]
 	pub fn find_attributes(_index: usize, xml: &str, attributes: [&[u8]; 3], expected: &[Option<&str>]) {
-		let mut reader = XmlReader::from_reader(xml.as_bytes());
+		let mut reader = XmlReader::from_reader(xml.as_bytes(), true);
 		let mut buf = Vec::new();
 
 		while let Some(event) = reader.next(&mut buf).unwrap() {
