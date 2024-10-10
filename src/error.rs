@@ -45,13 +45,13 @@ pub enum Error {
 
 	// Bad MAME interactions conditions
 	#[error("Error launching MAME: {0}")]
-	MameLaunchError(BoxDynError),
+	MameLaunch(BoxDynError),
 	#[error("Unexpected EOF from MAME")]
 	EofFromMame,
 	#[error("Error reading from MAME: {0}")]
-	ErrorReadingFromMame(BoxDynError),
+	ReadingFromMame(BoxDynError),
 	#[error("Error writing to MAME: {0}")]
-	ErrorWritingToMame(BoxDynError),
+	WritingToMame(BoxDynError),
 	#[error("MAME Error Response: {0}")]
 	MameErrorResponse(String),
 	#[error("Response not understood: {0}")]

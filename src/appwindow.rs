@@ -43,6 +43,7 @@ use crate::dialogs::messagebox::OkOnly;
 use crate::dialogs::namecollection::dialog_new_collection;
 use crate::dialogs::namecollection::dialog_rename_collection;
 use crate::dialogs::paths::dialog_paths;
+use crate::guiutils::childwnd::ChildWindow;
 use crate::guiutils::is_context_menu_event;
 use crate::guiutils::menuing::accel;
 use crate::guiutils::menuing::iterate_menu_items;
@@ -61,6 +62,7 @@ use crate::runtime::controller::MameCommand;
 use crate::runtime::controller::MameController;
 use crate::runtime::controller::MameEvent;
 use crate::runtime::status::Status;
+use crate::runtime::MameWindowing;
 use crate::selection::SelectionManager;
 use crate::threadlocalbubble::ThreadLocalBubble;
 use crate::ui::AboutDialog;
@@ -79,6 +81,7 @@ struct AppModel {
 	mame_controller: MameController,
 	running_state: Cell<MameRunningState>,
 	running_status: RefCell<Status>,
+	child_window: Option<ChildWindow>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -173,15 +176,26 @@ impl AppModel {
 			let info_db = info_db.clone();
 			collections_model.update(info_db, &prefs.collections);
 		});
-		self.mame_controller
-			.reset(info_db.is_some().then_some(&self.preferences.borrow().paths));
+		self.reset_mame_controller(info_db.is_some());
 	}
 
 	pub fn update_from_status(&self) {
 		let status = self.running_status.borrow();
 		self.app_window()
 			.set_running_machine_description(status.machine_name.as_deref().unwrap_or_default().into());
+		if let Some(child_window) = &self.child_window {
+			child_window.set_visible(status.machine_name.is_some());
+		}
 		update_menus(self);
+	}
+
+	pub fn reset_mame_controller(&self, is_enabled: bool) {
+		let windowing = match &self.child_window {
+			Some(window) => MameWindowing::Attached(window.text()),
+			None => MameWindowing::Windowed,
+		};
+		self.mame_controller
+			.reset(is_enabled.then_some(&self.preferences.borrow().paths), &windowing);
 	}
 }
 
@@ -200,7 +214,10 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 		.map(|x| x as &dyn IsMenuItem)
 		.collect::<Vec<_>>();
 
-	// Menu bar
+	// child window for MAME to attach to
+	let child_window = ChildWindow::new(app_window.window());
+
+	// menu bar
 	#[rustfmt::skip]
 	let menu_bar = Menu::with_items(&[
 		&Submenu::with_items(
@@ -271,6 +288,7 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 		mame_controller: MameController::new(),
 		running_state: Cell::new(MameRunningState::Normal),
 		running_status: RefCell::new(Status::default()),
+		child_window,
 	};
 	let model = Rc::new(model);
 
@@ -509,13 +527,12 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 		}
 		AppCommand::MameSessionEnded => {
 			let shutting_down = {
-				let prefs = model.preferences.borrow();
-				let (prefs_paths, shutting_down) = match model.running_state.get() {
-					MameRunningState::Normal => (None, false),
-					MameRunningState::Bouncing => (Some(prefs.paths.as_ref()), false),
-					MameRunningState::ShuttingDown => (None, true),
+				let (is_enabled, shutting_down) = match model.running_state.get() {
+					MameRunningState::Normal => (false, false),
+					MameRunningState::Bouncing => (true, false),
+					MameRunningState::ShuttingDown => (false, true),
 				};
-				model.mame_controller.reset(prefs_paths);
+				model.reset_mame_controller(is_enabled);
 				model.running_state.set(MameRunningState::Normal);
 				*model.running_status.borrow_mut() = Status::default();
 				model.update_from_status();
@@ -750,7 +767,7 @@ fn update_menus(model: &AppModel) {
 		let (enabled, checked) = match AppCommand::try_from(menu_item.id()) {
 			Ok(AppCommand::HelpRefreshInfoDb) => (Some(has_mame_executable), None),
 			Ok(AppCommand::FileStop) => (Some(is_running), None),
-			// TODO Ok(AppCommand::FilePause) => (Some(is_running), Some(false)),
+			Ok(AppCommand::FilePause) => (Some(is_running), Some(false)),
 			_ => (None, None),
 		};
 
@@ -900,6 +917,13 @@ async fn ping_callback(model_weak: std::rc::Weak<AppModel>) {
 	// we really should be turning the timer on and off depending on what is running
 	while let Some(model) = model_weak.upgrade() {
 		event!(LOG_PINGING, "ping_callback(): pinging");
+
+		// set the child window size
+		if let Some(child_window) = &model.child_window {
+			child_window.set_size(model.app_window().window().size());
+		}
+
+		// send a ping command (if we're running)
 		if model.running_status.borrow().machine_name.is_some() && model.mame_controller.is_queue_empty() {
 			handle_command(&model, AppCommand::MamePing);
 		}

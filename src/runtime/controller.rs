@@ -20,6 +20,7 @@ use crate::prefs::PrefsPaths;
 use crate::runtime::args::MameArguments;
 use crate::runtime::args::MameArgumentsSource;
 use crate::runtime::status::StatusUpdate;
+use crate::runtime::MameWindowing;
 use crate::Error;
 use crate::Result;
 
@@ -92,10 +93,10 @@ impl MameController {
 			.is_some_and(|session| session.comm.message_queue_len.load(Ordering::Relaxed) == 0)
 	}
 
-	pub fn reset(&self, prefs_paths: Option<&PrefsPaths>) {
+	pub fn reset(&self, prefs_paths: Option<&PrefsPaths>, mame_windowing: &MameWindowing) {
 		// first and foremost, determine if we actually have enough set up to invoke MAME
 		let mame_args = prefs_paths.and_then(|prefs_paths| {
-			MameArgumentsSource::from_prefs(prefs_paths)
+			MameArgumentsSource::from_prefs(prefs_paths, mame_windowing)
 				.ok()
 				.and_then(|x| x.preflight().is_ok().then_some(x))
 		});
@@ -178,7 +179,7 @@ fn internal_thread_proc(
 		.stdout(Stdio::piped())
 		.stderr(Stdio::piped())
 		.spawn()
-		.map_err(|e| Error::MameLaunchError(Box::new(e).into()))?;
+		.map_err(|e| Error::MameLaunch(Box::new(e).into()))?;
 
 	// MAME launched!  we now have a pid
 	comm.mame_pid.store(child.id().into(), Ordering::Relaxed);
@@ -205,7 +206,7 @@ fn internal_thread_proc(
 			if is_exiting {
 				break Ok(());
 			}
-			is_exiting = match process_event_from_front_end(&comm, &mut mame_stdin) {
+			is_exiting = match process_event_from_front_end(comm, &mut mame_stdin) {
 				Ok(x) => x,
 				Err(e) => break Err(e),
 			};
@@ -279,7 +280,7 @@ fn read_line_from_mame(mame_stdout: &mut impl BufRead, line: &mut String) -> Res
 	match mame_stdout.read_line(line) {
 		Ok(0) => Err(Error::EofFromMame.into()),
 		Ok(_) => Ok(()),
-		Err(e) => Err(Error::ErrorReadingFromMame(Box::new(e)).into()),
+		Err(e) => Err(Error::ReadingFromMame(Box::new(e)).into()),
 	}
 }
 
@@ -289,7 +290,7 @@ fn process_event_from_front_end(comm: &SessionCommunication, mame_stdin: &mut Bu
 	event!(LOG, "process_event_from_front_end(): command=\"{:?}\"", command);
 
 	fn mame_write_err(e: impl std::error::Error + Send + Sync + 'static) -> Error {
-		Error::ErrorWritingToMame(Box::new(e))
+		Error::WritingToMame(Box::new(e))
 	}
 	writeln!(mame_stdin, "{}", command.text).map_err(mame_write_err)?;
 	mame_stdin.flush().map_err(mame_write_err)?;

@@ -59,7 +59,7 @@ slint-build = "1.8"
 vivi_ui = { git = "https://seed.radicle.garden/z3oxAZSLcyXgpa7fcvgtueF49jHpH.git", rev = "76a83bc993ce625822182e629034e54496a3bc20" }
 
 [profile.dev]
-opt-level = 1
+opt-level = 0
 panic = "abort"
 
 [profile.release]

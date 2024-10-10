@@ -1,4 +1,5 @@
 //! `guiutils` is a module that attempts to enc[r]apsulate various platform-specific GUI aspects that would ideally be folded into Slint
+pub mod childwnd;
 pub mod menuing;
 pub mod windowing;
 
