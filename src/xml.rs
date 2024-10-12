@@ -9,8 +9,12 @@ use quick_xml::events::BytesStart;
 use quick_xml::events::Event;
 use quick_xml::name::QName;
 use quick_xml::Reader;
+use tracing::event;
+use tracing::Level;
 
 use crate::error::BoxDynError;
+
+const LOG: Level = Level::TRACE;
 
 /// quick-xml events are at a slightly different granularity than what we would prefer
 #[derive(Debug)]
@@ -52,14 +56,12 @@ where
 	pub fn next<'a>(&mut self, buf: &'a mut Vec<u8>) -> std::result::Result<Option<XmlEvent<'a>>, BoxDynError> {
 		let result = self.internal_next(buf);
 
-		// if we've reached the end of file, clear out the reader
-		if let CurrentReader::Active(reader) = &self.reader {
-			if !matches!(result, Ok(Some(_))) {
-				let buffer_position = reader.buffer_position();
-				self.reader = CurrentReader::Done(buffer_position);
-			}
+		// if we've reached the end of file or an error condition, clear out the reader
+		if !matches!(result, Ok(Some(_))) {
+			self.set_done();
 		}
 
+		event!(LOG, "XmlReader::next(): result={:?}", result);
 		result
 	}
 
@@ -77,8 +79,12 @@ where
 					Some(XmlEvent::Start(XmlElement { bytes_start }))
 				}
 				Event::Text(bytes_text) => {
+					let string = cow_bytes_to_str(bytes_text.into_inner())?;
+					if self.known_depth == 0 && self.unknown_depth == 0 && !string.trim().is_empty() {
+						let msg = format!("Extraneous text \"{:?}\"", string);
+						return Err(BoxDynError::from(msg));
+					}
 					if let Some(current_text) = &mut self.current_text {
-						let string = cow_bytes_to_str(bytes_text.into_inner())?;
 						current_text.push_str(&string);
 					}
 					Some(XmlEvent::Null)
@@ -109,9 +115,9 @@ where
 			.ok_or_else(|| BoxDynError::from("Invalid close tag"))?;
 
 		// did we hit the last close tag, and we're not reading until the end?
-		let event = (self.read_to_end || self.known_depth > 0 || self.unknown_depth > 0 || depth_adjustment != -1)
-			.then_some(event)
-			.flatten();
+		if !self.read_to_end && self.known_depth == 0 && self.unknown_depth == 0 && depth_adjustment == -1 {
+			self.set_done();
+		}
 
 		// are we at the end of file, but still in a tag?
 		if event.is_none() && (self.known_depth > 0 || self.unknown_depth > 0) {
@@ -138,6 +144,14 @@ where
 		match &self.reader {
 			CurrentReader::Active(reader) => reader.buffer_position(),
 			CurrentReader::Done(buffer_position) => *buffer_position,
+		}
+	}
+
+	/// Set ourselves to done
+	fn set_done(&mut self) {
+		if let CurrentReader::Active(reader) = &self.reader {
+			let buffer_position = reader.buffer_position();
+			self.reader = CurrentReader::Done(buffer_position);
 		}
 	}
 }
@@ -202,9 +216,14 @@ fn cow_bytes_to_str(cow: Cow<'_, [u8]>) -> std::result::Result<Cow<'_, str>, Box
 			Ok(unescape(s)?)
 		}
 		Cow::Owned(bytes) => {
-			let s = from_utf8(&bytes)?;
-			let s = unescape(s)?;
-			Ok(s.into_owned().into())
+			let text = String::from_utf8(bytes)?;
+			let unescaped_text = unescape(&text)?;
+			let unescaped_text = if matches!(unescaped_text, Cow::Borrowed(x) if x.len() == text.len()) {
+				text
+			} else {
+				unescaped_text.into_owned()
+			};
+			Ok(unescaped_text.into())
 		}
 	}
 }
@@ -227,15 +246,20 @@ mod test {
 		Error,
 	}
 
-	#[test_case(0, "<foo><bar/></foo>", true, &[Part::Start("foo"), Part::Start("bar"), Part::End(None), Part::End(None)])]
-	#[test_case(1, "<blah><unknown/></blah>", true, &[Part::Start("blah"), Part::End(None)])]
-	#[test_case(2, "<alpha><bravo/><unknown/><charlie/></alpha>", true, &[Part::Start("alpha"), Part::Start("bravo"), Part::End(None), Part::Start("charlie"), Part::End(None), Part::End(None)])]
-	#[test_case(3, "<alpha><text>Hello</text></alpha>", true, &[Part::Start("alpha"), Part::Start("text"), Part::End(Some("Hello")), Part::End(None)])]
-	#[test_case(4, "<foo><bar/>", true, &[Part::Start("foo"), Part::Start("bar"), Part::End(None), Part::Error])]
-	#[test_case(5, "</foo>", true, &[Part::Error])]
-	#[test_case(6, "<foo/></bar>", true, &[Part::Start("foo"), Part::End(None), Part::Error])]
-	#[test_case(7, "<foo/>BLAH", true, &[Part::Start("foo"), Part::End(None), Part::Error])]
-	#[test_case(8, "<foo/>BLAH", false, &[Part::Start("foo"), Part::End(None)])]
+	#[rustfmt::skip]
+	#[test_case( 0, "<foo><bar/></foo>", true, &[Part::Start("foo"), Part::Start("bar"), Part::End(None), Part::End(None)])]
+	#[test_case( 1, "<blah><unknown/></blah>", true, &[Part::Start("blah"), Part::End(None)])]
+	#[test_case( 2, "<alpha><bravo/><unknown/><charlie/></alpha>", true, &[Part::Start("alpha"), Part::Start("bravo"), Part::End(None), Part::Start("charlie"), Part::End(None), Part::End(None)])]
+	#[test_case( 3, "<alpha><text>Hello</text></alpha>", true, &[Part::Start("alpha"), Part::Start("text"), Part::End(Some("Hello")), Part::End(None)])]
+	#[test_case( 4, "<foo><bar/>", true, &[Part::Start("foo"), Part::Start("bar"), Part::End(None), Part::Error])]
+	#[test_case( 5, "</foo>", true, &[Part::Error])]
+	#[test_case( 6, "<foo/></bar>", true, &[Part::Start("foo"), Part::End(None), Part::Error])]
+	#[test_case( 7, "<foo/>EXTRANEOUS", false, &[Part::Start("foo"), Part::End(None)])]
+	#[test_case( 8, "<foo></foo>EXTRANEOUS", false, &[Part::Start("foo"), Part::End(None)])]
+	#[test_case( 9, "<foo/>EXTRANEOUS", true, &[Part::Start("foo"), Part::End(None), Part::Error])]
+	#[test_case(10, "<foo></foo>EXTRANEOUS", true, &[Part::Start("foo"), Part::End(None), Part::Error])]
+	#[test_case(11, "EXTRANEOUS", false, &[Part::Error])]
+	#[test_case(12, "EXTRANEOUS", true, &[Part::Error])]
 	pub fn general(_index: usize, xml: &str, read_to_end: bool, expected: &[Part]) {
 		let mut reader = XmlReader::from_reader(xml.as_bytes(), read_to_end);
 		let mut buf = Vec::new();
