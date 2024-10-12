@@ -15,7 +15,7 @@ jobs:
           override: true
       - uses: awalsh128/cache-apt-pkgs-action@latest
         with:
-          packages: librust-atk-dev libpango-1.0-0
+          packages: librust-atk-dev libpango-1.0-0 libgtk-3-dev
           version: 1.0
           execute_install_scripts: true          
       - uses: actions-rs/cargo@v1
@@ -34,7 +34,7 @@ jobs:
           override: true
       - uses: awalsh128/cache-apt-pkgs-action@latest
         with:
-          packages: librust-atk-dev libpango-1.0-0
+          packages: librust-atk-dev libpango-1.0-0 libgtk-3-dev
           version: 1.0
           execute_install_scripts: true          
       - uses: actions-rs/cargo@v1
@@ -70,7 +70,7 @@ jobs:
       - run: rustup component add clippy
       - uses: awalsh128/cache-apt-pkgs-action@latest
         with:
-          packages: librust-atk-dev libpango-1.0-0
+          packages: librust-atk-dev libpango-1.0-0 libgtk-3-dev
           version: 1.0
           execute_install_scripts: true          
       - uses: actions-rs/cargo@v1
