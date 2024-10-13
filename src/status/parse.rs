@@ -1,38 +1,18 @@
 use std::io::BufRead;
 
-use serde::Deserialize;
-use serde::Serialize;
+use tracing::event;
+use tracing::Level;
 
 use crate::error::BoxDynError;
+use crate::status::Update;
+use crate::status::UpdateRunning;
 use crate::xml::XmlElement;
 use crate::xml::XmlEvent;
 use crate::xml::XmlReader;
 use crate::Error;
 use crate::Result;
 
-#[derive(Debug, Default)]
-pub struct Status {
-	pub has_initialized: bool,
-	pub machine_name: Option<String>,
-}
-
-impl Status {
-	pub fn merge(&mut self, update: StatusUpdate) {
-		self.machine_name = update.machine_name;
-		self.has_initialized = true;
-	}
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct StatusUpdate {
-	pub machine_name: Option<String>,
-}
-
-impl StatusUpdate {
-	pub fn parse(reader: impl BufRead) -> Result<Self> {
-		parse_status(reader)
-	}
-}
+const LOG: Level = Level::TRACE;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum Phase {
@@ -44,15 +24,25 @@ enum Phase {
 #[derive(Debug, Default)]
 struct State {
 	phase: Phase,
-	machine_name: Option<String>,
+	running: UpdateRunning,
 }
 
 impl State {
 	pub fn handle_start(&mut self, evt: XmlElement<'_>) -> std::result::Result<Option<Phase>, BoxDynError> {
 		let new_phase = match (self.phase, evt.name().as_ref()) {
 			(Phase::Root, b"status") => {
-				let [romname] = evt.find_attributes([b"romname"])?;
-				self.machine_name = romname.and_then(|x| (!x.is_empty()).then(|| x.to_string()));
+				let [romname, is_paused] = evt.find_attributes([b"romname", b"paused"])?;
+				let machine_name = romname.unwrap_or_default().to_string();
+				let is_paused = is_paused.and_then(|x| parse_bool(x.as_ref()));
+				event!(
+					LOG,
+					"status State::handle_start(): machine_name={} is_paused={:?}",
+					machine_name,
+					is_paused
+				);
+
+				self.running.machine_name = machine_name;
+				self.running.is_paused = is_paused;
 				Some(Phase::Status)
 			}
 			_ => None,
@@ -69,7 +59,7 @@ impl State {
 	}
 }
 
-fn parse_status(reader: impl BufRead) -> Result<StatusUpdate> {
+pub fn parse_update(reader: impl BufRead) -> Result<Update> {
 	let mut reader = XmlReader::from_reader(reader, false);
 	let mut buf = Vec::with_capacity(1024);
 	let mut state = State::default();
@@ -94,12 +84,37 @@ fn parse_status(reader: impl BufRead) -> Result<StatusUpdate> {
 		}
 	}
 
-	let result = StatusUpdate {
-		machine_name: state.machine_name,
-	};
+	let running = (!state.running.machine_name.is_empty()).then_some(state.running);
+	let result = Update { running };
 	Ok(result)
 }
 
 fn statusxml_err(reader: &XmlReader<impl BufRead>, e: BoxDynError) -> crate::error::Error {
 	Error::StatusXmlProcessing(reader.buffer_position(), e)
+}
+
+fn parse_bool(s: &str) -> Option<bool> {
+	match s {
+		"false" => Some(false),
+		"true" => Some(true),
+		_ => None,
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use std::io::BufReader;
+
+	use assert_matches::assert_matches;
+	use test_case::test_case;
+
+	use super::parse_update;
+
+	#[test_case(0, include_str!("test_data/status_mame0226_coco2b_1.xml"))]
+	#[test_case(1, include_str!("test_data/status_mame0227_coco2b_1.xml"))]
+	fn general(_index: usize, xml: &str) {
+		let reader = BufReader::new(xml.as_bytes());
+		let result = parse_update(reader);
+		assert_matches!(result, Ok(_));
+	}
 }

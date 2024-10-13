@@ -62,9 +62,9 @@ use crate::prefs::SortOrder;
 use crate::runtime::controller::MameCommand;
 use crate::runtime::controller::MameController;
 use crate::runtime::controller::MameEvent;
-use crate::runtime::status::Status;
 use crate::runtime::MameWindowing;
 use crate::selection::SelectionManager;
+use crate::status::Status;
 use crate::threadlocalbubble::ThreadLocalBubble;
 use crate::ui::AboutDialog;
 use crate::ui::AppWindow;
@@ -182,10 +182,19 @@ impl AppModel {
 
 	pub fn update_from_status(&self) {
 		let status = self.running_status.borrow();
-		self.app_window()
-			.set_running_machine_description(status.machine_name.as_deref().unwrap_or_default().into());
+
+		// machine description
+		let machine_desc = status
+			.running
+			.as_ref()
+			.map(|x| x.machine_name.as_str())
+			.unwrap_or_default()
+			.into();
+		self.app_window().set_running_machine_description(machine_desc);
+
+		// child window visibility
 		if let Some(child_window) = &self.child_window {
-			child_window.set_visible(status.machine_name.is_some());
+			child_window.set_visible(status.running.is_some());
 		}
 		update_menus(self);
 	}
@@ -760,8 +769,9 @@ fn update(model: &AppModel) {
 
 fn update_menus(model: &AppModel) {
 	// calculate properties
+	let running_status = model.running_status.borrow();
 	let has_mame_executable = model.preferences.borrow().paths.mame_executable.is_some();
-	let is_running = model.running_status.borrow().machine_name.is_some();
+	let is_running = running_status.running.is_some();
 
 	// update the menu bar
 	update_menu_items(&model.menu_bar, |id| {
@@ -919,7 +929,7 @@ async fn ping_callback(model_weak: std::rc::Weak<AppModel>) {
 		}
 
 		// send a ping command (if we're running)
-		if model.running_status.borrow().machine_name.is_some() && model.mame_controller.is_queue_empty() {
+		if model.running_status.borrow().running.is_some() && model.mame_controller.is_queue_empty() {
 			handle_command(&model, AppCommand::MamePing);
 		}
 		drop(model);

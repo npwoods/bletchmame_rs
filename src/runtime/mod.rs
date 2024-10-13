@@ -1,6 +1,5 @@
 mod args;
 pub mod controller;
-pub mod status;
 
 #[derive(Debug)]
 pub enum MameWindowing {

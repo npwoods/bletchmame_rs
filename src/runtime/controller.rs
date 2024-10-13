@@ -19,8 +19,8 @@ use tracing::Level;
 use crate::prefs::PrefsPaths;
 use crate::runtime::args::MameArguments;
 use crate::runtime::args::MameArgumentsSource;
-use crate::runtime::status::StatusUpdate;
 use crate::runtime::MameWindowing;
+use crate::status::Update;
 use crate::Error;
 use crate::Result;
 
@@ -61,7 +61,7 @@ pub enum MameEvent {
 	SessionStarted,
 	SessionEnded,
 	Error(Error),
-	StatusUpdate(StatusUpdate),
+	StatusUpdate(Update),
 }
 
 #[derive(Debug)]
@@ -214,7 +214,7 @@ fn internal_thread_proc(
 	}
 }
 
-fn read_response_from_mame(mame_stdout: &mut impl BufRead, line: &mut String) -> Result<(Option<StatusUpdate>, bool)> {
+fn read_response_from_mame(mame_stdout: &mut impl BufRead, line: &mut String) -> Result<(Option<Update>, bool)> {
 	#[derive(Debug, Clone, Copy, PartialEq)]
 	enum ResponseLine {
 		Ok,
@@ -251,7 +251,7 @@ fn read_response_from_mame(mame_stdout: &mut impl BufRead, line: &mut String) ->
 
 	let update = if resp == ResponseLine::OkStatus {
 		// read the status XML from MAME
-		let update = StatusUpdate::parse(&mut *mame_stdout);
+		let update = Update::parse(&mut *mame_stdout);
 		event!(LOG, "thread_proc(): parsed update: {:?}", update.as_ref().map(|_| ()));
 
 		// read until end of line

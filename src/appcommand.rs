@@ -10,7 +10,7 @@ use crate::prefs::BuiltinCollection;
 use crate::prefs::PrefsCollection;
 use crate::prefs::PrefsItem;
 use crate::prefs::SortOrder;
-use crate::runtime::status::StatusUpdate;
+use crate::status::Update;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum AppCommand {
@@ -32,7 +32,7 @@ pub enum AppCommand {
 	// MAME communication
 	MameSessionStarted,
 	MameSessionEnded,
-	MameStatusUpdate(StatusUpdate),
+	MameStatusUpdate(Update),
 	MamePing,
 	ErrorMessageBox(String),
 

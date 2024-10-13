@@ -14,6 +14,7 @@ mod prefs;
 mod runtime;
 mod selection;
 mod software;
+mod status;
 mod threadlocalbubble;
 mod xml;
 
