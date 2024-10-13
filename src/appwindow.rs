@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
 
+use muda::CheckMenuItem;
 use muda::IsMenuItem;
 use muda::Menu;
 use muda::MenuEvent;
@@ -235,7 +236,7 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 			true,
 			&[
 				&MenuItem::with_id(AppCommand::FileStop, "Stop", false, None),
-				&MenuItem::with_id(AppCommand::FilePause, "Pause", false, accel("Pause")),
+				&CheckMenuItem::with_id(AppCommand::FilePause, "Pause", false, false,accel("Pause")),
 				&PredefinedMenuItem::separator(),
 				&MenuItem::new("Devices and Images...", false, None),
 				&PredefinedMenuItem::separator(),
@@ -498,7 +499,18 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			model.mame_controller.issue_command(MameCommand::Stop);
 		}
 		AppCommand::FilePause => {
-			model.mame_controller.issue_command(MameCommand::Pause);
+			let is_paused = model
+				.running_status
+				.borrow()
+				.running
+				.as_ref()
+				.map(|r| r.is_paused)
+				.unwrap_or_default();
+			if is_paused {
+				model.mame_controller.issue_command(MameCommand::Resume);
+			} else {
+				model.mame_controller.issue_command(MameCommand::Pause);
+			}
 		}
 		AppCommand::FileExit => {
 			if model.mame_controller.has_session() {
@@ -772,13 +784,14 @@ fn update_menus(model: &AppModel) {
 	let running_status = model.running_status.borrow();
 	let has_mame_executable = model.preferences.borrow().paths.mame_executable.is_some();
 	let is_running = running_status.running.is_some();
+	let is_paused = running_status.running.as_ref().map(|r| r.is_paused).unwrap_or_default();
 
 	// update the menu bar
 	update_menu_items(&model.menu_bar, |id| {
 		let (enabled, checked) = match AppCommand::try_from(id) {
 			Ok(AppCommand::HelpRefreshInfoDb) => (Some(has_mame_executable), None),
 			Ok(AppCommand::FileStop) => (Some(is_running), None),
-			Ok(AppCommand::FilePause) => (Some(is_running), None),
+			Ok(AppCommand::FilePause) => (Some(is_running), Some(is_paused)),
 			_ => (None, None),
 		};
 		MenuItemUpdate { enabled, checked }

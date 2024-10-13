@@ -51,7 +51,6 @@ pub enum MameCommand<'a> {
 	},
 	Stop,
 	Pause,
-	#[allow(dead_code)]
 	Resume,
 	Ping,
 }
