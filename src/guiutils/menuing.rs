@@ -1,7 +1,6 @@
-//! Helpers for Menu handling; which Sling does not handle yet
+//! Helpers for Menu handling; which Slint does not handle yet
 use std::mem::zeroed;
 
-use itertools::Either;
 use muda::accelerator::Accelerator;
 use muda::accelerator::Code;
 use muda::accelerator::Modifiers;
@@ -63,20 +62,43 @@ pub fn setup_window_menu_bar(window: &Window, menu_bar: &Menu) {
 	}
 }
 
-pub fn iterate_menu_items(menu: &Menu) -> impl Iterator<Item = MenuItem> {
-	iterate_menu_items_internal(menu.items())
+#[derive(Debug, Default)]
+pub struct MenuItemUpdate {
+	pub enabled: Option<bool>,
+	pub checked: Option<bool>,
 }
 
-fn iterate_menu_items_internal(items: Vec<MenuItemKind>) -> impl Iterator<Item = MenuItem> {
-	items.into_iter().flat_map(|item| match item {
-		MenuItemKind::MenuItem(menu_item) => Either::Left([menu_item].into_iter()),
-		MenuItemKind::Submenu(sub_menu) => Either::Right(
-			iterate_menu_items_internal(sub_menu.items())
-				.collect::<Vec<_>>()
-				.into_iter(),
-		),
-		_ => Either::Right(Vec::new().into_iter()),
-	})
+pub fn update_menu_items(menu: &Menu, callback: impl Fn(&MenuId) -> MenuItemUpdate) {
+	update_menu_items_internal(&menu.items(), &callback);
+}
+
+fn update_menu_items_internal(items: &[MenuItemKind], callback: &impl Fn(&MenuId) -> MenuItemUpdate) {
+	for item in items {
+		match item {
+			MenuItemKind::MenuItem(menu_item) => {
+				let update = callback(menu_item.id());
+				if let Some(enabled) = update.enabled {
+					menu_item.set_enabled(enabled);
+				}
+				assert!(update.checked.is_none());
+			}
+			MenuItemKind::Check(menu_item) => {
+				let update = callback(menu_item.id());
+				if let Some(enabled) = update.enabled {
+					menu_item.set_enabled(enabled);
+				}
+				if let Some(checked) = update.checked {
+					menu_item.set_checked(checked);
+				}
+			}
+			MenuItemKind::Submenu(sub_menu) => {
+				update_menu_items_internal(&sub_menu.items(), callback);
+			}
+			_ => {
+				// do nothing
+			}
+		}
+	}
 }
 
 pub enum MenuDesc {

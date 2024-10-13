@@ -46,9 +46,10 @@ use crate::dialogs::paths::dialog_paths;
 use crate::guiutils::childwnd::ChildWindow;
 use crate::guiutils::is_context_menu_event;
 use crate::guiutils::menuing::accel;
-use crate::guiutils::menuing::iterate_menu_items;
 use crate::guiutils::menuing::setup_window_menu_bar;
 use crate::guiutils::menuing::show_popup_menu;
+use crate::guiutils::menuing::update_menu_items;
+use crate::guiutils::menuing::MenuItemUpdate;
 use crate::guiutils::windowing::with_modal_parent;
 use crate::history::History;
 use crate::info::InfoDb;
@@ -763,21 +764,15 @@ fn update_menus(model: &AppModel) {
 	let is_running = model.running_status.borrow().machine_name.is_some();
 
 	// update the menu bar
-	for menu_item in iterate_menu_items(&model.menu_bar) {
-		let (enabled, checked) = match AppCommand::try_from(menu_item.id()) {
+	update_menu_items(&model.menu_bar, |id| {
+		let (enabled, checked) = match AppCommand::try_from(id) {
 			Ok(AppCommand::HelpRefreshInfoDb) => (Some(has_mame_executable), None),
 			Ok(AppCommand::FileStop) => (Some(is_running), None),
-			Ok(AppCommand::FilePause) => (Some(is_running), Some(false)),
+			Ok(AppCommand::FilePause) => (Some(is_running), None),
 			_ => (None, None),
 		};
-
-		if let Some(enabled) = enabled {
-			menu_item.set_enabled(enabled);
-		}
-		if let Some(_checked) = checked {
-			// TODO
-		}
-	}
+		MenuItemUpdate { enabled, checked }
+	});
 }
 
 /// updates all UI elements to reflect the current history item
