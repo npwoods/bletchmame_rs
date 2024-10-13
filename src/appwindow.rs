@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
 
+use muda::CheckMenuItem;
 use muda::IsMenuItem;
 use muda::Menu;
 use muda::MenuEvent;
@@ -46,9 +47,10 @@ use crate::dialogs::paths::dialog_paths;
 use crate::guiutils::childwnd::ChildWindow;
 use crate::guiutils::is_context_menu_event;
 use crate::guiutils::menuing::accel;
-use crate::guiutils::menuing::iterate_menu_items;
 use crate::guiutils::menuing::setup_window_menu_bar;
 use crate::guiutils::menuing::show_popup_menu;
+use crate::guiutils::menuing::update_menu_items;
+use crate::guiutils::menuing::MenuItemUpdate;
 use crate::guiutils::windowing::with_modal_parent;
 use crate::history::History;
 use crate::info::InfoDb;
@@ -61,9 +63,9 @@ use crate::prefs::SortOrder;
 use crate::runtime::controller::MameCommand;
 use crate::runtime::controller::MameController;
 use crate::runtime::controller::MameEvent;
-use crate::runtime::status::Status;
 use crate::runtime::MameWindowing;
 use crate::selection::SelectionManager;
+use crate::status::Status;
 use crate::threadlocalbubble::ThreadLocalBubble;
 use crate::ui::AboutDialog;
 use crate::ui::AppWindow;
@@ -181,10 +183,19 @@ impl AppModel {
 
 	pub fn update_from_status(&self) {
 		let status = self.running_status.borrow();
-		self.app_window()
-			.set_running_machine_description(status.machine_name.as_deref().unwrap_or_default().into());
+
+		// machine description
+		let machine_desc = status
+			.running
+			.as_ref()
+			.map(|x| x.machine_name.as_str())
+			.unwrap_or_default()
+			.into();
+		self.app_window().set_running_machine_description(machine_desc);
+
+		// child window visibility
 		if let Some(child_window) = &self.child_window {
-			child_window.set_visible(status.machine_name.is_some());
+			child_window.set_visible(status.running.is_some());
 		}
 		update_menus(self);
 	}
@@ -225,7 +236,7 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 			true,
 			&[
 				&MenuItem::with_id(AppCommand::FileStop, "Stop", false, None),
-				&MenuItem::with_id(AppCommand::FilePause, "Pause", false, accel("Pause")),
+				&CheckMenuItem::with_id(AppCommand::FilePause, "Pause", false, false,accel("Pause")),
 				&PredefinedMenuItem::separator(),
 				&MenuItem::new("Devices and Images...", false, None),
 				&PredefinedMenuItem::separator(),
@@ -488,7 +499,18 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			model.mame_controller.issue_command(MameCommand::Stop);
 		}
 		AppCommand::FilePause => {
-			model.mame_controller.issue_command(MameCommand::Pause);
+			let is_paused = model
+				.running_status
+				.borrow()
+				.running
+				.as_ref()
+				.map(|r| r.is_paused)
+				.unwrap_or_default();
+			if is_paused {
+				model.mame_controller.issue_command(MameCommand::Resume);
+			} else {
+				model.mame_controller.issue_command(MameCommand::Pause);
+			}
 		}
 		AppCommand::FileExit => {
 			if model.mame_controller.has_session() {
@@ -759,25 +781,21 @@ fn update(model: &AppModel) {
 
 fn update_menus(model: &AppModel) {
 	// calculate properties
+	let running_status = model.running_status.borrow();
 	let has_mame_executable = model.preferences.borrow().paths.mame_executable.is_some();
-	let is_running = model.running_status.borrow().machine_name.is_some();
+	let is_running = running_status.running.is_some();
+	let is_paused = running_status.running.as_ref().map(|r| r.is_paused).unwrap_or_default();
 
 	// update the menu bar
-	for menu_item in iterate_menu_items(&model.menu_bar) {
-		let (enabled, checked) = match AppCommand::try_from(menu_item.id()) {
+	update_menu_items(&model.menu_bar, |id| {
+		let (enabled, checked) = match AppCommand::try_from(id) {
 			Ok(AppCommand::HelpRefreshInfoDb) => (Some(has_mame_executable), None),
 			Ok(AppCommand::FileStop) => (Some(is_running), None),
-			Ok(AppCommand::FilePause) => (Some(is_running), Some(false)),
+			Ok(AppCommand::FilePause) => (Some(is_running), Some(is_paused)),
 			_ => (None, None),
 		};
-
-		if let Some(enabled) = enabled {
-			menu_item.set_enabled(enabled);
-		}
-		if let Some(_checked) = checked {
-			// TODO
-		}
-	}
+		MenuItemUpdate { enabled, checked }
+	});
 }
 
 /// updates all UI elements to reflect the current history item
@@ -924,7 +942,7 @@ async fn ping_callback(model_weak: std::rc::Weak<AppModel>) {
 		}
 
 		// send a ping command (if we're running)
-		if model.running_status.borrow().machine_name.is_some() && model.mame_controller.is_queue_empty() {
+		if model.running_status.borrow().running.is_some() && model.mame_controller.is_queue_empty() {
 			handle_command(&model, AppCommand::MamePing);
 		}
 		drop(model);
