@@ -1,16 +1,21 @@
 use std::borrow::Cow;
-use std::ffi::OsStr;
+use std::env::current_exe;
 use std::fs::metadata;
 use std::path::Path;
 use std::path::PathBuf;
 
 use is_executable::IsExecutable;
+use itertools::Itertools;
+use tracing::event;
+use tracing::Level;
 
 use crate::error::PreflightProblem;
 use crate::prefs::PrefsPaths;
 use crate::runtime::MameWindowing;
 use crate::Error;
 use crate::Result;
+
+const LOG: Level = Level::DEBUG;
 
 #[derive(Clone, Copy, Debug)]
 pub struct MameArgumentsSource<'a> {
@@ -68,7 +73,7 @@ impl From<MameArgumentsSource<'_>> for MameArguments {
 		.into_iter()
 		.filter(|(_, paths)| !paths.is_empty())
 		.map(|(arg, paths)| {
-			let paths_str = paths.join(";");
+			let paths_str = get_full_path(paths, |var_name| env_lookup(var_name, value.mame_executable_path));
 			(arg, paths_str)
 		})
 		.collect::<Vec<_>>();
@@ -109,7 +114,7 @@ impl From<MameArgumentsSource<'_>> for MameArguments {
 	}
 }
 
-fn preflight_checks(mame_executable_path: Option<&str>, plugins_paths: &[impl AsRef<OsStr>]) -> Vec<PreflightProblem> {
+fn preflight_checks(mame_executable_path: Option<&str>, plugins_paths: &[impl AsRef<str>]) -> Vec<PreflightProblem> {
 	let mut problems = Vec::new();
 
 	// MAME executable preflights
@@ -128,18 +133,27 @@ fn preflight_checks(mame_executable_path: Option<&str>, plugins_paths: &[impl As
 	// plugins preflights
 	let plugins_paths = plugins_paths
 		.iter()
-		.map(Path::new)
+		.flat_map(|path| {
+			let path = path.as_ref();
+			if let Some((var_name, rest)) = get_var_name(path) {
+				let var_value = env_lookup(var_name, mame_executable_path);
+				let result = var_value.map(|x| PathBuf::from(format!("{x}{rest}")));
+				result.map(Cow::Owned)
+			} else {
+				Some(Cow::Borrowed(Path::new(path)))
+			}
+		})
 		.filter(|path| metadata(path).is_ok_and(|m| m.is_dir()))
 		.collect::<Vec<_>>();
 	if !plugins_paths.is_empty() {
 		let mut found_boot = false;
 		let mut found_worker_ui = false;
 		for path in plugins_paths {
-			let boot = rel_path(path, &["boot.lua"]);
+			let boot = rel_path(&path, &["boot.lua"]);
 			found_boot |= boot.is_file();
 
-			let worker_ui_init = rel_path(path, &["worker_ui", "init.lua"]);
-			let worker_ui_json = rel_path(path, &["worker_ui", "plugin.json"]);
+			let worker_ui_init = rel_path(&path, &["worker_ui", "init.lua"]);
+			let worker_ui_json = rel_path(&path, &["worker_ui", "plugin.json"]);
 			found_worker_ui |= worker_ui_init.is_file() && worker_ui_json.is_file();
 		}
 
@@ -154,6 +168,7 @@ fn preflight_checks(mame_executable_path: Option<&str>, plugins_paths: &[impl As
 		problems.push(PreflightProblem::NoPluginsPaths);
 	}
 
+	event!(LOG, "preflight_checks(): problems={problems:?}");
 	problems
 }
 
@@ -163,4 +178,68 @@ fn rel_path(path: &Path, children: &[impl AsRef<Path>]) -> PathBuf {
 		path.push(child);
 	}
 	path
+}
+
+fn get_full_path(paths: &[impl AsRef<str>], lookup_var: impl Fn(&str) -> Option<String>) -> String {
+	paths
+		.iter()
+		.flat_map(|path| {
+			let path = path.as_ref();
+			if let Some((var_name, rest)) = get_var_name(path) {
+				let var_value = lookup_var(var_name);
+				let result = var_value.map(|x| format!("{x}{rest}"));
+				event!(LOG, "get_full_path(): path={path:?} result={result:?}");
+				result.map(Cow::Owned)
+			} else {
+				Some(Cow::Borrowed(path))
+			}
+		})
+		.join(";")
+}
+
+fn get_var_name(s: &str) -> Option<(&str, &str)> {
+	let s = s.strip_prefix("$(")?;
+	let idx = s.find(')')?;
+	let var_name = &s[0..idx];
+	let rest = &s[(idx + 1)..];
+	Some((var_name, rest))
+}
+
+fn env_lookup(var_name: &str, mame_executable_path: Option<&str>) -> Option<String> {
+	let file_path = match var_name {
+		"MAMEPATH" => mame_executable_path.map(|x| Path::new(x).to_path_buf()),
+		"BLETCHMAMEPATH" => current_exe().ok(),
+		_ => None,
+	}?;
+	file_path.parent().and_then(|x| x.to_str()).map(|x| x.to_string())
+}
+
+#[cfg(test)]
+mod test {
+	use test_case::test_case;
+
+	#[test_case(0, &["/foo"], "/foo")]
+	#[test_case(1, &["/foo", "/bar"], "/foo;/bar")]
+	#[test_case(2, &["/foo", "/bar", "/baz"], "/foo;/bar;/baz")]
+	#[test_case(3, &["$(FOO)", "/bar", "/baz"], "/path/foo;/bar;/baz")]
+	#[test_case(4, &["/foo", "$(BAR)", "/baz"], "/foo;/path/bar;/baz")]
+	#[test_case(5, &["/foo", "$(INVALID)", "/baz"], "/foo;/baz")]
+	#[test_case(6, &["$(FOO)/bar", "/baz"], "/path/foo/bar;/baz")]
+	pub fn get_full_path(_index: usize, paths: &[&str], expected: &str) {
+		let actual = super::get_full_path(paths, |var| match var {
+			"FOO" => Some("/path/foo".into()),
+			"BAR" => Some("/path/bar".into()),
+			_ => None,
+		});
+		assert_eq!(expected, actual);
+	}
+
+	#[test_case(0, "", None)]
+	#[test_case(1, "foo", None)]
+	#[test_case(2, "foo/bar", None)]
+	#[test_case(3, "$(FOO)/bar", Some(("FOO", "/bar")))]
+	pub fn get_var_name(_index: usize, s: &str, expected: Option<(&str, &str)>) {
+		let actual = super::get_var_name(s);
+		assert_eq!(expected, actual)
+	}
 }
