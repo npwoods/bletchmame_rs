@@ -3,6 +3,7 @@ use std::cell::RefCell;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::BufWriter;
+use std::io::Read;
 use std::io::Write;
 use std::process::Command;
 use std::process::Stdio;
@@ -185,14 +186,14 @@ fn internal_thread_proc(
 
 	// set up what we need to interact with MAME as a child process
 	let mut mame_stdin = BufWriter::new(child.stdin.take().unwrap());
-	let _mame_stderr = child.stderr.take().unwrap();
+	let mut mame_stderr = BufReader::new(child.stderr.take().unwrap());
 	let mut mame_stdout = BufReader::new(child.stdout.take().unwrap());
 	let mut line = String::new();
 	let mut is_exiting = false;
 
 	loop {
 		event!(LOG, "thread_proc(): calling read_line_from_mame()");
-		let (update, is_cruft) = match read_response_from_mame(&mut mame_stdout, &mut line) {
+		let (update, is_cruft) = match read_response_from_mame(&mut mame_stdout, &mut mame_stderr, &mut line) {
 			Ok((update, is_cruft)) => (update, is_cruft),
 			Err(e) => break Err(e),
 		};
@@ -213,7 +214,11 @@ fn internal_thread_proc(
 	}
 }
 
-fn read_response_from_mame(mame_stdout: &mut impl BufRead, line: &mut String) -> Result<(Option<Update>, bool)> {
+fn read_response_from_mame(
+	mame_stdout: &mut impl BufRead,
+	mame_stderr: &mut impl BufRead,
+	line: &mut String,
+) -> Result<(Option<Update>, bool)> {
 	#[derive(Debug, Clone, Copy, PartialEq)]
 	enum ResponseLine {
 		Ok,
@@ -221,7 +226,7 @@ fn read_response_from_mame(mame_stdout: &mut impl BufRead, line: &mut String) ->
 		Cruft,
 	}
 
-	let (resp, comment) = match read_line_from_mame(mame_stdout, line) {
+	let (resp, comment) = match read_line_from_mame(mame_stdout, mame_stderr, line) {
 		Ok(()) => {
 			if let Some(status_line) = line.strip_prefix("@") {
 				let (msg, comment) = if let Some((msg, comment)) = status_line.split_once("###") {
@@ -254,7 +259,7 @@ fn read_response_from_mame(mame_stdout: &mut impl BufRead, line: &mut String) ->
 		event!(LOG, "thread_proc(): parsed update: {:?}", update.as_ref().map(|_| ()));
 
 		// read until end of line
-		let result = read_line_from_mame(mame_stdout, line);
+		let result = read_line_from_mame(mame_stdout, mame_stderr, line);
 		event!(
 			LOG,
 			"thread_proc(): poststatus eoln: line={:?} result={:?}",
@@ -274,13 +279,28 @@ fn read_response_from_mame(mame_stdout: &mut impl BufRead, line: &mut String) ->
 	Ok((update, resp == ResponseLine::Cruft))
 }
 
-fn read_line_from_mame(mame_stdout: &mut impl BufRead, line: &mut String) -> Result<()> {
+fn read_line_from_mame(
+	mame_stdout: &mut impl BufRead,
+	mame_stderr: &mut impl BufRead,
+	line: &mut String,
+) -> Result<()> {
 	line.clear();
 	match mame_stdout.read_line(line) {
-		Ok(0) => Err(Error::EofFromMame.into()),
+		Ok(0) => {
+			let mame_stderr_text = read_text_from_reader(mame_stderr);
+			Err(Error::EofFromMame(mame_stderr_text).into())
+		}
 		Ok(_) => Ok(()),
 		Err(e) => Err(Error::ReadingFromMame(Box::new(e)).into()),
 	}
+}
+
+fn read_text_from_reader(read: &mut impl Read) -> String {
+	let mut buf = Vec::new();
+	if read.read_to_end(&mut buf).is_err() {
+		buf.clear();
+	}
+	String::from_utf8(buf).unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).to_string())
 }
 
 fn process_event_from_front_end(comm: &SessionCommunication, mame_stdin: &mut BufWriter<impl Write>) -> Result<bool> {
