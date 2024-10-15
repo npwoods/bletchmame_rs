@@ -1,6 +1,12 @@
 use std::borrow::Cow;
+use std::ffi::OsStr;
 use std::fs::metadata;
+use std::path::Path;
+use std::path::PathBuf;
 
+use is_executable::IsExecutable;
+
+use crate::error::PreflightProblem;
 use crate::prefs::PrefsPaths;
 use crate::runtime::MameWindowing;
 use crate::Error;
@@ -9,7 +15,7 @@ use crate::Result;
 #[derive(Clone, Copy, Debug)]
 pub struct MameArgumentsSource<'a> {
 	pub windowing: &'a MameWindowing,
-	pub mame_executable_path: &'a str,
+	pub mame_executable_path: Option<&'a str>,
 	pub roms_paths: &'a [String],
 	pub samples_paths: &'a [String],
 	pub plugins_paths: &'a [String],
@@ -17,9 +23,7 @@ pub struct MameArgumentsSource<'a> {
 
 impl<'a> MameArgumentsSource<'a> {
 	pub fn from_prefs(prefs_paths: &'a PrefsPaths, windowing: &'a MameWindowing) -> Result<Self> {
-		let Some(mame_executable_path) = prefs_paths.mame_executable.as_ref() else {
-			return Err(Error::NoMamePathSpecified.into());
-		};
+		let mame_executable_path = prefs_paths.mame_executable.as_deref();
 		let roms_paths = prefs_paths.roms.as_slice();
 		let samples_paths = prefs_paths.samples.as_slice();
 		let plugins_paths = prefs_paths.plugins.as_slice();
@@ -34,12 +38,12 @@ impl<'a> MameArgumentsSource<'a> {
 	}
 
 	pub fn preflight(&self) -> Result<()> {
-		let mame_metadata = metadata(self.mame_executable_path).map_err(|e| Error::CannotFindMame(Box::new(e)))?;
-		if !mame_metadata.is_file() {
-			return Err(Error::MameIsNotAFile.into());
+		let results = preflight_checks(self.mame_executable_path, self.plugins_paths);
+		if results.is_empty() {
+			Ok(())
+		} else {
+			Err(Error::MamePreflightProblems(results).into())
 		}
-
-		Ok(())
 	}
 }
 
@@ -85,7 +89,7 @@ impl From<MameArgumentsSource<'_>> for MameArguments {
 			.map(Cow::Borrowed);
 
 		// assemble all arguments
-		let program = value.mame_executable_path.to_string();
+		let program = value.mame_executable_path.unwrap().to_string();
 		let args = ["-plugin", "worker_ui", "-skip_gameinfo", "-nomouse", "-debug"]
 			.into_iter()
 			.map(Cow::Borrowed)
@@ -99,4 +103,60 @@ impl From<MameArgumentsSource<'_>> for MameArguments {
 			.collect::<Vec<_>>();
 		Self { program, args }
 	}
+}
+
+fn preflight_checks(mame_executable_path: Option<&str>, plugins_paths: &[impl AsRef<OsStr>]) -> Vec<PreflightProblem> {
+	let mut problems = Vec::new();
+
+	// MAME executable preflights
+	if let Some(mame_executable_path) = mame_executable_path {
+		let mame_executable_path = Path::new(mame_executable_path);
+		let metadata = metadata(mame_executable_path);
+		if metadata.is_err() {
+			problems.push(PreflightProblem::NoMameExecutable);
+		} else if metadata.is_ok_and(|x| !x.is_file()) || !mame_executable_path.is_executable() {
+			problems.push(PreflightProblem::MameExecutableIsNotExecutable);
+		}
+	} else {
+		problems.push(PreflightProblem::NoMameExecutablePath)
+	}
+
+	// plugins preflights
+	let plugins_paths = plugins_paths
+		.iter()
+		.map(Path::new)
+		.filter(|path| metadata(path).is_ok_and(|m| m.is_dir()))
+		.collect::<Vec<_>>();
+	if !plugins_paths.is_empty() {
+		let mut found_boot = false;
+		let mut found_worker_ui = false;
+		for path in plugins_paths {
+			let boot = rel_path(path, &["boot.lua"]);
+			found_boot |= boot.is_file();
+
+			let worker_ui_init = rel_path(path, &["worker_ui", "init.lua"]);
+			let worker_ui_json = rel_path(path, &["worker_ui", "plugin.json"]);
+			found_worker_ui |= worker_ui_init.is_file() && worker_ui_json.is_file();
+		}
+
+		if !found_boot {
+			problems.push(PreflightProblem::PluginsBootNotFound);
+		}
+
+		if !found_worker_ui {
+			problems.push(PreflightProblem::WorkerUiPluginNotFound);
+		}
+	} else {
+		problems.push(PreflightProblem::NoPluginsPaths);
+	}
+
+	problems
+}
+
+fn rel_path(path: &Path, children: &[impl AsRef<Path>]) -> PathBuf {
+	let mut path = path.to_path_buf();
+	for child in children {
+		path.push(child);
+	}
+	path
 }

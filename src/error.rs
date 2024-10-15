@@ -22,6 +22,8 @@ pub enum Error {
 	SoftwareListLoadNoPaths,
 	#[error("Error parsing software list XML at position {0}: {1}")]
 	SoftwareListXmlParsing(u64, BoxDynError),
+	#[error("Problems found during MAME preflight: {0:?}")]
+	MamePreflightProblems(Vec<PreflightProblem>),
 
 	// InfoDB corruption
 	#[error("Cannot deserialize InfoDB header")]
@@ -58,4 +60,20 @@ pub enum Error {
 	MameResponseNotUnderstood(String),
 	#[error("Error parsing status XML at position {0}: {1}")]
 	StatusXmlProcessing(u64, BoxDynError),
+}
+
+#[derive(Copy, Clone, Debug, strum_macros::Display)]
+pub enum PreflightProblem {
+	#[strum(to_string = "No MAME executable path specified")]
+	NoMameExecutablePath,
+	#[strum(to_string = "No MAME executable found")]
+	NoMameExecutable,
+	#[strum(to_string = "MAME executable file is not executable")]
+	MameExecutableIsNotExecutable,
+	#[strum(to_string = "No valid plugins paths specified")]
+	NoPluginsPaths,
+	#[strum(to_string = "MAME boot.lua not found")]
+	PluginsBootNotFound,
+	#[strum(to_string = "BletchMAME worker_ui plugin not found")]
+	WorkerUiPluginNotFound,
 }
