@@ -62,6 +62,9 @@ pub struct PrefsPaths {
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub software_lists: Vec<String>,
+
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub cfg: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq)]
@@ -219,6 +222,9 @@ impl Preferences {
 	pub fn fresh(prefs_path: Option<PathBuf>) -> Self {
 		let json = include_str!("prefs_fresh.json");
 		let mut result = load_prefs_from_reader(json.as_bytes()).unwrap();
+		Rc::get_mut(&mut result.paths).unwrap().cfg = prefs_path
+			.as_ref()
+			.and_then(|x| x.clone().into_os_string().into_string().ok());
 		result.prefs_path = prefs_path;
 		result
 	}

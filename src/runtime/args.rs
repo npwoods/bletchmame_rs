@@ -19,6 +19,7 @@ pub struct MameArgumentsSource<'a> {
 	pub roms_paths: &'a [String],
 	pub samples_paths: &'a [String],
 	pub plugins_paths: &'a [String],
+	pub cfg_path: &'a [String],
 }
 
 impl<'a> MameArgumentsSource<'a> {
@@ -27,12 +28,14 @@ impl<'a> MameArgumentsSource<'a> {
 		let roms_paths = prefs_paths.roms.as_slice();
 		let samples_paths = prefs_paths.samples.as_slice();
 		let plugins_paths = prefs_paths.plugins.as_slice();
+		let cfg_path = prefs_paths.cfg.as_slice();
 		let result = Self {
 			windowing,
 			roms_paths,
 			mame_executable_path,
 			samples_paths,
 			plugins_paths,
+			cfg_path,
 		};
 		Ok(result)
 	}
@@ -60,6 +63,7 @@ impl From<MameArgumentsSource<'_>> for MameArguments {
 			("-rompath", value.roms_paths),
 			("-samplepath", value.samples_paths),
 			("-pluginspath", value.plugins_paths),
+			("-cfg_directory", value.cfg_path),
 		]
 		.into_iter()
 		.filter(|(_, paths)| !paths.is_empty())

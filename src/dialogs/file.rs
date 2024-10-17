@@ -26,12 +26,14 @@ pub enum PathType {
 	SoftwareLists,
 	#[strum(to_string = "Plugins")]
 	Plugins,
+	#[strum(to_string = "MAME Configs")]
+	Cfg,
 }
 
 impl PathType {
 	pub fn is_multi(&self) -> bool {
 		match self {
-			Self::MameExecutable => false,
+			Self::MameExecutable | Self::Cfg => false,
 			Self::Roms | Self::Samples | Self::SoftwareLists | Self::Plugins => true,
 		}
 	}
@@ -42,7 +44,7 @@ impl PathType {
 				name: "MAME Executable",
 				extension: EXE_EXTENSION,
 			},
-			Self::Roms | Self::Samples | Self::SoftwareLists | Self::Plugins => PickType::Dir,
+			Self::Roms | Self::Samples | Self::SoftwareLists | Self::Plugins | Self::Cfg => PickType::Dir,
 		}
 	}
 
@@ -67,6 +69,7 @@ impl PathType {
 			PathType::Samples => SingleOrMultiple::Multiple(&prefs_paths.samples),
 			PathType::SoftwareLists => SingleOrMultiple::Multiple(&prefs_paths.software_lists),
 			PathType::Plugins => SingleOrMultiple::Multiple(&prefs_paths.plugins),
+			PathType::Cfg => SingleOrMultiple::Single(&prefs_paths.cfg),
 		};
 
 		match target {
@@ -91,6 +94,7 @@ impl PathType {
 			PathType::Samples => SingleOrMultiple::Multiple(&mut prefs_paths.samples),
 			PathType::SoftwareLists => SingleOrMultiple::Multiple(&mut prefs_paths.software_lists),
 			PathType::Plugins => SingleOrMultiple::Multiple(&mut prefs_paths.plugins),
+			PathType::Cfg => SingleOrMultiple::Single(&mut prefs_paths.cfg),
 		};
 
 		match target {
