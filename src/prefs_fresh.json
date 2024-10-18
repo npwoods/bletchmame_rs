@@ -1,4 +1,10 @@
 {
+  "paths": {
+    "plugins": [
+      "$(BLETCHMAMEPATH)\\plugins",
+      "$(MAMEPATH)\\plugins"
+    ]
+  },
   "itemsColumns": [
     {
       "type": "name",
