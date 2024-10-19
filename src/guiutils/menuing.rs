@@ -45,8 +45,12 @@ pub fn accel(text: &str) -> Option<Accelerator> {
 	let key = match text {
 		"X" => Code::KeyX,
 		"F7" => Code::F7,
+		"F8" => Code::F8,
+		"F9" => Code::F9,
+		"F10" => Code::F10,
+		"F11" => Code::F11,
 		"Pause" => Code::Pause,
-		_ => panic!("Unknown accelerator"),
+		x => panic!("Unknown accelerator {x}"),
 	};
 	Some(Accelerator::new(mods, key))
 }

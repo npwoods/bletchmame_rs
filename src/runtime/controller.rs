@@ -43,7 +43,7 @@ struct SessionCommunication {
 	mame_pid: AtomicU64,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq)]
 pub enum MameCommand<'a> {
 	Exit,
 	Start {
@@ -54,6 +54,8 @@ pub enum MameCommand<'a> {
 	Pause,
 	Resume,
 	Ping,
+	Throttled(bool),
+	ThrottleRate(f32),
 }
 
 #[derive(Debug)]
@@ -331,5 +333,15 @@ fn command_text(command: &MameCommand<'_>) -> Cow<'static, str> {
 		MameCommand::Pause => "PAUSE".into(),
 		MameCommand::Resume => "RESUME".into(),
 		MameCommand::Ping => "PING".into(),
+		MameCommand::Throttled(throttled) => format!("THROTTLED {}", bool_str(*throttled)).into(),
+		MameCommand::ThrottleRate(throttle) => format!("THROTTLE_RATE {}", throttle).into(),
+	}
+}
+
+fn bool_str(b: bool) -> &'static str {
+	if b {
+		"true"
+	} else {
+		"false"
 	}
 }
