@@ -17,18 +17,18 @@ use crate::Result;
 
 const LOG: Level = Level::DEBUG;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct MameArgumentsSource<'a> {
-	pub windowing: &'a MameWindowing,
-	pub mame_executable_path: Option<&'a str>,
-	pub roms_paths: &'a [String],
-	pub samples_paths: &'a [String],
-	pub plugins_paths: &'a [String],
-	pub cfg_path: &'a [String],
+	windowing: &'a MameWindowing,
+	mame_executable_path: Option<&'a str>,
+	roms_paths: &'a [String],
+	samples_paths: &'a [String],
+	plugins_paths: &'a [String],
+	cfg_path: &'a [String],
 }
 
 impl<'a> MameArgumentsSource<'a> {
-	pub fn from_prefs(prefs_paths: &'a PrefsPaths, windowing: &'a MameWindowing) -> Result<Self> {
+	pub fn new(prefs_paths: &'a PrefsPaths, windowing: &'a MameWindowing) -> Result<Self> {
 		let mame_executable_path = prefs_paths.mame_executable.as_deref();
 		let roms_paths = prefs_paths.roms.as_slice();
 		let samples_paths = prefs_paths.samples.as_slice();
@@ -46,7 +46,7 @@ impl<'a> MameArgumentsSource<'a> {
 	}
 
 	pub fn preflight(&self) -> Result<()> {
-		let results = preflight_checks(self.mame_executable_path, self.plugins_paths);
+		let results = preflight_checks(self.mame_executable_path, self.plugins_paths, current_exe_lookup);
 		if results.is_empty() {
 			Ok(())
 		} else {
@@ -63,58 +63,19 @@ pub struct MameArguments {
 
 impl From<MameArgumentsSource<'_>> for MameArguments {
 	fn from(value: MameArgumentsSource<'_>) -> Self {
-		// convert all path vec's to the appropriate MAME arguments
-		let paths = [
-			("-rompath", value.roms_paths),
-			("-samplepath", value.samples_paths),
-			("-pluginspath", value.plugins_paths),
-			("-cfg_directory", value.cfg_path),
-		]
-		.into_iter()
-		.filter(|(_, paths)| !paths.is_empty())
-		.map(|(arg, paths)| {
-			let paths_str = get_full_path(paths, |var_name| env_lookup(var_name, value.mame_executable_path));
-			(arg, paths_str)
-		})
-		.collect::<Vec<_>>();
-
-		// figure out windowing
-		let windowing_args = match value.windowing {
-			MameWindowing::Attached(window) => vec!["-attach_window".into(), Cow::Owned(window.to_string())],
-			MameWindowing::Windowed => vec!["-w".into(), "-nomax".into()],
-			MameWindowing::WindowedMaximized => vec!["-w".into(), "-max".into()],
-			MameWindowing::Fullscreen => vec!["-now".into()],
-		};
-
-		// platform specific arguments
-		let keyboard_provider = cfg!(windows).then_some("dinput");
-		let mouse_provider = cfg!(windows).then_some("dinput");
-		let lightgun_provider = cfg!(windows).then_some("dinput");
-		let platform_args = keyboard_provider
-			.iter()
-			.flat_map(|x| ["-keyboardprovider", x])
-			.chain(mouse_provider.iter().flat_map(|x| ["-mouseprovider", x]))
-			.chain(lightgun_provider.iter().flat_map(|x| ["-lightgunprovider", x]))
-			.map(Cow::Borrowed);
-
-		// assemble all arguments
-		let program = value.mame_executable_path.unwrap().to_string();
-		let args = ["-plugin", "worker_ui", "-skip_gameinfo", "-nomouse", "-debug"]
-			.into_iter()
-			.map(Cow::Borrowed)
-			.chain(windowing_args)
-			.chain(platform_args)
-			.chain(
-				paths
-					.into_iter()
-					.flat_map(|(arg, path)| [Cow::Borrowed(arg), Cow::Owned(path)]),
-			)
-			.collect::<Vec<_>>();
-		Self { program, args }
+		mame_args_from_source(value, current_exe_lookup)
 	}
 }
 
-fn preflight_checks(mame_executable_path: Option<&str>, plugins_paths: &[impl AsRef<str>]) -> Vec<PreflightProblem> {
+fn current_exe_lookup() -> Option<PathBuf> {
+	current_exe().ok()
+}
+
+fn preflight_checks(
+	mame_executable_path: Option<&str>,
+	plugins_paths: &[impl AsRef<str>],
+	current_exe_lookup: impl Fn() -> Option<PathBuf>,
+) -> Vec<PreflightProblem> {
 	let mut problems = Vec::new();
 
 	// MAME executable preflights
@@ -136,7 +97,7 @@ fn preflight_checks(mame_executable_path: Option<&str>, plugins_paths: &[impl As
 		.flat_map(|path| {
 			let path = path.as_ref();
 			if let Some((var_name, rest)) = get_var_name(path) {
-				let var_value = env_lookup(var_name, mame_executable_path);
+				let var_value = env_lookup(var_name, mame_executable_path, &current_exe_lookup);
 				let result = var_value.map(|x| PathBuf::from(format!("{x}{rest}")));
 				result.map(Cow::Owned)
 			} else {
@@ -180,6 +141,64 @@ fn rel_path(path: &Path, children: &[impl AsRef<Path>]) -> PathBuf {
 	path
 }
 
+fn mame_args_from_source(
+	source: MameArgumentsSource<'_>,
+	current_exe_lookup: impl Fn() -> Option<PathBuf>,
+) -> MameArguments {
+	// lambda that looks up variables
+	let mame_executable_path = source.mame_executable_path;
+	let lookup_var = move |var_name: &str| env_lookup(var_name, mame_executable_path, &current_exe_lookup);
+
+	// convert all path vec's to the appropriate MAME arguments
+	let paths = [
+		("-rompath", source.roms_paths),
+		("-samplepath", source.samples_paths),
+		("-pluginspath", source.plugins_paths),
+		("-cfg_directory", source.cfg_path),
+	]
+	.into_iter()
+	.filter(|(_, paths)| !paths.is_empty())
+	.map(|(arg, paths)| {
+		let paths_str = get_full_path(paths, &lookup_var);
+		(arg, paths_str)
+	})
+	.collect::<Vec<_>>();
+
+	// figure out windowing
+	let windowing_args = match source.windowing {
+		MameWindowing::Attached(window) => vec!["-attach_window".into(), Cow::Owned(window.to_string())],
+		MameWindowing::Windowed => vec!["-w".into(), "-nomax".into()],
+		MameWindowing::WindowedMaximized => vec!["-w".into(), "-max".into()],
+		MameWindowing::Fullscreen => vec!["-now".into()],
+	};
+
+	// platform specific arguments
+	let keyboard_provider = cfg!(windows).then_some("dinput");
+	let mouse_provider = cfg!(windows).then_some("dinput");
+	let lightgun_provider = cfg!(windows).then_some("dinput");
+	let platform_args = keyboard_provider
+		.iter()
+		.flat_map(|x| ["-keyboardprovider", x])
+		.chain(mouse_provider.iter().flat_map(|x| ["-mouseprovider", x]))
+		.chain(lightgun_provider.iter().flat_map(|x| ["-lightgunprovider", x]))
+		.map(Cow::Borrowed);
+
+	// assemble all arguments
+	let program = source.mame_executable_path.unwrap().to_string();
+	let args = ["-plugin", "worker_ui", "-skip_gameinfo", "-nomouse", "-debug"]
+		.into_iter()
+		.map(Cow::Borrowed)
+		.chain(windowing_args)
+		.chain(platform_args)
+		.chain(
+			paths
+				.into_iter()
+				.flat_map(|(arg, path)| [Cow::Borrowed(arg), Cow::Owned(path)]),
+		)
+		.collect::<Vec<_>>();
+	MameArguments { program, args }
+}
+
 fn get_full_path(paths: &[impl AsRef<str>], lookup_var: impl Fn(&str) -> Option<String>) -> String {
 	paths
 		.iter()
@@ -205,10 +224,14 @@ fn get_var_name(s: &str) -> Option<(&str, &str)> {
 	Some((var_name, rest))
 }
 
-fn env_lookup(var_name: &str, mame_executable_path: Option<&str>) -> Option<String> {
+fn env_lookup(
+	var_name: &str,
+	mame_executable_path: Option<&str>,
+	current_exe_lookup: impl Fn() -> Option<PathBuf>,
+) -> Option<String> {
 	let file_path = match var_name {
 		"MAMEPATH" => mame_executable_path.map(|x| Path::new(x).to_path_buf()),
-		"BLETCHMAMEPATH" => current_exe().ok(),
+		"BLETCHMAMEPATH" => current_exe_lookup(),
 		_ => None,
 	}?;
 	file_path.parent().and_then(|x| x.to_str()).map(|x| x.to_string())
@@ -217,6 +240,10 @@ fn env_lookup(var_name: &str, mame_executable_path: Option<&str>) -> Option<Stri
 #[cfg(test)]
 mod test {
 	use test_case::test_case;
+
+	use crate::runtime::MameWindowing;
+
+	use super::MameArgumentsSource;
 
 	#[test_case(0, &["/foo"], "/foo")]
 	#[test_case(1, &["/foo", "/bar"], "/foo;/bar")]
@@ -241,5 +268,46 @@ mod test {
 	pub fn get_var_name(_index: usize, s: &str, expected: Option<(&str, &str)>) {
 		let actual = super::get_var_name(s);
 		assert_eq!(expected, actual)
+	}
+
+	#[test]
+	pub fn mame_args_from_source() {
+		let windowing = MameWindowing::Attached("1234".to_string());
+		let source = MameArgumentsSource {
+			windowing: &windowing,
+			mame_executable_path: Some("/mydir/mame/mame.exe"),
+			roms_paths: &["/mydir/mame/roms1".to_string(), "/mydir/mame/roms2".to_string()],
+			samples_paths: &["/mydir/mame/samples1".to_string(), "/mydir/mame/samples2".to_string()],
+			plugins_paths: &[
+				"$(MAMEPATH)/plugins".to_string(),
+				"$(BLETCHMAMEPATH)/plugins".to_string(),
+			],
+			cfg_path: &["/mydir/mame/cfg".to_string()],
+		};
+		let result = super::mame_args_from_source(source, || Some(std::path::PathBuf::from("/bmdir/bletchmame")));
+
+		fn find_arg<'a>(args: &'a [impl AsRef<str>], target: &str) -> Option<&'a str> {
+			args.iter()
+				.position(|x| x.as_ref() == target)
+				.map(|idx| args[idx + 1].as_ref())
+		}
+
+		let actual = (
+			result.program.as_str(),
+			find_arg(&result.args, "-attach_window"),
+			find_arg(&result.args, "-rompath"),
+			find_arg(&result.args, "-samplepath"),
+			find_arg(&result.args, "-pluginspath"),
+			find_arg(&result.args, "-cfg_directory"),
+		);
+		let expected = (
+			"/mydir/mame/mame.exe",
+			Some("1234"),
+			Some("/mydir/mame/roms1;/mydir/mame/roms2"),
+			Some("/mydir/mame/samples1;/mydir/mame/samples2"),
+			Some("/mydir/mame/plugins;/bmdir/plugins"),
+			Some("/mydir/mame/cfg"),
+		);
+		assert_eq!(expected, actual);
 	}
 }
