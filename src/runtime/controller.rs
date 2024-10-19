@@ -95,8 +95,8 @@ impl MameController {
 
 	pub fn reset(&self, prefs_paths: Option<&PrefsPaths>, mame_windowing: &MameWindowing) {
 		// first and foremost, determine if we actually have enough set up to invoke MAME
-		let mame_args = prefs_paths.and_then(|prefs_paths| {
-			MameArgumentsSource::from_prefs(prefs_paths, mame_windowing)
+		let mame_args: Option<_> = prefs_paths.and_then(|prefs_paths| {
+			MameArgumentsSource::new(prefs_paths, mame_windowing)
 				.ok()
 				.and_then(|x| x.preflight().is_ok().then_some(x))
 		});

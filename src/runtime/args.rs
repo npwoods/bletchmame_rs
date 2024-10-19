@@ -28,7 +28,7 @@ pub struct MameArgumentsSource<'a> {
 }
 
 impl<'a> MameArgumentsSource<'a> {
-	pub fn from_prefs(prefs_paths: &'a PrefsPaths, windowing: &'a MameWindowing) -> Result<Self> {
+	pub fn new(prefs_paths: &'a PrefsPaths, windowing: &'a MameWindowing) -> Result<Self> {
 		let mame_executable_path = prefs_paths.mame_executable.as_deref();
 		let roms_paths = prefs_paths.roms.as_slice();
 		let samples_paths = prefs_paths.samples.as_slice();
