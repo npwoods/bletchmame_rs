@@ -25,7 +25,7 @@ use crate::status::Update;
 use crate::Error;
 use crate::Result;
 
-const LOG: Level = Level::TRACE;
+const LOG: Level = Level::DEBUG;
 
 pub struct MameController {
 	session: RefCell<Option<Session>>,
