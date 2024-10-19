@@ -213,71 +213,11 @@ impl AppModel {
 pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 	let app_window = AppWindow::new().unwrap();
 
-	let toggle_builtin_menu_items = BuiltinCollection::all_values()
-		.iter()
-		.map(|x| {
-			let id = AppCommand::SettingsToggleBuiltinCollection(*x);
-			MenuItem::with_id(id, format!("{}", x), true, None)
-		})
-		.collect::<Vec<_>>();
-	let toggle_builtin_menu_items = toggle_builtin_menu_items
-		.iter()
-		.map(|x| x as &dyn IsMenuItem)
-		.collect::<Vec<_>>();
-
 	// child window for MAME to attach to
 	let child_window = ChildWindow::new(app_window.window());
 
-	// menu bar
-	#[rustfmt::skip]
-	let menu_bar = Menu::with_items(&[
-		&Submenu::with_items(
-			"File",
-			true,
-			&[
-				&MenuItem::with_id(AppCommand::FileStop, "Stop", false, None),
-				&CheckMenuItem::with_id(AppCommand::FilePause, "Pause", false, false,accel("Pause")),
-				&PredefinedMenuItem::separator(),
-				&MenuItem::new("Devices and Images...", false, None),
-				&PredefinedMenuItem::separator(),
-				&MenuItem::new("Quick Load State", false, accel("F7")),
-				&MenuItem::new("Quick Save State", false, accel("Shift+F7")),
-				&MenuItem::new("Load State...", false, accel("Ctrl+F7")),
-				&MenuItem::new("Save State...", false, accel("Ctrl+Shift+F7")),
-				&PredefinedMenuItem::separator(),
-				&MenuItem::new("Debugger...", false, None),
-				&Submenu::with_items(
-					"Reset",
-					false,
-					&[
-						&MenuItem::new("Soft Reset", false, None),
-						&MenuItem::new("Hard Reset", false, None),
-					],
-				)
-				.unwrap(),
-				&MenuItem::with_id(AppCommand::FileExit, "Exit", true, accel("Ctrl+Alt+X"))
-			],
-		)
-		.unwrap(),
-		&Submenu::with_items("Settings", true, &[
-			&MenuItem::with_id(AppCommand::SettingsPaths, "Paths...", true, None),
-			&Submenu::with_items("Builtin Collections", true, &toggle_builtin_menu_items).unwrap(),
-			&MenuItem::with_id(AppCommand::SettingsReset, "Reset Settings To Default", true, None)
-		]).unwrap(),
-		&Submenu::with_items(
-			"Help",
-			true,
-			&[
-				&MenuItem::with_id(AppCommand::HelpRefreshInfoDb, "Refresh MAME machine info...", false, None),
-				&MenuItem::with_id(AppCommand::HelpWebSite, "BlechMAME web site...", true, None),
-				&MenuItem::with_id(AppCommand::HelpAbout, "About...", true, None),
-			],
-		)
-		.unwrap(),
-	])
-	.unwrap();
-
-	// associate the Menu Bar with our window (looking forward to Slint having first class menuing support)
+	// create the menu bar and associate it with our window (looking forward to Slint having first class menuing support)
+	let menu_bar = create_menu_bar();
 	setup_window_menu_bar(app_window.window(), &menu_bar);
 
 	// get preferences
@@ -490,6 +430,130 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 	// initial update of the model; kick off the process of loading InfoDB and return
 	update(&model);
 	app_window
+}
+
+fn create_menu_bar() -> Menu {
+	fn to_menu_item_ref_vec(items: &[impl IsMenuItem]) -> Vec<&dyn IsMenuItem> {
+		items.iter().map(|x| x as &dyn IsMenuItem).collect::<Vec<_>>()
+	}
+
+	let toggle_builtin_menu_items = BuiltinCollection::all_values()
+		.iter()
+		.map(|x| {
+			let id = AppCommand::SettingsToggleBuiltinCollection(*x);
+			MenuItem::with_id(id, format!("{}", x), true, None)
+		})
+		.collect::<Vec<_>>();
+	let toggle_builtin_menu_items = to_menu_item_ref_vec(&toggle_builtin_menu_items);
+
+	#[rustfmt::skip]
+	let menu_bar = Menu::with_items(&[
+		&Submenu::with_items(
+			"File",
+			true,
+			&[
+				&MenuItem::with_id(AppCommand::FileStop, "Stop", false, None),
+				&CheckMenuItem::with_id(AppCommand::FilePause, "Pause", false, false, accel("Pause")),
+				&PredefinedMenuItem::separator(),
+				&MenuItem::new("Devices and Images...", false, None),
+				&PredefinedMenuItem::separator(),
+				&MenuItem::new("Quick Load State", false, accel("F7")),
+				&MenuItem::new("Quick Save State", false, accel("Shift+F7")),
+				&MenuItem::new("Load State...", false, accel("Ctrl+F7")),
+				&MenuItem::new("Save State...", false, accel("Ctrl+Shift+F7")),
+				&PredefinedMenuItem::separator(),
+				&MenuItem::new("Debugger...", false, None),
+				&Submenu::with_items(
+					"Reset",
+					false,
+					&[
+						&MenuItem::new("Soft Reset", false, None),
+						&MenuItem::new("Hard Reset", false, None),
+					],
+				)
+				.unwrap(),
+				&MenuItem::with_id(AppCommand::FileExit, "Exit", true, accel("Ctrl+Alt+X")),
+			],
+		)
+		.unwrap(),
+		&Submenu::with_items(
+			"Options",
+			true,
+			&[
+				&Submenu::with_items(
+					"Throttle",
+					false,
+					&[
+						&MenuItem::new("1000%", false, None),
+						&MenuItem::new("500%", false, None),
+						&MenuItem::new("200%", false, None),
+						&MenuItem::new("100%", false, None),
+						&MenuItem::new("50%", false, None),
+						&MenuItem::new("20%", false, None),
+						&MenuItem::new("10%", false, None),
+						&PredefinedMenuItem::separator(),
+						&MenuItem::new("Increase Speed", false, accel("F9")),
+						&MenuItem::new("Decrease Speed", false, accel("F8")),
+						&MenuItem::new("Warp mode", false, accel("F10")),
+					],
+				)
+				.unwrap(),
+				&Submenu::with_items(
+					"Frame Skip",
+					false,
+					&[
+						&MenuItem::new("Auto", false, None),
+						&MenuItem::new("0", false, None),
+						&MenuItem::new("1", false, None),
+						&MenuItem::new("2", false, None),
+						&MenuItem::new("3", false, None),
+						&MenuItem::new("4", false, None),
+						&MenuItem::new("5", false, None),
+						&MenuItem::new("6", false, None),
+						&MenuItem::new("7", false, None),
+						&MenuItem::new("8", false, None),
+						&MenuItem::new("9", false, None),
+						&MenuItem::new("10", false, None),
+					],
+				)
+				.unwrap(),
+				&MenuItem::new("Full Screen", false, accel("F11")),
+				&MenuItem::new("Sound", false, None),
+				&MenuItem::new("Cheats...", false, None),
+			],
+		)
+		.unwrap(),
+		&Submenu::with_items(
+			"Settings",
+			true,
+			&[
+				&MenuItem::new("Joysticks and Controllers...", false, None),
+				&MenuItem::new("Keyboard...", false, None),
+				&MenuItem::new("Miscellaneous Input...", false, None),
+				&MenuItem::new("Configuration...", false, None),
+				&MenuItem::new("DIP Switches...", false, None),
+				&PredefinedMenuItem::separator(),
+				&MenuItem::with_id(AppCommand::SettingsPaths, "Paths...", true, None),
+				&Submenu::with_items("Builtin Collections", true, &toggle_builtin_menu_items).unwrap(),
+				&MenuItem::with_id(AppCommand::SettingsReset, "Reset Settings To Default", true, None),
+				&MenuItem::new("Import MAME INI...", false, None),
+			],
+		)
+		.unwrap(),
+		&Submenu::with_items(
+			"Help",
+			true,
+			&[
+				&MenuItem::with_id(AppCommand::HelpRefreshInfoDb, "Refresh MAME machine info...", false, None),
+				&MenuItem::with_id(AppCommand::HelpWebSite, "BlechMAME web site...", true, None),
+				&MenuItem::with_id(AppCommand::HelpAbout, "About...", true, None),
+			],
+		)
+		.unwrap(),
+	])
+	.unwrap();
+
+	menu_bar
 }
 
 fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
