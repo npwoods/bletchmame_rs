@@ -19,6 +19,7 @@ enum Phase {
 	#[default]
 	Root,
 	Status,
+	StatusVideo,
 }
 
 #[derive(Debug, Default)]
@@ -45,6 +46,21 @@ impl State {
 				self.running.is_paused = is_paused;
 				Some(Phase::Status)
 			}
+			(Phase::Status, b"video") => {
+				let [throttled, throttle_rate] = evt.find_attributes([b"throttled", b"throttle_rate"])?;
+				let throttled = throttled.and_then(|x| parse_bool(x.as_ref()));
+				let throttle_rate = throttle_rate.and_then(|x| x.parse::<f32>().ok());
+				event!(
+					LOG,
+					"status State::handle_start(): throttled={:?} throttle_rate={:?}",
+					throttled,
+					throttle_rate
+				);
+
+				self.running.is_throttled = throttled.or(self.running.is_throttled);
+				self.running.throttle_rate = throttle_rate.or(self.running.throttle_rate);
+				Some(Phase::StatusVideo)
+			}
 			_ => None,
 		};
 		Ok(new_phase)
@@ -54,6 +70,7 @@ impl State {
 		let new_phase = match self.phase {
 			Phase::Root => panic!(),
 			Phase::Status => Phase::Root,
+			Phase::StatusVideo => Phase::Status,
 		};
 		Ok(new_phase)
 	}
@@ -116,5 +133,16 @@ mod test {
 		let reader = BufReader::new(xml.as_bytes());
 		let result = parse_update(reader);
 		assert_matches!(result, Ok(_));
+	}
+
+	#[test_case(0, include_str!("test_data/status_mame0226_coco2b_1.xml"), Some(true), Some(1.0))]
+	#[test_case(1, include_str!("test_data/status_mame0227_coco2b_1.xml"), Some(true), Some(1.0))]
+	fn throttling(_index: usize, xml: &str, expected_is_throttled: Option<bool>, expected_throttle_rate: Option<f32>) {
+		let expected = (expected_is_throttled, expected_throttle_rate);
+
+		let reader = BufReader::new(xml.as_bytes());
+		let running = parse_update(reader).unwrap().running.unwrap();
+		let actual = (running.is_throttled, running.throttle_rate);
+		assert_eq!(expected, actual);
 	}
 }

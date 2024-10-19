@@ -12,12 +12,16 @@ use crate::prefs::PrefsItem;
 use crate::prefs::SortOrder;
 use crate::status::Update;
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum AppCommand {
 	// File menu
 	FileStop,
 	FilePause,
 	FileExit,
+
+	// Options menu
+	OptionsThrottleRate(f32),
+	OptionsToggleWarp,
 
 	// Settings menu
 	SettingsPaths,

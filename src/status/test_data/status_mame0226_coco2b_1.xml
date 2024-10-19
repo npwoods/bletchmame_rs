@@ -1,4 +1,5 @@
 <status
+	romname="coco2b"
 	phase="running"
 	polling_input_seq="false"
 	natural_keyboard_in_use="false"

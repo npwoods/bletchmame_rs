@@ -482,19 +482,19 @@ fn create_menu_bar() -> Menu {
 			&[
 				&Submenu::with_items(
 					"Throttle",
-					false,
+					true,
 					&[
-						&MenuItem::new("1000%", false, None),
-						&MenuItem::new("500%", false, None),
-						&MenuItem::new("200%", false, None),
-						&MenuItem::new("100%", false, None),
-						&MenuItem::new("50%", false, None),
-						&MenuItem::new("20%", false, None),
-						&MenuItem::new("10%", false, None),
+						&CheckMenuItem::with_id(AppCommand::OptionsThrottleRate(10.0), "1000%", false, false, None),
+						&CheckMenuItem::with_id(AppCommand::OptionsThrottleRate(5.0), "500%", false, false, None),
+						&CheckMenuItem::with_id(AppCommand::OptionsThrottleRate(2.0), "200%", false, false, None),
+						&CheckMenuItem::with_id(AppCommand::OptionsThrottleRate(1.0), "100%", false, false, None),
+						&CheckMenuItem::with_id(AppCommand::OptionsThrottleRate(0.5), "50%", false, false, None),
+						&CheckMenuItem::with_id(AppCommand::OptionsThrottleRate(0.2), "20%", false, false, None),
+						&CheckMenuItem::with_id(AppCommand::OptionsThrottleRate(0.1), "10%", false, false, None),
 						&PredefinedMenuItem::separator(),
 						&MenuItem::new("Increase Speed", false, accel("F9")),
 						&MenuItem::new("Decrease Speed", false, accel("F8")),
-						&MenuItem::new("Warp mode", false, accel("F10")),
+						&CheckMenuItem::with_id(AppCommand::OptionsToggleWarp, "Warp mode", false, false, accel("F10")),
 					],
 				)
 				.unwrap(),
@@ -583,6 +583,21 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			} else {
 				handle_command(model, AppCommand::Shutdown);
 			}
+		}
+		AppCommand::OptionsThrottleRate(throttle) => {
+			model.mame_controller.issue_command(MameCommand::ThrottleRate(throttle));
+		}
+		AppCommand::OptionsToggleWarp => {
+			let is_throttled = model
+				.running_status
+				.borrow()
+				.running
+				.as_ref()
+				.map(|r| r.is_throttled)
+				.unwrap_or_default();
+			model
+				.mame_controller
+				.issue_command(MameCommand::Throttled(!is_throttled));
 		}
 		AppCommand::SettingsPaths => {
 			let fut = show_paths_dialog(model.clone());
@@ -849,6 +864,12 @@ fn update_menus(model: &AppModel) {
 	let has_mame_executable = model.preferences.borrow().paths.mame_executable.is_some();
 	let is_running = running_status.running.is_some();
 	let is_paused = running_status.running.as_ref().map(|r| r.is_paused).unwrap_or_default();
+	let is_throttled = running_status
+		.running
+		.as_ref()
+		.map(|r| r.is_throttled)
+		.unwrap_or_default();
+	let throttle_rate = running_status.running.as_ref().map(|r| r.throttle_rate);
 
 	// update the menu bar
 	update_menu_items(&model.menu_bar, |id| {
@@ -856,6 +877,8 @@ fn update_menus(model: &AppModel) {
 			Ok(AppCommand::HelpRefreshInfoDb) => (Some(has_mame_executable), None),
 			Ok(AppCommand::FileStop) => (Some(is_running), None),
 			Ok(AppCommand::FilePause) => (Some(is_running), Some(is_paused)),
+			Ok(AppCommand::OptionsThrottleRate(x)) => (Some(is_running), Some(Some(x) == throttle_rate)),
+			Ok(AppCommand::OptionsToggleWarp) => (Some(is_running), Some(!is_throttled)),
 			_ => (None, None),
 		};
 		MenuItemUpdate { enabled, checked }
