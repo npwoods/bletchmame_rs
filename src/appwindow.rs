@@ -70,8 +70,8 @@ use crate::threadlocalbubble::ThreadLocalBubble;
 use crate::ui::AboutDialog;
 use crate::ui::AppWindow;
 
-const LOG_COMMANDS: Level = Level::TRACE;
-const LOG_PREFS: Level = Level::TRACE;
+const LOG_COMMANDS: Level = Level::DEBUG;
+const LOG_PREFS: Level = Level::DEBUG;
 const LOG_PINGING: Level = Level::TRACE;
 
 struct AppModel {
