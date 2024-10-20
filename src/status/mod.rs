@@ -67,3 +67,58 @@ struct UpdateRunning {
 	pub is_throttled: Option<bool>,
 	pub throttle_rate: Option<f32>,
 }
+
+#[cfg(test)]
+mod test {
+	use std::io::BufReader;
+
+	use crate::status::parse::parse_update;
+	use crate::status::Status;
+	use crate::status::Update;
+
+	#[test]
+	fn session() {
+		let xml0 = include_str!("test_data/status_mame0270_1.xml");
+		let xml1 = include_str!("test_data/status_mame0270_coco2b_1.xml");
+		let xml2 = include_str!("test_data/status_mame0270_coco2b_2.xml");
+		let xml3 = include_str!("test_data/status_mame0270_coco2b_3.xml");
+		let xml4 = include_str!("test_data/status_mame0270_coco2b_4.xml");
+
+		fn update(xml: &str) -> Update {
+			let reader = BufReader::new(xml.as_bytes());
+			parse_update(reader).unwrap()
+		}
+
+		// fresh status
+		let mut status = Status::default();
+		assert!(status.running.is_none());
+
+		// status after a non-running update
+		status.merge(update(xml0));
+		assert!(status.running.is_none());
+
+		// status after running
+		status.merge(update(xml1));
+		let run = status.running.as_ref().unwrap();
+		let actual = (run.is_paused, run.is_throttled, run.throttle_rate);
+		assert_eq!((true, true, 1.0), actual);
+
+		// unpaused...
+		status.merge(update(xml2));
+		let run = status.running.as_ref().unwrap();
+		let actual = (run.is_paused, run.is_throttled, run.throttle_rate);
+		assert_eq!((false, true, 1.0), actual);
+
+		// null update
+		status.merge(update(xml3));
+		let run = status.running.as_ref().unwrap();
+		let actual = (run.is_paused, run.is_throttled, run.throttle_rate);
+		assert_eq!((false, true, 1.0), actual);
+
+		// speed it up!
+		status.merge(update(xml4));
+		let run = status.running.as_ref().unwrap();
+		let actual = (run.is_paused, run.is_throttled, run.throttle_rate);
+		assert_eq!((false, false, 3.0), actual);
+	}
+}

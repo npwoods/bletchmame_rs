@@ -129,6 +129,11 @@ mod test {
 
 	#[test_case(0, include_str!("test_data/status_mame0226_coco2b_1.xml"))]
 	#[test_case(1, include_str!("test_data/status_mame0227_coco2b_1.xml"))]
+	#[test_case(2, include_str!("test_data/status_mame0270_1.xml"))]
+	#[test_case(3, include_str!("test_data/status_mame0270_coco2b_1.xml"))]
+	#[test_case(4, include_str!("test_data/status_mame0270_coco2b_2.xml"))]
+	#[test_case(5, include_str!("test_data/status_mame0270_coco2b_3.xml"))]
+	#[test_case(6, include_str!("test_data/status_mame0270_coco2b_4.xml"))]
 	fn general(_index: usize, xml: &str) {
 		let reader = BufReader::new(xml.as_bytes());
 		let result = parse_update(reader);
@@ -137,6 +142,10 @@ mod test {
 
 	#[test_case(0, include_str!("test_data/status_mame0226_coco2b_1.xml"), Some(true), Some(1.0))]
 	#[test_case(1, include_str!("test_data/status_mame0227_coco2b_1.xml"), Some(true), Some(1.0))]
+	#[test_case(2, include_str!("test_data/status_mame0270_coco2b_1.xml"), Some(true), Some(1.0))]
+	#[test_case(3, include_str!("test_data/status_mame0270_coco2b_2.xml"), Some(true), Some(1.0))]
+	#[test_case(4, include_str!("test_data/status_mame0270_coco2b_3.xml"), None, None)]
+	#[test_case(5, include_str!("test_data/status_mame0270_coco2b_4.xml"), Some(false), Some(3.0))]
 	fn throttling(_index: usize, xml: &str, expected_is_throttled: Option<bool>, expected_throttle_rate: Option<f32>) {
 		let expected = (expected_is_throttled, expected_throttle_rate);
 
