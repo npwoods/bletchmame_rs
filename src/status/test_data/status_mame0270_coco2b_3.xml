@@ -1,0 +1,18 @@
+<status
+	app_name="mame"
+	app_version="0.270"
+	gamename="Color Computer 2B"
+	romname="coco2b"
+	softname=""
+	time="8.1592973408627"
+	pid="40052"
+	polling_input_seq="false"
+	natural_keyboard_in_use="false"
+	paused="false"
+	startup_text=""
+	debugger_present="0"
+	show_profiler="false"
+	has_input_using_mouse="true"
+	has_mouse_enabled_problem="false"
+>
+</status>
