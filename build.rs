@@ -3,6 +3,12 @@ use std::env;
 use winresource::WindowsResource;
 
 fn main() -> std::io::Result<()> {
+	// constants
+	let icon_file = "ui/bletchmame.ico";
+
+	// dependencies
+	println!("cargo::rerun-if-changed={}", icon_file);
+
 	// build Slint stuff
 	slint_build::compile_with_config(
 		"ui/main.slint",
@@ -10,11 +16,9 @@ fn main() -> std::io::Result<()> {
 	)
 	.unwrap();
 
+	// BletchMAME icon
 	if env::var_os("CARGO_CFG_WINDOWS").is_some() {
-		WindowsResource::new()
-			// This path can be absolute, or relative to your crate root.
-			.set_icon("ui/bletchmame.ico")
-			.compile()?;
+		WindowsResource::new().set_icon(icon_file).compile()?;
 	}
 	Ok(())
 }
