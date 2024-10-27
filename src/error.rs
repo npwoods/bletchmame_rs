@@ -9,7 +9,9 @@ pub enum Error {
 	#[error("Bad machine reference in MAME -listxml output")]
 	BadMachineReference(String),
 	#[error("Error loading preferences: {0}")]
-	PreferencesLoad(BoxDynError),
+	PreferencesLoadIo(std::io::Error),
+	#[error("Error loading preferences: {0}")]
+	PreferencesLoadDeserl(BoxDynError),
 	#[error("Error saving preferences: {0}")]
 	PreferencesSave(BoxDynError),
 	#[error("Cannot find preferences directory")]
