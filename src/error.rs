@@ -16,6 +16,10 @@ pub enum Error {
 	CantFindPreferencesDirectory,
 	#[error("Cannot determine InfoDB filename")]
 	CannotBuildInfoDbFilename,
+	#[error("Error loading InfoDB: {0}")]
+	InfoDbLoad(BoxDynError),
+	#[error("Error saving InfoDB: {0}")]
+	InfoDbSave(BoxDynError),
 	#[error("Error loading software list: {0}")]
 	SoftwareListLoad(BoxDynError),
 	#[error("Error loading software list: No paths specified")]
