@@ -230,11 +230,11 @@ fn infodb_filename(prefs_path: Option<impl AsRef<Path>>, mame_executable_path: &
 }
 
 fn infodb_load_error(e: impl std::error::Error + Send + Sync + 'static) -> Error {
-	Error::PreferencesLoad(e.into())
+	Error::InfoDbLoad(e.into())
 }
 
 fn infodb_save_error(e: impl std::error::Error + Send + Sync + 'static) -> Error {
-	Error::PreferencesSave(e.into())
+	Error::InfoDbSave(e.into())
 }
 
 fn decode_header(data: &[u8]) -> Result<binary::Header> {

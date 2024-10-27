@@ -9,13 +9,19 @@ pub enum Error {
 	#[error("Bad machine reference in MAME -listxml output")]
 	BadMachineReference(String),
 	#[error("Error loading preferences: {0}")]
-	PreferencesLoad(BoxDynError),
+	PreferencesLoadIo(std::io::Error),
+	#[error("Error loading preferences: {0}")]
+	PreferencesLoadDeserl(BoxDynError),
 	#[error("Error saving preferences: {0}")]
 	PreferencesSave(BoxDynError),
 	#[error("Cannot find preferences directory")]
 	CantFindPreferencesDirectory,
 	#[error("Cannot determine InfoDB filename")]
 	CannotBuildInfoDbFilename,
+	#[error("Error loading InfoDB: {0}")]
+	InfoDbLoad(BoxDynError),
+	#[error("Error saving InfoDB: {0}")]
+	InfoDbSave(BoxDynError),
 	#[error("Error loading software list: {0}")]
 	SoftwareListLoad(BoxDynError),
 	#[error("Error loading software list: No paths specified")]

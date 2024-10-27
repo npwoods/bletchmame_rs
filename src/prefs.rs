@@ -1,7 +1,9 @@
 use std::borrow::Cow;
 use std::fs;
+use std::fs::rename;
 use std::fs::File;
 use std::io::BufReader;
+use std::io::ErrorKind;
 use std::io::Read;
 use std::io::Write;
 use std::path::Path;
@@ -13,12 +15,16 @@ use num::clamp;
 use serde::Deserialize;
 use serde::Serialize;
 use slint::LogicalSize;
+use tracing::event;
+use tracing::Level;
 
 use crate::history::History;
 use crate::icon::Icon;
 use crate::info::InfoDb;
 use crate::Error;
 use crate::Result;
+
+const LOG: Level = Level::DEBUG;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -202,11 +208,29 @@ pub enum PrefsItem {
 }
 
 const PREFS: Option<&str> = Some("BletchMAME.json");
+const PREFS_BACKUP: Option<&str> = Some("BletchMAME.backup.json");
 
 impl Preferences {
 	pub fn load(prefs_path: Option<impl AsRef<Path> + Copy>) -> Result<Self> {
-		let path = prefs_filename(prefs_path, PREFS).map_err(prefs_load_error)?;
-		let mut result = load_prefs(&path)?;
+		// try to load the preferences
+		let path = prefs_filename(prefs_path, PREFS)?;
+		let result = load_prefs(&path);
+		event!(LOG, "Preferences::load(): result={:?}", result.as_ref().map(|_| ()));
+
+		// did we error for a reason other than the file not being found?
+		if result
+			.as_ref()
+			.is_err_and(|e| !matches!(e.as_ref(), Error::PreferencesLoadIo(e) if e.kind() == ErrorKind::NotFound))
+		{
+			// we did; back up this file
+			if let Ok(renamed) = prefs_filename(prefs_path, PREFS_BACKUP) {
+				let rc = rename(&path, &renamed);
+				event!(LOG, "Preferences::load(): {:?} ==> {:?}; rc={:?}", path, renamed, rc,);
+			}
+		}
+
+		// store the prefs_path and return
+		let mut result = result?;
 		result.prefs_path = prefs_path.map(|x| x.as_ref().to_path_buf());
 		Ok(result)
 	}
@@ -215,7 +239,7 @@ impl Preferences {
 		if let Some(prefs_path) = &self.prefs_path {
 			ensure_directory(prefs_path);
 		}
-		let path = prefs_filename(self.prefs_path.as_ref(), PREFS).map_err(prefs_save_error)?;
+		let path = prefs_filename(self.prefs_path.as_ref(), PREFS)?;
 		save_prefs(self, &path)
 	}
 
@@ -242,14 +266,14 @@ pub fn prefs_filename(prefs_path: Option<impl AsRef<Path>>, filename: Option<&st
 }
 
 fn load_prefs(path: &Path) -> Result<Preferences> {
-	let file = File::open(path).map_err(prefs_load_error)?;
+	let file = File::open(path).map_err(Error::PreferencesLoadIo)?;
 	load_prefs_from_reader(file)
 }
 
 fn load_prefs_from_reader(reader: impl Read) -> Result<Preferences> {
 	// deserialize the preferences
 	let reader = BufReader::new(reader);
-	let mut prefs: Preferences = serde_json::from_reader(reader).map_err(prefs_load_error)?;
+	let mut prefs: Preferences = serde_json::from_reader(reader).map_err(|e| Error::PreferencesLoadDeserl(e.into()))?;
 
 	// special treatments
 	prefs_treatments(&mut prefs);
@@ -291,10 +315,6 @@ fn save_prefs(prefs: &Preferences, path: &Path) -> Result<()> {
 fn save_prefs_to_string(prefs: &Preferences) -> Result<String> {
 	let json = serde_json::to_string_pretty(prefs).map_err(prefs_save_error)?;
 	Ok(json)
-}
-
-fn prefs_load_error(e: impl std::error::Error + Send + Sync + 'static) -> Error {
-	Error::PreferencesLoad(e.into())
 }
 
 fn prefs_save_error(e: impl std::error::Error + Send + Sync + 'static) -> Error {
