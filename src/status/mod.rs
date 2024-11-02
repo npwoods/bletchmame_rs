@@ -2,13 +2,13 @@ mod parse;
 
 use std::io::BufRead;
 
+use anyhow::Result;
 use serde::Deserialize;
 use serde::Serialize;
 use tracing::event;
 use tracing::Level;
 
 use crate::status::parse::parse_update;
-use crate::Result;
 
 const LOG: Level = Level::TRACE;
 

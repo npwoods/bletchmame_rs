@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
+use anyhow::Error;
 use muda::MenuId;
 use serde::Deserialize;
 use serde::Serialize;
 
 use crate::dialogs::file::PathType;
-use crate::error::BoxDynError;
 use crate::prefs::BuiltinCollection;
 use crate::prefs::PrefsCollection;
 use crate::prefs::PrefsItem;
@@ -82,13 +82,13 @@ impl From<AppCommand> for MenuId {
 }
 
 impl TryFrom<&MenuId> for AppCommand {
-	type Error = BoxDynError;
+	type Error = Error;
 
 	fn try_from(value: &MenuId) -> std::result::Result<Self, Self::Error> {
 		let value = value
 			.as_ref()
 			.strip_prefix(MENU_PREFIX)
-			.ok_or_else(|| BoxDynError::from("Not a menu string"))?;
+			.ok_or_else(|| Error::msg("Not a menu string"))?;
 		Ok(serde_json::from_str(value)?)
 	}
 }

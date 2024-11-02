@@ -8,10 +8,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread::scope;
 
+use anyhow::Error;
+use anyhow::Result;
 use process::process_xml;
-
-use crate::Error;
-use crate::Result;
 
 mod process;
 
@@ -31,7 +30,7 @@ pub struct Software {
 
 impl SoftwareList {
 	pub fn load(path: impl AsRef<Path>) -> Result<Self> {
-		let file = File::open(path).map_err(|x| Error::SoftwareListLoad(x.into()))?;
+		let file = File::open(path)?;
 		let file = BufReader::new(file);
 		Self::from_reader(file)
 	}
@@ -95,7 +94,7 @@ impl<'a> SoftwareListDispenser<'a> {
 }
 
 fn load_software_list(paths: &[String], name: &str) -> Result<Arc<SoftwareList>> {
-	let mut err = Error::SoftwareListLoadNoPaths.into();
+	let mut err = Error::msg("Error loading software list: No paths specified");
 	paths
 		.iter()
 		.filter(|&path| !path.is_empty())

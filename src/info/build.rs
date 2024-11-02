@@ -6,13 +6,14 @@ use std::fmt::Formatter;
 use std::io::BufRead;
 use std::marker::PhantomData;
 
+use anyhow::Error;
+use anyhow::Result;
 use binary_serde::BinarySerde;
 use itertools::Itertools;
 use num::CheckedAdd;
 use tracing::event;
 use tracing::Level;
 
-use crate::error::BoxDynError;
 use crate::info::binary;
 use crate::info::binary::Fixup;
 use crate::info::strings::StringTableBuilder;
@@ -23,8 +24,6 @@ use crate::info::MAGIC_HDR;
 use crate::xml::XmlElement;
 use crate::xml::XmlEvent;
 use crate::xml::XmlReader;
-use crate::Error;
-use crate::Result;
 
 const LOG: Level = Level::TRACE;
 
@@ -81,7 +80,7 @@ impl State {
 		}
 	}
 
-	pub fn handle_start(&mut self, evt: XmlElement<'_>) -> std::result::Result<Option<Phase>, BoxDynError> {
+	pub fn handle_start(&mut self, evt: XmlElement<'_>) -> Result<Option<Phase>> {
 		event!(LOG, "handle_start(): self={:?}", self);
 		event!(LOG, "handle_start(): {:?}", evt);
 
@@ -183,7 +182,7 @@ impl State {
 		&mut self,
 		callback: &mut impl FnMut(&str) -> bool,
 		text: Option<String>,
-	) -> std::result::Result<Option<Phase>, BoxDynError> {
+	) -> Result<Option<Phase>> {
 		event!(LOG, "handle_end(): self={:?}", self);
 
 		let new_phase = match self.phase {
@@ -352,7 +351,7 @@ impl State {
 }
 
 impl Debug for State {
-	fn fmt(&self, f: &mut Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+	fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
 		f.debug_struct("State")
 			.field("phase", &self.phase)
 			.field("machines.len()", &self.machines.len())
@@ -371,8 +370,11 @@ fn fixup(
 		for machine_index in x.identify_machine_indexes() {
 			let new_machine_index = if *machine_index != 0 {
 				machines_indexmap(*machine_index).ok_or_else(|| {
-					let bad_reference = strings.index(*machine_index).to_string();
-					Error::BadMachineReference(bad_reference)
+					let message = format!(
+						"Bad machine reference in MAME -listxml output: {}",
+						strings.index(*machine_index)
+					);
+					Error::msg(message)
 				})?
 			} else {
 				!0
@@ -386,8 +388,12 @@ fn fixup(
 	})
 }
 
-fn listxml_err(reader: &XmlReader<impl BufRead>, e: BoxDynError) -> crate::error::Error {
-	Error::ListXmlProcessing(reader.buffer_position(), e)
+fn listxml_err(reader: &XmlReader<impl BufRead>, e: impl Into<Error>) -> Error {
+	let message = format!(
+		"Error processing MAME -listxml output at position {}",
+		reader.buffer_position()
+	);
+	e.into().context(message)
 }
 
 pub fn data_from_listxml_output(
@@ -476,7 +482,7 @@ where
 		result
 	}
 
-	fn tweak_all<E>(&mut self, func: impl Fn(&mut T) -> std::result::Result<(), E>) -> std::result::Result<(), E> {
+	fn tweak_all<E>(&mut self, func: impl Fn(&mut T) -> Result<(), E>) -> Result<(), E> {
 		for slice in self.vec.chunks_mut(T::SERIALIZED_SIZE) {
 			let mut obj = T::binary_deserialize(slice, ENDIANNESS).unwrap();
 			func(&mut obj)?;
@@ -485,7 +491,7 @@ where
 		Ok(())
 	}
 
-	fn increment<N>(&mut self, func: impl FnOnce(&mut T) -> &mut N) -> std::result::Result<(), BoxDynError>
+	fn increment<N>(&mut self, func: impl FnOnce(&mut T) -> &mut N) -> Result<()>
 	where
 		N: CheckedAdd<Output = N> + Clone + From<u8> + Ord,
 	{
@@ -495,7 +501,7 @@ where
 				*value = new_value;
 				Ok(())
 			} else {
-				Err(BoxDynError::from("Overflow"))
+				Err(Error::msg("Overflow"))
 			}
 		})
 	}

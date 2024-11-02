@@ -221,7 +221,10 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 	setup_window_menu_bar(app_window.window(), &menu_bar);
 
 	// get preferences
-	let preferences = Preferences::load(prefs_path.as_ref()).unwrap_or_else(|_| Preferences::fresh(prefs_path));
+	let preferences = Preferences::load(prefs_path.as_ref())
+		.ok()
+		.flatten()
+		.unwrap_or_else(|| Preferences::fresh(prefs_path));
 
 	// update window preferences
 	if let Some(window_size) = &preferences.window_size {
