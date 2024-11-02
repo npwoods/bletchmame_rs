@@ -4,7 +4,6 @@ mod appwindow;
 mod collections;
 mod diagnostics;
 mod dialogs;
-mod error;
 mod guiutils;
 mod history;
 mod icon;
@@ -36,9 +35,6 @@ use crate::guiutils::init_gui_utils;
 mod ui {
 	slint::include_modules!();
 }
-
-type Error = crate::error::Error;
-type Result<T> = std::result::Result<T, Box<crate::error::Error>>;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "basic")]

@@ -4,18 +4,38 @@ use std::fs::metadata;
 use std::path::Path;
 use std::path::PathBuf;
 
+use anyhow::Result;
 use is_executable::IsExecutable;
 use itertools::Itertools;
 use tracing::event;
 use tracing::Level;
 
-use crate::error::PreflightProblem;
 use crate::prefs::PrefsPaths;
 use crate::runtime::MameWindowing;
-use crate::Error;
-use crate::Result;
 
 const LOG: Level = Level::DEBUG;
+
+#[derive(Copy, Clone, Debug, strum_macros::Display)]
+pub enum PreflightProblem {
+	#[strum(to_string = "No MAME executable path specified")]
+	NoMameExecutablePath,
+	#[strum(to_string = "No MAME executable found")]
+	NoMameExecutable,
+	#[strum(to_string = "MAME executable file is not executable")]
+	MameExecutableIsNotExecutable,
+	#[strum(to_string = "No valid plugins paths specified")]
+	NoPluginsPaths,
+	#[strum(to_string = "MAME boot.lua not found")]
+	PluginsBootNotFound,
+	#[strum(to_string = "BletchMAME worker_ui plugin not found")]
+	WorkerUiPluginNotFound,
+}
+
+#[derive(thiserror::Error, Debug)]
+enum ThisError {
+	#[error("Problems found during MAME preflight: {0:?}")]
+	MamePreflightProblems(Vec<PreflightProblem>),
+}
 
 #[derive(Clone, Debug)]
 pub struct MameArgumentsSource<'a> {
@@ -50,7 +70,7 @@ impl<'a> MameArgumentsSource<'a> {
 		if results.is_empty() {
 			Ok(())
 		} else {
-			Err(Error::MamePreflightProblems(results).into())
+			Err(ThisError::MamePreflightProblems(results).into())
 		}
 	}
 }

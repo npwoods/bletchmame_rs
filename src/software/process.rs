@@ -2,14 +2,14 @@ use std::collections::HashSet;
 use std::io::BufRead;
 use std::sync::Arc;
 
-use crate::error::BoxDynError;
+use anyhow::Error;
+use anyhow::Result;
+
 use crate::software::Software;
 use crate::software::SoftwareList;
 use crate::xml::XmlElement;
 use crate::xml::XmlEvent;
 use crate::xml::XmlReader;
-use crate::Error;
-use crate::Result;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Phase {
@@ -54,7 +54,7 @@ impl State {
 		}
 	}
 
-	pub fn handle_start(&mut self, evt: XmlElement<'_>) -> std::result::Result<Option<Phase>, BoxDynError> {
+	pub fn handle_start(&mut self, evt: XmlElement<'_>) -> Result<Option<Phase>> {
 		let new_phase = match (self.phase, evt.name().as_ref()) {
 			(Phase::Root, b"softwarelist") => {
 				let [name, description] = evt.find_attributes([b"name", b"description"])?;
@@ -83,7 +83,7 @@ impl State {
 		Ok(new_phase)
 	}
 
-	pub fn handle_end(&mut self, text: Option<String>) -> std::result::Result<Phase, BoxDynError> {
+	pub fn handle_end(&mut self, text: Option<String>) -> Result<Phase> {
 		let new_phase = match self.phase {
 			Phase::Root => panic!(),
 			Phase::SoftwareList => Phase::Root,
@@ -121,8 +121,12 @@ impl State {
 	}
 }
 
-fn softlistxml_err(reader: &XmlReader<impl BufRead>, e: BoxDynError) -> crate::error::Error {
-	Error::SoftwareListXmlParsing(reader.buffer_position(), e)
+fn softlistxml_err(reader: &XmlReader<impl BufRead>, e: impl Into<Error>) -> Error {
+	let message = format!(
+		"Error parsing software list XML at position {}",
+		reader.buffer_position()
+	);
+	e.into().context(message)
 }
 
 pub fn process_xml(reader: impl BufRead) -> Result<SoftwareList> {

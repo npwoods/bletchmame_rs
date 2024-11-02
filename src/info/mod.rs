@@ -19,12 +19,13 @@ use std::ops::Range;
 use std::path::Path;
 use std::path::PathBuf;
 
+use anyhow::Error;
+use anyhow::Result;
 use binary_serde::BinarySerde;
+use binary_serde::DeserializeError;
 use binary_serde::Endianness;
 
 use crate::prefs::prefs_filename;
-use crate::Error;
-use crate::Result;
 
 pub use self::binary::ChipType;
 pub use self::binary::SoftwareListStatus;
@@ -72,7 +73,7 @@ impl InfoDb {
 
 		// validations we want to skip if we're creating things ourselves
 		if !skip_validations {
-			validate_string_table(&data[cursor.start..]).map_err(|_| Error::CorruptStringTable)?;
+			validate_string_table(&data[cursor.start..]).map_err(|_| Error::msg("Corrupt String Table"))?;
 		}
 
 		// and return
@@ -94,7 +95,7 @@ impl InfoDb {
 				.iter()
 				.all(|x| x.obj() < result.machines().len().try_into().unwrap())
 				.then_some(())
-				.ok_or(Error::CorruptSoftwareListMachineIndex)?;
+				.ok_or_else(|| Error::msg("Corrupt Software List Machine Index"))?;
 		}
 
 		Ok(result)
@@ -110,16 +111,13 @@ impl InfoDb {
 	}
 
 	pub fn save(&self, prefs_path: Option<impl AsRef<Path>>, mame_executable_path: &str) -> Result<()> {
-		let filename = infodb_filename(prefs_path, mame_executable_path).map_err(infodb_load_error)?;
+		let filename = infodb_filename(prefs_path, mame_executable_path).map_err(infodb_save_error)?;
 		let mut file = File::create(filename).map_err(infodb_save_error)?;
 		file.write_all(&self.data).map_err(infodb_save_error)?;
 		Ok(())
 	}
 
-	pub fn from_listxml_output(
-		reader: impl BufRead,
-		callback: impl FnMut(&str) -> bool,
-	) -> crate::Result<Option<Self>> {
+	pub fn from_listxml_output(reader: impl BufRead, callback: impl FnMut(&str) -> bool) -> Result<Option<Self>> {
 		// process 'mame -listxml' output
 		let data = data_from_listxml_output(reader, callback)?;
 
@@ -187,22 +185,24 @@ fn next_root_view<T>(cursor: &mut Range<usize>, count: u32) -> Result<RootView<T
 where
 	T: BinarySerde,
 {
+	let error_message = "Cannot deserialize InfoDB header";
+
 	// get the result
 	let offset = cursor
 		.start
 		.try_into()
-		.map_err(|_| Error::CannotDeserializeInfoDbHeader)?;
+		.map_err(|e| Error::new(e).context(error_message))?;
 
 	// advance the cursor
 	let count_bytes = count
 		.checked_mul(T::SERIALIZED_SIZE.try_into().unwrap())
-		.ok_or(Error::CannotDeserializeInfoDbHeader)?;
+		.ok_or_else(|| Error::msg(error_message))?;
 	let new_start = cursor
 		.start
 		.checked_add(count_bytes.try_into().unwrap())
-		.ok_or(Error::CannotDeserializeInfoDbHeader)?;
+		.ok_or_else(|| Error::msg(error_message))?;
 	if new_start > cursor.end {
-		return Err(Error::CannotDeserializeInfoDbHeader.into());
+		return Err(Error::msg(error_message));
 	}
 	*cursor = new_start..(cursor.end);
 
@@ -221,31 +221,37 @@ struct RootView<T> {
 fn infodb_filename(prefs_path: Option<impl AsRef<Path>>, mame_executable_path: &str) -> Result<PathBuf> {
 	let file_name = Path::new(mame_executable_path)
 		.file_name()
-		.ok_or(Error::CannotBuildInfoDbFilename)?;
-	let file_stem = Path::new(file_name)
-		.file_stem()
-		.ok_or(Error::CannotBuildInfoDbFilename)?;
+		.ok_or_else(infodb_filename_error)?;
+	let file_stem = Path::new(file_name).file_stem().ok_or_else(infodb_filename_error)?;
 	let file_name = Path::new(file_stem).with_extension("infodb");
 	prefs_filename(prefs_path, Some(&file_name.as_path().to_string_lossy()))
 }
 
-fn infodb_load_error(e: impl std::error::Error + Send + Sync + 'static) -> Error {
-	Error::InfoDbLoad(e.into())
+fn infodb_load_error(error: impl Into<Error>) -> Error {
+	error.into().context("Error loading InfoDB")
 }
 
-fn infodb_save_error(e: impl std::error::Error + Send + Sync + 'static) -> Error {
-	Error::InfoDbSave(e.into())
+fn infodb_save_error(error: impl Into<Error>) -> Error {
+	error.into().context("Error saving InfoDB")
+}
+
+fn infodb_filename_error() -> Error {
+	Error::msg("Cannot determine InfoDB filename")
+}
+
+fn infodb_deserialize_header_error(error: DeserializeError) -> Error {
+	Error::msg(error).context("Cannot deserialize InfoDB header")
 }
 
 fn decode_header(data: &[u8]) -> Result<binary::Header> {
 	let header_data = &data[0..min(binary::Header::SERIALIZED_SIZE, data.len())];
-	let header = binary::Header::binary_deserialize(header_data, ENDIANNESS)
-		.map_err(|_| Error::CannotDeserializeInfoDbHeader)?;
+	let header =
+		binary::Header::binary_deserialize(header_data, ENDIANNESS).map_err(infodb_deserialize_header_error)?;
 	if &header.magic != MAGIC_HDR {
-		return Err(Box::new(Error::BadInfoDbMagicValue));
+		return Err(Error::msg("Bad InfoDB Magic Value In Header"));
 	}
 	if header.sizes_hash != calculate_sizes_hash() {
-		return Err(Box::new(Error::BadInfoDbSizesHash));
+		return Err(Error::msg("Bad Sizes Hash In Header"));
 	}
 	Ok(header)
 }

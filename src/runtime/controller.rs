@@ -13,6 +13,8 @@ use std::sync::Arc;
 use std::thread::spawn;
 use std::thread::JoinHandle;
 
+use anyhow::Error;
+use anyhow::Result;
 use blockingqueue::BlockingQueue;
 use tracing::event;
 use tracing::Level;
@@ -22,8 +24,6 @@ use crate::runtime::args::MameArguments;
 use crate::runtime::args::MameArgumentsSource;
 use crate::runtime::MameWindowing;
 use crate::status::Update;
-use crate::Error;
-use crate::Result;
 
 const LOG: Level = Level::DEBUG;
 
@@ -70,6 +70,16 @@ pub enum MameEvent {
 struct ProcessedCommand {
 	pub text: Cow<'static, str>,
 	pub is_exit: bool,
+}
+
+#[derive(thiserror::Error, Debug)]
+enum ThisError {
+	#[error("MAME Error Response: {0:?}")]
+	MameErrorResponse(String),
+	#[error("Problems found during MAME preflight: {0:?}")]
+	MameResponseNotUnderstood(String),
+	#[error("Unexpected EOF from MAME: {0}")]
+	EofFromMame(String),
 }
 
 impl MameController {
@@ -159,7 +169,7 @@ fn thread_proc(mame_args: &MameArguments, comm: &SessionCommunication, event_cal
 	event_callback(MameEvent::SessionStarted);
 
 	if let Err(e) = internal_thread_proc(mame_args, comm, event_callback) {
-		event_callback(MameEvent::Error(*e))
+		event_callback(MameEvent::Error(e))
 	}
 
 	comm.mame_pid.store(!0, Ordering::Relaxed);
@@ -181,7 +191,7 @@ fn internal_thread_proc(
 		.stdout(Stdio::piped())
 		.stderr(Stdio::piped())
 		.spawn()
-		.map_err(|e| Error::MameLaunch(Box::new(e).into()))?;
+		.map_err(|error| Error::new(error).context("Error launching MAME"))?;
 
 	// MAME launched!  we now have a pid
 	comm.mame_pid.store(child.id().into(), Ordering::Relaxed);
@@ -240,8 +250,8 @@ fn read_response_from_mame(
 				let result = match msg {
 					"OK" => Ok(ResponseLine::Ok),
 					"OK STATUS" => Ok(ResponseLine::OkStatus),
-					"ERROR" => Err(Error::MameErrorResponse(comment.unwrap_or_default().to_string()).into()),
-					_ => Err(Error::MameResponseNotUnderstood(line.to_string()).into()),
+					"ERROR" => Err(ThisError::MameErrorResponse(comment.unwrap_or_default().to_string()).into()),
+					_ => Err(ThisError::MameResponseNotUnderstood(line.to_string()).into()),
 				};
 
 				(result, comment)
@@ -270,7 +280,7 @@ fn read_response_from_mame(
 		);
 		result?;
 		if !line.trim().is_empty() {
-			return Err(Error::MameResponseNotUnderstood(line.to_string()).into());
+			return Err(ThisError::MameResponseNotUnderstood(line.to_string()).into());
 		}
 
 		// bail if we errored
@@ -290,10 +300,10 @@ fn read_line_from_mame(
 	match mame_stdout.read_line(line) {
 		Ok(0) => {
 			let mame_stderr_text = read_text_from_reader(mame_stderr);
-			Err(Error::EofFromMame(mame_stderr_text).into())
+			Err(ThisError::EofFromMame(mame_stderr_text).into())
 		}
 		Ok(_) => Ok(()),
-		Err(e) => Err(Error::ReadingFromMame(Box::new(e)).into()),
+		Err(error) => Err(Error::new(error).context("Error reading from MAME")),
 	}
 }
 
@@ -310,9 +320,10 @@ fn process_event_from_front_end(comm: &SessionCommunication, mame_stdin: &mut Bu
 	comm.message_queue_len.fetch_sub(1, Ordering::Relaxed);
 	event!(LOG, "process_event_from_front_end(): command=\"{:?}\"", command);
 
-	fn mame_write_err(e: impl std::error::Error + Send + Sync + 'static) -> Error {
-		Error::WritingToMame(Box::new(e))
+	fn mame_write_err(e: impl Into<Error>) -> Error {
+		e.into().context("Error writing to MAME")
 	}
+
 	writeln!(mame_stdin, "{}", command.text).map_err(mame_write_err)?;
 	mame_stdin.flush().map_err(mame_write_err)?;
 

@@ -1,16 +1,15 @@
 use std::io::BufRead;
 
+use anyhow::Error;
+use anyhow::Result;
 use tracing::event;
 use tracing::Level;
 
-use crate::error::BoxDynError;
 use crate::status::Update;
 use crate::status::UpdateRunning;
 use crate::xml::XmlElement;
 use crate::xml::XmlEvent;
 use crate::xml::XmlReader;
-use crate::Error;
-use crate::Result;
 
 const LOG: Level = Level::TRACE;
 
@@ -29,7 +28,7 @@ struct State {
 }
 
 impl State {
-	pub fn handle_start(&mut self, evt: XmlElement<'_>) -> std::result::Result<Option<Phase>, BoxDynError> {
+	pub fn handle_start(&mut self, evt: XmlElement<'_>) -> Result<Option<Phase>> {
 		let new_phase = match (self.phase, evt.name().as_ref()) {
 			(Phase::Root, b"status") => {
 				let [romname, is_paused] = evt.find_attributes([b"romname", b"paused"])?;
@@ -66,7 +65,7 @@ impl State {
 		Ok(new_phase)
 	}
 
-	pub fn handle_end(&mut self, _text: Option<String>) -> std::result::Result<Phase, BoxDynError> {
+	pub fn handle_end(&mut self, _text: Option<String>) -> Result<Phase> {
 		let new_phase = match self.phase {
 			Phase::Root => panic!(),
 			Phase::Status => Phase::Root,
@@ -106,8 +105,9 @@ pub fn parse_update(reader: impl BufRead) -> Result<Update> {
 	Ok(result)
 }
 
-fn statusxml_err(reader: &XmlReader<impl BufRead>, e: BoxDynError) -> crate::error::Error {
-	Error::StatusXmlProcessing(reader.buffer_position(), e)
+fn statusxml_err(reader: &XmlReader<impl BufRead>, e: impl Into<Error>) -> Error {
+	let message = format!("Error parsing status XML at position {}", reader.buffer_position());
+	e.into().context(message)
 }
 
 fn parse_bool(s: &str) -> Option<bool> {

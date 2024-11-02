@@ -10,6 +10,8 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
 
+use anyhow::Error;
+use anyhow::Result;
 use derive_enum_all_values::AllValues;
 use num::clamp;
 use serde::Deserialize;
@@ -21,8 +23,6 @@ use tracing::Level;
 use crate::history::History;
 use crate::icon::Icon;
 use crate::info::InfoDb;
-use crate::Error;
-use crate::Result;
 
 const LOG: Level = Level::DEBUG;
 
@@ -228,7 +228,7 @@ impl Preferences {
 
 		// store the prefs_path and return
 		if let Ok(Some(mut result)) = result {
-		result.prefs_path = prefs_path.map(|x| x.as_ref().to_path_buf());
+			result.prefs_path = prefs_path.map(|x| x.as_ref().to_path_buf());
 			Ok(Some(result))
 		} else {
 			result
@@ -256,7 +256,7 @@ impl Preferences {
 
 pub fn prefs_filename(prefs_path: Option<impl AsRef<Path>>, filename: Option<&str>) -> Result<PathBuf> {
 	let mut pathbuf = prefs_path
-		.ok_or(Error::CantFindPreferencesDirectory)?
+		.ok_or_else(|| Error::msg("Cannot find preferences directory"))?
 		.as_ref()
 		.to_path_buf();
 	if let Some(filename) = filename {
@@ -272,7 +272,7 @@ fn load_prefs(path: &Path) -> Result<Option<Preferences>> {
 			return if e.kind() == ErrorKind::NotFound {
 				Ok(None)
 			} else {
-				Err(Error::PreferencesLoadIo(e).into())
+				Err(Error::new(e))
 			}
 		}
 	};
@@ -284,7 +284,8 @@ fn load_prefs(path: &Path) -> Result<Option<Preferences>> {
 fn load_prefs_from_reader(reader: impl Read) -> Result<Preferences> {
 	// deserialize the preferences
 	let reader = BufReader::new(reader);
-	let mut prefs: Preferences = serde_json::from_reader(reader).map_err(|e| Error::PreferencesLoadDeserl(e.into()))?;
+	let mut prefs: Preferences =
+		serde_json::from_reader(reader).map_err(|e| Error::new(e).context("Error loading preferences"))?;
 
 	// special treatments
 	prefs_treatments(&mut prefs);
@@ -328,8 +329,8 @@ fn save_prefs_to_string(prefs: &Preferences) -> Result<String> {
 	Ok(json)
 }
 
-fn prefs_save_error(e: impl std::error::Error + Send + Sync + 'static) -> Error {
-	Error::PreferencesSave(e.into())
+fn prefs_save_error(e: impl Into<Error>) -> Error {
+	e.into().context("Error saving preferences")
 }
 
 fn ensure_directory(path: &impl AsRef<Path>) {

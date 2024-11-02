@@ -4,6 +4,8 @@ use std::fmt::Debug;
 use std::io::BufRead;
 use std::str::from_utf8;
 
+use anyhow::Error;
+use anyhow::Result;
 use quick_xml::escape::unescape;
 use quick_xml::events::BytesStart;
 use quick_xml::events::Event;
@@ -11,8 +13,6 @@ use quick_xml::name::QName;
 use quick_xml::Reader;
 use tracing::event;
 use tracing::Level;
-
-use crate::error::BoxDynError;
 
 const LOG: Level = Level::TRACE;
 
@@ -53,7 +53,7 @@ where
 		}
 	}
 
-	pub fn next<'a>(&mut self, buf: &'a mut Vec<u8>) -> std::result::Result<Option<XmlEvent<'a>>, BoxDynError> {
+	pub fn next<'a>(&mut self, buf: &'a mut Vec<u8>) -> Result<Option<XmlEvent<'a>>> {
 		let result = self.internal_next(buf);
 
 		// if we've reached the end of file or an error condition, clear out the reader
@@ -65,7 +65,7 @@ where
 		result
 	}
 
-	fn internal_next<'a>(&mut self, buf: &'a mut Vec<u8>) -> std::result::Result<Option<XmlEvent<'a>>, BoxDynError> {
+	fn internal_next<'a>(&mut self, buf: &'a mut Vec<u8>) -> Result<Option<XmlEvent<'a>>> {
 		let event = if self.next_event_is_end {
 			self.next_event_is_end = false;
 			Some(XmlEvent::End(self.current_text.take()))
@@ -82,7 +82,7 @@ where
 					let string = cow_bytes_to_str(bytes_text.into_inner())?;
 					if self.known_depth == 0 && self.unknown_depth == 0 && !string.trim().is_empty() {
 						let msg = format!("Extraneous text \"{:?}\"", string);
-						return Err(BoxDynError::from(msg));
+						return Err(Error::msg(msg));
 					}
 					if let Some(current_text) = &mut self.current_text {
 						current_text.push_str(&string);
@@ -112,7 +112,7 @@ where
 		// adjust the known or unknown depth
 		*depth = depth
 			.checked_add_signed(depth_adjustment)
-			.ok_or_else(|| BoxDynError::from("Invalid close tag"))?;
+			.ok_or_else(|| Error::msg("Invalid close tag"))?;
 
 		// did we hit the last close tag, and we're not reading until the end?
 		if !self.read_to_end && self.known_depth == 0 && self.unknown_depth == 0 && depth_adjustment == -1 {
@@ -123,7 +123,7 @@ where
 		if event.is_none() && (self.known_depth > 0 || self.unknown_depth > 0) {
 			self.known_depth = 0;
 			self.unknown_depth = 0;
-			return Err(BoxDynError::from("Unexpected end of file"));
+			return Err(Error::msg("Unexpected end of file"));
 		}
 
 		// and return!
@@ -165,10 +165,7 @@ impl<'a> XmlElement<'a> {
 		self.bytes_start.name()
 	}
 
-	pub fn find_attributes<const N: usize>(
-		&'a self,
-		attrs: [&[u8]; N],
-	) -> std::result::Result<[Option<Cow<'a, str>>; N], BoxDynError> {
+	pub fn find_attributes<const N: usize>(&'a self, attrs: [&[u8]; N]) -> Result<[Option<Cow<'a, str>>; N]> {
 		const DEFAULT_ATTRVAL: Option<Cow<str>> = None;
 		let mut result: [Option<Cow<'a, str>>; N] = [DEFAULT_ATTRVAL; N];
 
@@ -209,7 +206,7 @@ impl<'a> Debug for XmlElement<'a> {
 	}
 }
 
-fn cow_bytes_to_str(cow: Cow<'_, [u8]>) -> std::result::Result<Cow<'_, str>, BoxDynError> {
+fn cow_bytes_to_str(cow: Cow<'_, [u8]>) -> Result<Cow<'_, str>> {
 	match cow {
 		Cow::Borrowed(bytes) => {
 			let s = from_utf8(bytes)?;
@@ -313,7 +310,7 @@ mod test {
 	#[test_case(3, Cow::Owned(b"foo".into()), Ok("foo"))]
 	#[test_case(4, Cow::Borrowed(b"&lt;escaping&gt; &amp; things"), Ok("<escaping> & things"))]
 	#[test_case(5, Cow::Owned(b"&lt;escaping&gt; &amp; things".into()), Ok("<escaping> & things"))]
-	pub fn cow_bytes_to_str(_index: usize, input: Cow<'_, [u8]>, expected: std::result::Result<&str, ()>) {
+	pub fn cow_bytes_to_str(_index: usize, input: Cow<'_, [u8]>, expected: Result<&str, ()>) {
 		let actual = super::cow_bytes_to_str(input);
 		let actual = actual.as_ref().map_or_else(|_| Err(()), |x| Ok(x.as_ref()));
 		assert_eq!(expected, actual);
