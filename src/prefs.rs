@@ -211,17 +211,14 @@ const PREFS: Option<&str> = Some("BletchMAME.json");
 const PREFS_BACKUP: Option<&str> = Some("BletchMAME.backup.json");
 
 impl Preferences {
-	pub fn load(prefs_path: Option<impl AsRef<Path> + Copy>) -> Result<Self> {
+	pub fn load(prefs_path: Option<impl AsRef<Path> + Copy>) -> Result<Option<Self>> {
 		// try to load the preferences
 		let path = prefs_filename(prefs_path, PREFS)?;
 		let result = load_prefs(&path);
 		event!(LOG, "Preferences::load(): result={:?}", result.as_ref().map(|_| ()));
 
-		// did we error for a reason other than the file not being found?
-		if result
-			.as_ref()
-			.is_err_and(|e| !matches!(e.as_ref(), Error::PreferencesLoadIo(e) if e.kind() == ErrorKind::NotFound))
-		{
+		// did we error?
+		if result.is_err() {
 			// we did; back up this file
 			if let Ok(renamed) = prefs_filename(prefs_path, PREFS_BACKUP) {
 				let rc = rename(&path, &renamed);
@@ -230,9 +227,12 @@ impl Preferences {
 		}
 
 		// store the prefs_path and return
-		let mut result = result?;
+		if let Ok(Some(mut result)) = result {
 		result.prefs_path = prefs_path.map(|x| x.as_ref().to_path_buf());
-		Ok(result)
+			Ok(Some(result))
+		} else {
+			result
+		}
 	}
 
 	pub fn save(&self) -> Result<()> {
@@ -265,9 +265,20 @@ pub fn prefs_filename(prefs_path: Option<impl AsRef<Path>>, filename: Option<&st
 	Ok(pathbuf)
 }
 
-fn load_prefs(path: &Path) -> Result<Preferences> {
-	let file = File::open(path).map_err(Error::PreferencesLoadIo)?;
-	load_prefs_from_reader(file)
+fn load_prefs(path: &Path) -> Result<Option<Preferences>> {
+	let file = match File::open(path) {
+		Ok(x) => x,
+		Err(e) => {
+			return if e.kind() == ErrorKind::NotFound {
+				Ok(None)
+			} else {
+				Err(Error::PreferencesLoadIo(e).into())
+			}
+		}
+	};
+
+	let prefs = load_prefs_from_reader(file)?;
+	Ok(Some(prefs))
 }
 
 fn load_prefs_from_reader(reader: impl Read) -> Result<Preferences> {
@@ -304,7 +315,7 @@ fn prefs_treatments(prefs: &mut Preferences) {
 
 fn save_prefs(prefs: &Preferences, path: &Path) -> Result<()> {
 	// only save if there is a change
-	if load_prefs(path).ok().as_ref() != Some(prefs) {
+	if load_prefs(path).ok().flatten().as_ref() != Some(prefs) {
 		let mut file = File::create(path).map_err(prefs_save_error)?;
 		let json = save_prefs_to_string(prefs)?;
 		file.write_all(json.as_bytes()).map_err(prefs_save_error)?;
