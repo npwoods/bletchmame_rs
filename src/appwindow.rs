@@ -670,7 +670,6 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			machine_name,
 			software_name,
 		} => {
-			assert!(software_name.is_none());
 			let command = MameCommand::Start {
 				machine_name: &machine_name,
 				software_name: software_name.as_ref().map(|x| x.as_ref()),

@@ -6,6 +6,8 @@ use std::cmp::Reverse;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use anyhow::Error;
+use anyhow::Result;
 use itertools::Either;
 use itertools::Itertools;
 use levenshtein::levenshtein;
@@ -23,6 +25,7 @@ use unicase::UniCase;
 use crate::appcommand::AppCommand;
 use crate::dialogs::file::PathType;
 use crate::guiutils::menuing::MenuDesc;
+use crate::info;
 use crate::info::InfoDb;
 use crate::info::View;
 use crate::prefs::BuiltinCollection;
@@ -102,107 +105,94 @@ impl ItemsTableModel {
 		let info_db = self.info_db.borrow();
 		let collection = self.current_collection.borrow().clone();
 
-		let (items, any_dispenser_failures) = {
-			let software_list_paths = self.software_list_paths.borrow();
-			let mut dispenser = SoftwareListDispenser::new(&software_list_paths);
+		let (items, dispenser_is_empty) = info_db
+			.as_ref()
+			.map(|info_db: &Rc<InfoDb>| {
+				let software_list_paths = self.software_list_paths.borrow();
+				let mut dispenser = SoftwareListDispenser::new(info_db, &software_list_paths);
 
-			let items = info_db.as_ref().map(|info_db| match collection.as_ref() {
-				PrefsCollection::Builtin(BuiltinCollection::All) => {
-					let machine_count = info_db.machines().len();
-					(0..machine_count)
-						.map(|machine_index| Item::Machine { machine_index })
-						.collect::<Rc<[_]>>()
-				}
-				PrefsCollection::Builtin(BuiltinCollection::AllSoftware) => dispenser
-					.get_multiple(&info_db.software_lists().iter().map(|x| x.name()).collect::<Vec<_>>())
-					.into_iter()
-					.enumerate()
-					.filter_map(|(index, software_list)| {
-						software_list.map(|x| (info_db.software_lists().get(index).unwrap(), x))
-					})
-					.flat_map(|(info, list)| {
-						list.software
-							.iter()
-							.map(|s| (list.clone(), s.clone(), info))
-							.collect::<Vec<_>>()
-					})
-					.map(|(software_list, software, info)| {
-						let machine_indexes = Iterator::chain(
-							info.original_for_machines().iter(),
-							info.compatible_for_machines().iter(),
-						)
-						.map(|x| x.index())
-						.collect::<Vec<_>>();
-
-						Item::Software {
-							software_list,
-							software,
-							machine_indexes,
-						}
-					})
-					.collect::<Rc<[_]>>(),
-
-				PrefsCollection::MachineSoftware { machine_name } => info_db
-					.machines()
-					.find(machine_name)
-					.into_iter()
-					.flat_map(|x| x.machine_software_lists().iter().collect::<Vec<_>>())
-					.filter_map(|x| dispenser.get(&x.software_list().name()))
-					.flat_map(|list| {
-						list.software
-							.iter()
-							.map(|s| (list.clone(), s.clone()))
-							.collect::<Vec<_>>()
-					})
-					.map(|(software_list, software)| Item::Software {
-						software_list,
-						software,
-						machine_indexes: Vec::default(),
-					})
-					.collect::<Rc<[_]>>(),
-
-				PrefsCollection::Folder { name: _, items } => items
-					.iter()
-					.filter_map(|item| match item {
-						PrefsItem::Machine { machine_name } => info_db
-							.machines()
-							.find_index(machine_name)
-							.map(|machine_index| Item::Machine { machine_index }),
-						PrefsItem::Software {
-							software_list,
-							software,
-							machine_names,
-						} => dispenser.get(software_list).and_then(|software_list| {
-							software_list
-								.software
+				let items = match collection.as_ref() {
+					PrefsCollection::Builtin(BuiltinCollection::All) => {
+						let machine_count = info_db.machines().len();
+						(0..machine_count)
+							.map(|machine_index| Item::Machine { machine_index })
+							.collect::<Rc<[_]>>()
+					}
+					PrefsCollection::Builtin(BuiltinCollection::AllSoftware) => dispenser
+						.get_all()
+						.into_iter()
+						.flat_map(|(info, list)| {
+							list.software
 								.iter()
-								.find(|x| x.name.as_ref() == software)
-								.cloned()
-								.map(|software| {
-									let machine_indexes = machine_names
-										.iter()
-										.filter_map(|x| info_db.machines().find(x))
-										.map(|x| x.index())
-										.collect::<Vec<_>>();
-									Item::Software {
-										software_list,
-										software,
-										machine_indexes,
-									}
-								})
-						}),
-					})
-					.collect::<Rc<[_]>>(),
-			});
-			let items = items.unwrap_or_else(|| Rc::new([]));
-			(items, dispenser.any_failures())
-		};
+								.map(|s| (list.clone(), s.clone(), info))
+								.collect::<Vec<_>>()
+						})
+						.map(|(software_list, software, info)| {
+							let machine_indexes = Iterator::chain(
+								info.original_for_machines().iter(),
+								info.compatible_for_machines().iter(),
+							)
+							.map(|x| x.index())
+							.collect::<Vec<_>>();
+
+							Item::Software {
+								software_list,
+								software,
+								machine_indexes,
+							}
+						})
+						.collect::<Rc<[_]>>(),
+
+					PrefsCollection::MachineSoftware { machine_name } => info_db
+						.machines()
+						.find(machine_name)
+						.into_iter()
+						.flat_map(|x| x.machine_software_lists().iter().collect::<Vec<_>>())
+						.filter_map(|x| dispenser.get(&x.software_list().name()).ok())
+						.flat_map(|(_, list)| {
+							list.software
+								.iter()
+								.map(|s| (list.clone(), s.clone()))
+								.collect::<Vec<_>>()
+						})
+						.map(|(software_list, software)| Item::Software {
+							software_list,
+							software,
+							machine_indexes: Vec::default(),
+						})
+						.collect::<Rc<[_]>>(),
+
+					PrefsCollection::Folder { name: _, items } => items
+						.iter()
+						.filter_map(|item| match item {
+							PrefsItem::Machine { machine_name } => info_db
+								.machines()
+								.find_index(machine_name)
+								.map(|machine_index| Item::Machine { machine_index }),
+							PrefsItem::Software {
+								software_list,
+								software,
+							} => {
+								let item = software_folder_item(&mut dispenser, software_list, software)
+									.unwrap_or_else(|error| Item::UnrecognizedSoftware {
+										software_list_name: software_list.clone(),
+										software_name: software.clone(),
+										error: Rc::new(error),
+									});
+								Some(item)
+							}
+						})
+						.collect::<Rc<[_]>>(),
+				};
+				(items, dispenser.is_empty())
+			})
+			.unwrap_or_else(|| (Rc::new([]), true));
 
 		// if we're empty, try to gauge why and broadcast the result
 		let empty_reason = items.is_empty().then(|| {
 			if info_db.is_none() {
 				EmptyReason::NoInfoDb
-			} else if any_dispenser_failures || self.software_list_paths.borrow().is_empty() {
+			} else if dispenser_is_empty || self.software_list_paths.borrow().is_empty() {
 				EmptyReason::NoSoftwareLists
 			} else if matches!(collection.as_ref(), PrefsCollection::Folder { name: _, items } if items.is_empty() ) {
 				EmptyReason::Folder
@@ -269,15 +259,26 @@ impl ItemsTableModel {
 					.iter()
 					.map(|&index| {
 						let machine = info_db.machines().get(index).unwrap();
-						let command = AppCommand::RunMame {
-							machine_name: machine.name().to_string(),
-							software_name: Some(software.name.clone()),
-						};
-						MenuDesc::Item(machine.description().to_string(), Some(command.into()))
+
+						// running is not yet supported!
+						let command = false.then(|| {
+							AppCommand::RunMame {
+								machine_name: machine.name().to_string(),
+								software_name: Some(software.name.clone()),
+							}
+							.into()
+						});
+
+						MenuDesc::Item(machine.description().to_string(), command)
 					})
 					.collect::<Vec<_>>();
 				let text = run_item_text(&software.description);
 				let run_menu_item = MenuDesc::SubMenu(text, true, sub_items);
+				(run_menu_item, None)
+			}
+			Item::UnrecognizedSoftware { error, .. } => {
+				let message = format!("{}", error);
+				let run_menu_item = MenuDesc::Item(message, None);
 				(run_menu_item, None)
 			}
 		};
@@ -475,6 +476,40 @@ impl Model for ItemsTableModel {
 	}
 }
 
+fn software_folder_item(
+	dispenser: &mut SoftwareListDispenser,
+	software_list_name: &str,
+	software_name: &str,
+) -> Result<Item> {
+	let (info, software_list) = dispenser.get(software_list_name)?;
+	let software = software_list
+		.software
+		.iter()
+		.find(|x| x.name.as_ref() == software_name)
+		.ok_or_else(|| {
+			let message = format!("Unknown software '{}'", software_name);
+			Error::msg(message)
+		})?
+		.clone();
+
+	Ok(software_item(info, software_list, software))
+}
+
+fn software_item(info: info::SoftwareList<'_>, software_list: Arc<SoftwareList>, software: Arc<Software>) -> Item {
+	let machine_indexes = Iterator::chain(
+		info.original_for_machines().iter(),
+		info.compatible_for_machines().iter(),
+	)
+	.map(|x| x.index())
+	.collect::<Vec<_>>();
+
+	Item::Software {
+		software_list,
+		software,
+		machine_indexes,
+	}
+}
+
 /// Sometimes, the items view is empty - we can (try to) report why
 #[derive(Clone, Copy, Debug, strum_macros::Display)]
 pub enum EmptyReason {
@@ -511,6 +546,11 @@ enum Item {
 		software: Arc<Software>,
 		machine_indexes: Vec<usize>,
 	},
+	UnrecognizedSoftware {
+		software_list_name: String,
+		software_name: String,
+		error: Rc<Error>,
+	},
 }
 
 fn make_prefs_item(info_db: &InfoDb, item: &Item) -> PrefsItem {
@@ -522,20 +562,19 @@ fn make_prefs_item(info_db: &InfoDb, item: &Item) -> PrefsItem {
 		Item::Software {
 			software_list,
 			software,
-			machine_indexes,
-		} => {
-			let software_list = software_list.name.to_string();
-			let software = software.name.to_string();
-			let machine_names = machine_indexes
-				.iter()
-				.map(|&index| info_db.machines().get(index).unwrap().name().to_string())
-				.collect::<Vec<_>>();
-			PrefsItem::Software {
-				software_list,
-				software,
-				machine_names,
-			}
-		}
+			..
+		} => PrefsItem::Software {
+			software_list: software_list.name.to_string(),
+			software: software.name.to_string(),
+		},
+		Item::UnrecognizedSoftware {
+			software_list_name,
+			software_name,
+			..
+		} => PrefsItem::Software {
+			software_list: software_list_name.clone(),
+			software: software_name.clone(),
+		},
 	}
 }
 
@@ -658,6 +697,15 @@ fn column_text<'a>(info_db: &'a InfoDb, item: &'a Item, column: ColumnType) -> C
 			ColumnType::Description => software.description.as_ref().into(),
 			ColumnType::Year => software.year.as_ref().into(),
 			ColumnType::Provider => software.publisher.as_ref().into(),
+		},
+		Item::UnrecognizedSoftware {
+			software_list_name,
+			software_name,
+			..
+		} => match column {
+			ColumnType::Name => software_name.into(),
+			ColumnType::SourceFile => format!("{}.xml", software_list_name).into(),
+			_ => "".into(),
 		},
 	}
 }
