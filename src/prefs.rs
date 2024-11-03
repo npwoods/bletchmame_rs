@@ -202,8 +202,6 @@ pub enum PrefsItem {
 	Software {
 		software_list: String,
 		software: String,
-		#[serde(rename = "machines")]
-		machine_names: Vec<String>,
 	},
 }
 

@@ -13,6 +13,7 @@ pub type Machine<'a> = Object<'a, binary::Machine>;
 pub type MachinesView<'a> = SimpleView<'a, binary::Machine>;
 pub type Chip<'a> = Object<'a, binary::Chip>;
 pub type SoftwareList<'a> = Object<'a, binary::SoftwareList>;
+pub type SoftwareListsView<'a> = SimpleView<'a, binary::SoftwareList>;
 pub type MachineSoftwareList<'a> = Object<'a, binary::MachineSoftwareList>;
 
 impl<'a> Machine<'a> {
@@ -122,6 +123,12 @@ impl<'a> SoftwareList<'a> {
 			index_view,
 			object_view,
 		}
+	}
+}
+
+impl<'a> SoftwareListsView<'a> {
+	pub fn find(&self, target: &str) -> Option<SoftwareList<'a>> {
+		self.iter().find(|x| x.name() == target)
 	}
 }
 

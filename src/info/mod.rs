@@ -24,6 +24,7 @@ use anyhow::Result;
 use binary_serde::BinarySerde;
 use binary_serde::DeserializeError;
 use binary_serde::Endianness;
+use entities::SoftwareListsView;
 
 use crate::prefs::prefs_filename;
 
@@ -143,7 +144,7 @@ impl InfoDb {
 		self.make_view(&self.chips)
 	}
 
-	pub fn software_lists(&self) -> impl View<'_, SoftwareList<'_>> {
+	pub fn software_lists(&self) -> SoftwareListsView<'_> {
 		self.make_view(&self.software_lists)
 	}
 
