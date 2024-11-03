@@ -648,16 +648,17 @@ fn column_text<'a>(info_db: &'a InfoDb, item: &'a Item, column: ColumnType) -> C
 			};
 			text.into()
 		}
-		Item::Software { software, .. } => {
-			let text = match column {
-				ColumnType::Name => &software.name,
-				ColumnType::SourceFile => "",
-				ColumnType::Description => &software.description,
-				ColumnType::Year => &software.year,
-				ColumnType::Provider => &software.publisher,
-			};
-			text.into()
-		}
+		Item::Software {
+			software_list,
+			software,
+			..
+		} => match column {
+			ColumnType::Name => software.name.as_ref().into(),
+			ColumnType::SourceFile => format!("{}.xml", &software_list.name).into(),
+			ColumnType::Description => software.description.as_ref().into(),
+			ColumnType::Year => software.year.as_ref().into(),
+			ColumnType::Provider => software.publisher.as_ref().into(),
+		},
 	}
 }
 
