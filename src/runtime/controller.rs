@@ -5,6 +5,7 @@ use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Read;
 use std::io::Write;
+use std::os::windows::process::CommandExt;
 use std::process::Command;
 use std::process::Stdio;
 use std::sync::atomic::AtomicU64;
@@ -18,6 +19,7 @@ use anyhow::Result;
 use blockingqueue::BlockingQueue;
 use tracing::event;
 use tracing::Level;
+use winapi::um::winbase::CREATE_NO_WINDOW;
 
 use crate::prefs::PrefsPaths;
 use crate::runtime::args::MameArguments;
@@ -190,6 +192,7 @@ fn internal_thread_proc(
 		.stdin(Stdio::piped())
 		.stdout(Stdio::piped())
 		.stderr(Stdio::piped())
+		.creation_flags(CREATE_NO_WINDOW)
 		.spawn()
 		.map_err(|error| Error::new(error).context("Error launching MAME"))?;
 
