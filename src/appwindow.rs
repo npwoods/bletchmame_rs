@@ -668,11 +668,16 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 		}
 		AppCommand::RunMame {
 			machine_name,
-			software_name,
+			initial_loads,
 		} => {
+			let initial_loads = initial_loads
+				.iter()
+				.map(|(dev, arg)| (dev.as_ref(), arg.as_ref()))
+				.collect::<Vec<_>>();
+
 			let command = MameCommand::Start {
 				machine_name: &machine_name,
-				software_name: software_name.as_ref().map(|x| x.as_ref()),
+				initial_loads: initial_loads.as_slice(),
 			};
 			model.mame_controller.issue_command(command);
 		}

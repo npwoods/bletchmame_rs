@@ -625,16 +625,24 @@ function emit_status(light, out)
 end
 
 function is_running()
-	return emu.romname() ~= "___empty" and machine_natkeyboard()
+	return emu.romname() ~= "___empty"
 end
 
 local session_starting = false
+local session_starting_load_args = {}
 local session_stopping = false
 local session_exiting = false
 
 -- START command
 function command_start(args)
 	emu.start(args[2])
+
+	-- prep initial load args
+	session_starting_load_args = {}
+	for i = 3,#args-1,2 do
+		session_starting_load_args[args[i+0]] = args[i+1]
+	end
+
 	session_starting = true
 	pause_when_restarted = false
 end
@@ -1234,8 +1242,20 @@ function startplugin()
 
 	-- register another handler to handle commands after prestart
 	function callback_periodic()
-		-- are we starting, and has that start completed?
-		if session_starting and is_running() then
+		-- are we starting, and has that start completed?  note that the paused
+		-- check is necessary because it is how we detect we've entered the
+		-- running phase
+		if session_starting and is_running() and not machine().paused then
+
+			-- load initial images
+			for k,v in pairs(session_starting_load_args) do
+				local image = find_image_by_tag(k)
+				if image then
+					image:load(v)
+				end
+			end
+			session_starting_load_args = {}
+
 			emu.unpause()
 			print "@OK STATUS ### Emulation has started"
 			emit_status()

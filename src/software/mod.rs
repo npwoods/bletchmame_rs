@@ -38,7 +38,7 @@ pub struct Software {
 pub struct SoftwarePart {
 	#[allow(dead_code)]
 	pub name: Arc<str>,
-	#[allow(dead_code)]
+
 	pub interface: Arc<str>,
 }
 
