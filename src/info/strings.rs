@@ -209,7 +209,7 @@ mod test {
 		let actual = builder
 			.map
 			.into_values()
-			.flat_map(|x| x)
+			.flatten()
 			.map(|x| super::read_string(&builder.data, x).unwrap().to_string())
 			.sorted()
 			.collect::<Vec<_>>();

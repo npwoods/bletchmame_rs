@@ -558,7 +558,7 @@ mod test {
 			.collect::<Vec<_>>();
 
 		let expected = expected
-			.into_iter()
+			.iter()
 			.map(|(chip_type, tag)| (*chip_type, tag.to_string()))
 			.collect::<Vec<_>>();
 		assert_eq!(expected, actual);
@@ -577,7 +577,7 @@ mod test {
 			.collect::<Vec<_>>();
 
 		let expected = expected
-			.into_iter()
+			.iter()
 			.map(|(tag, name)| (tag.to_string(), name.to_string()))
 			.collect::<Vec<_>>();
 		assert_eq!(expected, actual);
