@@ -44,6 +44,7 @@ pub struct MameArgumentsSource<'a> {
 	roms_paths: &'a [String],
 	samples_paths: &'a [String],
 	plugins_paths: &'a [String],
+	software_lists_paths: &'a [String],
 	cfg_path: &'a [String],
 }
 
@@ -53,6 +54,7 @@ impl<'a> MameArgumentsSource<'a> {
 		let roms_paths = prefs_paths.roms.as_slice();
 		let samples_paths = prefs_paths.samples.as_slice();
 		let plugins_paths = prefs_paths.plugins.as_slice();
+		let software_lists_paths = prefs_paths.software_lists.as_slice();
 		let cfg_path = prefs_paths.cfg.as_slice();
 		let result = Self {
 			windowing,
@@ -60,6 +62,7 @@ impl<'a> MameArgumentsSource<'a> {
 			mame_executable_path,
 			samples_paths,
 			plugins_paths,
+			software_lists_paths,
 			cfg_path,
 		};
 		Ok(result)
@@ -174,6 +177,7 @@ fn mame_args_from_source(
 		("-rompath", source.roms_paths),
 		("-samplepath", source.samples_paths),
 		("-pluginspath", source.plugins_paths),
+		("-hashpath", source.software_lists_paths),
 		("-cfg_directory", source.cfg_path),
 	]
 	.into_iter()
@@ -302,6 +306,7 @@ mod test {
 				"$(MAMEPATH)/plugins".to_string(),
 				"$(BLETCHMAMEPATH)/plugins".to_string(),
 			],
+			software_lists_paths: &["/mydir/mame/hash".to_string()],
 			cfg_path: &["/mydir/mame/cfg".to_string()],
 		};
 		let result = super::mame_args_from_source(source, || Some(std::path::PathBuf::from("/bmdir/bletchmame")));
@@ -318,6 +323,7 @@ mod test {
 			find_arg(&result.args, "-rompath"),
 			find_arg(&result.args, "-samplepath"),
 			find_arg(&result.args, "-pluginspath"),
+			find_arg(&result.args, "-hashpath"),
 			find_arg(&result.args, "-cfg_directory"),
 		);
 		let expected = (
@@ -326,6 +332,7 @@ mod test {
 			Some("/mydir/mame/roms1;/mydir/mame/roms2"),
 			Some("/mydir/mame/samples1;/mydir/mame/samples2"),
 			Some("/mydir/mame/plugins;/bmdir/plugins"),
+			Some("/mydir/mame/hash"),
 			Some("/mydir/mame/cfg"),
 		);
 		assert_eq!(expected, actual);
