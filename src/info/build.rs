@@ -577,7 +577,9 @@ pub fn calculate_sizes_hash() -> u64 {
 		binary::MachineSoftwareList::SERIALIZED_SIZE,
 	]
 	.into_iter()
-	.fold(0, |value, item| (value * multiplicand) ^ (item as u64))
+	.fold(0, |value, item| {
+		u64::overflowing_mul(value, multiplicand).0 ^ (item as u64)
+	})
 }
 
 #[cfg(test)]
