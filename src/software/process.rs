@@ -7,6 +7,7 @@ use anyhow::Result;
 
 use crate::software::Software;
 use crate::software::SoftwareList;
+use crate::software::SoftwarePart;
 use crate::xml::XmlElement;
 use crate::xml::XmlEvent;
 use crate::xml::XmlReader;
@@ -71,6 +72,7 @@ impl State {
 					description: self.empty_str.clone(),
 					year: self.empty_str.clone(),
 					publisher: self.empty_str.clone(),
+					parts: Vec::new(),
 				};
 				self.current_software = Some(software);
 				Some(Phase::Software)
@@ -78,6 +80,15 @@ impl State {
 			(Phase::Software, b"description") => Some(Phase::SoftwareDescription),
 			(Phase::Software, b"year") => Some(Phase::SoftwareYear),
 			(Phase::Software, b"publisher") => Some(Phase::SoftwarePublisher),
+			(Phase::Software, b"part") => {
+				let [name, interface] = evt.find_attributes([b"name", b"interface"])?;
+				if let Some((name, interface)) = Option::zip(name, interface) {
+					let (name, interface) = (name.into(), interface.into());
+					let part = SoftwarePart { name, interface };
+					self.current_software.as_mut().unwrap().parts.push(part);
+				}
+				None
+			}
 			_ => None,
 		};
 		Ok(new_phase)

@@ -31,6 +31,15 @@ pub struct Software {
 	pub description: Arc<str>,
 	pub year: Arc<str>,
 	pub publisher: Arc<str>,
+	pub parts: Vec<SoftwarePart>,
+}
+
+#[derive(Debug)]
+pub struct SoftwarePart {
+	#[allow(dead_code)]
+	pub name: Arc<str>,
+	#[allow(dead_code)]
+	pub interface: Arc<str>,
 }
 
 impl SoftwareList {
