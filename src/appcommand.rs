@@ -44,7 +44,7 @@ pub enum AppCommand {
 	Shutdown,
 	RunMame {
 		machine_name: String,
-		software_name: Option<Arc<str>>,
+		initial_loads: Vec<(Arc<str>, Arc<str>)>,
 	},
 	Browse(PrefsCollection),
 	HistoryAdvance(isize),

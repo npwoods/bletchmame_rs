@@ -17,6 +17,7 @@ use std::thread::JoinHandle;
 use anyhow::Error;
 use anyhow::Result;
 use blockingqueue::BlockingQueue;
+use itertools::Itertools;
 use tracing::event;
 use tracing::Level;
 use winapi::um::winbase::CREATE_NO_WINDOW;
@@ -50,7 +51,7 @@ pub enum MameCommand<'a> {
 	Exit,
 	Start {
 		machine_name: &'a str,
-		software_name: Option<&'a str>,
+		initial_loads: &'a [(&'a str, &'a str)],
 	},
 	Stop,
 	Pause,
@@ -338,11 +339,12 @@ fn command_text(command: &MameCommand<'_>) -> Cow<'static, str> {
 		MameCommand::Exit => "EXIT".into(),
 		MameCommand::Start {
 			machine_name,
-			software_name,
-		} => {
-			assert!(software_name.is_none());
-			format!("START {machine_name}").into()
-		}
+			initial_loads,
+		} => ["START", machine_name]
+			.into_iter()
+			.chain(initial_loads.iter().flat_map(|(dev, target)| [*dev, *target]))
+			.join(" ")
+			.into(),
 		MameCommand::Stop => "STOP".into(),
 		MameCommand::Pause => "PAUSE".into(),
 		MameCommand::Resume => "RESUME".into(),

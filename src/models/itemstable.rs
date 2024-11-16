@@ -240,7 +240,7 @@ impl ItemsTableModel {
 				let machine = info_db.machines().get(*machine_index).unwrap();
 				let command = has_mame_initialized.then(|| AppCommand::RunMame {
 					machine_name: machine.name().to_string(),
-					software_name: None,
+					initial_loads: vec![],
 				});
 				let text = run_item_text(&machine.description());
 				let run_menu_item = MenuDesc::Item(text, command.map(|x| x.into()));
@@ -257,19 +257,32 @@ impl ItemsTableModel {
 			} => {
 				let sub_items = machine_indexes
 					.iter()
-					.map(|&index| {
+					.filter_map(|&index| {
+						// get the machine out of the InfoDB
 						let machine = info_db.machines().get(index).unwrap();
 
-						// running is not yet supported!
-						let command = false.then(|| {
-							AppCommand::RunMame {
-								machine_name: machine.name().to_string(),
-								software_name: Some(software.name.clone()),
-							}
-							.into()
-						});
+						// identify all parts of the software
+						let parts_with_devices = software
+							.parts
+							.iter()
+							.map(|part| {
+								machine
+									.devices()
+									.iter()
+									.find(|dev| part.interface.as_ref() == dev.interface().as_ref())
+									.map(|dev| (Arc::<str>::from(dev.tag().as_ref()), software.name.clone()))
+									.ok_or(())
+							})
+							.collect::<std::result::Result<Vec<_>, ()>>();
 
-						MenuDesc::Item(machine.description().to_string(), command)
+						parts_with_devices.ok().map(|initial_loads| {
+							// running is not yet supported!
+							let command = AppCommand::RunMame {
+								machine_name: machine.name().to_string(),
+								initial_loads,
+							};
+							MenuDesc::Item(machine.description().to_string(), Some(command.into()))
+						})
 					})
 					.collect::<Vec<_>>();
 				let text = run_item_text(&software.description);
@@ -283,7 +296,7 @@ impl ItemsTableModel {
 			}
 		};
 
-		// basics of
+		// now actually build the context menu
 		let mut menu_items = Vec::new();
 		menu_items.push(run_menu_item);
 		menu_items.push(MenuDesc::Separator);
