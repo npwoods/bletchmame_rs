@@ -31,6 +31,7 @@ use crate::prefs::prefs_filename;
 pub use self::binary::ChipType;
 pub use self::binary::SoftwareListStatus;
 pub use self::entities::Chip;
+pub use self::entities::Device;
 pub use self::entities::MachineSoftwareList;
 pub use self::entities::MachinesView;
 pub use self::entities::SoftwareList;
@@ -48,6 +49,7 @@ pub struct InfoDb {
 	data: Box<[u8]>,
 	machines: RootView<binary::Machine>,
 	chips: RootView<binary::Chip>,
+	devices: RootView<binary::Device>,
 	software_lists: RootView<binary::SoftwareList>,
 	software_list_machine_indexes: RootView<u32>,
 	machine_software_lists: RootView<binary::MachineSoftwareList>,
@@ -68,6 +70,7 @@ impl InfoDb {
 		let mut cursor = binary::Header::SERIALIZED_SIZE..data.len();
 		let machines = next_root_view(&mut cursor, hdr.machine_count)?;
 		let chips = next_root_view(&mut cursor, hdr.chips_count)?;
+		let devices = next_root_view(&mut cursor, hdr.device_count)?;
 		let software_lists = next_root_view(&mut cursor, hdr.software_list_count)?;
 		let software_list_machine_indexes = next_root_view(&mut cursor, hdr.software_list_machine_count)?;
 		let machine_software_lists = next_root_view(&mut cursor, hdr.machine_software_lists_count)?;
@@ -82,6 +85,7 @@ impl InfoDb {
 			data,
 			machines,
 			chips,
+			devices,
 			software_lists,
 			software_list_machine_indexes,
 			machine_software_lists,
@@ -142,6 +146,10 @@ impl InfoDb {
 
 	pub fn chips(&self) -> impl View<'_, Chip<'_>> {
 		self.make_view(&self.chips)
+	}
+
+	pub fn devices(&self) -> impl View<'_, Device<'_>> {
+		self.make_view(&self.devices)
 	}
 
 	pub fn software_lists(&self) -> SoftwareListsView<'_> {
@@ -423,6 +431,7 @@ where
 mod test {
 	use std::cmp::max;
 
+	use itertools::Itertools;
 	use test_case::test_case;
 
 	use super::ChipType;
@@ -561,6 +570,42 @@ mod test {
 			.iter()
 			.map(|(chip_type, tag)| (*chip_type, tag.to_string()))
 			.collect::<Vec<_>>();
+		assert_eq!(expected, actual);
+	}
+
+	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", "ext:fdcv11:wd17xx:0:qd", "floppydisk", "floppy_5_25",
+		&["dmk", "jvc", "dsk", "vdk", "sdf", "os9", "d77", "d88", "1dd", "dfi", "hfe", "imd", "ipf", "mfi", "mfm", "td0", "cqm", "cqi"])]
+	pub fn devices(
+		_index: usize,
+		xml: &str,
+		machine: &str,
+		device_tag: &str,
+		expected_type: &str,
+		expected_interface: &str,
+		expected_extensions: &[&str],
+	) {
+		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
+		let device = db
+			.machines()
+			.find(machine)
+			.unwrap()
+			.devices()
+			.iter()
+			.filter(|x| x.tag() == device_tag)
+			.exactly_one()
+			.map_err(|_| ())
+			.unwrap();
+		let actual = (
+			device.device_type().to_string(),
+			device.interface().to_string(),
+			device.extensions().map(|x| x.to_string()).collect::<Vec<_>>(),
+		);
+
+		let expected = (
+			expected_type.to_string(),
+			expected_interface.to_string(),
+			expected_extensions.iter().map(|x| x.to_string()).collect::<Vec<_>>(),
+		);
 		assert_eq!(expected, actual);
 	}
 

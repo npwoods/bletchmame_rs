@@ -10,12 +10,29 @@ use std::hash::Hasher;
 use std::ops::Deref;
 
 use arrayvec::ArrayString;
+use itertools::Either;
 use slint::SharedString;
 
 #[derive(Clone, Copy)]
 pub enum SmallStrRef<'a> {
 	Ref(&'a str),
 	Inline(ArrayString<5>),
+}
+
+impl<'a> SmallStrRef<'a> {
+	pub fn split(&self, pattern: char) -> impl Iterator<Item = Cow<'a, str>> {
+		match self {
+			Self::Ref(s) => Either::Left(s.split(pattern).map(Cow::Borrowed)),
+			Self::Inline(s) => Either::Right(
+				s.as_str()
+					.split(pattern)
+					.map(|x| x.to_string())
+					.map(Cow::Owned)
+					.collect::<Vec<_>>()
+					.into_iter(),
+			),
+		}
+	}
 }
 
 impl SmallStrRef<'static> {
@@ -175,6 +192,17 @@ mod test {
 		let s2 = SmallStrRef::from_small_chars(s.chars());
 		assert_eq!(s1, s2);
 		assert_eq!(calculate_hash(&s1), calculate_hash(&s2));
+	}
+
+	#[test_case(0, "", ',', &[""])]
+	#[test_case(1, "foo", ',', &["foo"])]
+	#[test_case(2, "foo,bar", ',', &["foo", "bar"])]
+	#[test_case(3, "foo\0bar", '\0', &["foo", "bar"])]
+	pub fn split(_index: usize, s: &str, pattern: char, expected: &[&str]) {
+		let s = SmallStrRef::from(s);
+		let actual = s.split(pattern).collect::<Vec<_>>();
+		let actual = actual.iter().map(|x| x.as_ref()).collect::<Vec<_>>();
+		assert_eq!(expected, actual);
 	}
 
 	fn calculate_hash<T: Hash>(t: &T) -> u64 {

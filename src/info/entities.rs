@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use binary_search::binary_search;
 use binary_search::Direction;
 
@@ -12,6 +14,7 @@ use crate::info::View;
 pub type Machine<'a> = Object<'a, binary::Machine>;
 pub type MachinesView<'a> = SimpleView<'a, binary::Machine>;
 pub type Chip<'a> = Object<'a, binary::Chip>;
+pub type Device<'a> = Object<'a, binary::Device>;
 pub type SoftwareList<'a> = Object<'a, binary::SoftwareList>;
 pub type SoftwareListsView<'a> = SimpleView<'a, binary::SoftwareList>;
 pub type MachineSoftwareList<'a> = Object<'a, binary::MachineSoftwareList>;
@@ -55,6 +58,12 @@ impl<'a> Machine<'a> {
 		self.db.chips().sub_view(self.obj().chips_start..self.obj().chips_end)
 	}
 
+	pub fn devices(&self) -> impl View<'a, Device<'a>> {
+		self.db
+			.devices()
+			.sub_view(self.obj().devices_start..self.obj().devices_end)
+	}
+
 	pub fn machine_software_lists(&self) -> impl View<'a, MachineSoftwareList<'a>> {
 		self.db
 			.machine_software_lists()
@@ -95,6 +104,28 @@ impl<'a> Chip<'a> {
 
 	pub fn chip_type(&self) -> ChipType {
 		self.obj().chip_type
+	}
+}
+
+impl<'a> Device<'a> {
+	pub fn device_type(&self) -> SmallStrRef<'a> {
+		self.string(|x| x.type_strindex)
+	}
+
+	pub fn tag(&self) -> SmallStrRef<'a> {
+		self.string(|x| x.tag_strindex)
+	}
+
+	pub fn mandatory(&self) -> bool {
+		self.obj().mandatory
+	}
+
+	pub fn interface(&self) -> SmallStrRef<'a> {
+		self.string(|x| x.interface_strindex)
+	}
+
+	pub fn extensions(&self) -> impl Iterator<Item = Cow<'a, str>> {
+		self.string(|x| x.extensions_strindex).split('\0')
 	}
 }
 

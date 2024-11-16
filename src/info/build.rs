@@ -36,6 +36,7 @@ enum Phase {
 	MachineDescription,
 	MachineYear,
 	MachineManufacturer,
+	MachineDevice,
 }
 
 const TEXT_CAPTURE_PHASES: &[Phase] = &[
@@ -48,10 +49,12 @@ struct State {
 	phase: Phase,
 	machines: BinBuilder<binary::Machine>,
 	chips: BinBuilder<binary::Chip>,
+	devices: BinBuilder<binary::Device>,
 	machine_software_lists: BinBuilder<binary::MachineSoftwareList>,
 	strings: StringTableBuilder,
 	software_lists: BTreeMap<String, SoftwareListBuild>,
 	build_strindex: u32,
+	device_extensions: Option<String>,
 }
 
 #[derive(Debug, Default)]
@@ -73,10 +76,12 @@ impl State {
 			phase: Phase::Root,
 			machines: BinBuilder::new(48000),              // 44092 machines,
 			chips: BinBuilder::new(190000),                // 174679 chips
+			devices: BinBuilder::new(12000),               // 10738 devices
 			machine_software_lists: BinBuilder::new(6800), // 6337 software lists
 			software_lists: BTreeMap::new(),
 			strings,
 			build_strindex,
+			device_extensions: None,
 		}
 	}
 
@@ -115,6 +120,8 @@ impl State {
 					rom_of_machine_index,
 					chips_start: self.chips.len(),
 					chips_end: self.chips.len(),
+					devices_start: self.devices.len(),
+					devices_end: self.devices.len(),
 					machine_software_lists_start: self.machine_software_lists.len(),
 					machine_software_lists_end: self.machine_software_lists.len(),
 					runnable,
@@ -144,6 +151,25 @@ impl State {
 				self.machines.increment(|m| &mut m.chips_end)?;
 				Some(Phase::MachineSubtag)
 			}
+			(Phase::Machine, b"device") => {
+				let [device_type, tag, mandatory, interface] =
+					evt.find_attributes([b"type", b"tag", b"mandatory", b"interface"])?;
+				let type_strindex = self.strings.lookup(&device_type.unwrap_or_default());
+				let tag_strindex = self.strings.lookup(&tag.unwrap_or_default());
+				let mandatory = mandatory.map(bool_attribute).unwrap_or(false);
+				let interface_strindex = self.strings.lookup(&interface.unwrap_or_default());
+				let device = binary::Device {
+					type_strindex,
+					tag_strindex,
+					mandatory,
+					interface_strindex,
+					extensions_strindex: 0,
+				};
+				self.devices.push(device);
+				self.machines.increment(|m| &mut m.devices_end)?;
+				self.device_extensions = Some(String::with_capacity(1024));
+				Some(Phase::MachineDevice)
+			}
 			(Phase::Machine, b"softwarelist") => {
 				let [tag, name, status, filter] = evt.find_attributes([b"tag", b"name", b"status", b"filter"])?;
 				let Some(status) = status.and_then(|x| x.as_ref().parse::<SoftwareListStatus>().ok()) else {
@@ -172,6 +198,17 @@ impl State {
 				};
 				list.push(self.machines.items().next_back().unwrap().name_strindex);
 				Some(Phase::MachineSubtag)
+			}
+			(Phase::MachineDevice, b"extension") => {
+				let [name] = evt.find_attributes([b"name"])?;
+				if let Some(name) = name {
+					let device_extensions = self.device_extensions.as_mut().unwrap();
+					if !device_extensions.is_empty() {
+						device_extensions.push('\0');
+					}
+					device_extensions.push_str(name.as_ref());
+				}
+				None
 			}
 			_ => None,
 		};
@@ -208,6 +245,12 @@ impl State {
 			Phase::MachineManufacturer => {
 				let manufacturer_strindex = self.strings.lookup(&text.unwrap());
 				self.machines.tweak(|x| x.manufacturer_strindex = manufacturer_strindex);
+				Phase::Machine
+			}
+			Phase::MachineDevice => {
+				let extensions = self.device_extensions.take().unwrap();
+				let extensions_strindex = self.strings.lookup(&extensions);
+				self.devices.tweak(|d| d.extensions_strindex = extensions_strindex);
 				Phase::Machine
 			}
 		};
@@ -329,6 +372,7 @@ impl State {
 			build_strindex: self.build_strindex,
 			machine_count: self.machines.len(),
 			chips_count: self.chips.len(),
+			device_count: self.devices.len(),
 			software_list_count: software_lists.len(),
 			software_list_machine_count: software_list_machine_indexes.len(),
 			machine_software_lists_count: self.machine_software_lists.len(),
@@ -341,6 +385,7 @@ impl State {
 			.into_iter()
 			.chain(self.machines.into_iter())
 			.chain(self.chips.into_iter())
+			.chain(self.devices.into_iter())
 			.chain(software_lists.into_iter())
 			.chain(software_list_machine_indexes.into_iter())
 			.chain(self.machine_software_lists.into_iter())
@@ -573,6 +618,7 @@ pub fn calculate_sizes_hash() -> u64 {
 		binary::Header::SERIALIZED_SIZE,
 		binary::Machine::SERIALIZED_SIZE,
 		binary::Chip::SERIALIZED_SIZE,
+		binary::Device::SERIALIZED_SIZE,
 		binary::SoftwareList::SERIALIZED_SIZE,
 		binary::MachineSoftwareList::SERIALIZED_SIZE,
 	]
