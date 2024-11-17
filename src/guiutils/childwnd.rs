@@ -12,6 +12,7 @@ use tracing::Level;
 use winapi::shared::windef::HWND;
 use winapi::um::winuser::CreateWindowExW;
 use winapi::um::winuser::GetWindowRect;
+use winapi::um::winuser::SetFocus;
 use winapi::um::winuser::SetWindowPos;
 use winapi::um::winuser::ShowWindow;
 use winapi::um::winuser::SWP_NOACTIVATE;
@@ -89,6 +90,7 @@ impl ChildWindow {
 		let cy = size.height.try_into().unwrap();
 		unsafe {
 			SetWindowPos(self.hwnd, 0 as HWND, x, y, cx, cy, flags);
+			SetFocus(self.hwnd);
 		}
 	}
 
