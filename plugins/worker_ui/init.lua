@@ -359,6 +359,9 @@ function emit_status(light, out)
 	emit("<status");
 	emit("\tapp_name=\"" .. tostring(emu.app_name()) .. "\"");
 	emit("\tapp_version=\"" .. tostring(emu.app_version()) .. "\"");
+	if emu.app_build then
+		emit("\tapp_build=\"" .. tostring(emu.app_build()) .. "\"");
+	end
 
 	-- most status is only relevant if we're running
 	if not is_running() then
