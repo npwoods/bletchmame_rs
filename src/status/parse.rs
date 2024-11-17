@@ -24,6 +24,7 @@ enum Phase {
 #[derive(Debug, Default)]
 struct State {
 	phase: Phase,
+	build: Option<String>,
 	running: UpdateRunning,
 }
 
@@ -31,7 +32,7 @@ impl State {
 	pub fn handle_start(&mut self, evt: XmlElement<'_>) -> Result<Option<Phase>> {
 		let new_phase = match (self.phase, evt.name().as_ref()) {
 			(Phase::Root, b"status") => {
-				let [romname, is_paused] = evt.find_attributes([b"romname", b"paused"])?;
+				let [romname, is_paused, app_build] = evt.find_attributes([b"romname", b"paused", b"app_build"])?;
 				let machine_name = romname.unwrap_or_default().to_string();
 				let is_paused = is_paused.and_then(|x| parse_bool(x.as_ref()));
 				event!(
@@ -41,6 +42,7 @@ impl State {
 					is_paused
 				);
 
+				self.build = app_build.map(String::from);
 				self.running.machine_name = machine_name;
 				self.running.is_paused = is_paused;
 				Some(Phase::Status)
@@ -101,7 +103,10 @@ pub fn parse_update(reader: impl BufRead) -> Result<Update> {
 	}
 
 	let running = (!state.running.machine_name.is_empty()).then_some(state.running);
-	let result = Update { running };
+	let result = Update {
+		running,
+		build: state.build,
+	};
 	Ok(result)
 }
 

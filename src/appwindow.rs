@@ -84,6 +84,7 @@ struct AppModel {
 	running_state: Cell<MameRunningState>,
 	running_status: RefCell<Status>,
 	child_window: Option<ChildWindow>,
+	build_skew_state: Cell<BuildSkewState>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -91,6 +92,13 @@ enum MameRunningState {
 	Normal,
 	Bouncing,
 	ShuttingDown,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum BuildSkewState {
+	Normal,
+	MamePathChanged,
+	FoundSkew,
 }
 
 impl AppModel {
@@ -155,8 +163,7 @@ impl AppModel {
 			}
 			if prefs.paths.mame_executable != old_prefs.paths.mame_executable {
 				event!(LOG_PREFS, "modify_prefs(): paths.mame_executable changed");
-				let fut = process_mame_listxml(self.clone());
-				spawn_local(fut).unwrap();
+				self.build_skew_state.set(BuildSkewState::MamePathChanged);
 			}
 			if prefs.paths.software_lists != old_prefs.paths.software_lists {
 				event!(LOG_PREFS, "modify_prefs(): paths.software_lists changed");
@@ -243,6 +250,7 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 		running_state: Cell::new(MameRunningState::Normal),
 		running_status: RefCell::new(Status::default()),
 		child_window,
+		build_skew_state: Cell::new(BuildSkewState::Normal),
 	};
 	let model = Rc::new(model);
 
@@ -647,10 +655,21 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			}
 		}
 		AppCommand::MameStatusUpdate(update) => {
-			let mut status = model.running_status.borrow_mut();
-			status.merge(update);
-			drop(status);
+			model.running_status.borrow_mut().merge(update);
 			model.update_from_status();
+
+			// check for build skew
+			let next_build_skew_state = next_build_skew_state(
+				&model.running_status.borrow(),
+				model.info_db.borrow().as_deref(),
+				model.build_skew_state.get(),
+			);
+			let need_to_refresh = model.build_skew_state.get() != BuildSkewState::FoundSkew
+				&& next_build_skew_state == BuildSkewState::FoundSkew;
+			model.build_skew_state.set(next_build_skew_state);
+			if need_to_refresh {
+				handle_command(model, AppCommand::HelpRefreshInfoDb);
+			}
 		}
 		AppCommand::MamePing => {
 			model.mame_controller.issue_command(MameCommand::Ping);
@@ -1023,6 +1042,24 @@ fn items_set_sorting(model: &Rc<AppModel>, column: i32, order: SortOrder) {
 	let column = usize::try_from(column).unwrap();
 	let command = AppCommand::ItemsSort(column, order);
 	handle_command(model, command);
+}
+
+fn next_build_skew_state(status: &Status, info_db: Option<&InfoDb>, last: BuildSkewState) -> BuildSkewState {
+	// not having an InfoDb but receiving status updates is a very degenerate scenario
+	let Some(info_db) = info_db else {
+		return last;
+	};
+
+	let has_skew = if let Some(build) = status.build.as_ref() {
+		build.as_str() != info_db.build().as_ref()
+	} else {
+		last != BuildSkewState::Normal
+	};
+	if has_skew {
+		BuildSkewState::FoundSkew
+	} else {
+		BuildSkewState::Normal
+	}
 }
 
 async fn ping_callback(model_weak: std::rc::Weak<AppModel>) {

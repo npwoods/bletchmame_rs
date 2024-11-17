@@ -16,6 +16,7 @@ const LOG: Level = Level::TRACE;
 pub struct Status {
 	pub has_initialized: bool,
 	pub running: Option<StatusRunning>,
+	pub build: Option<String>,
 }
 
 impl Status {
@@ -38,6 +39,7 @@ impl Status {
 		event!(LOG, "Status::merge(): running={:?}", running);
 		self.running = running;
 		self.has_initialized = true;
+		self.build = update.build
 	}
 }
 
@@ -52,6 +54,7 @@ pub struct StatusRunning {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Update {
 	running: Option<UpdateRunning>,
+	build: Option<String>,
 }
 
 impl Update {
