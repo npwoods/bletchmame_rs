@@ -18,7 +18,6 @@ enum Phase {
 	#[default]
 	Root,
 	Status,
-	StatusVideo,
 }
 
 #[derive(Debug, Default)]
@@ -60,7 +59,13 @@ impl State {
 
 				self.running.is_throttled = throttled.or(self.running.is_throttled);
 				self.running.throttle_rate = throttle_rate.or(self.running.throttle_rate);
-				Some(Phase::StatusVideo)
+				None
+			}
+			(Phase::Status, b"sound") => {
+				let [attenuation] = evt.find_attributes([b"attenuation"])?;
+				let attenuation = attenuation.and_then(|x| x.parse::<i32>().ok());
+				self.running.sound_attenuation = attenuation.or(self.running.sound_attenuation);
+				None
 			}
 			_ => None,
 		};
@@ -71,7 +76,6 @@ impl State {
 		let new_phase = match self.phase {
 			Phase::Root => panic!(),
 			Phase::Status => Phase::Root,
-			Phase::StatusVideo => Phase::Status,
 		};
 		Ok(new_phase)
 	}
