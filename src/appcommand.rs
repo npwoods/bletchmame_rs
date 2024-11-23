@@ -22,6 +22,7 @@ pub enum AppCommand {
 	// Options menu
 	OptionsThrottleRate(f32),
 	OptionsToggleWarp,
+	OptionsToggleSound,
 
 	// Settings menu
 	SettingsPaths,

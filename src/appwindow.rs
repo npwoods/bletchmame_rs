@@ -74,6 +74,9 @@ const LOG_COMMANDS: Level = Level::DEBUG;
 const LOG_PREFS: Level = Level::DEBUG;
 const LOG_PINGING: Level = Level::TRACE;
 
+const SOUND_ATTENUATION_OFF: i32 = -32;
+const SOUND_ATTENUATION_ON: i32 = 0;
+
 struct AppModel {
 	menu_bar: Menu,
 	app_window_weak: Weak<AppWindow>,
@@ -529,7 +532,7 @@ fn create_menu_bar() -> Menu {
 				)
 				.unwrap(),
 				&MenuItem::new("Full Screen", false, accel("F11")),
-				&MenuItem::new("Sound", false, None),
+				&CheckMenuItem::with_id(AppCommand::OptionsToggleSound, "Sound", false, false,None),
 				&MenuItem::new("Cheats...", false, None),
 			],
 		)
@@ -609,6 +612,25 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			model
 				.mame_controller
 				.issue_command(MameCommand::Throttled(!is_throttled));
+		}
+		AppCommand::OptionsToggleSound => {
+			if let Some(sound_attenuation) = model
+				.running_status
+				.borrow()
+				.running
+				.as_ref()
+				.map(|r| r.sound_attenuation)
+			{
+				let is_sound_enabled = sound_attenuation > SOUND_ATTENUATION_OFF;
+				let new_attenuation = if is_sound_enabled {
+					SOUND_ATTENUATION_OFF
+				} else {
+					SOUND_ATTENUATION_ON
+				};
+				model
+					.mame_controller
+					.issue_command(MameCommand::SetAttenuation(new_attenuation));
+			}
 		}
 		AppCommand::SettingsPaths => {
 			let fut = show_paths_dialog(model.clone());
@@ -896,6 +918,11 @@ fn update_menus(model: &AppModel) {
 		.map(|r| r.is_throttled)
 		.unwrap_or_default();
 	let throttle_rate = running_status.running.as_ref().map(|r| r.throttle_rate);
+	let is_sound_enabled = running_status
+		.running
+		.as_ref()
+		.map(|r| r.sound_attenuation > SOUND_ATTENUATION_OFF)
+		.unwrap_or_default();
 
 	// update the menu bar
 	update_menu_items(&model.menu_bar, |id| {
@@ -905,6 +932,7 @@ fn update_menus(model: &AppModel) {
 			Ok(AppCommand::FilePause) => (Some(is_running), Some(is_paused)),
 			Ok(AppCommand::OptionsThrottleRate(x)) => (Some(is_running), Some(Some(x) == throttle_rate)),
 			Ok(AppCommand::OptionsToggleWarp) => (Some(is_running), Some(!is_throttled)),
+			Ok(AppCommand::OptionsToggleSound) => (Some(is_running), Some(is_sound_enabled)),
 			_ => (None, None),
 		};
 		MenuItemUpdate { enabled, checked }

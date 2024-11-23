@@ -59,6 +59,7 @@ pub enum MameCommand<'a> {
 	Ping,
 	Throttled(bool),
 	ThrottleRate(f32),
+	SetAttenuation(i32),
 }
 
 #[derive(Debug)]
@@ -351,6 +352,7 @@ fn command_text(command: &MameCommand<'_>) -> Cow<'static, str> {
 		MameCommand::Ping => "PING".into(),
 		MameCommand::Throttled(throttled) => format!("THROTTLED {}", bool_str(*throttled)).into(),
 		MameCommand::ThrottleRate(throttle) => format!("THROTTLE_RATE {}", throttle).into(),
+		MameCommand::SetAttenuation(attenuation) => format!("SET_ATTENUATION {}", attenuation).into(),
 	}
 }
 
