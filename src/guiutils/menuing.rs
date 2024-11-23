@@ -84,7 +84,11 @@ fn update_menu_items_internal(items: &[MenuItemKind], callback: &impl Fn(&MenuId
 				if let Some(enabled) = update.enabled {
 					menu_item.set_enabled(enabled);
 				}
-				assert!(update.checked.is_none());
+				assert!(
+					update.checked.is_none(),
+					"Menu item \"{}\" needs to be using CheckMenuItem",
+					menu_item.text()
+				);
 			}
 			MenuItemKind::Check(menu_item) => {
 				let update = callback(menu_item.id());

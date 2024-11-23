@@ -28,12 +28,14 @@ impl Status {
 			let is_paused = running.is_paused.unwrap_or(status_running.is_paused);
 			let is_throttled = running.is_throttled.unwrap_or(status_running.is_throttled);
 			let throttle_rate = running.throttle_rate.unwrap_or(status_running.throttle_rate);
+			let sound_attenuation = running.sound_attenuation.unwrap_or(status_running.sound_attenuation);
 
 			StatusRunning {
 				machine_name,
 				is_paused,
 				is_throttled,
 				throttle_rate,
+				sound_attenuation,
 			}
 		});
 		event!(LOG, "Status::merge(): running={:?}", running);
@@ -49,6 +51,7 @@ pub struct StatusRunning {
 	pub is_paused: bool,
 	pub is_throttled: bool,
 	pub throttle_rate: f32,
+	pub sound_attenuation: i32,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -69,6 +72,7 @@ struct UpdateRunning {
 	pub is_paused: Option<bool>,
 	pub is_throttled: Option<bool>,
 	pub throttle_rate: Option<f32>,
+	pub sound_attenuation: Option<i32>,
 }
 
 #[cfg(test)]
