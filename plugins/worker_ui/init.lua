@@ -242,6 +242,15 @@ local current_poll_callback = nil
 local mouse_enabled_by_ui = false
 local pause_when_restarted = true
 
+-- state can be:
+--   "IDLE"		    	- emulation is not running
+--   "RESET_PAUSED"		- we're in the process of starting/resetting, and we need to pause
+--   "RESET_UNPAUSED"	- we're in the process of starting/resetting, and we need to unpause
+--   "ACTIVE"       	- emulation is running
+--   "EXITING"      	- we're shutting down
+local state = "IDLE"
+local start_load_args = {}
+
 function is_polling_input_seq()
 	if current_poll_callback then
 		return true
@@ -364,7 +373,7 @@ function emit_status(light, out)
 	end
 
 	-- most status is only relevant if we're running
-	if not is_running() then
+	if state ~= "ACTIVE" then
 		emit("\tromname=\"\"");
 		emit("/>");
 	else
@@ -627,34 +636,24 @@ function emit_status(light, out)
 	end
 end
 
-function is_running()
-	return emu.romname() ~= "___empty"
-end
-
-local session_starting = false
-local session_starting_load_args = {}
-local session_stopping = false
-local session_exiting = false
-
 -- START command
 function command_start(args)
 	emu.start(args[2])
 
 	-- prep initial load args
-	session_starting_load_args = {}
+	start_load_args = {}
 	for i = 3,#args-1,2 do
-		session_starting_load_args[args[i+0]] = args[i+1]
+		start_load_args[args[i+0]] = args[i+1]
 	end
 
-	session_starting = true
-	pause_when_restarted = false
+	print("@INFO ### Starting emulation...")
 end
 
 -- STOP command
 function command_stop(args)
-	if is_running() then
+	if state == "ACTIVE" then
 		machine():exit()
-		session_stopping = true
+		print("@INFO ### Stopping emulation")
 	else
 		print("@OK ### No running emulation")
 	end
@@ -663,19 +662,14 @@ end
 -- EXIT command
 function command_exit(args)
 	machine():exit()
-	if is_running() then
-		session_exiting = true
-	else
-		print("@OK ### Exit scheduled")
-	end
+	state = "EXITING"
+	print("@OK ### Exit scheduled")
 end
 
 -- PING command
-local next_ping_should_be_light = false
 function command_ping(args)
 	print("@OK STATUS ### Ping... pong...")
-	emit_status(next_ping_should_be_light)
-	next_ping_should_be_light = true
+	emit_status(true)
 end
 
 -- SLEEP command (in practice only used by tests)
@@ -692,16 +686,14 @@ end
 
 -- SOFT_RESET command
 function command_soft_reset(args)
-	pause_when_restarted = machine().paused
 	machine():soft_reset()
-	print("@OK ### Soft Reset Scheduled")
+	print("@INFO ### Soft Reset Scheduled")
 end
 
 -- HARD_RESET command
 function command_hard_reset(args)
-	pause_when_restarted = machine().paused
 	machine():hard_reset()
-	print("@OK ### Hard Reset Scheduled")
+	print("@INFO ### Hard Reset Scheduled")
 end
 
 -- PAUSE command
@@ -1192,37 +1184,57 @@ function startplugin()
 	conth:start(scr);
 
 	-- we want to hold off until the prestart event; register a handler for it
-	local initial_start = false
-	local session_active = true
 	function callback_prestart()
 		-- prestart has been invoked; set up MAME for our control
 		machine_uiinput().presses_enabled = false
 		if machine_debugger() then
 			machine_debugger().execution_state = 'run'
 		end
-		session_active = true
 		update_mouse_enabled()
 		
 		-- turn off image display status; we like our own UX
 		pcall(function() ui().image_display_enabled = false end)
 
-		-- do we have to pause now that we [re]started?
-		if pause_when_restarted then
-			emu.pause()
-			pause_when_restarted = true
-		end
-
-		-- is this the very first time we have hit a pre-start?
-		if not initial_start then
-			-- and indicate that we're ready for commands
-			print("@OK STATUS ### Emulation commenced; ready for commands")
+		-- switch based off the state
+		if state == "EXITING" then
+			-- we're exiting - keep on exiting!
+			machine():exit()
+		elseif emu.romname() == "___empty" then
+			-- we're idling
+			state = "IDLE"
+			print("@OK STATUS ### Idle; no emulation running; ready for commands")
 			emit_status()
-			initial_start = true
-		end
+		else
+			-- we're active (this could be the result of starting an emulation, or a soft/hard
+			-- reset); first  do we need to load images on start?  if so load them
+			local will_reset = false
+			for k,v in pairs(start_load_args) do
+				local image = find_image_by_tag(k)
+				if image then
+					image:load(v)
+					if image.is_reset_on_load then
+						will_reset = true
+					end
+				end
+			end
+			start_load_args = {}
 
-		-- since we had a reset, we might have images that were just loaded, therefore
-		-- the status returned by the next PING should not be light
-		 next_ping_should_be_light = false
+			-- it is possible that loading an image will force a reset; we need to only
+			-- enter this block if we don't expect a reset
+			if not will_reset then
+				-- do we need to pause/unpause?
+				if state == "RESET_PAUSED" then
+					emu.pause()
+				elseif state == "RESET_UNPAUSED" then
+					emu.unpause()
+				end
+
+				-- and finally we're active
+				state = "ACTIVE"
+				print("@OK STATUS ### Emulation reset")
+				emit_status()
+			end
+		end
 	end
 	emu.register_prestart(function() 
 		protected_call(callback_prestart, "callback_prestart")
@@ -1231,7 +1243,17 @@ function startplugin()
 	function callback_stop()
 		-- the emulation session has stopped; tidy things up
 		stop_polling_input_seq()
-		session_active = false
+
+		-- adjust the state to show we're resetting (unless we're exiting)
+		if state ~= "EXITING" then
+			if machine().paused then
+				state = "RESET_PAUSED"
+			else
+				state = "RESET_UNPAUSED"
+			end
+		end
+
+		print("@INFO ### Session is stopping")
 	end
 	if emu.add_machine_stop_notifier ~= nil then
 		emu.add_machine_stop_notifier(function()
@@ -1245,43 +1267,9 @@ function startplugin()
 
 	-- register another handler to handle commands after prestart
 	function callback_periodic()
-		-- are we starting, and has that start completed?  note that the paused
-		-- check is necessary because it is how we detect we've entered the
-		-- running phase
-		if session_starting and is_running() and not machine().paused then
-
-			-- load initial images
-			for k,v in pairs(session_starting_load_args) do
-				local image = find_image_by_tag(k)
-				if image then
-					image:load(v)
-				end
-			end
-			session_starting_load_args = {}
-
-			emu.unpause()
-			print "@OK STATUS ### Emulation has started"
-			emit_status()
-			session_starting = false
-		end
-
-		-- are we stopping, and has that stop completed?
-		if session_stopping and not is_running() then
-			print "@OK STATUS ### Emulation has stopped"
-			emit_status()
-			session_stopping = false
-		end
-
-		-- are we exiting, and has the first stop completed?
-		if session_exiting and not is_running() then
-			machine():exit()
-			print("@OK ### Exit scheduled")
-			session_exiting = false
-		end
-
 		-- it is essential that we only perform these activities when there
 		-- is an active session!
-		if session_active then
+		if state == "IDLE" or state == "ACTIVE" then
 			-- are we polling input?  if so, poll!
 			if is_polling_input_seq() then
 				current_poll_callback()
