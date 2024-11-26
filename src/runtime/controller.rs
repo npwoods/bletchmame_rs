@@ -210,16 +210,13 @@ fn internal_thread_proc(
 
 	loop {
 		event!(LOG, "thread_proc(): calling read_line_from_mame()");
-		let (update, is_cruft) = match read_response_from_mame(&mut mame_stdout, &mut mame_stderr, &mut line) {
-			Ok((update, is_cruft)) => (update, is_cruft),
-			Err(e) => break Err(e),
-		};
+		let (update, is_signal) = read_response_from_mame(&mut mame_stdout, &mut mame_stderr, &mut line)?;
 
 		if let Some(update) = update {
 			event_callback(MameEvent::StatusUpdate(update))
 		}
 
-		if !is_cruft {
+		if is_signal {
 			if is_exiting {
 				break Ok(());
 			}
@@ -240,6 +237,7 @@ fn read_response_from_mame(
 	enum ResponseLine {
 		Ok,
 		OkStatus,
+		Info,
 		Cruft,
 	}
 
@@ -255,6 +253,7 @@ fn read_response_from_mame(
 				let result = match msg {
 					"OK" => Ok(ResponseLine::Ok),
 					"OK STATUS" => Ok(ResponseLine::OkStatus),
+					"INFO" => Ok(ResponseLine::Info),
 					"ERROR" => Err(ThisError::MameErrorResponse(comment.unwrap_or_default().to_string()).into()),
 					_ => Err(ThisError::MameResponseNotUnderstood(line.to_string()).into()),
 				};
@@ -293,7 +292,14 @@ fn read_response_from_mame(
 	} else {
 		None
 	};
-	Ok((update, resp == ResponseLine::Cruft))
+
+	// is the response a "signal", indicating that it is our turn to issue a command?
+	let is_signal = match resp {
+		ResponseLine::Ok | ResponseLine::OkStatus => true,
+		ResponseLine::Info | ResponseLine::Cruft => false,
+	};
+
+	Ok((update, is_signal))
 }
 
 fn read_line_from_mame(
