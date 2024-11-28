@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::cell::Cell;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::BufWriter;
@@ -33,6 +34,7 @@ const LOG: Level = Level::DEBUG;
 pub struct MameSession {
 	handle: JoinHandle<()>,
 	comm: Arc<SessionCommunication>,
+	exit_issued: Cell<bool>,
 }
 
 struct SessionCommunication {
@@ -76,7 +78,11 @@ impl MameSession {
 		let handle = spawn(move || thread_proc(&mame_args, &comm_clone, event_callback, mame_stderr));
 
 		// and set ourselves up
-		Self { handle, comm }
+		Self {
+			handle,
+			comm,
+			exit_issued: Cell::new(false),
+		}
 	}
 
 	pub fn has_pending_commands(&self) -> bool {
@@ -84,11 +90,17 @@ impl MameSession {
 	}
 
 	pub fn issue_command(&self, command: MameCommand) {
+		if command == MameCommand::Exit {
+			self.exit_issued.set(true);
+		}
 		self.comm.message_queue.push(command.into());
 		self.comm.message_queue_len.fetch_add(1, Ordering::Relaxed);
 	}
 
 	pub fn shutdown(self) {
+		if !self.exit_issued.get() {
+			self.issue_command(MameCommand::Exit);
+		}
 		self.handle.join().unwrap()
 	}
 }
