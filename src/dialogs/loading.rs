@@ -1,5 +1,5 @@
 use std::io::BufReader;
-use std::io::Read;
+use std::process::Child;
 use std::process::Command;
 use std::process::Stdio;
 use std::sync::atomic::AtomicBool;
@@ -33,8 +33,7 @@ pub async fn dialog_load_mame_info(
 	dialog.set_current_status("Retrieving machine info from MAME...".into());
 	dialog.show().unwrap();
 
-	// then launch the process - TODO - this clippy warning should be fixed!
-	#[allow(clippy::zombie_processes)]
+	// then launch the process
 	let process = Command::new(mame_executable)
 		.arg("-listxml")
 		.arg("-nodtd")
@@ -54,7 +53,7 @@ pub async fn dialog_load_mame_info(
 
 	// and with that out of the way, launch the thread
 	let dialog_weak = dialog.as_weak();
-	spawn_blocking(move || load_mame_info_thread_proc(dialog_weak, process.stdout.unwrap(), cancelled))
+	spawn_blocking(move || load_mame_info_thread_proc(dialog_weak, process, cancelled))
 		.await
 		.unwrap()
 }
@@ -62,10 +61,13 @@ pub async fn dialog_load_mame_info(
 /// worker thread for loading MAME info
 fn load_mame_info_thread_proc(
 	dialog_weak: Weak<LoadingDialog>,
-	input: impl Read,
+	mut process: Child,
 	cancelled: Arc<AtomicBool>,
 ) -> Option<InfoDb> {
 	let mut last_updated_time = None;
+
+	// access the MAME process stdout (which is input to us)
+	let input = process.stdout.as_mut().unwrap();
 
 	// prepare a callback for the InfoDB loading code
 	let dialog_weak_clone = dialog_weak.clone();
@@ -102,5 +104,10 @@ fn load_mame_info_thread_proc(
 	dialog_weak
 		.upgrade_in_event_loop(|dialog| dialog.hide().unwrap())
 		.unwrap();
+
+	// and close out the process (we don't want it to zombie)
+	let _ = process.wait();
+
+	// and return!
 	db
 }
