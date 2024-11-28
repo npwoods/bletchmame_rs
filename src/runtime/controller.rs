@@ -57,6 +57,8 @@ pub enum MameCommand<'a> {
 		initial_loads: &'a [(&'a str, &'a str)],
 	},
 	Stop,
+	SoftReset,
+	HardReset,
 	Pause,
 	Resume,
 	Ping,
@@ -381,6 +383,8 @@ fn command_text(command: &MameCommand<'_>) -> Cow<'static, str> {
 			.join(" ")
 			.into(),
 		MameCommand::Stop => "STOP".into(),
+		MameCommand::SoftReset => "SOFT_RESET".into(),
+		MameCommand::HardReset => "HARD_RESET".into(),
 		MameCommand::Pause => "PAUSE".into(),
 		MameCommand::Resume => "RESUME".into(),
 		MameCommand::Ping => "PING".into(),

@@ -17,6 +17,8 @@ pub enum AppCommand {
 	// File menu
 	FileStop,
 	FilePause,
+	FileResetSoft,
+	FileResetHard,
 	FileExit,
 
 	// Options menu
