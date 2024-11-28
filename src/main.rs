@@ -20,15 +20,15 @@ mod xml;
 
 use std::path::PathBuf;
 
+use dirs::config_local_dir;
+use runtime::controller::MameStderr;
+use slint::ComponentHandle;
+use structopt::StructOpt;
 use tracing::Level;
 use win32job::Job;
 use win32job::JobError;
 use winapi::um::wincon::AttachConsole;
 use winapi::um::wincon::ATTACH_PARENT_PROCESS;
-
-use dirs::config_local_dir;
-use slint::ComponentHandle;
-use structopt::StructOpt;
 
 use crate::diagnostics::info_db_from_xml_file;
 use crate::guiutils::init_gui_utils;
@@ -48,6 +48,9 @@ struct Opt {
 
 	#[cfg_attr(feature = "diagnostics", structopt(long))]
 	log_level: Option<Level>,
+
+	#[cfg_attr(feature = "diagnostics", structopt(long))]
+	no_capture_mame_stderr: bool,
 }
 
 #[cfg(target_os = "windows")]
@@ -95,6 +98,13 @@ fn main() {
 		path
 	});
 
+	// are we supposed to capture MAME's stderr? we almost always do, except when debugging
+	let mame_stderr = if opts.no_capture_mame_stderr {
+		MameStderr::Inherit
+	} else {
+		MameStderr::Capture
+	};
+
 	// set up the tokio runtime
 	let tokio_runtime = tokio::runtime::Builder::new_multi_thread()
 		.enable_time()
@@ -106,7 +116,7 @@ fn main() {
 	init_gui_utils();
 
 	// create the application winodw...
-	let app_window = appwindow::create(prefs_path);
+	let app_window = appwindow::create(prefs_path, mame_stderr);
 
 	// ...and run run run!
 	app_window.run().unwrap();

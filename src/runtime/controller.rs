@@ -18,6 +18,7 @@ use anyhow::Error;
 use anyhow::Result;
 use blockingqueue::BlockingQueue;
 use itertools::Itertools;
+use strum::EnumString;
 use tracing::event;
 use tracing::Level;
 use winapi::um::winbase::CREATE_NO_WINDOW;
@@ -34,6 +35,7 @@ const LOG: Level = Level::DEBUG;
 pub struct MameController {
 	session: RefCell<Option<Session>>,
 	event_callback: RefCell<Arc<dyn Fn(MameEvent) + Send + Sync + 'static>>,
+	mame_stderr: MameStderr,
 }
 
 struct Session {
@@ -77,6 +79,15 @@ struct ProcessedCommand {
 	pub is_exit: bool,
 }
 
+#[derive(Clone, Copy, Debug, Default, EnumString)]
+pub enum MameStderr {
+	#[default]
+	#[strum(ascii_case_insensitive)]
+	Capture,
+	#[strum(ascii_case_insensitive)]
+	Inherit,
+}
+
 #[derive(thiserror::Error, Debug)]
 enum ThisError {
 	#[error("MAME Error Response: {0:?}")]
@@ -88,10 +99,11 @@ enum ThisError {
 }
 
 impl MameController {
-	pub fn new() -> Self {
+	pub fn new(mame_stderr: MameStderr) -> Self {
 		Self {
 			session: RefCell::new(None),
 			event_callback: RefCell::new(Arc::new(|_| {})),
+			mame_stderr,
 		}
 	}
 
@@ -146,7 +158,8 @@ impl MameController {
 			// and start the thread
 			let comm_clone = comm.clone();
 			let event_callback = self.event_callback.borrow().clone();
-			let handle = spawn(move || thread_proc(&mame_args, &comm_clone, event_callback.as_ref()));
+			let mame_stderr = self.mame_stderr;
+			let handle = spawn(move || thread_proc(&mame_args, &comm_clone, event_callback.as_ref(), mame_stderr));
 
 			// and set up our session info
 			let session = Session { handle, comm };
@@ -173,10 +186,15 @@ impl From<MameCommand<'_>> for ProcessedCommand {
 	}
 }
 
-fn thread_proc(mame_args: &MameArguments, comm: &SessionCommunication, event_callback: &dyn Fn(MameEvent)) {
+fn thread_proc(
+	mame_args: &MameArguments,
+	comm: &SessionCommunication,
+	event_callback: &dyn Fn(MameEvent),
+	mame_stderr: MameStderr,
+) {
 	event_callback(MameEvent::SessionStarted);
 
-	if let Err(e) = internal_thread_proc(mame_args, comm, event_callback) {
+	if let Err(e) = internal_thread_proc(mame_args, comm, event_callback, mame_stderr) {
 		event_callback(MameEvent::Error(e))
 	}
 
@@ -188,17 +206,22 @@ fn internal_thread_proc(
 	mame_args: &MameArguments,
 	comm: &SessionCommunication,
 	event_callback: &dyn Fn(MameEvent),
+	mame_stderr: MameStderr,
 ) -> Result<()> {
 	event!(LOG, "thread_proc(): Launching MAME: mame_args={mame_args:?}");
 
 	// launch MAME, launch!
 	let args = mame_args.args.iter().map(|x| x.as_ref());
+	let (mame_stderr, creation_flags) = match mame_stderr {
+		MameStderr::Capture => (Stdio::piped(), CREATE_NO_WINDOW),
+		MameStderr::Inherit => (Stdio::inherit(), 0),
+	};
 	let mut child = Command::new(&mame_args.program)
 		.args(args)
 		.stdin(Stdio::piped())
 		.stdout(Stdio::piped())
-		.stderr(Stdio::piped())
-		.creation_flags(CREATE_NO_WINDOW)
+		.stderr(mame_stderr)
+		.creation_flags(creation_flags)
 		.spawn()
 		.map_err(|error| Error::new(error).context("Error launching MAME"))?;
 
@@ -207,7 +230,7 @@ fn internal_thread_proc(
 
 	// set up what we need to interact with MAME as a child process
 	let mut mame_stdin = BufWriter::new(child.stdin.take().unwrap());
-	let mut mame_stderr = BufReader::new(child.stderr.take().unwrap());
+	let mut mame_stderr = child.stderr.take().map(BufReader::new);
 	let mut mame_stdout = BufReader::new(child.stdout.take().unwrap());
 	let mut line = String::new();
 	let mut is_exiting = false;
@@ -234,7 +257,7 @@ fn internal_thread_proc(
 
 fn read_response_from_mame(
 	mame_stdout: &mut impl BufRead,
-	mame_stderr: &mut impl BufRead,
+	mame_stderr: &mut Option<impl BufRead>,
 	line: &mut String,
 ) -> Result<(Option<Update>, bool)> {
 	#[derive(Debug, Clone, Copy, PartialEq)]
@@ -275,6 +298,7 @@ fn read_response_from_mame(
 
 	let update = if resp == ResponseLine::OkStatus {
 		// read the status XML from MAME
+		event!(LOG, "thread_proc(): starting to parse update");
 		let update = Update::parse(&mut *mame_stdout);
 		event!(LOG, "thread_proc(): parsed update: {:?}", update.as_ref().map(|_| ()));
 
@@ -308,13 +332,13 @@ fn read_response_from_mame(
 
 fn read_line_from_mame(
 	mame_stdout: &mut impl BufRead,
-	mame_stderr: &mut impl BufRead,
+	mame_stderr: &mut Option<impl BufRead>,
 	line: &mut String,
 ) -> Result<()> {
 	line.clear();
 	match mame_stdout.read_line(line) {
 		Ok(0) => {
-			let mame_stderr_text = read_text_from_reader(mame_stderr);
+			let mame_stderr_text = mame_stderr.as_mut().map(read_text_from_reader).unwrap_or_default();
 			Err(ThisError::EofFromMame(mame_stderr_text).into())
 		}
 		Ok(_) => Ok(()),

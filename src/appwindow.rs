@@ -63,6 +63,7 @@ use crate::prefs::SortOrder;
 use crate::runtime::controller::MameCommand;
 use crate::runtime::controller::MameController;
 use crate::runtime::controller::MameEvent;
+use crate::runtime::controller::MameStderr;
 use crate::runtime::MameWindowing;
 use crate::selection::SelectionManager;
 use crate::status::Status;
@@ -220,7 +221,7 @@ impl AppModel {
 	}
 }
 
-pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
+pub fn create(prefs_path: Option<PathBuf>, mame_stderr: MameStderr) -> AppWindow {
 	let app_window = AppWindow::new().unwrap();
 
 	// child window for MAME to attach to
@@ -249,7 +250,7 @@ pub fn create(prefs_path: Option<PathBuf>) -> AppWindow {
 		preferences: RefCell::new(preferences),
 		info_db: RefCell::new(None),
 		empty_button_command: RefCell::new(None),
-		mame_controller: MameController::new(),
+		mame_controller: MameController::new(mame_stderr),
 		running_state: Cell::new(MameRunningState::Normal),
 		running_status: RefCell::new(Status::default()),
 		child_window,
