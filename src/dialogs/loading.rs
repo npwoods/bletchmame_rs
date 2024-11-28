@@ -14,6 +14,7 @@ use slint::SharedString;
 use slint::Weak;
 use tokio::task::spawn_blocking;
 
+use crate::guiutils::windowing::reenable_modal_parent;
 use crate::guiutils::windowing::with_modal_parent;
 use crate::info::InfoDb;
 use crate::ui::LoadingDialog;
@@ -53,13 +54,14 @@ pub async fn dialog_load_mame_info(
 
 	// and with that out of the way, launch the thread
 	let dialog_weak = dialog.as_weak();
-	spawn_blocking(move || load_mame_info_thread_proc(dialog_weak, process, cancelled))
+	spawn_blocking(move || load_mame_info_thread_proc(parent, dialog_weak, process, cancelled))
 		.await
 		.unwrap()
 }
 
 /// worker thread for loading MAME info
 fn load_mame_info_thread_proc(
+	parent: Weak<impl ComponentHandle + 'static>,
 	dialog_weak: Weak<LoadingDialog>,
 	mut process: Child,
 	cancelled: Arc<AtomicBool>,
@@ -102,7 +104,10 @@ fn load_mame_info_thread_proc(
 
 	// now that we're done, close out the dialog
 	dialog_weak
-		.upgrade_in_event_loop(|dialog| dialog.hide().unwrap())
+		.upgrade_in_event_loop(move |dialog| {
+			reenable_modal_parent(parent.unwrap().window());
+			dialog.hide().unwrap()
+		})
 		.unwrap();
 
 	// and close out the process (we don't want it to zombie)

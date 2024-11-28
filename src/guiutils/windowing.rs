@@ -96,6 +96,6 @@ pub async fn run_modal_dialog<R>(
 	result
 }
 
-fn reenable_modal_parent(parent: &Window) {
+pub fn reenable_modal_parent(parent: &Window) {
 	parent.with_winit_window(|window| window.set_enable(true));
 }
