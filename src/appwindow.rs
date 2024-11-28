@@ -480,10 +480,10 @@ fn create_menu_bar() -> Menu {
 				&MenuItem::new("Debugger...", false, None),
 				&Submenu::with_items(
 					"Reset",
-					false,
+					true,
 					&[
-						&MenuItem::new("Soft Reset", false, None),
-						&MenuItem::new("Hard Reset", false, None),
+						&MenuItem::with_id(AppCommand::FileResetSoft, "Soft Reset", false, None),
+						&MenuItem::with_id(AppCommand::FileResetHard,"Hard Reset", false, None),
 					],
 				)
 				.unwrap(),
@@ -590,6 +590,12 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			} else {
 				model.mame_controller.issue_command(MameCommand::Pause);
 			}
+		}
+		AppCommand::FileResetSoft => {
+			model.mame_controller.issue_command(MameCommand::SoftReset);
+		}
+		AppCommand::FileResetHard => {
+			model.mame_controller.issue_command(MameCommand::HardReset);
 		}
 		AppCommand::FileExit => {
 			if model.mame_controller.has_session() {
@@ -931,6 +937,8 @@ fn update_menus(model: &AppModel) {
 			Ok(AppCommand::HelpRefreshInfoDb) => (Some(has_mame_executable), None),
 			Ok(AppCommand::FileStop) => (Some(is_running), None),
 			Ok(AppCommand::FilePause) => (Some(is_running), Some(is_paused)),
+			Ok(AppCommand::FileResetSoft) => (Some(is_running), None),
+			Ok(AppCommand::FileResetHard) => (Some(is_running), None),
 			Ok(AppCommand::OptionsThrottleRate(x)) => (Some(is_running), Some(Some(x) == throttle_rate)),
 			Ok(AppCommand::OptionsToggleWarp) => (Some(is_running), Some(!is_throttled)),
 			Ok(AppCommand::OptionsToggleSound) => (Some(is_running), Some(is_sound_enabled)),
