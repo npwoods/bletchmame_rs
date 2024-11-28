@@ -5,6 +5,7 @@ use std::io::BufWriter;
 use std::io::Read;
 use std::io::Write;
 use std::os::windows::process::CommandExt;
+use std::process::Child;
 use std::process::Command;
 use std::process::Stdio;
 use std::sync::atomic::AtomicU64;
@@ -106,24 +107,20 @@ fn thread_proc(
 	mame_stderr: MameStderr,
 ) {
 	event_callback(MameEvent::SessionStarted);
-
-	if let Err(e) = internal_thread_proc(mame_args, comm, &event_callback, mame_stderr) {
-		event_callback(MameEvent::Error(e))
+	if let Err(e) = execute_mame(mame_args, comm, &event_callback, mame_stderr) {
+		event_callback(MameEvent::Error(e));
 	}
-
-	comm.mame_pid.store(!0, Ordering::Relaxed);
 	event_callback(MameEvent::SessionEnded);
 }
 
-fn internal_thread_proc(
+fn execute_mame(
 	mame_args: &MameArguments,
 	comm: &SessionCommunication,
 	event_callback: &impl Fn(MameEvent),
 	mame_stderr: MameStderr,
 ) -> Result<()> {
-	event!(LOG, "thread_proc(): Launching MAME: mame_args={mame_args:?}");
-
 	// launch MAME, launch!
+	event!(LOG, "execute_mame(): Launching MAME: mame_args={mame_args:?}");
 	let args = mame_args.args.iter().map(|x| x.as_ref());
 	let (mame_stderr, creation_flags) = match mame_stderr {
 		MameStderr::Capture => (Stdio::piped(), CREATE_NO_WINDOW),
@@ -141,6 +138,23 @@ fn internal_thread_proc(
 	// MAME launched!  we now have a pid
 	comm.mame_pid.store(child.id().into(), Ordering::Relaxed);
 
+	// interact with MAME, do our thing
+	let mame_result = interact_with_mame(&mut child, comm, &event_callback);
+
+	// await the exit status
+	let exit_status = child.wait();
+	event!(LOG, "execute_mame(): MAME exited exit_status={:?}", exit_status);
+
+	// and we're done
+	comm.mame_pid.store(!0, Ordering::Relaxed);
+	mame_result
+}
+
+fn interact_with_mame(
+	child: &mut Child,
+	comm: &SessionCommunication,
+	event_callback: &impl Fn(MameEvent),
+) -> Result<()> {
 	// set up what we need to interact with MAME as a child process
 	let mut mame_stdin = BufWriter::new(child.stdin.take().unwrap());
 	let mut mame_stderr = child.stderr.take().map(BufReader::new);
@@ -149,7 +163,7 @@ fn internal_thread_proc(
 	let mut is_exiting = false;
 
 	loop {
-		event!(LOG, "thread_proc(): calling read_line_from_mame()");
+		event!(LOG, "interact_with_mame(): calling read_line_from_mame()");
 		let (update, is_signal) = read_response_from_mame(&mut mame_stdout, &mut mame_stderr, &mut line)?;
 
 		if let Some(update) = update {
