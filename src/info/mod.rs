@@ -414,7 +414,7 @@ where
 	}
 }
 
-impl<'a, B> Debug for Object<'a, B>
+impl<B> Debug for Object<'_, B>
 where
 	B: BinarySerde + Debug,
 {
