@@ -21,7 +21,6 @@ mod xml;
 use std::path::PathBuf;
 
 use dirs::config_local_dir;
-use runtime::controller::MameStderr;
 use slint::ComponentHandle;
 use structopt::StructOpt;
 use tracing::Level;
@@ -32,6 +31,7 @@ use winapi::um::wincon::ATTACH_PARENT_PROCESS;
 
 use crate::diagnostics::info_db_from_xml_file;
 use crate::guiutils::init_gui_utils;
+use crate::runtime::MameStderr;
 
 mod ui {
 	slint::include_modules!();
