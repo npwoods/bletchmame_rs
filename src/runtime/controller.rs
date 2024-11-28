@@ -22,6 +22,7 @@ use tracing::event;
 use tracing::Level;
 use winapi::um::winbase::CREATE_NO_WINDOW;
 
+use crate::debugstr::DebugString;
 use crate::prefs::PrefsPaths;
 use crate::runtime::args::MameArguments;
 use crate::runtime::args::MameArgumentsSource;
@@ -118,8 +119,11 @@ impl MameController {
 		});
 
 		// logging
-		let prefs_paths_str = if prefs_paths.is_some() { "Some(...)" } else { "None" };
-		event!(LOG, "MameController::reset(): prefs_paths={}", prefs_paths_str);
+		event!(
+			LOG,
+			"MameController::reset(): prefs_paths={:?}",
+			prefs_paths.as_ref().map(DebugString::elipsis)
+		);
 
 		// is there an active session? if so, join it
 		if let Some(session) = self.session.take() {

@@ -1,5 +1,7 @@
 mod parse;
 
+use std::fmt::Debug;
+use std::fmt::Formatter;
 use std::io::BufRead;
 
 use anyhow::Result;
@@ -8,11 +10,12 @@ use serde::Serialize;
 use tracing::event;
 use tracing::Level;
 
+use crate::debugstr::DebugString;
 use crate::status::parse::parse_update;
 
 const LOG: Level = Level::TRACE;
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct Status {
 	pub has_initialized: bool,
 	pub running: Option<StatusRunning>,
@@ -45,6 +48,16 @@ impl Status {
 	}
 }
 
+impl Debug for Status {
+	fn fmt(&self, fmt: &mut Formatter<'_>) -> std::fmt::Result {
+		fmt.debug_struct("Status")
+			.field("has_initialized", &self.has_initialized)
+			.field("running", &self.running.as_ref().map(DebugString::elipsis))
+			.field("build", &self.build)
+			.finish()
+	}
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct StatusRunning {
 	pub machine_name: String,
@@ -54,7 +67,7 @@ pub struct StatusRunning {
 	pub sound_attenuation: i32,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Deserialize, Serialize, PartialEq)]
 pub struct Update {
 	running: Option<UpdateRunning>,
 	build: Option<String>,
@@ -63,6 +76,15 @@ pub struct Update {
 impl Update {
 	pub fn parse(reader: impl BufRead) -> Result<Self> {
 		parse_update(reader)
+	}
+}
+
+impl Debug for Update {
+	fn fmt(&self, fmt: &mut Formatter<'_>) -> std::fmt::Result {
+		fmt.debug_struct("Update")
+			.field("running", &self.running.as_ref().map(DebugString::elipsis))
+			.field("build", &self.build)
+			.finish()
 	}
 }
 

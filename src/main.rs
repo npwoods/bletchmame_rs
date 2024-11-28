@@ -2,6 +2,7 @@
 mod appcommand;
 mod appwindow;
 mod collections;
+mod debugstr;
 mod diagnostics;
 mod dialogs;
 mod guiutils;
