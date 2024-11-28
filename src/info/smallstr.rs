@@ -90,7 +90,7 @@ impl Debug for SmallStrRef<'_> {
 	}
 }
 
-impl<'a> AsRef<str> for SmallStrRef<'a> {
+impl AsRef<str> for SmallStrRef<'_> {
 	fn as_ref(&self) -> &str {
 		match self {
 			SmallStrRef::Ref(x) => x,
@@ -105,7 +105,7 @@ impl PartialEq for SmallStrRef<'_> {
 	}
 }
 
-impl<'a> PartialEq<str> for SmallStrRef<'a> {
+impl PartialEq<str> for SmallStrRef<'_> {
 	fn eq(&self, other: &str) -> bool {
 		self.as_ref() == other
 	}
@@ -117,7 +117,7 @@ impl<'a> PartialEq<SmallStrRef<'a>> for str {
 	}
 }
 
-impl<'a> PartialEq<&str> for SmallStrRef<'a> {
+impl PartialEq<&str> for SmallStrRef<'_> {
 	fn eq(&self, other: &&str) -> bool {
 		self.as_ref() == *other
 	}
@@ -129,21 +129,21 @@ impl<'a> PartialEq<SmallStrRef<'a>> for &str {
 	}
 }
 
-impl<'a> Eq for SmallStrRef<'a> {}
+impl Eq for SmallStrRef<'_> {}
 
-impl<'a> PartialOrd for SmallStrRef<'a> {
+impl PartialOrd for SmallStrRef<'_> {
 	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
 		Some(Ord::cmp(self, other))
 	}
 }
 
-impl<'a> Ord for SmallStrRef<'a> {
+impl Ord for SmallStrRef<'_> {
 	fn cmp(&self, other: &Self) -> Ordering {
 		self.as_ref().cmp(other.as_ref())
 	}
 }
 
-impl<'a> Deref for SmallStrRef<'a> {
+impl Deref for SmallStrRef<'_> {
 	type Target = str;
 
 	fn deref(&self) -> &str {
@@ -151,7 +151,7 @@ impl<'a> Deref for SmallStrRef<'a> {
 	}
 }
 
-impl<'a> Borrow<str> for SmallStrRef<'a> {
+impl Borrow<str> for SmallStrRef<'_> {
 	fn borrow(&self) -> &str {
 		self.as_ref()
 	}
