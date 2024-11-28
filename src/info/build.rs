@@ -297,7 +297,7 @@ impl State {
 				.copied();
 
 			// sanity check and return
-			assert!(!result.is_some_and(|x| x >= machine_count), "Invalid machine");
+			assert!(result.is_none_or(|x| x < machine_count), "Invalid machine");
 			result
 		};
 

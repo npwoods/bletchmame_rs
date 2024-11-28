@@ -33,7 +33,8 @@ pub async fn dialog_load_mame_info(
 	dialog.set_current_status("Retrieving machine info from MAME...".into());
 	dialog.show().unwrap();
 
-	// then launch the process
+	// then launch the process - TODO - this clippy warning should be fixed!
+	#[allow(clippy::zombie_processes)]
 	let process = Command::new(mame_executable)
 		.arg("-listxml")
 		.arg("-nodtd")

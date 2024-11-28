@@ -123,7 +123,7 @@ where
 		// and retain everything - except folders that are no longer named
 		let history_entries = take(history);
 		let (new_history, new_position) = retain_with_position(history_entries, *position, |entry| {
-			!collection_folder_name(&entry.collection).is_some_and(|x| !folder_names.contains(x))
+			collection_folder_name(&entry.collection).is_none_or(|x| folder_names.contains(x))
 		});
 
 		// override the old history

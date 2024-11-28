@@ -189,7 +189,7 @@ impl<'a> XmlElement<'a> {
 	}
 }
 
-impl<'a> Debug for XmlElement<'a> {
+impl Debug for XmlElement<'_> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(f, "<{}", String::from_utf8_lossy(self.name().as_ref()))?;
 		for x in self.bytes_start.attributes().with_checks(false) {
