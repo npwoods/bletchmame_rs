@@ -321,6 +321,25 @@ function get_slot_option(tag)
 	return machine_options():slot_option(tag)
 end
 
+function reset_emulation(is_hard)
+	-- are we paused?  we want to make sure we can restore this state
+	local is_paused = machine().paused
+
+	-- do the reset
+	if is_hard then
+		machine():hard_reset()
+	else
+		machine():soft_reset()
+	end
+
+	-- and set the state to the proper status
+	if is_paused then
+		state = "RESET_PAUSED"
+	else
+		state = "RESET_UNPAUSED"
+	end
+end
+
 function emit_status(light, out)
 	if light == nil then
 		light = false
@@ -686,13 +705,13 @@ end
 
 -- SOFT_RESET command
 function command_soft_reset(args)
-	machine():soft_reset()
+	reset_emulation(false)
 	print("@INFO ### Soft Reset Scheduled")
 end
 
 -- HARD_RESET command
 function command_hard_reset(args)
-	machine():hard_reset()
+	reset_emulation(true)
 	print("@INFO ### Hard Reset Scheduled")
 end
 
@@ -875,7 +894,7 @@ function command_change_slots(args)
 		opt:specify(slot_option_value)
 	end
 	pause_when_restarted = machine().paused
-	machine():hard_reset()
+	reset_emulation(true)
 	print("@OK ### Slots changed and hard reset scheduled")
 end
 
@@ -1243,16 +1262,6 @@ function startplugin()
 	function callback_stop()
 		-- the emulation session has stopped; tidy things up
 		stop_polling_input_seq()
-
-		-- adjust the state to show we're resetting (unless we're exiting)
-		if state ~= "EXITING" then
-			if machine().paused then
-				state = "RESET_PAUSED"
-			else
-				state = "RESET_UNPAUSED"
-			end
-		end
-
 		print("@INFO ### Session is stopping")
 	end
 	if emu.add_machine_stop_notifier ~= nil then
