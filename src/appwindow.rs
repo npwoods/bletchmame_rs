@@ -1104,13 +1104,16 @@ async fn ping_callback(model_weak: std::rc::Weak<AppModel>) {
 	while let Some(model) = model_weak.upgrade() {
 		event!(LOG_PINGING, "ping_callback(): pinging");
 
+		// are we running?
+		let is_running = model.running_status.borrow().running.is_some();
+
 		// set the child window size
 		if let Some(child_window) = &model.child_window {
-			child_window.set_size(model.app_window().window().size());
+			child_window.set_size(model.app_window().window().size(), is_running);
 		}
 
 		// send a ping command (if we're running)
-		if model.running_status.borrow().running.is_some() && model.mame_controller.is_queue_empty() {
+		if is_running && model.mame_controller.is_queue_empty() {
 			handle_command(&model, AppCommand::MamePing);
 		}
 		drop(model);

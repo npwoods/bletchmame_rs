@@ -68,7 +68,7 @@ impl ChildWindow {
 		}
 	}
 
-	pub fn set_size(&self, container_size: PhysicalSize) {
+	pub fn set_size(&self, container_size: PhysicalSize, set_focus: bool) {
 		// get the HWND's width/height
 		let (width, height) = unsafe {
 			let mut rect = zeroed();
@@ -93,7 +93,7 @@ impl ChildWindow {
 		unsafe {
 			SetWindowPos(self.hwnd, 0 as HWND, x, y, cx, cy, flags);
 
-			if GetFocus() == GetParent(self.hwnd) {
+			if set_focus && (GetFocus() == GetParent(self.hwnd)) {
 				SetFocus(self.hwnd);
 			}
 		}
