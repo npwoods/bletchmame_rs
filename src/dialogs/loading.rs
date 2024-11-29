@@ -1,4 +1,5 @@
 use std::io::BufReader;
+use std::os::windows::process::CommandExt;
 use std::process::Child;
 use std::process::Command;
 use std::process::Stdio;
@@ -13,6 +14,7 @@ use slint::ComponentHandle;
 use slint::SharedString;
 use slint::Weak;
 use tokio::task::spawn_blocking;
+use winapi::um::winbase::CREATE_NO_WINDOW;
 
 use crate::guiutils::windowing::reenable_modal_parent;
 use crate::guiutils::windowing::with_modal_parent;
@@ -39,6 +41,7 @@ pub async fn dialog_load_mame_info(
 		.arg("-listxml")
 		.arg("-nodtd")
 		.stdout(Stdio::piped())
+		.creation_flags(CREATE_NO_WINDOW)
 		.spawn()
 		.unwrap();
 
