@@ -7,6 +7,7 @@ use tracing::Level;
 
 use crate::status::Update;
 use crate::status::UpdateRunning;
+use crate::version::MameVersion;
 use crate::xml::XmlElement;
 use crate::xml::XmlEvent;
 use crate::xml::XmlReader;
@@ -23,7 +24,7 @@ enum Phase {
 #[derive(Debug, Default)]
 struct State {
 	phase: Phase,
-	build: Option<String>,
+	build: Option<MameVersion>,
 	running: UpdateRunning,
 }
 
@@ -41,7 +42,7 @@ impl State {
 					is_paused
 				);
 
-				self.build = app_build.map(String::from);
+				self.build = app_build.map(MameVersion::from);
 				self.running.machine_name = machine_name;
 				self.running.is_paused = is_paused;
 				Some(Phase::Status)

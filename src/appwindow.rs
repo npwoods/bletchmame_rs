@@ -1088,7 +1088,7 @@ fn next_build_skew_state(status: &Status, info_db: Option<&InfoDb>, last: BuildS
 	};
 
 	let has_skew = if let Some(build) = status.build.as_ref() {
-		build.as_str() != info_db.build().as_ref()
+		build != info_db.build()
 	} else {
 		last != BuildSkewState::Normal
 	};
