@@ -12,6 +12,7 @@ use tracing::Level;
 
 use crate::debugstr::DebugString;
 use crate::status::parse::parse_update;
+use crate::version::MameVersion;
 
 const LOG: Level = Level::TRACE;
 
@@ -19,7 +20,7 @@ const LOG: Level = Level::TRACE;
 pub struct Status {
 	pub has_initialized: bool,
 	pub running: Option<StatusRunning>,
-	pub build: Option<String>,
+	pub build: Option<MameVersion>,
 }
 
 impl Status {
@@ -70,7 +71,7 @@ pub struct StatusRunning {
 #[derive(Clone, Deserialize, Serialize, PartialEq)]
 pub struct Update {
 	running: Option<UpdateRunning>,
-	build: Option<String>,
+	build: Option<MameVersion>,
 }
 
 impl Update {

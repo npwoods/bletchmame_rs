@@ -16,6 +16,7 @@ mod selection;
 mod software;
 mod status;
 mod threadlocalbubble;
+mod version;
 mod xml;
 
 use std::path::PathBuf;

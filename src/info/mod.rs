@@ -27,6 +27,7 @@ use binary_serde::Endianness;
 use entities::SoftwareListsView;
 
 use crate::prefs::prefs_filename;
+use crate::version::MameVersion;
 
 pub use self::binary::ChipType;
 pub use self::binary::SoftwareListStatus;
@@ -54,7 +55,7 @@ pub struct InfoDb {
 	software_list_machine_indexes: RootView<u32>,
 	machine_software_lists: RootView<binary::MachineSoftwareList>,
 	strings_offset: usize,
-	build_strindex: u32,
+	build: MameVersion,
 }
 
 impl InfoDb {
@@ -80,6 +81,10 @@ impl InfoDb {
 			validate_string_table(&data[cursor.start..]).map_err(|_| Error::msg("Corrupt String Table"))?;
 		}
 
+		// get the build
+		let build_str = read_string(&data[cursor.start..], hdr.build_strindex).unwrap_or_default();
+		let build = MameVersion::from(build_str.as_ref());
+
 		// and return
 		let result = Self {
 			data,
@@ -90,7 +95,7 @@ impl InfoDb {
 			software_list_machine_indexes,
 			machine_software_lists,
 			strings_offset: cursor.start,
-			build_strindex: hdr.build_strindex,
+			build,
 		};
 
 		// more validations
@@ -136,8 +141,8 @@ impl InfoDb {
 		Ok(Some(info_db))
 	}
 
-	pub fn build(&self) -> SmallStrRef<'_> {
-		self.string(self.build_strindex)
+	pub fn build(&self) -> &MameVersion {
+		&self.build
 	}
 
 	pub fn machines(&self) -> MachinesView<'_> {
