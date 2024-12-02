@@ -10,8 +10,7 @@ use slint::VecModel;
 use slint::Weak;
 
 use crate::dialogs::SingleResult;
-use crate::guiutils::windowing::run_modal_dialog;
-use crate::guiutils::windowing::with_modal_parent;
+use crate::guiutils::modal::Modal;
 use crate::ui::MessageBoxDialog;
 
 pub trait MessageBoxDefaults {
@@ -99,7 +98,7 @@ async fn internal_dialog_message_box(
 	abort_index: usize,
 ) -> usize {
 	// prepare the dialog
-	let dialog = with_modal_parent(&parent.unwrap(), || MessageBoxDialog::new().unwrap());
+	let modal = Modal::new(&parent.unwrap(), || MessageBoxDialog::new().unwrap());
 	let single_result = SingleResult::default();
 
 	// turn value_texts into a model
@@ -107,24 +106,24 @@ async fn internal_dialog_message_box(
 	let value_texts = ModelRc::new(value_texts);
 
 	// set the dialog properties
-	dialog.set_title_text(title);
-	dialog.set_message_text(message);
-	dialog.set_button_texts(value_texts);
+	modal.dialog().set_title_text(title);
+	modal.dialog().set_message_text(message);
+	modal.dialog().set_button_texts(value_texts);
 
 	// set button callbacks
 	let signaller = single_result.signaller();
-	dialog.on_button_clicked(move |index| {
+	modal.dialog().on_button_clicked(move |index| {
 		let index = usize::try_from(index).unwrap();
 		signaller.signal(index)
 	});
 
 	// close requested callback
 	let signaller = single_result.signaller();
-	dialog.window().on_close_requested(move || {
+	modal.window().on_close_requested(move || {
 		signaller.signal(abort_index);
 		CloseRequestResponse::KeepWindowShown
 	});
 
 	// show the dialog and wait for completion
-	run_modal_dialog(&parent.unwrap(), &dialog, async { single_result.wait().await }).await
+	modal.run(async { single_result.wait().await }).await
 }

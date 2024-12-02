@@ -17,8 +17,7 @@ use slint::Weak;
 use crate::dialogs::file::file_dialog;
 use crate::dialogs::file::PathType;
 use crate::dialogs::SingleResult;
-use crate::guiutils::windowing::run_modal_dialog;
-use crate::guiutils::windowing::with_modal_parent;
+use crate::guiutils::modal::Modal;
 use crate::icon::Icon;
 use crate::prefs::PrefsPaths;
 use crate::ui::MagicListViewItem;
@@ -41,10 +40,10 @@ impl Debug for State {
 
 pub async fn dialog_paths(parent: Weak<impl ComponentHandle + 'static>, paths: Rc<PrefsPaths>) -> Option<PrefsPaths> {
 	// prepare the dialog
-	let dialog = with_modal_parent(&parent.unwrap(), || PathsDialog::new().unwrap());
+	let modal = Modal::new(&parent.unwrap(), || PathsDialog::new().unwrap());
 	let single_result = SingleResult::default();
 	let state = State {
-		dialog_weak: dialog.as_weak(),
+		dialog_weak: modal.dialog().as_weak(),
 		paths: RefCell::new((*paths).clone()),
 		original_paths: paths,
 	};
@@ -57,23 +56,23 @@ pub async fn dialog_paths(parent: Weak<impl ComponentHandle + 'static>, paths: R
 		.collect::<Vec<_>>();
 	let path_labels = VecModel::from(path_labels);
 	let path_labels = ModelRc::new(path_labels);
-	dialog.set_path_labels(path_labels);
+	modal.dialog().set_path_labels(path_labels);
 
 	// set up the "ok" button
 	let signaller = single_result.signaller();
-	dialog.on_ok_clicked(move || {
+	modal.dialog().on_ok_clicked(move || {
 		signaller.signal(true);
 	});
 
 	// set up the "cancel" button
 	let signaller = single_result.signaller();
-	dialog.on_cancel_clicked(move || {
+	modal.dialog().on_cancel_clicked(move || {
 		signaller.signal(false);
 	});
 
 	// set up the "browse" button
 	let state_clone = state.clone();
-	dialog.on_browse_clicked(move || {
+	modal.dialog().on_browse_clicked(move || {
 		let dialog = state_clone.dialog_weak.unwrap();
 		browse_clicked(&dialog);
 		model_contents_changed(&state_clone);
@@ -81,7 +80,7 @@ pub async fn dialog_paths(parent: Weak<impl ComponentHandle + 'static>, paths: R
 
 	// set up the "delete" button
 	let state_clone = state.clone();
-	dialog.on_delete_clicked(move || {
+	modal.dialog().on_delete_clicked(move || {
 		let dialog = state_clone.dialog_weak.unwrap();
 		delete_clicked(&dialog);
 		model_contents_changed(&state_clone);
@@ -89,35 +88,34 @@ pub async fn dialog_paths(parent: Weak<impl ComponentHandle + 'static>, paths: R
 
 	// set up the close handler
 	let signaller = single_result.signaller();
-	dialog.window().on_close_requested(move || {
+	modal.window().on_close_requested(move || {
 		signaller.signal(false);
 		CloseRequestResponse::KeepWindowShown
 	});
 
 	// ensure paths entries are updated
 	let state_clone = state.clone();
-	let model: PathEntriesModel = PathEntriesModel::new(dialog.as_weak(), move || {
+	let model: PathEntriesModel = PathEntriesModel::new(modal.dialog().as_weak(), move || {
 		model_contents_changed(&state_clone);
 	});
 	let model = ModelRc::from(Rc::new(model));
-	dialog.set_path_entries(model);
+	modal.dialog().set_path_entries(model);
 	let state_clone = state.clone();
-	dialog.on_path_label_index_changed(move || {
+	modal.dialog().on_path_label_index_changed(move || {
 		let dialog = state_clone.dialog_weak.unwrap();
 		update_paths_entries(&dialog, &state_clone.paths.borrow());
 	});
-	update_paths_entries(&dialog, &state.paths.borrow());
+	update_paths_entries(modal.dialog(), &state.paths.borrow());
 
 	// update buttons when selected entries changes
-	let dialog_weak = dialog.as_weak();
-	dialog.on_path_entries_index_changed(move || {
+	let dialog_weak = modal.dialog().as_weak();
+	modal.dialog().on_path_entries_index_changed(move || {
 		let dialog = dialog_weak.unwrap();
 		update_buttons(&dialog);
 	});
 
 	// present the modal dialog
-	let accepted = run_modal_dialog(&parent.unwrap(), &dialog, async { single_result.wait().await }).await;
-	drop(dialog);
+	let accepted = modal.run(async { single_result.wait().await }).await;
 
 	// if the user hit "ok", return
 	accepted.then(|| Rc::try_unwrap(state).unwrap().paths.into_inner())

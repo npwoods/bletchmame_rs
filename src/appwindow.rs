@@ -51,7 +51,7 @@ use crate::guiutils::menuing::setup_window_menu_bar;
 use crate::guiutils::menuing::show_popup_menu;
 use crate::guiutils::menuing::update_menu_items;
 use crate::guiutils::menuing::MenuItemUpdate;
-use crate::guiutils::windowing::with_modal_parent;
+use crate::guiutils::modal::Modal;
 use crate::history::History;
 use crate::info::InfoDb;
 use crate::models::collectionsview::CollectionsViewModel;
@@ -660,8 +660,8 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			let _ = open::that("https://www.bletchmame.org");
 		}
 		AppCommand::HelpAbout => {
-			let dialog = with_modal_parent(&model.app_window(), || AboutDialog::new().unwrap());
-			dialog.show().unwrap();
+			let modal = Modal::new(&model.app_window(), || AboutDialog::new().unwrap());
+			modal.launch();
 		}
 		AppCommand::MameSessionStarted => {
 			// do nothing

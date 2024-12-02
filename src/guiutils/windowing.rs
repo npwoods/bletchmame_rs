@@ -38,7 +38,7 @@ where
 	let _ = result.window().size();
 
 	// clear out WINDOW_ATTRIBUTE_HOOK_CALLBACK
-	let old_hook = WINDOW_ATTRIBUTE_HOOK_CALLBACK.take();
+	let old_hook: Option<Box<dyn Fn(WindowAttributes) -> WindowAttributes>> = WINDOW_ATTRIBUTE_HOOK_CALLBACK.take();
 	assert!(old_hook.is_some(), "WINDOW_ATTRIBUTE_HOOK_CALLBACK was lost");
 
 	// by default install an `on_close_requested` handle that will reenable the modal parent
