@@ -7,8 +7,7 @@ use slint::SharedString;
 use slint::Weak;
 
 use crate::dialogs::SingleResult;
-use crate::guiutils::windowing::run_modal_dialog;
-use crate::guiutils::windowing::with_modal_parent;
+use crate::guiutils::modal::Modal;
 use crate::ui::NameCollectionDialog;
 
 async fn dialog_name_collection(
@@ -18,43 +17,43 @@ async fn dialog_name_collection(
 	default_name: impl Into<SharedString>,
 ) -> Option<String> {
 	// prepare the dialog
-	let dialog = with_modal_parent(&parent.unwrap(), || NameCollectionDialog::new().unwrap());
+	let modal = Modal::new(&parent.unwrap(), || NameCollectionDialog::new().unwrap());
 	let single_result = SingleResult::default();
 
 	// set the title and default name
-	dialog.set_title_text(title.into());
-	dialog.invoke_set_text(default_name.into());
+	modal.dialog().set_title_text(title.into());
+	modal.dialog().invoke_set_text(default_name.into());
 
 	// set up the "ok" button
 	let signaller = single_result.signaller();
-	let dialog_weak = dialog.as_weak();
-	dialog.on_ok_clicked(move || {
+	let dialog_weak = modal.dialog().as_weak();
+	modal.dialog().on_ok_clicked(move || {
 		let text = dialog_weak.unwrap().get_text().to_string();
 		signaller.signal(Some(text));
 	});
 
 	// set up the "cancel" button
 	let signaller = single_result.signaller();
-	dialog.on_cancel_clicked(move || {
+	modal.dialog().on_cancel_clicked(move || {
 		signaller.signal(None);
 	});
 
 	// set up the close handler
 	let signaller = single_result.signaller();
-	dialog.window().on_close_requested(move || {
+	modal.window().on_close_requested(move || {
 		signaller.signal(None);
 		CloseRequestResponse::KeepWindowShown
 	});
 
 	// we want the "ok" button to be disabled when bad names are proposed
-	let dialog_weak = dialog.as_weak();
-	dialog.on_text_edited(move |new_name| {
+	let dialog_weak = modal.dialog().as_weak();
+	modal.dialog().on_text_edited(move |new_name| {
 		let ok_enabled = is_good_new_name(&existing_names, &new_name);
 		dialog_weak.unwrap().set_ok_enabled(ok_enabled);
 	});
 
 	// show the dialog and wait for completion
-	run_modal_dialog(&parent.unwrap(), &dialog, async { single_result.wait().await }).await
+	modal.run(async { single_result.wait().await }).await
 }
 
 pub async fn dialog_new_collection(

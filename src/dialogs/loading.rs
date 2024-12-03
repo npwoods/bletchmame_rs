@@ -16,8 +16,7 @@ use slint::Weak;
 use tokio::task::spawn_blocking;
 use winapi::um::winbase::CREATE_NO_WINDOW;
 
-use crate::guiutils::windowing::reenable_modal_parent;
-use crate::guiutils::windowing::with_modal_parent;
+use crate::guiutils::modal::Modal;
 use crate::info::InfoDb;
 use crate::ui::LoadingDialog;
 
@@ -32,9 +31,11 @@ pub async fn dialog_load_mame_info(
 	assert!(!mame_executable.is_empty());
 
 	// present the dialog
-	let dialog = with_modal_parent(&parent.unwrap(), || LoadingDialog::new().unwrap());
-	dialog.set_current_status("Retrieving machine info from MAME...".into());
-	dialog.show().unwrap();
+	let modal = Modal::new(&parent.unwrap(), || LoadingDialog::new().unwrap());
+	modal
+		.dialog()
+		.set_current_status("Retrieving machine info from MAME...".into());
+	modal.dialog().show().unwrap();
 
 	// then launch the process
 	let process = Command::new(mame_executable)
@@ -50,21 +51,19 @@ pub async fn dialog_load_mame_info(
 
 	// set up a close requested handler
 	let cancelled_clone = cancelled.clone();
-	dialog.window().on_close_requested(move || {
+	modal.window().on_close_requested(move || {
 		cancelled_clone.store(true, Ordering::Relaxed);
 		CloseRequestResponse::HideWindow
 	});
 
 	// and with that out of the way, launch the thread
-	let dialog_weak = dialog.as_weak();
-	spawn_blocking(move || load_mame_info_thread_proc(parent, dialog_weak, process, cancelled))
-		.await
-		.unwrap()
+	let dialog_weak = modal.dialog().as_weak();
+	let fut = spawn_blocking(move || load_mame_info_thread_proc(dialog_weak, process, cancelled));
+	modal.run(fut).await.unwrap()
 }
 
 /// worker thread for loading MAME info
 fn load_mame_info_thread_proc(
-	parent: Weak<impl ComponentHandle + 'static>,
 	dialog_weak: Weak<LoadingDialog>,
 	mut process: Child,
 	cancelled: Arc<AtomicBool>,
@@ -104,14 +103,6 @@ fn load_mame_info_thread_proc(
 	// process the InfoDB output
 	let reader = BufReader::new(input);
 	let db = InfoDb::from_listxml_output(reader, info_db_callback).unwrap();
-
-	// now that we're done, close out the dialog
-	dialog_weak
-		.upgrade_in_event_loop(move |dialog| {
-			reenable_modal_parent(parent.unwrap().window());
-			dialog.hide().unwrap()
-		})
-		.unwrap();
 
 	// and close out the process (we don't want it to zombie)
 	let _ = process.wait();

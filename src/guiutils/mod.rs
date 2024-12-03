@@ -1,9 +1,8 @@
 //! `guiutils` is a module that attempts to enc[r]apsulate various platform-specific GUI aspects that would ideally be folded into Slint
 pub mod childwnd;
+mod hook;
 pub mod menuing;
-pub mod windowing;
-
-use std::cell::RefCell;
+pub mod modal;
 
 use i_slint_backend_winit::Backend;
 use i_slint_core::items::PointerEvent;
@@ -14,10 +13,7 @@ use winit::platform::windows::WindowAttributesExtWindows;
 use winit::window::Icon;
 use winit::window::WindowAttributes;
 
-type WindowAttributeHookCallback = Box<dyn Fn(WindowAttributes) -> WindowAttributes + 'static>;
-thread_local! {
-	static WINDOW_ATTRIBUTE_HOOK_CALLBACK: RefCell<Option<WindowAttributeHookCallback>> = const { RefCell::new(None) }
-}
+use crate::guiutils::hook::create_window_attributes_hook;
 
 fn bletchmame_icon() -> Option<Icon> {
 	#[cfg(target_os = "windows")]
@@ -29,21 +25,15 @@ fn bletchmame_icon() -> Option<Icon> {
 	icon
 }
 
-fn window_attributes_hook(attrs: WindowAttributes) -> WindowAttributes {
-	let attrs = attrs.with_window_icon(bletchmame_icon());
-	let attrs = attrs.with_taskbar_icon(bletchmame_icon());
-	WINDOW_ATTRIBUTE_HOOK_CALLBACK.with_borrow(|callback| {
-		if let Some(callback) = callback {
-			callback(attrs)
-		} else {
-			attrs
-		}
-	})
+fn global_hook(attrs: WindowAttributes) -> WindowAttributes {
+	attrs
+		.with_window_icon(bletchmame_icon())
+		.with_taskbar_icon(bletchmame_icon())
 }
 
 pub fn init_gui_utils() {
 	let mut backend = Backend::new().unwrap();
-	backend.window_attributes_hook = Some(Box::new(window_attributes_hook));
+	backend.window_attributes_hook = create_window_attributes_hook(global_hook);
 	slint::platform::set_platform(Box::new(backend)).unwrap();
 }
 
