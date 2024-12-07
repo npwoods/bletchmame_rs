@@ -2,6 +2,8 @@ use std::mem::zeroed;
 use std::ptr::null;
 use std::ptr::null_mut;
 
+use anyhow::Error;
+use anyhow::Result;
 use raw_window_handle::HasWindowHandle;
 use raw_window_handle::RawWindowHandle;
 use slint::PhysicalPosition;
@@ -14,6 +16,7 @@ use winapi::um::winuser::CreateWindowExW;
 use winapi::um::winuser::GetFocus;
 use winapi::um::winuser::GetParent;
 use winapi::um::winuser::GetWindowRect;
+use winapi::um::winuser::IsWindowVisible;
 use winapi::um::winuser::SetFocus;
 use winapi::um::winuser::SetWindowPos;
 use winapi::um::winuser::ShowWindow;
@@ -26,53 +29,55 @@ use winapi::um::winuser::WS_CHILD;
 
 const LOG: Level = Level::TRACE;
 
-pub struct ChildWindow {
-	hwnd: HWND,
-}
+pub struct WinChildWindow(HWND);
 
-impl ChildWindow {
-	pub fn new(window: &Window) -> Option<Self> {
-		let raw_window = window.window_handle().window_handle().unwrap().as_raw();
-		let hwnd = match raw_window {
-			#[cfg(target_os = "windows")]
-			RawWindowHandle::Win32(win32_window) => {
-				let class_name = "Static\0".encode_utf16().collect::<Vec<_>>();
-				let style = WS_CHILD;
-				let ex_style = 0;
-				let hwnd = unsafe {
-					CreateWindowExW(
-						ex_style,
-						class_name.as_ptr(),
-						null(),
-						style,
-						0,
-						0,
-						10,
-						10,
-						isize::from(win32_window.hwnd) as HWND,
-						null_mut(),
-						null_mut(),
-						null_mut(),
-					)
-				};
-				(!hwnd.is_null()).then_some(hwnd)
-			}
-			_ => None,
-		}?;
-		Some(Self { hwnd })
+impl WinChildWindow {
+	pub fn new(window: &Window) -> Result<Self> {
+		let RawWindowHandle::Win32(win32_window) = window.window_handle().window_handle().unwrap().as_raw() else {
+			let message = "WinChildWindow::new() - no Win32 window handle";
+			return Err(Error::msg(message));
+		};
+
+		let class_name = "Static\0".encode_utf16().collect::<Vec<_>>();
+		let style = WS_CHILD;
+		let ex_style = 0;
+		let hwnd = unsafe {
+			CreateWindowExW(
+				ex_style,
+				class_name.as_ptr(),
+				null(),
+				style,
+				0,
+				0,
+				10,
+				10,
+				isize::from(win32_window.hwnd) as winapi::shared::windef::HWND,
+				null_mut(),
+				null_mut(),
+				null_mut(),
+			)
+		};
+		if hwnd.is_null() {
+			let message = "WinChildWindow::new(): CreateWindowEx failed";
+			return Err(Error::msg(message));
+		}
+
+		Ok(Self(hwnd))
 	}
 
 	pub fn set_visible(&self, is_visible: bool) {
 		unsafe {
-			ShowWindow(self.hwnd, if is_visible { SW_SHOW } else { SW_HIDE });
+			ShowWindow(self.0, if is_visible { SW_SHOW } else { SW_HIDE });
 		}
 	}
 
-	pub fn set_size(&self, container_size: PhysicalSize, set_focus: bool) {
+	pub fn update(&self, container: &Window) {
+		let container_size = container.size();
+
 		// get the HWND's width/height
 		let (width, height) = unsafe {
 			let mut rect = zeroed();
-			GetWindowRect(self.hwnd, &mut rect);
+			GetWindowRect(self.0, &mut rect);
 			((rect.right - rect.left), (rect.bottom - rect.top))
 		};
 		if width <= 0 && height <= 0 {
@@ -81,9 +86,9 @@ impl ChildWindow {
 		let aspect_ratio = width as f64 / height as f64;
 		let (position, size) = fit_in_size(container_size, aspect_ratio);
 		event!(
-			LOG,
-			"ChildWindow::set_size(): container_size={container_size:?} aspect_ratio={aspect_ratio} position={position:?} size={size:?}"
-		);
+            LOG,
+            "ChildWindow::set_size(): container_size={container_size:?} aspect_ratio={aspect_ratio} position={position:?} size={size:?}"
+        );
 
 		let flags = SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOSENDCHANGING;
 		let x = position.x;
@@ -91,16 +96,18 @@ impl ChildWindow {
 		let cx = size.width.try_into().unwrap();
 		let cy = size.height.try_into().unwrap();
 		unsafe {
-			SetWindowPos(self.hwnd, 0 as HWND, x, y, cx, cy, flags);
+			SetWindowPos(self.0, 0 as HWND, x, y, cx, cy, flags);
 
-			if set_focus && (GetFocus() == GetParent(self.hwnd)) {
-				SetFocus(self.hwnd);
+			let is_visible = IsWindowVisible(self.0) != 0;
+			if is_visible && (GetFocus() == GetParent(self.0)) {
+				SetFocus(self.0);
 			}
 		}
 	}
 
-	pub fn text(&self) -> String {
-		(self.hwnd as usize).to_string()
+	pub fn text(&self) -> Option<String> {
+		let hwnd = self.0 as usize;
+		Some(hwnd.to_string())
 	}
 }
 

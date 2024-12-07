@@ -1,10 +1,7 @@
 //! Helpers for Menu handling; which Slint does not handle yet
-use std::mem::zeroed;
-
 use muda::accelerator::Accelerator;
 use muda::accelerator::Code;
 use muda::accelerator::Modifiers;
-use muda::ContextMenu;
 use muda::IsMenuItem;
 use muda::Menu;
 use muda::MenuId;
@@ -12,17 +9,6 @@ use muda::MenuItem;
 use muda::MenuItemKind;
 use muda::PredefinedMenuItem;
 use muda::Submenu;
-use raw_window_handle::HasWindowHandle;
-use raw_window_handle::RawWindowHandle;
-use slint::LogicalPosition;
-use slint::Window;
-use winapi::shared::windef::HWND;
-use winapi::um::winuser::GetWindowRect;
-use winapi::um::winuser::SetWindowPos;
-use winapi::um::winuser::SWP_NOACTIVATE;
-use winapi::um::winuser::SWP_NOMOVE;
-use winapi::um::winuser::SWP_NOOWNERZORDER;
-use winapi::um::winuser::SWP_NOSENDCHANGING;
 
 /// Helper function to declare accelerators
 pub fn accel(text: &str) -> Option<Accelerator> {
@@ -53,17 +39,6 @@ pub fn accel(text: &str) -> Option<Accelerator> {
 		x => panic!("Unknown accelerator {x}"),
 	};
 	Some(Accelerator::new(mods, key))
-}
-
-pub fn setup_window_menu_bar(window: &Window, menu_bar: &Menu) {
-	let raw_window = window.window_handle().window_handle().unwrap().as_raw();
-	match raw_window {
-		#[cfg(target_os = "windows")]
-		RawWindowHandle::Win32(win32_window) => {
-			menu_bar.init_for_hwnd(win32_window.hwnd.into()).unwrap();
-		}
-		_ => panic!("Unknown RawWindowHandle type"),
-	}
 }
 
 #[derive(Debug, Default)]
@@ -143,40 +118,6 @@ impl MenuDesc {
 		let items = items.into_iter().map(|x| x.into_boxed_menu_item()).collect::<Vec<_>>();
 		let items = items.iter().map(|x| &**x as &dyn IsMenuItem).collect::<Vec<_>>();
 		Menu::with_items(&items).unwrap()
-	}
-}
-
-pub fn show_popup_menu(window: &Window, popup_menu: &Menu, _point: LogicalPosition) {
-	let raw_window = window.window_handle().window_handle().unwrap().as_raw();
-	match raw_window {
-		#[cfg(target_os = "windows")]
-		RawWindowHandle::Win32(win32_window) => {
-			// use tauri to show the popup menu
-			popup_menu.show_context_menu_for_hwnd(win32_window.hwnd.into(), None);
-
-			// very gross hack
-			unfreeze_slint_after_popup_menu_hack(isize::from(win32_window.hwnd) as HWND);
-		}
-		_ => panic!("Unknown RawWindowHandle type"),
-	}
-}
-
-/// gross hack to work around Slint freezes
-fn unfreeze_slint_after_popup_menu_hack(hwnd: HWND) {
-	// see https://github.com/slint-ui/slint/issues/5863 for details
-	unsafe {
-		// get the HWND's width/height
-		let (width, height) = {
-			let mut rect = zeroed();
-			GetWindowRect(hwnd, &mut rect);
-			(rect.right - rect.left, rect.bottom - rect.top)
-		};
-
-		// make the window a single pixel wider, and flip it back - the act of changing the size
-		// seems to "tickle" Slint into unfreezing
-		let flags = SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOSENDCHANGING;
-		SetWindowPos(hwnd, 0 as HWND, 0, 0, width + 1, height, flags);
-		SetWindowPos(hwnd, 0 as HWND, 0, 0, width, height, flags);
 	}
 }
 

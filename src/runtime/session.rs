@@ -5,7 +5,6 @@ use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Read;
 use std::io::Write;
-use std::os::windows::process::CommandExt;
 use std::process::Child;
 use std::process::Command;
 use std::process::Stdio;
@@ -21,8 +20,8 @@ use blockingqueue::BlockingQueue;
 use itertools::Itertools;
 use tracing::event;
 use tracing::Level;
-use winapi::um::winbase::CREATE_NO_WINDOW;
 
+use crate::platform::CommandExt;
 use crate::runtime::args::MameArguments;
 use crate::runtime::MameCommand;
 use crate::runtime::MameEvent;
@@ -134,16 +133,16 @@ fn execute_mame(
 	// launch MAME, launch!
 	event!(LOG, "execute_mame(): Launching MAME: mame_args={mame_args:?}");
 	let args = mame_args.args.iter().map(|x| x.as_ref());
-	let (mame_stderr, creation_flags) = match mame_stderr {
-		MameStderr::Capture => (Stdio::piped(), CREATE_NO_WINDOW),
-		MameStderr::Inherit => (Stdio::inherit(), 0),
+	let (mame_stderr, create_no_window_flag) = match mame_stderr {
+		MameStderr::Capture => (Stdio::piped(), true),
+		MameStderr::Inherit => (Stdio::inherit(), false),
 	};
 	let mut child = Command::new(&mame_args.program)
 		.args(args)
 		.stdin(Stdio::piped())
 		.stdout(Stdio::piped())
 		.stderr(mame_stderr)
-		.creation_flags(creation_flags)
+		.create_no_window(create_no_window_flag)
 		.spawn()
 		.map_err(|error| Error::new(error).context("Error launching MAME"))?;
 

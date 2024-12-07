@@ -44,11 +44,8 @@ use crate::dialogs::messagebox::OkOnly;
 use crate::dialogs::namecollection::dialog_new_collection;
 use crate::dialogs::namecollection::dialog_rename_collection;
 use crate::dialogs::paths::dialog_paths;
-use crate::guiutils::childwnd::ChildWindow;
 use crate::guiutils::is_context_menu_event;
 use crate::guiutils::menuing::accel;
-use crate::guiutils::menuing::setup_window_menu_bar;
-use crate::guiutils::menuing::show_popup_menu;
 use crate::guiutils::menuing::update_menu_items;
 use crate::guiutils::menuing::MenuItemUpdate;
 use crate::guiutils::modal::Modal;
@@ -57,6 +54,8 @@ use crate::info::InfoDb;
 use crate::models::collectionsview::CollectionsViewModel;
 use crate::models::itemstable::EmptyReason;
 use crate::models::itemstable::ItemsTableModel;
+use crate::platform::ChildWindow;
+use crate::platform::WindowExt;
 use crate::prefs::BuiltinCollection;
 use crate::prefs::Preferences;
 use crate::prefs::SortOrder;
@@ -87,7 +86,7 @@ struct AppModel {
 	mame_controller: MameController,
 	running_state: Cell<MameRunningState>,
 	running_status: RefCell<Status>,
-	child_window: Option<ChildWindow>,
+	child_window: ChildWindow,
 	build_skew_state: Cell<BuildSkewState>,
 }
 
@@ -205,17 +204,18 @@ impl AppModel {
 		self.app_window().set_running_machine_description(machine_desc);
 
 		// child window visibility
-		if let Some(child_window) = &self.child_window {
-			child_window.set_visible(status.running.is_some());
-		}
+		self.child_window.set_visible(status.running.is_some());
+
 		update_menus(self);
 	}
 
 	pub fn reset_mame_controller(&self, is_enabled: bool) {
-		let windowing = match &self.child_window {
-			Some(window) => MameWindowing::Attached(window.text()),
-			None => MameWindowing::Windowed,
+		let windowing = if let Some(text) = self.child_window.text() {
+			MameWindowing::Attached(text)
+		} else {
+			MameWindowing::Windowed
 		};
+
 		self.mame_controller
 			.reset(is_enabled.then_some(&self.preferences.borrow().paths), &windowing);
 	}
@@ -225,11 +225,15 @@ pub fn create(prefs_path: Option<PathBuf>, mame_stderr: MameStderr) -> AppWindow
 	let app_window = AppWindow::new().unwrap();
 
 	// child window for MAME to attach to
-	let child_window = ChildWindow::new(app_window.window());
+	let child_window =
+		ChildWindow::new(app_window.window()).unwrap_or_else(|e| panic!("Failed to create child window: {e:?}"));
 
 	// create the menu bar and associate it with our window (looking forward to Slint having first class menuing support)
 	let menu_bar = create_menu_bar();
-	setup_window_menu_bar(app_window.window(), &menu_bar);
+	app_window
+		.window()
+		.attach_menu_bar(&menu_bar)
+		.unwrap_or_else(|e| panic!("Failed to attach menu bar: {e:?}"));
 
 	// get preferences
 	let preferences = Preferences::load(prefs_path.as_ref())
@@ -417,7 +421,7 @@ pub fn create(prefs_path: Option<PathBuf>, mame_stderr: MameStderr) -> AppWindow
 			let index = usize::try_from(index).ok();
 			if let Some(popup_menu) = model_clone.with_collections_view_model(|x| x.context_commands(index)) {
 				let app_window = model_clone.app_window();
-				show_popup_menu(app_window.window(), &popup_menu, point);
+				app_window.window().show_popup_menu(&popup_menu, point);
 			}
 		}
 	});
@@ -433,7 +437,7 @@ pub fn create(prefs_path: Option<PathBuf>, mame_stderr: MameStderr) -> AppWindow
 				model_clone.with_items_table_model(|x| x.context_commands(index, &folder_info, has_mame_initialized))
 			{
 				let app_window = model_clone.app_window();
-				show_popup_menu(app_window.window(), &popup_menu, point);
+				app_window.window().show_popup_menu(&popup_menu, point);
 			}
 		}
 	});
@@ -1108,9 +1112,7 @@ async fn ping_callback(model_weak: std::rc::Weak<AppModel>) {
 		let is_running = model.running_status.borrow().running.is_some();
 
 		// set the child window size
-		if let Some(child_window) = &model.child_window {
-			child_window.set_size(model.app_window().window().size(), is_running);
-		}
+		model.child_window.update(model.app_window().window());
 
 		// send a ping command (if we're running)
 		if is_running && model.mame_controller.is_queue_empty() {

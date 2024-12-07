@@ -1,5 +1,4 @@
 use std::io::BufReader;
-use std::os::windows::process::CommandExt;
 use std::process::Child;
 use std::process::Command;
 use std::process::Stdio;
@@ -14,10 +13,10 @@ use slint::ComponentHandle;
 use slint::SharedString;
 use slint::Weak;
 use tokio::task::spawn_blocking;
-use winapi::um::winbase::CREATE_NO_WINDOW;
 
 use crate::guiutils::modal::Modal;
 use crate::info::InfoDb;
+use crate::platform::CommandExt;
 use crate::ui::LoadingDialog;
 
 const UPDATE_INTERVAL: Duration = Duration::from_millis(250);
@@ -42,7 +41,7 @@ pub async fn dialog_load_mame_info(
 		.arg("-listxml")
 		.arg("-nodtd")
 		.stdout(Stdio::piped())
-		.creation_flags(CREATE_NO_WINDOW)
+		.create_no_window(true)
 		.spawn()
 		.unwrap();
 

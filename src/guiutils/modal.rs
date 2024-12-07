@@ -1,19 +1,14 @@
 use std::future::Future;
 use std::rc::Rc;
 
-use i_slint_backend_winit::winit::platform::windows::WindowExtWindows;
-use i_slint_backend_winit::WinitWindowAccessor;
-use raw_window_handle::HasWindowHandle;
-use raw_window_handle::RawWindowHandle;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
-use slint::PhysicalPosition;
 use slint::Window;
-use slint::WindowHandle;
-use winit::platform::windows::WindowAttributesExtWindows;
 use winit::window::WindowAttributes;
 
 use crate::guiutils::hook::with_attributes_hook;
+use crate::platform::WindowAttributesExt;
+use crate::platform::WindowExt;
 
 pub struct Modal<D> {
 	reenable_parent: Rc<dyn Fn() + 'static>,
@@ -25,16 +20,13 @@ where
 	D: ComponentHandle + 'static,
 {
 	pub fn new(parent: &(impl ComponentHandle + 'static), func: impl FnOnce() -> D) -> Self {
-		// disable the parent and get the parent handle and position
-		let (parent_handle, parent_position) = {
-			let window = parent.window();
-			window.with_winit_window(|window| window.set_enable(false));
-			(window.window_handle().clone(), window.position())
-		};
+		// disable the parent
+		parent.window().set_enabled_for_modal(false);
 
 		// set up a hook
+		let parent_weak = parent.as_weak();
 		let hook = move |window_attributes| {
-			set_window_attributes_for_modal_parent(window_attributes, &parent_handle, parent_position)
+			set_window_attributes_for_modal_parent(window_attributes, parent_weak.unwrap().window())
 		};
 
 		// invoke the func
@@ -97,28 +89,18 @@ where
 
 fn set_window_attributes_for_modal_parent(
 	mut window_attributes: WindowAttributes,
-	parent_handle: &WindowHandle,
-	parent_position: PhysicalPosition,
+	parent: &Window,
 ) -> WindowAttributes {
-	match parent_handle.window_handle().unwrap().as_raw() {
-		// modal dialog on Windows
-		#[cfg(target_os = "windows")]
-		RawWindowHandle::Win32(win32_window) => {
-			let position = winit::dpi::PhysicalPosition {
-				x: parent_position.x + 64,
-				y: parent_position.y + 64,
-			};
-			window_attributes = window_attributes.with_owner_window(win32_window.hwnd.into());
-			window_attributes.position = Some(position.into());
-		}
-
-		// no modal dialog, or unknown platform
-		_ => {}
+	let parent_position = parent.position();
+	let position = winit::dpi::PhysicalPosition {
+		x: parent_position.x + 64,
+		y: parent_position.y + 64,
 	};
-
+	window_attributes = window_attributes.with_owner_window(parent);
+	window_attributes.position = Some(position.into());
 	window_attributes
 }
 
 fn reenable_modal_parent(parent: &impl ComponentHandle) {
-	parent.window().with_winit_window(|window| window.set_enable(true));
+	parent.window().set_enabled_for_modal(true);
 }
