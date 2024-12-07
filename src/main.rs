@@ -10,6 +10,7 @@ mod history;
 mod icon;
 mod info;
 mod models;
+mod platform;
 mod prefs;
 mod runtime;
 mod selection;
@@ -25,13 +26,10 @@ use dirs::config_local_dir;
 use slint::ComponentHandle;
 use structopt::StructOpt;
 use tracing::Level;
-use win32job::Job;
-use win32job::JobError;
-use winapi::um::wincon::AttachConsole;
-use winapi::um::wincon::ATTACH_PARENT_PROCESS;
 
 use crate::diagnostics::info_db_from_xml_file;
 use crate::guiutils::init_gui_utils;
+use crate::platform::platform_init;
 use crate::runtime::MameStderr;
 
 mod ui {
@@ -54,26 +52,9 @@ struct Opt {
 	no_capture_mame_stderr: bool,
 }
 
-#[cfg(target_os = "windows")]
-fn setup_win32_job() -> std::result::Result<Job, JobError> {
-	let job = Job::create()?;
-	let mut info = job.query_extended_limit_info()?;
-	info.limit_kill_on_job_close();
-	job.set_extended_limit_info(&info)?;
-	job.assign_current_process()?;
-	Ok(job)
-}
-
 fn main() {
-	// stuff specific to Windows
-	#[cfg(target_os = "windows")]
-	let _job = {
-		// attach to the parent's console - debugging is hell if we don't do this
-		unsafe {
-			AttachConsole(ATTACH_PARENT_PROCESS);
-		}
-		setup_win32_job().unwrap()
-	};
+	// platform-specific stuff
+	let _platform_specific = platform_init().unwrap();
 
 	// get the command line arguments
 	let opts = Opt::from_args();
