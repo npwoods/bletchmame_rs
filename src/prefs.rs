@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::fs;
+use std::fs::create_dir_all;
 use std::fs::rename;
 use std::fs::File;
 use std::io::BufReader;
@@ -332,13 +332,17 @@ fn prefs_save_error(e: impl Into<Error>) -> Error {
 }
 
 fn ensure_directory(path: &impl AsRef<Path>) {
-	if !fs::metadata(path).is_ok_and(|m| m.is_dir()) {
-		let _ = fs::create_dir(path);
-	}
+	let _ = create_dir_all(path);
 }
 
 #[cfg(test)]
 mod test {
+	use std::fs::File;
+
+	use assert_matches::assert_matches;
+	use tempdir::TempDir;
+	use test_case::test_case;
+
 	use super::load_prefs_from_reader;
 	use super::save_prefs_to_string;
 	use super::Preferences;
@@ -353,5 +357,22 @@ mod test {
 
 		let new_prefs = load_prefs_from_reader(json.as_bytes()).expect("Failed to load saved fresh prefs");
 		assert_eq!(prefs, new_prefs);
+	}
+
+	#[test_case(0, &["foo"])]
+	#[test_case(1, &["foo", "bar"])]
+	pub fn ensure_directory(_index: usize, path_parts: &[&str]) {
+		let tmp_dir = TempDir::new("temp").unwrap();
+		let mut path = tmp_dir.path().to_path_buf();
+		for x in path_parts {
+			path = path.join(x);
+		}
+
+		// try to ensure the directory
+		super::ensure_directory(&path);
+
+		// try to create a file in that dir
+		let result = File::create(path.join("file_in_ensured_dir.txt")).map(|_| ());
+		assert_matches!(result, Ok(_));
 	}
 }
