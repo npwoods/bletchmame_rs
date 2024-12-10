@@ -167,6 +167,11 @@ impl AppModel {
 			if prefs.paths.mame_executable != old_prefs.paths.mame_executable {
 				event!(LOG_PREFS, "modify_prefs(): paths.mame_executable changed");
 				self.build_skew_state.set(BuildSkewState::MamePathChanged);
+
+				// refresh MAME InfoDB if we now have an exectuable
+				if prefs.paths.mame_executable.is_some() && !self.mame_controller.has_session() {
+					handle_command(self, AppCommand::HelpRefreshInfoDb);
+				}
 			}
 			if prefs.paths.software_lists != old_prefs.paths.software_lists {
 				event!(LOG_PREFS, "modify_prefs(): paths.software_lists changed");
