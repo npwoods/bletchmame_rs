@@ -82,12 +82,15 @@ struct Inner {
 impl Drop for Inner {
 	fn drop(&mut self) {
 		if self.owning_thread == thread::current().id() {
-			LOCAL.with_borrow_mut(|local_data| {
-				local_data.map.as_mut().unwrap().remove(&self.id);
-				if local_data.map.as_ref().is_some_and(|map| map.is_empty()) {
+			let _ = LOCAL.try_with(|local_data| {
+				let mut local_data = local_data.borrow_mut();
+				if let Some(map) = local_data.map.as_mut() {
+					map.remove(&self.id);
+				};
+				if local_data.map.as_ref().is_some_and(|x| x.is_empty()) {
 					local_data.map = None;
 				}
-			})
+			});
 		}
 	}
 }
