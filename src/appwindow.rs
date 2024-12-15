@@ -46,7 +46,7 @@ use crate::dialogs::namecollection::dialog_rename_collection;
 use crate::dialogs::paths::dialog_paths;
 use crate::guiutils::is_context_menu_event;
 use crate::guiutils::menuing::accel;
-use crate::guiutils::menuing::update_menu_items;
+use crate::guiutils::menuing::MenuExt;
 use crate::guiutils::menuing::MenuItemUpdate;
 use crate::guiutils::modal::Modal;
 use crate::history::History;
@@ -941,7 +941,7 @@ fn update_menus(model: &AppModel) {
 		.unwrap_or_default();
 
 	// update the menu bar
-	update_menu_items(&model.menu_bar, |id| {
+	model.menu_bar.update(|id| {
 		let (enabled, checked) = match AppCommand::try_from(id) {
 			Ok(AppCommand::HelpRefreshInfoDb) => (Some(has_mame_executable), None),
 			Ok(AppCommand::FileStop) => (Some(is_running), None),
