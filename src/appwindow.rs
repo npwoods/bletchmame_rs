@@ -569,7 +569,7 @@ fn create_menu_bar() -> Menu {
 			true,
 			&[
 				&MenuItem::with_id(AppCommand::HelpRefreshInfoDb, "Refresh MAME machine info...", false, None),
-				&MenuItem::with_id(AppCommand::HelpWebSite, "BlechMAME web site...", true, None),
+				&MenuItem::with_id(AppCommand::HelpWebSite, "BletchMAME web site...", true, None),
 				&MenuItem::with_id(AppCommand::HelpAbout, "About...", true, None),
 			],
 		)
