@@ -47,8 +47,15 @@ pub struct MenuItemUpdate {
 	pub checked: Option<bool>,
 }
 
-pub fn update_menu_items(menu: &Menu, callback: impl Fn(&MenuId) -> MenuItemUpdate) {
-	update_menu_items_internal(&menu.items(), &callback);
+// extension for muda menus
+pub trait MenuExt {
+	fn update(&self, callback: impl Fn(&MenuId) -> MenuItemUpdate);
+}
+
+impl MenuExt for Menu {
+	fn update(&self, callback: impl Fn(&MenuId) -> MenuItemUpdate) {
+		update_menu_items_internal(&self.items(), &callback);
+	}
 }
 
 fn update_menu_items_internal(items: &[MenuItemKind], callback: &impl Fn(&MenuId) -> MenuItemUpdate) {
