@@ -17,7 +17,9 @@ use super::get_win32_window_handle;
 
 pub fn attach_menu_bar(window: &Window, menu_bar: &Menu) -> Result<()> {
 	let win32_window = get_win32_window_handle(window)?;
-	menu_bar.init_for_hwnd(win32_window.hwnd.into())?;
+	unsafe {
+		menu_bar.init_for_hwnd(win32_window.hwnd.into())?;
+	}
 	Ok(())
 }
 
@@ -25,8 +27,10 @@ pub fn show_popup_menu(window: &Window, popup_menu: &Menu, _point: LogicalPositi
 	// get the Win32 window handle
 	let win32_window = get_win32_window_handle(window).unwrap();
 
-	// use tauri to show the popup menu
-	popup_menu.show_context_menu_for_hwnd(win32_window.hwnd.into(), None);
+	// use muda to show the popup menu
+	unsafe {
+		popup_menu.show_context_menu_for_hwnd(win32_window.hwnd.into(), None);
+	}
 
 	// very gross hack
 	unfreeze_slint_after_popup_menu_hack(isize::from(win32_window.hwnd) as HWND);

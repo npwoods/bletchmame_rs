@@ -16,7 +16,7 @@ slint = { version = "1.8", features = ["raw-window-handle-06"] }
 i-slint-core = "1.8"
 i-slint-common = "1.8"
 i-slint-backend-winit = "1.8"
-muda = "0.14.1"
+muda = "0.15.3"
 raw-window-handle = "0.6.2"
 rfd = "0.15.1"
 serde = { version = "1.0.216", features = ["rc"] }
