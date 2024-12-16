@@ -77,6 +77,14 @@ const LOG_PINGING: Level = Level::TRACE;
 const SOUND_ATTENUATION_OFF: i32 = -32;
 const SOUND_ATTENUATION_ON: i32 = 0;
 
+/// Arguments to the application (derivative from the command line); almost all of this
+/// are power user features or diagnostics
+#[derive(Debug)]
+pub struct AppArgs {
+	pub prefs_path: Option<PathBuf>,
+	pub mame_stderr: MameStderr,
+}
+
 struct AppModel {
 	menu_bar: Menu,
 	app_window_weak: Weak<AppWindow>,
@@ -226,7 +234,7 @@ impl AppModel {
 	}
 }
 
-pub fn create(prefs_path: Option<PathBuf>, mame_stderr: MameStderr) -> AppWindow {
+pub fn create(args: AppArgs) -> AppWindow {
 	let app_window = AppWindow::new().unwrap();
 
 	// child window for MAME to attach to
@@ -241,6 +249,7 @@ pub fn create(prefs_path: Option<PathBuf>, mame_stderr: MameStderr) -> AppWindow
 		.unwrap_or_else(|e| panic!("Failed to attach menu bar: {e:?}"));
 
 	// get preferences
+	let prefs_path = args.prefs_path;
 	let preferences = Preferences::load(prefs_path.as_ref())
 		.ok()
 		.flatten()
@@ -259,7 +268,7 @@ pub fn create(prefs_path: Option<PathBuf>, mame_stderr: MameStderr) -> AppWindow
 		preferences: RefCell::new(preferences),
 		info_db: RefCell::new(None),
 		empty_button_command: RefCell::new(None),
-		mame_controller: MameController::new(mame_stderr),
+		mame_controller: MameController::new(args.mame_stderr),
 		running_state: Cell::new(MameRunningState::Normal),
 		running_status: RefCell::new(Status::default()),
 		child_window,

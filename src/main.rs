@@ -27,6 +27,7 @@ use slint::ComponentHandle;
 use structopt::StructOpt;
 use tracing::Level;
 
+use crate::appwindow::AppArgs;
 use crate::diagnostics::info_db_from_xml_file;
 use crate::guiutils::init_gui_utils;
 use crate::platform::platform_init;
@@ -97,8 +98,12 @@ fn main() {
 	// initialize our GUI utility code that will hopefully go away as Slint improves
 	init_gui_utils();
 
-	// create the application winodw...
-	let app_window = appwindow::create(prefs_path, mame_stderr);
+	// create the application window...
+	let args = AppArgs {
+		prefs_path,
+		mame_stderr,
+	};
+	let app_window = appwindow::create(args);
 
 	// ...and run run run!
 	app_window.run().unwrap();
