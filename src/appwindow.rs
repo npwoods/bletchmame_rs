@@ -9,6 +9,7 @@ use muda::CheckMenuItem;
 use muda::IsMenuItem;
 use muda::Menu;
 use muda::MenuEvent;
+use muda::MenuId;
 use muda::MenuItem;
 use muda::PredefinedMenuItem;
 use muda::Submenu;
@@ -24,6 +25,7 @@ use slint::SharedString;
 use slint::TableColumn;
 use slint::VecModel;
 use slint::Weak;
+use strum::EnumString;
 use tracing::event;
 use tracing::Level;
 
@@ -83,6 +85,14 @@ const SOUND_ATTENUATION_ON: i32 = 0;
 pub struct AppArgs {
 	pub prefs_path: Option<PathBuf>,
 	pub mame_stderr: MameStderr,
+	pub menuing_type: MenuingType,
+}
+
+#[derive(Debug, EnumString)]
+#[strum(ascii_case_insensitive)]
+pub enum MenuingType {
+	Native,
+	Slint,
 }
 
 struct AppModel {
@@ -241,12 +251,8 @@ pub fn create(args: AppArgs) -> AppWindow {
 	let child_window =
 		ChildWindow::new(app_window.window()).unwrap_or_else(|e| panic!("Failed to create child window: {e:?}"));
 
-	// create the menu bar and associate it with our window (looking forward to Slint having first class menuing support)
+	// create the menu bar
 	let menu_bar = create_menu_bar();
-	app_window
-		.window()
-		.attach_menu_bar(&menu_bar)
-		.unwrap_or_else(|e| panic!("Failed to attach menu bar: {e:?}"));
 
 	// get preferences
 	let prefs_path = args.prefs_path;
@@ -275,6 +281,30 @@ pub fn create(args: AppArgs) -> AppWindow {
 		build_skew_state: Cell::new(BuildSkewState::Normal),
 	};
 	let model = Rc::new(model);
+
+	// attach the menu bar (either natively or with an approximation using Slint); looking forward to Slint having first class menuing support
+	match args.menuing_type {
+		MenuingType::Native => {
+			// attach a native menu bar
+			app_window
+				.window()
+				.attach_menu_bar(&model.menu_bar)
+				.unwrap_or_else(|e| panic!("Failed to attach menu bar: {e:?}"));
+		}
+		MenuingType::Slint => {
+			// set up Slint menu bar by proxying muda menu bar
+			app_window.set_menubar_entries(model.menu_bar.slint_menu_entries(None));
+			let model_clone = model.clone();
+			app_window.on_menubar_sub_menu_selected(move |entry| model_clone.menu_bar.slint_menu_entries(Some(&entry)));
+			let model_clone = model.clone();
+			app_window.on_menubar_sub_menu_activated(move |entry| {
+				let id = MenuId::from(&entry.id);
+				if let Ok(command) = AppCommand::try_from(&id) {
+					handle_command(&model_clone, command);
+				}
+			});
+		}
+	}
 
 	// set up a callback for MAME events
 	let bubble = ThreadLocalBubble::new(model.clone());

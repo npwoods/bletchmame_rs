@@ -38,12 +38,25 @@ export component AppWindow inherits Window {
     callback bookmark-collection-clicked();
     in property <[MagicListViewItem]> collections-model;
     in property <[[StandardListViewItem]]> items-model;
+    in property <[MenuEntry]> menubar-entries;
+    callback menubar-sub-menu-selected(MenuEntry) -> [MenuEntry];
+    callback menubar-sub-menu-activated(MenuEntry);
     public function collections-view-select(index: int) {
         collections-list-view.current_index = index;
     }
     public function items-view-select(index: int) {
         items-table-view.set-current-row(index);
     }
+    MenuBar {
+        entries: menubar-entries;
+        sub-menu(entry) => {
+            return menubar-sub-menu-selected(entry);
+        }
+        activated(entry) => {
+            menubar-sub-menu-activated(entry)
+        }
+    }
+
     HorizontalBox {
         visible: running-machine-description == "";
         alignment: stretch;
