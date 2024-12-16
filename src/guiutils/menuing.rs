@@ -1,4 +1,5 @@
 //! Helpers for Menu handling; which Slint does not handle yet
+use i_slint_core::items::MenuEntry as SlintMenuEntry;
 use muda::accelerator::Accelerator;
 use muda::accelerator::Code;
 use muda::accelerator::Modifiers;
@@ -9,6 +10,8 @@ use muda::MenuItem;
 use muda::MenuItemKind;
 use muda::PredefinedMenuItem;
 use muda::Submenu;
+use slint::ModelRc;
+use slint::VecModel;
 
 /// Helper function to declare accelerators
 pub fn accel(text: &str) -> Option<Accelerator> {
@@ -50,11 +53,38 @@ pub struct MenuItemUpdate {
 // extension for muda menus
 pub trait MenuExt {
 	fn update(&self, callback: impl Fn(&MenuId) -> MenuItemUpdate);
+	fn slint_menu_entries(&self, sub_menu: Option<&SlintMenuEntry>) -> ModelRc<SlintMenuEntry>;
+	fn is_natively_supported() -> bool;
 }
 
 impl MenuExt for Menu {
 	fn update(&self, callback: impl Fn(&MenuId) -> MenuItemUpdate) {
 		update_menu_items_internal(&self.items(), &callback);
+	}
+
+	fn slint_menu_entries(&self, sub_menu: Option<&SlintMenuEntry>) -> ModelRc<SlintMenuEntry> {
+		// find the menu items we want to return
+		let items = if let Some(sub_menu) = sub_menu {
+			let title = &sub_menu.title;
+			traverse_menu_items(&self.items(), &|item: &MenuItemKind| {
+				item.as_submenu()
+					.and_then(|sub_menu| (sub_menu.text().as_str() == title.as_str()).then(|| sub_menu.items()))
+			})
+			.unwrap_or_default()
+		} else {
+			self.items()
+		};
+
+		// convert them to Slint
+		let items = items.iter().filter_map(slint_menu_entry).collect::<Vec<_>>();
+
+		// and build the model
+		let model = VecModel::from(items);
+		ModelRc::new(model)
+	}
+
+	fn is_natively_supported() -> bool {
+		cfg!(windows)
 	}
 }
 
@@ -89,6 +119,36 @@ fn update_menu_items_internal(items: &[MenuItemKind], callback: &impl Fn(&MenuId
 			}
 		}
 	}
+}
+
+fn traverse_menu_items<T>(items: &[MenuItemKind], func: &impl Fn(&MenuItemKind) -> Option<T>) -> Option<T> {
+	items
+		.iter()
+		.filter_map(|item| {
+			func(item).or_else(|| {
+				item.as_submenu()
+					.and_then(|sub_menu| traverse_menu_items(&sub_menu.items(), func))
+			})
+		})
+		.next()
+}
+
+fn slint_menu_entry(menu_item: &MenuItemKind) -> Option<SlintMenuEntry> {
+	let (title, id, has_sub_menu) = match menu_item {
+		MenuItemKind::MenuItem(menu_item) => Some((menu_item.text(), menu_item.id().as_ref(), false)),
+		MenuItemKind::Check(menu_item) => Some((menu_item.text(), menu_item.id().as_ref(), false)),
+		MenuItemKind::Submenu(menu_item) => Some((menu_item.text(), menu_item.id().as_ref(), true)),
+		_ => None,
+	}?;
+
+	let title = title.into();
+	let id = id.into();
+	let entry = SlintMenuEntry {
+		title,
+		id,
+		has_sub_menu,
+	};
+	Some(entry)
 }
 
 pub enum MenuDesc {

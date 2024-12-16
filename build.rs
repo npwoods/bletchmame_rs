@@ -9,6 +9,11 @@ fn main() -> std::io::Result<()> {
 	// dependencies
 	println!("cargo::rerun-if-changed={}", icon_file);
 
+	// set the experimental environment variable
+	unsafe {
+		env::set_var("SLINT_ENABLE_EXPERIMENTAL_FEATURES", "1");
+	}
+
 	// build Slint stuff
 	slint_build::compile_with_config(
 		"ui/main.slint",

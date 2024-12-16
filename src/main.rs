@@ -22,7 +22,9 @@ mod xml;
 
 use std::path::PathBuf;
 
+use appwindow::MenuingType;
 use dirs::config_local_dir;
+use muda::Menu;
 use slint::ComponentHandle;
 use structopt::StructOpt;
 use tracing::Level;
@@ -30,6 +32,7 @@ use tracing::Level;
 use crate::appwindow::AppArgs;
 use crate::diagnostics::info_db_from_xml_file;
 use crate::guiutils::init_gui_utils;
+use crate::guiutils::menuing::MenuExt;
 use crate::platform::platform_init;
 use crate::runtime::MameStderr;
 
@@ -51,6 +54,9 @@ struct Opt {
 
 	#[cfg_attr(feature = "diagnostics", structopt(long))]
 	no_capture_mame_stderr: bool,
+
+	#[cfg_attr(feature = "diagnostics", structopt(long))]
+	menuing: Option<MenuingType>,
 }
 
 fn main() {
@@ -98,10 +104,20 @@ fn main() {
 	// initialize our GUI utility code that will hopefully go away as Slint improves
 	init_gui_utils();
 
+	// what types of menus will we be using?
+	let menuing_type = opts.menuing.unwrap_or_else(|| {
+		if Menu::is_natively_supported() {
+			MenuingType::Native
+		} else {
+			MenuingType::Slint
+		}
+	});
+
 	// create the application window...
 	let args = AppArgs {
 		prefs_path,
 		mame_stderr,
+		menuing_type,
 	};
 	let app_window = appwindow::create(args);
 
