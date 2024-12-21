@@ -3,6 +3,7 @@ import { MagicListView, MagicListViewItem, Icons, FilledButton } from "@vivi/mag
 
 export component PathsDialog inherits Window {
     title: "Paths";
+    icon: @image-url("bletchmame.png");
     in property <[string]> path-labels;
     in property <[MagicListViewItem]> path-entries;
     in property <bool> ok-enabled;

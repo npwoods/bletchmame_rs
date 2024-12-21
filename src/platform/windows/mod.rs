@@ -18,10 +18,8 @@ use win32job::Job;
 use winapi::um::winbase::CREATE_NO_WINDOW;
 use winapi::um::wincon::AttachConsole;
 use winapi::um::wincon::ATTACH_PARENT_PROCESS;
-use winit::platform::windows::IconExtWindows;
 use winit::platform::windows::WindowAttributesExtWindows;
 use winit::platform::windows::WindowExtWindows;
-use winit::window::Icon;
 use winit::window::WindowAttributes;
 
 pub fn win_platform_init() -> Result<impl Any, Error> {
@@ -55,21 +53,11 @@ impl WinCommandExt for Command {
 	}
 }
 
-fn bletchmame_icon() -> Icon {
-	Icon::from_resource(32512, None).unwrap()
-}
-
 pub trait WinWindowAttributesExt {
-	fn with_bletchmame_icon(self) -> Self;
 	fn with_owner_window(self, owner: &Window) -> Self;
 }
 
 impl WinWindowAttributesExt for WindowAttributes {
-	fn with_bletchmame_icon(self) -> Self {
-		let icon = bletchmame_icon();
-		self.with_window_icon(Some(icon.clone())).with_taskbar_icon(Some(icon))
-	}
-
 	fn with_owner_window(self, owner: &Window) -> Self {
 		let win32_window = get_win32_window_handle(owner).unwrap();
 		WindowAttributesExtWindows::with_owner_window(self, win32_window.hwnd.into())
@@ -102,13 +90,5 @@ fn get_win32_window_handle(window: &Window) -> Result<Win32WindowHandle> {
 	} else {
 		let message = "RawWindowHandle is not RawWindowHandle::Win32";
 		Err(Error::msg(message))
-	}
-}
-
-#[cfg(test)]
-mod test {
-	#[test]
-	fn bletchmame_icon() {
-		let _ = super::bletchmame_icon();
 	}
 }

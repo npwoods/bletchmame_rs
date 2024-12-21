@@ -13,6 +13,7 @@ export component AppWindow inherits Window {
     min-height: 100px;
     max-width: 10000px;
     max-height: 10000px;
+    icon: @image-url("bletchmame.png");
     title: @tr("BletchMAME 3.0 prototype: ") + (running-machine-description != "" ? ": " + running-machine-description : "");
     callback empty-action-clicked();
     callback find-software-lists-clicked();

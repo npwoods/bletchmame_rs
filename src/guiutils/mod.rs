@@ -12,10 +12,9 @@ use slint::platform::PointerEventButton;
 use winit::window::WindowAttributes;
 
 use crate::guiutils::hook::create_window_attributes_hook;
-use crate::platform::WindowAttributesExt;
 
 fn global_hook(attrs: WindowAttributes) -> WindowAttributes {
-	attrs.with_bletchmame_icon()
+	attrs
 }
 
 pub fn init_gui_utils() {
