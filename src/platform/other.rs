@@ -24,15 +24,10 @@ impl OtherCommandExt for Command {
 }
 
 pub trait OtherWindowAttributesExt {
-	fn with_bletchmame_icon(self) -> Self;
 	fn with_owner_window(self, owner: &Window) -> Self;
 }
 
 impl OtherWindowAttributesExt for WindowAttributes {
-	fn with_bletchmame_icon(self) -> Self {
-		self
-	}
-
 	fn with_owner_window(self, _owner: &Window) -> Self {
 		self
 	}

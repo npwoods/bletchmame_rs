@@ -58,6 +58,7 @@ test-case = "3.3.1"
 tempdir = "0.3.7"
 
 [build-dependencies]
+ico = "0.3.0"
 slint-build = "1.9"
 vivi_ui = { git = "https://seed.radicle.garden/z3oxAZSLcyXgpa7fcvgtueF49jHpH.git", rev = "76a83bc993ce625822182e629034e54496a3bc20" }
 winresource = "0.1.17"
