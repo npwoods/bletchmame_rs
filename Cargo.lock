@@ -656,6 +656,7 @@ dependencies = [
  "default-ext",
  "derive-enum-all-values",
  "dirs",
+ "dpi",
  "i-slint-backend-winit",
  "i-slint-common",
  "i-slint-core",

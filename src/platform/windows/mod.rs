@@ -1,4 +1,4 @@
-pub mod childwnd;
+#![allow(dead_code)]
 pub mod menuing;
 
 use std::any::Any;
@@ -15,9 +15,12 @@ use raw_window_handle::Win32WindowHandle;
 use slint::LogicalPosition;
 use slint::Window;
 use win32job::Job;
+use winapi::shared::windef::HWND;
 use winapi::um::winbase::CREATE_NO_WINDOW;
 use winapi::um::wincon::AttachConsole;
 use winapi::um::wincon::ATTACH_PARENT_PROCESS;
+use winapi::um::winuser::GetFocus;
+use winapi::um::winuser::SetFocus;
 use winit::platform::windows::WindowAttributesExtWindows;
 use winit::platform::windows::WindowExtWindows;
 use winit::window::WindowAttributes;
@@ -68,6 +71,7 @@ pub trait WinWindowExt {
 	fn attach_menu_bar(&self, menu_bar: &Menu) -> Result<()>;
 	fn show_popup_menu(&self, popup_menu: &Menu, point: LogicalPosition);
 	fn set_enabled_for_modal(&self, enabled: bool);
+	fn ensure_child_focus(&self, child: &winit::window::Window);
 }
 
 impl WinWindowExt for Window {
@@ -81,6 +85,28 @@ impl WinWindowExt for Window {
 
 	fn set_enabled_for_modal(&self, enabled: bool) {
 		self.with_winit_window(|window| window.set_enable(enabled));
+	}
+
+	fn ensure_child_focus(&self, child: &winit::window::Window) {
+		// hackish method that ensures so-called "appropriate focus"; this really needs
+		// to be generalized
+
+		// note that we avoid `Window::focus_window()`, as `winit` has a nasty hack that blasts
+		// keystrokes into the window
+		if child.is_visible().unwrap_or_default() {
+			let do_set_focus = get_win32_window_handle(self)
+				.ok()
+				.map(|x| unsafe { GetFocus() } == isize::from(x.hwnd) as HWND)
+				.unwrap_or_default();
+
+			if do_set_focus {
+				if let RawWindowHandle::Win32(child_hwnd) = child.window_handle().unwrap().as_raw() {
+					unsafe {
+						SetFocus(isize::from(child_hwnd.hwnd) as HWND);
+					}
+				}
+			}
+		}
 	}
 }
 

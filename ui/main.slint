@@ -40,6 +40,9 @@ export component AppWindow inherits Window {
     in property <[MagicListViewItem]> collections-model;
     in property <[[StandardListViewItem]]> items-model;
     in property <[MenuEntry]> menubar-entries;
+    public function menubar-height() -> length {
+        return hbox.absolute-position.y - self.absolute-position.y;
+    }
     public function show-context-menu(entries: [MenuEntry], point: Point) {
         context-menu.show(entries, point);
     }
@@ -70,7 +73,7 @@ export component AppWindow inherits Window {
         }
     }
 
-    HorizontalBox {
+    hbox := HorizontalBox {
         visible: running-machine-description == "";
         alignment: stretch;
         collections-list-view := MagicListView {

@@ -31,6 +31,7 @@ use tracing::event;
 use tracing::Level;
 
 use crate::appcommand::AppCommand;
+use crate::childwindow::ChildWindow;
 use crate::collections::add_items_to_existing_folder_collection;
 use crate::collections::add_items_to_new_folder_collection;
 use crate::collections::get_collection_name;
@@ -57,7 +58,6 @@ use crate::info::InfoDb;
 use crate::models::collectionsview::CollectionsViewModel;
 use crate::models::itemstable::EmptyReason;
 use crate::models::itemstable::ItemsTableModel;
-use crate::platform::ChildWindow;
 use crate::platform::WindowExt;
 use crate::prefs::BuiltinCollection;
 use crate::prefs::Preferences;
@@ -1170,9 +1170,9 @@ async fn ping_callback(model_weak: std::rc::Weak<AppModel>) {
 		let is_running = model.running_status.borrow().running.is_some();
 
 		// set the child window size
-		model.child_window.update(model.app_window().window());
+		let menubar_height = model.app_window().invoke_menubar_height();
+		model.child_window.update(model.app_window().window(), menubar_height);
 
-		// send a ping command (if we're running)
 		if is_running && model.mame_controller.is_queue_empty() {
 			handle_command(&model, AppCommand::MamePing);
 		}

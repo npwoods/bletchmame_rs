@@ -37,6 +37,7 @@ pub trait OtherWindowExt {
 	fn attach_menu_bar(&self, menu_bar: &Menu) -> Result<()>;
 	fn show_popup_menu(&self, popup_menu: &Menu, point: LogicalPosition);
 	fn set_enabled_for_modal(&self, enabled: bool);
+	fn ensure_child_focus(&self, child: &winit::window::Window);
 }
 
 impl OtherWindowExt for Window {
@@ -51,24 +52,8 @@ impl OtherWindowExt for Window {
 	fn set_enabled_for_modal(&self, _enabled: bool) {
 		todo!()
 	}
-}
 
-pub struct OtherChildWindow();
-
-impl OtherChildWindow {
-	pub fn new(_window: &Window) -> Result<Self> {
-		Ok(Self())
-	}
-
-	pub fn set_visible(&self, _is_visible: bool) {
-		// do nothing
-	}
-
-	pub fn update(&self, _container: &Window) {
-		// do nothing
-	}
-
-	pub fn text(&self) -> Option<String> {
-		None
+	fn ensure_child_focus(&self, _child: &winit::window::Window) {
+		// do nothing for now
 	}
 }

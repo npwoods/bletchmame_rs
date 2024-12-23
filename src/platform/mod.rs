@@ -7,7 +7,6 @@ mod windows;
 #[cfg(target_os = "windows")]
 #[rustfmt::skip]
 pub use {
-    windows::childwnd::WinChildWindow as ChildWindow,
     windows::win_platform_init as platform_init,
     windows::WinCommandExt as CommandExt,
     windows::WinWindowAttributesExt as WindowAttributesExt,
@@ -18,7 +17,6 @@ pub use {
 #[cfg(not(target_os = "windows"))]
 #[rustfmt::skip]
 pub use {
-    other::OtherChildWindow as ChildWindow,
     other::other_platform_init as platform_init,
     other::OtherCommandExt as CommandExt,
     other::OtherWindowAttributesExt as WindowAttributesExt,
