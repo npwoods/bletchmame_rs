@@ -70,7 +70,10 @@ export component AppWindow inherits Window {
                 collections-view-selected(index)
             }
             row-pointer-event(row, event, point) => {
-                collections-row-pointer-event(row, event, point)
+                collections-row-pointer-event(row, event, {
+                    x: point.x + collections-list-view.absolute-position.x,
+                    y: point.y + collections-list-view.absolute-position.y
+                })
             }
         }
 
@@ -157,7 +160,10 @@ export component AppWindow inherits Window {
                         items-current-row-changed()
                     }
                     row-pointer-event(row, event, point) => {
-                        items-row-pointer-event(row, event, point)
+                        items-row-pointer-event(row, event, {
+                            x: point.x + items-table-view.absolute-position.x,
+                            y: point.y + items-table-view.absolute-position.y
+                        })
                     }
                 }
             }
