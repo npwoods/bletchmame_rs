@@ -297,7 +297,7 @@ pub fn create(args: AppArgs) -> AppWindow {
 			let model_clone = model.clone();
 			app_window.on_menubar_sub_menu_selected(move |entry| model_clone.menu_bar.slint_menu_entries(Some(&entry)));
 			let model_clone = model.clone();
-			app_window.on_menubar_sub_menu_activated(move |entry| {
+			app_window.on_menu_entry_activated(move |entry| {
 				let id = MenuId::from(&entry.id);
 				if let Ok(command) = AppCommand::try_from(&id) {
 					handle_command(&model_clone, command);
