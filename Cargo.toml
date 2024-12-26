@@ -12,10 +12,12 @@ tracing = { version = "0.1.41", features = [
     "release_max_level_info",
 ] }
 tracing-subscriber = "0.3.19"
-slint = { version = "1.9.1", features = ["raw-window-handle-06"] }
-i-slint-core = "1.9.1"
-i-slint-common = "1.9.1"
-i-slint-backend-winit = "1.9.1"
+slint = { git = "https://github.com/npwoods/slint.git", rev = "57e97797dfb8badfef89e3303d540e57a36365e6", features = [
+    "raw-window-handle-06",
+] }
+i-slint-core = { git = "https://github.com/npwoods/slint.git", rev = "57e97797dfb8badfef89e3303d540e57a36365e6" }
+i-slint-common = { git = "https://github.com/npwoods/slint.git", rev = "57e97797dfb8badfef89e3303d540e57a36365e6" }
+i-slint-backend-winit = { git = "https://github.com/npwoods/slint.git", rev = "57e97797dfb8badfef89e3303d540e57a36365e6" }
 muda = "0.15.3"
 raw-window-handle = "0.6.2"
 rfd = "0.15.1"
@@ -59,7 +61,7 @@ tempdir = "0.3.7"
 
 [build-dependencies]
 ico = "0.3.0"
-slint-build = "1.9.1"
+slint-build = { git = "https://github.com/npwoods/slint.git", rev = "57e97797dfb8badfef89e3303d540e57a36365e6" }
 vivi_ui = { git = "https://seed.radicle.garden/z3oxAZSLcyXgpa7fcvgtueF49jHpH.git", rev = "76a83bc993ce625822182e629034e54496a3bc20" }
 winresource = "0.1.17"
 
