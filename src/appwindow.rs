@@ -18,6 +18,7 @@ use slint::quit_event_loop;
 use slint::spawn_local;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
+use slint::LogicalPosition;
 use slint::LogicalSize;
 use slint::Model;
 use slint::ModelRc;
@@ -88,7 +89,7 @@ pub struct AppArgs {
 	pub menuing_type: MenuingType,
 }
 
-#[derive(Debug, EnumString)]
+#[derive(Copy, Clone, Debug, EnumString)]
 #[strum(ascii_case_insensitive)]
 pub enum MenuingType {
 	Native,
@@ -97,6 +98,7 @@ pub enum MenuingType {
 
 struct AppModel {
 	menu_bar: Menu,
+	menuing_type: MenuingType,
 	app_window_weak: Weak<AppWindow>,
 	preferences: RefCell<Preferences>,
 	info_db: RefCell<Option<Rc<InfoDb>>>,
@@ -242,6 +244,19 @@ impl AppModel {
 		self.mame_controller
 			.reset(is_enabled.then_some(&self.preferences.borrow().paths), &windowing);
 	}
+
+	pub fn show_popup_menu(&self, popup_menu: Menu, point: LogicalPosition) {
+		let app_window = self.app_window();
+		match self.menuing_type {
+			MenuingType::Native => {
+				app_window.window().show_popup_menu(&popup_menu, point);
+			}
+			MenuingType::Slint => {
+				let entries = popup_menu.slint_menu_entries(None);
+				app_window.invoke_show_context_menu(entries, point);
+			}
+		}
+	}
 }
 
 pub fn create(args: AppArgs) -> AppWindow {
@@ -270,6 +285,7 @@ pub fn create(args: AppArgs) -> AppWindow {
 	// create the model
 	let model = AppModel {
 		menu_bar,
+		menuing_type: args.menuing_type,
 		app_window_weak: app_window.as_weak(),
 		preferences: RefCell::new(preferences),
 		info_db: RefCell::new(None),
@@ -464,8 +480,7 @@ pub fn create(args: AppArgs) -> AppWindow {
 		if is_context_menu_event(&evt) {
 			let index = usize::try_from(index).ok();
 			if let Some(popup_menu) = model_clone.with_collections_view_model(|x| x.context_commands(index)) {
-				let app_window = model_clone.app_window();
-				app_window.window().show_popup_menu(&popup_menu, point);
+				model_clone.show_popup_menu(popup_menu, point);
 			}
 		}
 	});
@@ -480,8 +495,7 @@ pub fn create(args: AppArgs) -> AppWindow {
 			if let Some(popup_menu) =
 				model_clone.with_items_table_model(|x| x.context_commands(index, &folder_info, has_mame_initialized))
 			{
-				let app_window = model_clone.app_window();
-				app_window.window().show_popup_menu(&popup_menu, point);
+				model_clone.show_popup_menu(popup_menu, point);
 			}
 		}
 	});

@@ -40,6 +40,9 @@ export component AppWindow inherits Window {
     in property <[MagicListViewItem]> collections-model;
     in property <[[StandardListViewItem]]> items-model;
     in property <[MenuEntry]> menubar-entries;
+    public function show-context-menu(entries: [MenuEntry], point: Point) {
+        context-menu.show(entries, point);
+    }
     callback menubar-sub-menu-selected(MenuEntry) -> [MenuEntry];
     callback menu-entry-activated(MenuEntry);
     public function collections-view-select(index: int) {
@@ -50,6 +53,15 @@ export component AppWindow inherits Window {
     }
     MenuBar {
         entries: menubar-entries;
+        sub-menu(entry) => {
+            return menubar-sub-menu-selected(entry);
+        }
+        activated(entry) => {
+            menu-entry-activated(entry)
+        }
+    }
+
+    context-menu := ContextMenu {
         sub-menu(entry) => {
             return menubar-sub-menu-selected(entry);
         }
