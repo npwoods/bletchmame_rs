@@ -94,6 +94,27 @@ fn current_exe_lookup() -> Option<PathBuf> {
 	current_exe().ok()
 }
 
+/// Returns platform specific arguments to MAME
+fn platform_specific_args() -> Vec<&'static str> {
+	if cfg!(target_family = "windows") {
+		// Windows MAME
+		vec![
+			"-keyboardprovider",
+			"dinput",
+			"-mouseprovider",
+			"dinput",
+			"-lightgunprovider",
+			"dinput",
+		]
+	} else if cfg!(target_family = "unix") {
+		// SDL MAME
+		vec!["-video", "soft"]
+	} else {
+		// Unknown
+		vec![]
+	}
+}
+
 fn preflight_checks(
 	mame_executable_path: Option<&str>,
 	plugins_paths: &[impl AsRef<str>],
@@ -197,15 +218,7 @@ fn mame_args_from_source(
 	};
 
 	// platform specific arguments
-	let keyboard_provider = cfg!(windows).then_some("dinput");
-	let mouse_provider = cfg!(windows).then_some("dinput");
-	let lightgun_provider = cfg!(windows).then_some("dinput");
-	let platform_args = keyboard_provider
-		.iter()
-		.flat_map(|x| ["-keyboardprovider", x])
-		.chain(mouse_provider.iter().flat_map(|x| ["-mouseprovider", x]))
-		.chain(lightgun_provider.iter().flat_map(|x| ["-lightgunprovider", x]))
-		.map(Cow::Borrowed);
+	let platform_args = platform_specific_args().into_iter().map(Cow::Borrowed);
 
 	// assemble all arguments
 	let program = source.mame_executable_path.unwrap().to_string();
