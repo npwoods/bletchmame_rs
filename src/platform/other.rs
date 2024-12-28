@@ -50,7 +50,7 @@ impl OtherWindowExt for Window {
 	}
 
 	fn set_enabled_for_modal(&self, _enabled: bool) {
-		todo!()
+		// do nothing for now
 	}
 
 	fn ensure_child_focus(&self, _child: &winit::window::Window) {
