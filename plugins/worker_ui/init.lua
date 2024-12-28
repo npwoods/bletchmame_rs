@@ -5,6 +5,8 @@ exports.description = "worker-ui plugin"
 exports.license = "The BSD 3-Clause License"
 exports.author = { name = "Bletch" }
 
+print("@INFO ### Worker UI plugin starting")
+
 function quoted_string_split(text)
 	local result = {}
 	local e = 0
