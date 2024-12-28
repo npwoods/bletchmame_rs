@@ -742,6 +742,13 @@ function command_debugger(args)
 	print("@OK ### Dropping into debugger")
 end
 
+-- CLASSIC_MENU command
+function command_classic_menu(args)
+	ui():show_menu()
+	machine_uiinput().presses_enabled = true
+	print("@OK ### Showing the classic menu")
+end
+
 -- THROTTLED command
 function command_throttled(args)
 	machine_video().throttled = toboolean(args[2])
@@ -1145,6 +1152,7 @@ local commands =
 	["pause"]						= command_pause,
 	["resume"]						= command_resume,
 	["debugger"]					= command_debugger,
+	["classic_menu"]				= command_classic_menu,
 	["input"]						= command_input,
 	["paste"]						= command_paste,
 	["set_attenuation"]				= command_set_attenuation,

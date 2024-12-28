@@ -597,6 +597,7 @@ fn create_menu_bar() -> Menu {
 				&MenuItem::new("Full Screen", false, accel("F11")),
 				&CheckMenuItem::with_id(AppCommand::OptionsToggleSound, "Sound", false, false,None),
 				&MenuItem::new("Cheats...", false, None),
+				&MenuItem::with_id(AppCommand::OptionsClassic,"Classic MAME Menu", false, None),
 			],
 		)
 		.unwrap(),
@@ -700,6 +701,9 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 					.mame_controller
 					.issue_command(MameCommand::SetAttenuation(new_attenuation));
 			}
+		}
+		AppCommand::OptionsClassic => {
+			model.mame_controller.issue_command(MameCommand::ClassicMenu);
 		}
 		AppCommand::SettingsPaths => {
 			let fut = show_paths_dialog(model.clone());
@@ -1004,6 +1008,7 @@ fn update_menus(model: &AppModel) {
 			Ok(AppCommand::OptionsThrottleRate(x)) => (Some(is_running), Some(Some(x) == throttle_rate)),
 			Ok(AppCommand::OptionsToggleWarp) => (Some(is_running), Some(!is_throttled)),
 			Ok(AppCommand::OptionsToggleSound) => (Some(is_running), Some(is_sound_enabled)),
+			Ok(AppCommand::OptionsClassic) => (Some(is_running), None),
 			_ => (None, None),
 		};
 		MenuItemUpdate { enabled, checked }

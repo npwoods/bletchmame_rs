@@ -324,6 +324,7 @@ fn command_text(command: &MameCommand<'_>) -> Cow<'static, str> {
 		MameCommand::Pause => "PAUSE".into(),
 		MameCommand::Resume => "RESUME".into(),
 		MameCommand::Ping => "PING".into(),
+		MameCommand::ClassicMenu => "CLASSIC_MENU".into(),
 		MameCommand::Throttled(throttled) => format!("THROTTLED {}", bool_str(*throttled)).into(),
 		MameCommand::ThrottleRate(throttle) => format!("THROTTLE_RATE {}", throttle).into(),
 		MameCommand::SetAttenuation(attenuation) => format!("SET_ATTENUATION {}", attenuation).into(),
