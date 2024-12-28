@@ -30,6 +30,7 @@ pub enum MameCommand<'a> {
 	Pause,
 	Resume,
 	Ping,
+	ClassicMenu,
 	Throttled(bool),
 	ThrottleRate(f32),
 	SetAttenuation(i32),
