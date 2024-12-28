@@ -5241,7 +5241,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 [[package]]
 name = "vivi_ui"
 version = "0.2.0"
-source = "git+https://seed.radicle.garden/z3oxAZSLcyXgpa7fcvgtueF49jHpH.git?rev=76a83bc993ce625822182e629034e54496a3bc20#76a83bc993ce625822182e629034e54496a3bc20"
+source = "git+https://seed.radicle.garden/z3oxAZSLcyXgpa7fcvgtueF49jHpH.git?rev=92a0987cf92647290353826bf05113a65fca25a9#92a0987cf92647290353826bf05113a65fca25a9"
 
 [[package]]
 name = "vtable"
