@@ -248,7 +248,7 @@ impl State {
 				Phase::Machine
 			}
 			Phase::MachineDevice => {
-				let extensions = self.device_extensions.take().unwrap();
+				let extensions = self.device_extensions.take().unwrap().split('\0').sorted().join("\0");
 				let extensions_strindex = self.strings.lookup(&extensions);
 				self.devices.tweak(|d| d.extensions_strindex = extensions_strindex);
 				Phase::Machine
