@@ -32,7 +32,6 @@ enum Phase {
 	Root,
 	Mame,
 	Machine,
-	MachineSubtag,
 	MachineDescription,
 	MachineYear,
 	MachineManufacturer,
@@ -149,7 +148,7 @@ impl State {
 				};
 				self.chips.push(chip);
 				self.machines.increment(|m| &mut m.chips_end)?;
-				Some(Phase::MachineSubtag)
+				None
 			}
 			(Phase::Machine, b"device") => {
 				let [device_type, tag, mandatory, interface] =
@@ -197,7 +196,7 @@ impl State {
 					SoftwareListStatus::Compatible => &mut software_list.compatibles,
 				};
 				list.push(self.machines.items().next_back().unwrap().name_strindex);
-				Some(Phase::MachineSubtag)
+				None
 			}
 			(Phase::MachineDevice, b"extension") => {
 				let [name] = evt.find_attributes([b"name"])?;
@@ -226,7 +225,6 @@ impl State {
 			Phase::Root => unreachable!(),
 			Phase::Mame => Phase::Root,
 			Phase::Machine => Phase::Mame,
-			Phase::MachineSubtag => Phase::Machine,
 
 			Phase::MachineDescription => {
 				let description = text.unwrap();
