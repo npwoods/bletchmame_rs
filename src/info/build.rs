@@ -223,7 +223,7 @@ impl State {
 		event!(LOG, "handle_end(): self={:?}", self);
 
 		let new_phase = match self.phase {
-			Phase::Root => panic!(),
+			Phase::Root => unreachable!(),
 			Phase::Mame => Phase::Root,
 			Phase::Machine => Phase::Mame,
 			Phase::MachineSubtag => Phase::Machine,
