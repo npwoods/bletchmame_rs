@@ -579,7 +579,7 @@ mod test {
 	}
 
 	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", "ext:fdcv11:wd17xx:0:qd", "floppydisk", "floppy_5_25",
-		&["dmk", "jvc", "dsk", "vdk", "sdf", "os9", "d77", "d88", "1dd", "dfi", "hfe", "imd", "ipf", "mfi", "mfm", "td0", "cqm", "cqi"])]
+		&["1dd", "cqi", "cqm", "d77", "d88", "dfi", "dmk", "dsk", "hfe", "imd", "ipf", "jvc", "mfi", "mfm", "os9", "sdf", "td0", "vdk"])]
 	pub fn devices(
 		_index: usize,
 		xml: &str,
