@@ -32,7 +32,6 @@ enum Phase {
 	Root,
 	Mame,
 	Machine,
-	MachineSubtag,
 	MachineDescription,
 	MachineYear,
 	MachineManufacturer,
@@ -54,7 +53,11 @@ struct State {
 	strings: StringTableBuilder,
 	software_lists: BTreeMap<String, SoftwareListBuild>,
 	build_strindex: u32,
-	device_extensions: Option<String>,
+	phase_specific: Option<PhaseSpecificState>,
+}
+
+enum PhaseSpecificState {
+	Extensions(String),
 }
 
 #[derive(Debug, Default)]
@@ -81,7 +84,7 @@ impl State {
 			software_lists: BTreeMap::new(),
 			strings,
 			build_strindex,
-			device_extensions: None,
+			phase_specific: None,
 		}
 	}
 
@@ -149,7 +152,7 @@ impl State {
 				};
 				self.chips.push(chip);
 				self.machines.increment(|m| &mut m.chips_end)?;
-				Some(Phase::MachineSubtag)
+				None
 			}
 			(Phase::Machine, b"device") => {
 				let [device_type, tag, mandatory, interface] =
@@ -167,7 +170,7 @@ impl State {
 				};
 				self.devices.push(device);
 				self.machines.increment(|m| &mut m.devices_end)?;
-				self.device_extensions = Some(String::with_capacity(1024));
+				self.phase_specific = Some(PhaseSpecificState::Extensions(String::with_capacity(1024)));
 				Some(Phase::MachineDevice)
 			}
 			(Phase::Machine, b"softwarelist") => {
@@ -197,16 +200,16 @@ impl State {
 					SoftwareListStatus::Compatible => &mut software_list.compatibles,
 				};
 				list.push(self.machines.items().next_back().unwrap().name_strindex);
-				Some(Phase::MachineSubtag)
+				None
 			}
 			(Phase::MachineDevice, b"extension") => {
 				let [name] = evt.find_attributes([b"name"])?;
 				if let Some(name) = name {
-					let device_extensions = self.device_extensions.as_mut().unwrap();
-					if !device_extensions.is_empty() {
-						device_extensions.push('\0');
+					let PhaseSpecificState::Extensions(extensions) = self.phase_specific.as_mut().unwrap();
+					if !extensions.is_empty() {
+						extensions.push('\0');
 					}
-					device_extensions.push_str(name.as_ref());
+					extensions.push_str(name.as_ref());
 				}
 				None
 			}
@@ -223,10 +226,9 @@ impl State {
 		event!(LOG, "handle_end(): self={:?}", self);
 
 		let new_phase = match self.phase {
-			Phase::Root => panic!(),
+			Phase::Root => unreachable!(),
 			Phase::Mame => Phase::Root,
 			Phase::Machine => Phase::Mame,
-			Phase::MachineSubtag => Phase::Machine,
 
 			Phase::MachineDescription => {
 				let description = text.unwrap();
@@ -248,7 +250,8 @@ impl State {
 				Phase::Machine
 			}
 			Phase::MachineDevice => {
-				let extensions = self.device_extensions.take().unwrap().split('\0').sorted().join("\0");
+				let PhaseSpecificState::Extensions(extensions) = self.phase_specific.take().unwrap();
+				let extensions = extensions.split('\0').sorted().join("\0");
 				let extensions_strindex = self.strings.lookup(&extensions);
 				self.devices.tweak(|d| d.extensions_strindex = extensions_strindex);
 				Phase::Machine
