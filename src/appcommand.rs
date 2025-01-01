@@ -1,9 +1,11 @@
 use std::sync::Arc;
 
 use anyhow::Error;
+use itertools::Itertools;
 use muda::MenuId;
 use serde::Deserialize;
 use serde::Serialize;
+use strum::EnumProperty;
 
 use crate::dialogs::file::PathType;
 use crate::prefs::BuiltinCollection;
@@ -11,8 +13,9 @@ use crate::prefs::PrefsCollection;
 use crate::prefs::PrefsItem;
 use crate::prefs::SortOrder;
 use crate::status::Update;
+use crate::version::MameVersion;
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, EnumProperty)]
 pub enum AppCommand {
 	// File menu
 	FileStop,
@@ -25,6 +28,7 @@ pub enum AppCommand {
 	OptionsThrottleRate(f32),
 	OptionsToggleWarp,
 	OptionsToggleSound,
+	#[strum(props(MinimumMame = "0.273"))] // should be 0.274
 	OptionsClassic,
 
 	// Settings menu
@@ -78,6 +82,16 @@ pub enum AppCommand {
 }
 
 const MENU_PREFIX: &str = "MENU_";
+
+impl AppCommand {
+	pub fn minimum_mame_version(&self) -> Option<MameVersion> {
+		let s = self.get_str("MinimumMame")?;
+		let Some((Ok(major), Ok(minor))) = s.split('.').map(|s| s.parse()).collect_tuple() else {
+			panic!("Failed to parse {s}");
+		};
+		Some(MameVersion::new(major, minor))
+	}
+}
 
 impl From<AppCommand> for MenuId {
 	fn from(value: AppCommand) -> Self {

@@ -999,7 +999,8 @@ fn update_menus(model: &AppModel) {
 
 	// update the menu bar
 	model.menu_bar.update(|id| {
-		let (enabled, checked) = match AppCommand::try_from(id) {
+		let command = AppCommand::try_from(id);
+		let (enabled, checked) = match command {
 			Ok(AppCommand::HelpRefreshInfoDb) => (Some(has_mame_executable), None),
 			Ok(AppCommand::FileStop) => (Some(is_running), None),
 			Ok(AppCommand::FilePause) => (Some(is_running), Some(is_paused)),
@@ -1011,6 +1012,15 @@ fn update_menus(model: &AppModel) {
 			Ok(AppCommand::OptionsClassic) => (Some(is_running), None),
 			_ => (None, None),
 		};
+
+		// factor in the minimum MAME version when deteriming enabled, if available
+		let enabled = enabled.map(|e| {
+			e && command
+				.as_ref()
+				.ok()
+				.and_then(AppCommand::minimum_mame_version)
+				.is_none_or(|a| running_status.build.as_ref().is_some_and(|b| b >= &a))
+		});
 		MenuItemUpdate { enabled, checked }
 	});
 }
@@ -1185,4 +1195,24 @@ async fn ping_callback(model_weak: std::rc::Weak<AppModel>) {
 		tokio::time::sleep(Duration::from_secs(1)).await;
 	}
 	event!(LOG_PINGING, "ping_callback(): exiting");
+}
+
+#[cfg(test)]
+mod test {
+	use std::convert::Infallible;
+	use std::ops::ControlFlow;
+
+	use crate::appcommand::AppCommand;
+	use crate::guiutils::menuing::MenuExt;
+
+	#[test]
+	fn create_menu_bar() {
+		let menu_bar = super::create_menu_bar();
+		menu_bar.visit((), |_, item| {
+			if let Ok(command) = AppCommand::try_from(item.id()) {
+				let _ = command.minimum_mame_version();
+			}
+			ControlFlow::<Infallible>::Continue(())
+		});
+	}
 }

@@ -1,4 +1,7 @@
 //! Helpers for Menu handling; which Slint does not handle yet
+use std::convert::Infallible;
+use std::ops::ControlFlow;
+
 use i_slint_core::items::MenuEntry as SlintMenuEntry;
 use muda::accelerator::Accelerator;
 use muda::accelerator::Code;
@@ -50,27 +53,64 @@ pub struct MenuItemUpdate {
 	pub checked: Option<bool>,
 }
 
-// extension for muda menus
+/// Extension for muda menus
 pub trait MenuExt {
 	fn update(&self, callback: impl Fn(&MenuId) -> MenuItemUpdate);
 	fn slint_menu_entries(&self, sub_menu: Option<&SlintMenuEntry>) -> ModelRc<SlintMenuEntry>;
 	fn is_natively_supported() -> bool;
+	fn visit<B, C>(&self, init: C, func: impl Fn(C, &MenuItemKind) -> ControlFlow<B, C>) -> ControlFlow<B, C>;
 }
 
 impl MenuExt for Menu {
 	fn update(&self, callback: impl Fn(&MenuId) -> MenuItemUpdate) {
-		update_menu_items_internal(&self.items(), &callback);
+		self.visit((), |_, item| {
+			match item {
+				MenuItemKind::MenuItem(menu_item) => {
+					let update = callback(menu_item.id());
+					if let Some(enabled) = update.enabled {
+						menu_item.set_enabled(enabled);
+					}
+					assert!(
+						update.checked.is_none(),
+						"Menu item \"{}\" needs to be using CheckMenuItem",
+						menu_item.text()
+					);
+				}
+				MenuItemKind::Check(menu_item) => {
+					let update = callback(menu_item.id());
+					if let Some(enabled) = update.enabled {
+						menu_item.set_enabled(enabled);
+					}
+					if let Some(checked) = update.checked {
+						menu_item.set_checked(checked);
+					}
+				}
+				_ => {
+					// do nothing
+				}
+			};
+			ControlFlow::<Infallible>::Continue(())
+		});
 	}
 
 	fn slint_menu_entries(&self, sub_menu: Option<&SlintMenuEntry>) -> ModelRc<SlintMenuEntry> {
 		// find the menu items we want to return
 		let items = if let Some(sub_menu) = sub_menu {
 			let title = &sub_menu.title;
-			traverse_menu_items(&self.items(), &|item: &MenuItemKind| {
-				item.as_submenu()
+			let flow = self.visit((), |_, item: &MenuItemKind| {
+				if let Some(items) = item
+					.as_submenu()
 					.and_then(|sub_menu| (sub_menu.text().as_str() == title.as_str()).then(|| sub_menu.items()))
-			})
-			.unwrap_or_default()
+				{
+					ControlFlow::Break(items)
+				} else {
+					ControlFlow::Continue(())
+				}
+			});
+			match flow {
+				ControlFlow::Break(items) => items,
+				ControlFlow::Continue(()) => Vec::new(),
+			}
 		} else {
 			self.items()
 		};
@@ -86,51 +126,27 @@ impl MenuExt for Menu {
 	fn is_natively_supported() -> bool {
 		cfg!(windows)
 	}
-}
 
-fn update_menu_items_internal(items: &[MenuItemKind], callback: &impl Fn(&MenuId) -> MenuItemUpdate) {
-	for item in items {
-		match item {
-			MenuItemKind::MenuItem(menu_item) => {
-				let update = callback(menu_item.id());
-				if let Some(enabled) = update.enabled {
-					menu_item.set_enabled(enabled);
-				}
-				assert!(
-					update.checked.is_none(),
-					"Menu item \"{}\" needs to be using CheckMenuItem",
-					menu_item.text()
-				);
-			}
-			MenuItemKind::Check(menu_item) => {
-				let update = callback(menu_item.id());
-				if let Some(enabled) = update.enabled {
-					menu_item.set_enabled(enabled);
-				}
-				if let Some(checked) = update.checked {
-					menu_item.set_checked(checked);
-				}
-			}
-			MenuItemKind::Submenu(sub_menu) => {
-				update_menu_items_internal(&sub_menu.items(), callback);
-			}
-			_ => {
-				// do nothing
-			}
-		}
+	fn visit<B, C>(&self, init: C, func: impl Fn(C, &MenuItemKind) -> ControlFlow<B, C>) -> ControlFlow<B, C> {
+		visit_menu_items(&self.items(), init, &func)
 	}
 }
 
-fn traverse_menu_items<T>(items: &[MenuItemKind], func: &impl Fn(&MenuItemKind) -> Option<T>) -> Option<T> {
-	items
-		.iter()
-		.filter_map(|item| {
-			func(item).or_else(|| {
-				item.as_submenu()
-					.and_then(|sub_menu| traverse_menu_items(&sub_menu.items(), func))
-			})
-		})
-		.next()
+fn visit_menu_items<B, C>(
+	items: &[MenuItemKind],
+	init: C,
+	func: &impl Fn(C, &MenuItemKind) -> ControlFlow<B, C>,
+) -> ControlFlow<B, C> {
+	items.iter().try_fold(init, |state, item| match func(state, item) {
+		ControlFlow::Break(x) => ControlFlow::Break(x),
+		ControlFlow::Continue(x) => {
+			if let MenuItemKind::Submenu(sub_menu) = item {
+				visit_menu_items(&sub_menu.items(), x, func)
+			} else {
+				ControlFlow::Continue(x)
+			}
+		}
+	})
 }
 
 fn slint_menu_entry(menu_item: &MenuItemKind) -> Option<SlintMenuEntry> {
