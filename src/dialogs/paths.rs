@@ -236,7 +236,7 @@ impl PathEntriesModel {
 	pub fn append_row_index(&self) -> Option<usize> {
 		let data = self.data.borrow();
 		let (entries, is_multi) = &*data;
-		is_multi.then_some(entries.len())
+		(*is_multi || entries.is_empty()).then_some(entries.len())
 	}
 
 	pub fn remove(&self, row: usize) {
