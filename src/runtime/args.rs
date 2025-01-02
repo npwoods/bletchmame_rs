@@ -46,6 +46,7 @@ pub struct MameArgumentsSource<'a> {
 	plugins_paths: &'a [String],
 	software_lists_paths: &'a [String],
 	cfg_path: &'a [String],
+	nvram_path: &'a [String],
 }
 
 impl<'a> MameArgumentsSource<'a> {
@@ -55,8 +56,9 @@ impl<'a> MameArgumentsSource<'a> {
 		let samples_paths = prefs_paths.samples.as_slice();
 		let plugins_paths = prefs_paths.plugins.as_slice();
 		let software_lists_paths = prefs_paths.software_lists.as_slice();
-		let cfg_path = prefs_paths.cfg.as_slice();
-		let result = Self {
+		let cfg_path: &[String] = prefs_paths.cfg.as_slice();
+		let nvram_path = prefs_paths.nvram.as_slice();
+		let result: MameArgumentsSource<'a> = Self {
 			windowing,
 			roms_paths,
 			mame_executable_path,
@@ -64,6 +66,7 @@ impl<'a> MameArgumentsSource<'a> {
 			plugins_paths,
 			software_lists_paths,
 			cfg_path,
+			nvram_path,
 		};
 		Ok(result)
 	}
@@ -200,6 +203,7 @@ fn mame_args_from_source(
 		("-pluginspath", source.plugins_paths),
 		("-hashpath", source.software_lists_paths),
 		("-cfg_directory", source.cfg_path),
+		("-nvram_directory", source.nvram_path),
 	]
 	.into_iter()
 	.filter(|(_, paths)| !paths.is_empty())
@@ -321,6 +325,7 @@ mod test {
 			],
 			software_lists_paths: &["/mydir/mame/hash".to_string()],
 			cfg_path: &["/mydir/mame/cfg".to_string()],
+			nvram_path: &["/mydir/mame/nvram".to_string()],
 		};
 		let result = super::mame_args_from_source(source, || Some(std::path::PathBuf::from("/bmdir/bletchmame")));
 
@@ -338,6 +343,7 @@ mod test {
 			find_arg(&result.args, "-pluginspath"),
 			find_arg(&result.args, "-hashpath"),
 			find_arg(&result.args, "-cfg_directory"),
+			find_arg(&result.args, "-nvram_directory"),
 		);
 		let expected = (
 			"/mydir/mame/mame.exe",
@@ -347,6 +353,7 @@ mod test {
 			Some("/mydir/mame/plugins;/bmdir/plugins"),
 			Some("/mydir/mame/hash"),
 			Some("/mydir/mame/cfg"),
+			Some("/mydir/mame/nvram"),
 		);
 		assert_eq!(expected, actual);
 	}
