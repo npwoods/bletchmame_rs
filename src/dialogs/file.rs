@@ -34,9 +34,9 @@ pub enum PathType {
 
 impl PathType {
 	pub fn is_multi(&self) -> bool {
-		match self {
-			Self::MameExecutable | Self::Cfg | Self::Nvram => false,
-			Self::Roms | Self::Samples | Self::SoftwareLists | Self::Plugins => true,
+		match self.access() {
+			(_, PathsStore::Single(_)) => false,
+			(_, PathsStore::Multiple(_)) => true,
 		}
 	}
 
@@ -60,25 +60,8 @@ impl PathType {
 	}
 
 	pub fn load_from_prefs_paths(prefs_paths: &PrefsPaths, path_type: PathType) -> Vec<&String> {
-		enum SingleOrMultiple<'a> {
-			Single(&'a Option<String>),
-			Multiple(&'a Vec<String>),
-		}
-
-		let target = match path_type {
-			PathType::MameExecutable => SingleOrMultiple::Single(&prefs_paths.mame_executable),
-			PathType::Roms => SingleOrMultiple::Multiple(&prefs_paths.roms),
-			PathType::Samples => SingleOrMultiple::Multiple(&prefs_paths.samples),
-			PathType::SoftwareLists => SingleOrMultiple::Multiple(&prefs_paths.software_lists),
-			PathType::Plugins => SingleOrMultiple::Multiple(&prefs_paths.plugins),
-			PathType::Cfg => SingleOrMultiple::Single(&prefs_paths.cfg),
-			PathType::Nvram => SingleOrMultiple::Single(&prefs_paths.nvram),
-		};
-
-		match target {
-			SingleOrMultiple::Single(x) => x.iter().collect(),
-			SingleOrMultiple::Multiple(x) => x.iter().collect(),
-		}
+		let (retrieve, _) = path_type.access();
+		retrieve(prefs_paths).iter().collect()
 	}
 
 	pub fn store_in_prefs_paths(
@@ -86,26 +69,38 @@ impl PathType {
 		path_type: PathType,
 		paths_iter: impl Iterator<Item = String>,
 	) {
-		enum SingleOrMultiple<'a> {
-			Single(&'a mut Option<String>),
-			Multiple(&'a mut Vec<String>),
-		}
+		let (_, store) = path_type.access();
 
-		let target = match path_type {
-			PathType::MameExecutable => SingleOrMultiple::Single(&mut prefs_paths.mame_executable),
-			PathType::Roms => SingleOrMultiple::Multiple(&mut prefs_paths.roms),
-			PathType::Samples => SingleOrMultiple::Multiple(&mut prefs_paths.samples),
-			PathType::SoftwareLists => SingleOrMultiple::Multiple(&mut prefs_paths.software_lists),
-			PathType::Plugins => SingleOrMultiple::Multiple(&mut prefs_paths.plugins),
-			PathType::Cfg => SingleOrMultiple::Single(&mut prefs_paths.cfg),
-			PathType::Nvram => SingleOrMultiple::Single(&mut prefs_paths.nvram),
-		};
-
-		match target {
-			SingleOrMultiple::Single(x) => *x = paths_iter.at_most_one().map_err(|_| ()).unwrap(),
-			SingleOrMultiple::Multiple(x) => *x = paths_iter.collect(),
+		match store {
+			PathsStore::Single(store) => {
+				*store(prefs_paths) = paths_iter.at_most_one().map_err(|_| ()).unwrap();
+			}
+			PathsStore::Multiple(store) => {
+				*store(prefs_paths) = paths_iter.collect();
+			}
 		}
 	}
+
+	fn access(&self) -> (fn(&PrefsPaths) -> &[String], PathsStore) {
+		match self {
+			PathType::MameExecutable => (
+				(|x| x.mame_executable.as_slice()),
+				PathsStore::Single(|x| &mut x.mame_executable),
+			),
+			PathType::Roms => ((|x| &x.roms), PathsStore::Multiple(|x| &mut x.roms)),
+			PathType::Samples => ((|x| &x.samples), PathsStore::Multiple(|x| &mut x.samples)),
+			PathType::SoftwareLists => ((|x| &x.software_lists), PathsStore::Multiple(|x| &mut x.software_lists)),
+			PathType::Plugins => ((|x| &x.plugins), PathsStore::Multiple(|x| &mut x.plugins)),
+			PathType::Cfg => ((|x| x.cfg.as_slice()), PathsStore::Single(|x| &mut x.cfg)),
+			PathType::Nvram => ((|x| x.nvram.as_slice()), PathsStore::Single(|x| &mut x.nvram)),
+		}
+	}
+}
+
+#[derive(Debug)]
+enum PathsStore {
+	Single(fn(&mut PrefsPaths) -> &mut Option<String>),
+	Multiple(fn(&mut PrefsPaths) -> &mut Vec<String>),
 }
 
 enum PickType {
