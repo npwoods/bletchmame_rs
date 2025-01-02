@@ -71,6 +71,9 @@ pub struct PrefsPaths {
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub cfg: Option<String>,
+
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub nvram: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq)]
@@ -245,6 +248,9 @@ impl Preferences {
 		let json = include_str!("prefs_fresh.json");
 		let mut result = load_prefs_from_reader(json.as_bytes()).unwrap();
 		Rc::get_mut(&mut result.paths).unwrap().cfg = prefs_path
+			.as_ref()
+			.and_then(|x| x.clone().into_os_string().into_string().ok());
+		Rc::get_mut(&mut result.paths).unwrap().nvram = prefs_path
 			.as_ref()
 			.and_then(|x| x.clone().into_os_string().into_string().ok());
 		result.prefs_path = prefs_path;
