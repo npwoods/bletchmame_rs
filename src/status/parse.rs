@@ -14,23 +14,23 @@ use crate::xml::XmlReader;
 
 const LOG: Level = Level::TRACE;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Phase {
-	#[default]
 	Root,
 	Status,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct State {
-	phase: Phase,
+	phase_stack: Vec<Phase>,
 	build: Option<MameVersion>,
 	running: UpdateRunning,
 }
 
 impl State {
 	pub fn handle_start(&mut self, evt: XmlElement<'_>) -> Result<Option<Phase>> {
-		let new_phase = match (self.phase, evt.name().as_ref()) {
+		let phase = self.phase_stack.last().unwrap_or(&Phase::Root);
+		let new_phase = match (phase, evt.name().as_ref()) {
 			(Phase::Root, b"status") => {
 				let [romname, is_paused, app_build] = evt.find_attributes([b"romname", b"paused", b"app_build"])?;
 				let machine_name = romname.unwrap_or_default().to_string();
@@ -73,34 +73,34 @@ impl State {
 		Ok(new_phase)
 	}
 
-	pub fn handle_end(&mut self, _text: Option<String>) -> Result<Phase> {
-		let new_phase = match self.phase {
-			Phase::Root => panic!(),
-			Phase::Status => Phase::Root,
-		};
-		Ok(new_phase)
+	pub fn handle_end(&mut self, _text: Option<String>) -> Result<()> {
+		Ok(())
 	}
 }
 
 pub fn parse_update(reader: impl BufRead) -> Result<Update> {
 	let mut reader = XmlReader::from_reader(reader, false);
 	let mut buf = Vec::with_capacity(1024);
-	let mut state = State::default();
+	let mut state = State {
+		phase_stack: Vec::with_capacity(32),
+		build: None,
+		running: UpdateRunning::default(),
+	};
 
 	while let Some(evt) = reader.next(&mut buf).map_err(|e| statusxml_err(&reader, e))? {
 		match evt {
 			XmlEvent::Start(evt) => {
 				let new_phase = state.handle_start(evt).map_err(|e| statusxml_err(&reader, e))?;
 				if let Some(new_phase) = new_phase {
-					state.phase = new_phase;
+					state.phase_stack.push(new_phase);
 				} else {
 					reader.start_unknown_tag();
 				}
 			}
 
 			XmlEvent::End(s) => {
-				let new_phase = state.handle_end(s).map_err(|e| statusxml_err(&reader, e))?;
-				state.phase = new_phase;
+				state.handle_end(s).map_err(|e| statusxml_err(&reader, e))?;
+				state.phase_stack.pop().unwrap();
 			}
 
 			XmlEvent::Null => {} // meh
