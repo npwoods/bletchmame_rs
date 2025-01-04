@@ -45,7 +45,7 @@ const TEXT_CAPTURE_PHASES: &[Phase] = &[
 ];
 
 struct State {
-	phase: Phase,
+	phase_stack: Vec<Phase>,
 	machines: BinBuilder<binary::Machine>,
 	chips: BinBuilder<binary::Chip>,
 	devices: BinBuilder<binary::Device>,
@@ -76,7 +76,7 @@ impl State {
 
 		// reserve space based the same MAME version as above
 		Self {
-			phase: Phase::Root,
+			phase_stack: Vec::with_capacity(32),
 			machines: BinBuilder::new(48000),              // 44092 machines,
 			chips: BinBuilder::new(190000),                // 174679 chips
 			devices: BinBuilder::new(12000),               // 10738 devices
@@ -92,7 +92,8 @@ impl State {
 		event!(LOG, "handle_start(): self={:?}", self);
 		event!(LOG, "handle_start(): {:?}", evt);
 
-		let new_phase = match (self.phase, evt.name().as_ref()) {
+		let phase = self.phase_stack.last().unwrap_or(&Phase::Root);
+		let new_phase = match (phase, evt.name().as_ref()) {
 			(Phase::Root, b"mame") => {
 				let [build] = evt.find_attributes([b"build"])?;
 				self.build_strindex = self.strings.lookup(&build.unwrap_or_default());
@@ -218,46 +219,35 @@ impl State {
 		Ok(new_phase)
 	}
 
-	pub fn handle_end(
-		&mut self,
-		callback: &mut impl FnMut(&str) -> bool,
-		text: Option<String>,
-	) -> Result<Option<Phase>> {
+	pub fn handle_end(&mut self, callback: &mut impl FnMut(&str) -> bool, text: Option<String>) -> Result<()> {
 		event!(LOG, "handle_end(): self={:?}", self);
 
-		let new_phase = match self.phase {
-			Phase::Root => unreachable!(),
-			Phase::Mame => Phase::Root,
-			Phase::Machine => Phase::Mame,
-
+		match self.phase_stack.last().unwrap_or(&Phase::Root) {
 			Phase::MachineDescription => {
 				let description = text.unwrap();
 				if !description.is_empty() && callback(&description) {
-					return Ok(None);
+					return Ok(());
 				}
 				let description_strindex = self.strings.lookup(&description);
 				self.machines.tweak(|x| x.description_strindex = description_strindex);
-				Phase::Machine
 			}
 			Phase::MachineYear => {
 				let year_strindex = self.strings.lookup(&text.unwrap());
 				self.machines.tweak(|x| x.year_strindex = year_strindex);
-				Phase::Machine
 			}
 			Phase::MachineManufacturer => {
 				let manufacturer_strindex = self.strings.lookup(&text.unwrap());
 				self.machines.tweak(|x| x.manufacturer_strindex = manufacturer_strindex);
-				Phase::Machine
 			}
 			Phase::MachineDevice => {
 				let PhaseSpecificState::Extensions(extensions) = self.phase_specific.take().unwrap();
 				let extensions = extensions.split('\0').sorted().join("\0");
 				let extensions_strindex = self.strings.lookup(&extensions);
 				self.devices.tweak(|d| d.extensions_strindex = extensions_strindex);
-				Phase::Machine
 			}
+			_ => {}
 		};
-		Ok(Some(new_phase))
+		Ok(())
 	}
 
 	pub fn into_data(mut self) -> Result<Box<[u8]>> {
@@ -401,7 +391,7 @@ impl State {
 impl Debug for State {
 	fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
 		f.debug_struct("State")
-			.field("phase", &self.phase)
+			.field("phase_stack", &self.phase_stack)
 			.field("machines.len()", &self.machines.len())
 			.field("chips.len()", &self.chips.len())
 			.finish()
@@ -458,9 +448,9 @@ pub fn data_from_listxml_output(
 				let new_phase = state.handle_start(evt).map_err(|e| listxml_err(&reader, e))?;
 
 				if let Some(new_phase) = new_phase {
-					state.phase = new_phase;
+					state.phase_stack.push(new_phase);
 
-					if TEXT_CAPTURE_PHASES.contains(&state.phase) {
+					if TEXT_CAPTURE_PHASES.contains(&new_phase) {
 						reader.start_text_capture();
 					}
 				} else {
@@ -469,13 +459,10 @@ pub fn data_from_listxml_output(
 			}
 
 			XmlEvent::End(s) => {
-				let new_phase = state
+				state
 					.handle_end(&mut callback, s)
 					.map_err(|e| listxml_err(&reader, e))?;
-				let Some(new_phase) = new_phase else {
-					return Ok(None);
-				};
-				state.phase = new_phase;
+				state.phase_stack.pop().unwrap();
 			}
 
 			XmlEvent::Null => {} // meh
@@ -483,7 +470,7 @@ pub fn data_from_listxml_output(
 	}
 
 	// sanity check
-	assert_eq!(Phase::Root, state.phase);
+	assert!(state.phase_stack.is_empty());
 
 	// get all bytes and return
 	let data = state.into_data()?;
