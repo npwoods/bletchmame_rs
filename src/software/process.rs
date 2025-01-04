@@ -29,7 +29,7 @@ const TEXT_CAPTURE_PHASES: &[Phase] = &[
 ];
 
 struct State {
-	phase: Phase,
+	phase_stack: Vec<Phase>,
 	strings: HashSet<Arc<str>>,
 	empty_str: Arc<str>,
 	software_list: SoftwareList,
@@ -43,7 +43,7 @@ impl State {
 		strings.insert(empty_str.clone());
 
 		Self {
-			phase: Phase::Root,
+			phase_stack: Vec::with_capacity(32),
 			strings: HashSet::new(),
 			empty_str: empty_str.clone(),
 			software_list: SoftwareList {
@@ -56,7 +56,8 @@ impl State {
 	}
 
 	pub fn handle_start(&mut self, evt: XmlElement<'_>) -> Result<Option<Phase>> {
-		let new_phase = match (self.phase, evt.name().as_ref()) {
+		let phase = self.phase_stack.last().unwrap_or(&Phase::Root);
+		let new_phase = match (phase, evt.name().as_ref()) {
 			(Phase::Root, b"softwarelist") => {
 				let [name, description] = evt.find_attributes([b"name", b"description"])?;
 				self.software_list.name = self.string(&name.unwrap_or_default());
@@ -94,33 +95,28 @@ impl State {
 		Ok(new_phase)
 	}
 
-	pub fn handle_end(&mut self, text: Option<String>) -> Result<Phase> {
-		let new_phase = match self.phase {
-			Phase::Root => panic!(),
-			Phase::SoftwareList => Phase::Root,
+	pub fn handle_end(&mut self, text: Option<String>) -> Result<()> {
+		match self.phase_stack.last().unwrap_or(&Phase::Root) {
 			Phase::Software => {
 				let software = self.current_software.take().unwrap().into();
 				self.software_list.software.push(software);
-				Phase::SoftwareList
 			}
 
 			Phase::SoftwareDescription => {
 				let description = self.string(&text.unwrap());
 				self.current_software.as_mut().unwrap().description = description;
-				Phase::Software
 			}
 			Phase::SoftwareYear => {
 				let year = self.string(&text.unwrap());
 				self.current_software.as_mut().unwrap().year = year;
-				Phase::Software
 			}
 			Phase::SoftwarePublisher => {
 				let publisher = self.string(&text.unwrap());
 				self.current_software.as_mut().unwrap().publisher = publisher;
-				Phase::Software
 			}
+			_ => {}
 		};
-		Ok(new_phase)
+		Ok(())
 	}
 
 	fn string(&mut self, s: &str) -> Arc<str> {
@@ -151,9 +147,9 @@ pub fn process_xml(reader: impl BufRead) -> Result<SoftwareList> {
 				let new_phase = state.handle_start(evt).map_err(|e| softlistxml_err(&reader, e))?;
 
 				if let Some(new_phase) = new_phase {
-					state.phase = new_phase;
+					state.phase_stack.push(new_phase);
 
-					if TEXT_CAPTURE_PHASES.contains(&state.phase) {
+					if TEXT_CAPTURE_PHASES.contains(&new_phase) {
 						reader.start_text_capture();
 					}
 				} else {
@@ -162,15 +158,15 @@ pub fn process_xml(reader: impl BufRead) -> Result<SoftwareList> {
 			}
 
 			XmlEvent::End(s) => {
-				let new_phase = state.handle_end(s).map_err(|e| softlistxml_err(&reader, e))?;
-				state.phase = new_phase;
+				state.handle_end(s).map_err(|e| softlistxml_err(&reader, e))?;
+				state.phase_stack.pop().unwrap();
 			}
 
 			XmlEvent::Null => {} // meh
 		}
 	}
 
-	assert_eq!(Phase::Root, state.phase);
+	assert!(state.phase_stack.is_empty());
 	Ok(state.software_list)
 }
 
