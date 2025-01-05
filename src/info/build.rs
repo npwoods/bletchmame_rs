@@ -66,6 +66,12 @@ struct SoftwareListBuild {
 	pub compatibles: Vec<u32>,
 }
 
+#[derive(thiserror::Error, Debug)]
+enum ThisError {
+	#[error("Missing mandatory attribute {0} when parsing InfoDB")]
+	MissingMandatoryAttribute(&'static str),
+}
+
 impl State {
 	pub fn new() -> Self {
 		// prepare a string table, allocating capacity with respect to what we know about MAME 0.239
@@ -111,7 +117,7 @@ impl State {
 					runnable
 				);
 
-				let Some(name) = name else { return Ok(None) };
+				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?;
 				let name_strindex = self.strings.lookup(&name);
 				let source_file_strindex = self.strings.lookup(&source_file.unwrap_or_default());
 				let clone_of_machine_index = self.strings.lookup(&clone_of.unwrap_or_default());
@@ -139,7 +145,12 @@ impl State {
 			(Phase::Machine, b"manufacturer") => Some(Phase::MachineManufacturer),
 			(Phase::Machine, b"chip") => {
 				let [chip_type, tag, name, clock] = evt.find_attributes([b"type", b"tag", b"name", b"clock"])?;
-				let Some(chip_type) = chip_type.and_then(|x| x.as_ref().parse::<ChipType>().ok()) else {
+				let Ok(chip_type) = chip_type
+					.ok_or(ThisError::MissingMandatoryAttribute("type"))?
+					.as_ref()
+					.parse::<ChipType>()
+				else {
+					// presumably an unknown chip type; ignore
 					return Ok(None);
 				};
 				let tag_strindex = self.strings.lookup(&tag.unwrap_or_default());
@@ -158,8 +169,9 @@ impl State {
 			(Phase::Machine, b"device") => {
 				let [device_type, tag, mandatory, interface] =
 					evt.find_attributes([b"type", b"tag", b"mandatory", b"interface"])?;
+				let tag = tag.ok_or(ThisError::MissingMandatoryAttribute("tag"))?;
 				let type_strindex = self.strings.lookup(&device_type.unwrap_or_default());
-				let tag_strindex = self.strings.lookup(&tag.unwrap_or_default());
+				let tag_strindex = self.strings.lookup(&tag);
 				let mandatory = mandatory.map(bool_attribute).unwrap_or(false);
 				let interface_strindex = self.strings.lookup(&interface.unwrap_or_default());
 				let device = binary::Device {
@@ -176,12 +188,12 @@ impl State {
 			}
 			(Phase::Machine, b"softwarelist") => {
 				let [tag, name, status, filter] = evt.find_attributes([b"tag", b"name", b"status", b"filter"])?;
-				let Some(status) = status.and_then(|x| x.as_ref().parse::<SoftwareListStatus>().ok()) else {
+				let status = status.ok_or(ThisError::MissingMandatoryAttribute("status"))?;
+				let Ok(status) = status.as_ref().parse::<SoftwareListStatus>() else {
+					// presumably an unknown software list status; ignore
 					return Ok(None);
 				};
-				let Some(name) = name else {
-					return Ok(None);
-				};
+				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?;
 				let tag_strindex = self.strings.lookup(&tag.unwrap_or_default());
 				let name_strindex = self.strings.lookup(&name);
 				let filter_strindex = self.strings.lookup(&filter.unwrap_or_default());
