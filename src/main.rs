@@ -11,6 +11,7 @@ mod history;
 mod icon;
 mod info;
 mod models;
+mod parse;
 mod platform;
 mod prefs;
 mod runtime;

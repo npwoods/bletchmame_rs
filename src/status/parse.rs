@@ -5,6 +5,7 @@ use anyhow::Result;
 use tracing::event;
 use tracing::Level;
 
+use crate::parse::parse_mame_bool;
 use crate::status::Update;
 use crate::status::UpdateRunning;
 use crate::version::MameVersion;
@@ -34,7 +35,7 @@ impl State {
 			(Phase::Root, b"status") => {
 				let [romname, is_paused, app_build] = evt.find_attributes([b"romname", b"paused", b"app_build"])?;
 				let machine_name = romname.unwrap_or_default().to_string();
-				let is_paused = is_paused.and_then(|x| parse_bool(x.as_ref()));
+				let is_paused = is_paused.map(|x| parse_mame_bool(x.as_ref())).transpose()?;
 				event!(
 					LOG,
 					"status State::handle_start(): machine_name={} is_paused={:?}",
@@ -49,8 +50,9 @@ impl State {
 			}
 			(Phase::Status, b"video") => {
 				let [throttled, throttle_rate] = evt.find_attributes([b"throttled", b"throttle_rate"])?;
-				let throttled = throttled.and_then(|x| parse_bool(x.as_ref()));
-				let throttle_rate = throttle_rate.and_then(|x| x.parse::<f32>().ok());
+				let throttled = throttled.map(parse_mame_bool).transpose()?;
+				let throttle_rate = throttle_rate.map(|x| x.parse::<f32>()).transpose()?;
+
 				event!(
 					LOG,
 					"status State::handle_start(): throttled={:?} throttle_rate={:?}",
@@ -64,7 +66,7 @@ impl State {
 			}
 			(Phase::Status, b"sound") => {
 				let [attenuation] = evt.find_attributes([b"attenuation"])?;
-				let attenuation = attenuation.and_then(|x| x.parse::<i32>().ok());
+				let attenuation = attenuation.map(|x| x.parse::<i32>()).transpose()?;
 				self.running.sound_attenuation = attenuation.or(self.running.sound_attenuation);
 				None
 			}
@@ -118,14 +120,6 @@ pub fn parse_update(reader: impl BufRead) -> Result<Update> {
 fn statusxml_err(reader: &XmlReader<impl BufRead>, e: impl Into<Error>) -> Error {
 	let message = format!("Error parsing status XML at position {}", reader.buffer_position());
 	e.into().context(message)
-}
-
-fn parse_bool(s: &str) -> Option<bool> {
-	match s {
-		"false" => Some(false),
-		"true" => Some(true),
-		_ => None,
-	}
 }
 
 #[cfg(test)]
