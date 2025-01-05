@@ -21,6 +21,7 @@ use crate::info::ChipType;
 use crate::info::SoftwareListStatus;
 use crate::info::ENDIANNESS;
 use crate::info::MAGIC_HDR;
+use crate::parse::normalize_tag;
 use crate::parse::parse_mame_bool;
 use crate::xml::XmlElement;
 use crate::xml::XmlEvent;
@@ -171,6 +172,7 @@ impl State {
 				let [device_type, tag, mandatory, interface] =
 					evt.find_attributes([b"type", b"tag", b"mandatory", b"interface"])?;
 				let tag = tag.ok_or(ThisError::MissingMandatoryAttribute("tag"))?;
+				let tag = normalize_tag(tag);
 				let type_strindex = self.strings.lookup(&device_type.unwrap_or_default());
 				let tag_strindex = self.strings.lookup(&tag);
 				let mandatory = mandatory.map(parse_mame_bool).transpose()?.unwrap_or(false);
