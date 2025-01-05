@@ -21,6 +21,7 @@ use crate::info::ChipType;
 use crate::info::SoftwareListStatus;
 use crate::info::ENDIANNESS;
 use crate::info::MAGIC_HDR;
+use crate::parse::parse_mame_bool;
 use crate::xml::XmlElement;
 use crate::xml::XmlEvent;
 use crate::xml::XmlReader;
@@ -122,7 +123,7 @@ impl State {
 				let source_file_strindex = self.strings.lookup(&source_file.unwrap_or_default());
 				let clone_of_machine_index = self.strings.lookup(&clone_of.unwrap_or_default());
 				let rom_of_machine_index = self.strings.lookup(&rom_of.unwrap_or_default());
-				let runnable = runnable.map(bool_attribute).unwrap_or(true);
+				let runnable = runnable.map(parse_mame_bool).transpose()?.unwrap_or(true);
 				let machine = binary::Machine {
 					name_strindex,
 					source_file_strindex,
@@ -172,7 +173,7 @@ impl State {
 				let tag = tag.ok_or(ThisError::MissingMandatoryAttribute("tag"))?;
 				let type_strindex = self.strings.lookup(&device_type.unwrap_or_default());
 				let tag_strindex = self.strings.lookup(&tag);
-				let mandatory = mandatory.map(bool_attribute).unwrap_or(false);
+				let mandatory = mandatory.map(parse_mame_bool).transpose()?.unwrap_or(false);
 				let interface_strindex = self.strings.lookup(&interface.unwrap_or_default());
 				let device = binary::Device {
 					type_strindex,
@@ -607,11 +608,6 @@ where
 			self.push(obj);
 		}
 	}
-}
-
-fn bool_attribute(text: impl AsRef<str>) -> bool {
-	let text = text.as_ref();
-	text == "yes" || text == "1" || text == "true"
 }
 
 pub fn calculate_sizes_hash() -> u64 {
