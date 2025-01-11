@@ -191,7 +191,7 @@ impl InfoDb {
 
 impl Debug for InfoDb {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-		write!(f, "{:?}", self.data)
+		f.debug_list().entries(self.data.iter()).finish_non_exhaustive()
 	}
 }
 

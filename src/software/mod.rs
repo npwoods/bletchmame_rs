@@ -60,7 +60,7 @@ impl Debug for SoftwareList {
 			.field("name", &self.name)
 			.field("description", &self.description)
 			.field("software.len()", &self.software.len())
-			.finish()
+			.finish_non_exhaustive()
 	}
 }
 

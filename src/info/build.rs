@@ -409,7 +409,7 @@ impl Debug for State {
 			.field("phase_stack", &self.phase_stack)
 			.field("machines.len()", &self.machines.len())
 			.field("chips.len()", &self.chips.len())
-			.finish()
+			.finish_non_exhaustive()
 	}
 }
 
