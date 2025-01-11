@@ -6,8 +6,8 @@ use tracing::event;
 use tracing::Level;
 
 use crate::parse::parse_mame_bool;
+use crate::status::RunningUpdate;
 use crate::status::Update;
-use crate::status::UpdateRunning;
 use crate::version::MameVersion;
 use crate::xml::XmlElement;
 use crate::xml::XmlEvent;
@@ -25,7 +25,7 @@ enum Phase {
 struct State {
 	phase_stack: Vec<Phase>,
 	build: Option<MameVersion>,
-	running: UpdateRunning,
+	running: RunningUpdate,
 }
 
 impl State {
@@ -86,7 +86,7 @@ pub fn parse_update(reader: impl BufRead) -> Result<Update> {
 	let mut state = State {
 		phase_stack: Vec::with_capacity(32),
 		build: None,
-		running: UpdateRunning::default(),
+		running: RunningUpdate::default(),
 	};
 
 	while let Some(evt) = reader.next(&mut buf).map_err(|e| statusxml_err(&reader, e))? {

@@ -19,7 +19,7 @@ const LOG: Level = Level::TRACE;
 #[derive(Default)]
 pub struct Status {
 	pub has_initialized: bool,
-	pub running: Option<StatusRunning>,
+	pub running: Option<Running>,
 	pub build: Option<MameVersion>,
 }
 
@@ -34,7 +34,7 @@ impl Status {
 			let throttle_rate = running.throttle_rate.unwrap_or(status_running.throttle_rate);
 			let sound_attenuation = running.sound_attenuation.unwrap_or(status_running.sound_attenuation);
 
-			StatusRunning {
+			Running {
 				machine_name,
 				is_paused,
 				is_throttled,
@@ -60,7 +60,7 @@ impl Debug for Status {
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct StatusRunning {
+pub struct Running {
 	pub machine_name: String,
 	pub is_paused: bool,
 	pub is_throttled: bool,
@@ -70,7 +70,7 @@ pub struct StatusRunning {
 
 #[derive(Clone, Deserialize, Serialize, PartialEq)]
 pub struct Update {
-	running: Option<UpdateRunning>,
+	running: Option<RunningUpdate>,
 	build: Option<MameVersion>,
 }
 
@@ -90,7 +90,7 @@ impl Debug for Update {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
-struct UpdateRunning {
+struct RunningUpdate {
 	pub machine_name: String,
 	pub is_paused: Option<bool>,
 	pub is_throttled: Option<bool>,
