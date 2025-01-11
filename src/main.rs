@@ -24,8 +24,8 @@ mod xml;
 
 use std::path::PathBuf;
 
-use appwindow::MenuingType;
 use dirs::config_local_dir;
+use guiutils::MenuingType;
 use muda::Menu;
 use slint::ComponentHandle;
 use structopt::StructOpt;
