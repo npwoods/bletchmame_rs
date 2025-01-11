@@ -26,7 +26,6 @@ use slint::SharedString;
 use slint::TableColumn;
 use slint::VecModel;
 use slint::Weak;
-use strum::EnumString;
 use tracing::event;
 use tracing::Level;
 
@@ -53,6 +52,7 @@ use crate::guiutils::menuing::accel;
 use crate::guiutils::menuing::MenuExt;
 use crate::guiutils::menuing::MenuItemUpdate;
 use crate::guiutils::modal::Modal;
+use crate::guiutils::MenuingType;
 use crate::history::History;
 use crate::info::InfoDb;
 use crate::models::collectionsview::CollectionsViewModel;
@@ -87,13 +87,6 @@ pub struct AppArgs {
 	pub prefs_path: Option<PathBuf>,
 	pub mame_stderr: MameStderr,
 	pub menuing_type: MenuingType,
-}
-
-#[derive(Copy, Clone, Debug, EnumString)]
-#[strum(ascii_case_insensitive)]
-pub enum MenuingType {
-	Native,
-	Slint,
 }
 
 struct AppModel {
