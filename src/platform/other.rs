@@ -45,7 +45,7 @@ impl OtherWindowExt for Window {
 		todo!()
 	}
 
-	fn show_popup_menu(&self, _popup_menu: &Menu, _point: LogicalPosition) {
+	fn show_popup_menu(&self, _popup_menu: &Menu, _position: LogicalPosition) {
 		todo!()
 	}
 

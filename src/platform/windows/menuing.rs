@@ -23,7 +23,7 @@ pub fn attach_menu_bar(window: &Window, menu_bar: &Menu) -> Result<()> {
 	Ok(())
 }
 
-pub fn show_popup_menu(window: &Window, popup_menu: &Menu, _point: LogicalPosition) {
+pub fn show_popup_menu(window: &Window, popup_menu: &Menu, _position: LogicalPosition) {
 	// get the Win32 window handle
 	let win32_window = get_win32_window_handle(window).unwrap();
 

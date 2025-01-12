@@ -69,7 +69,7 @@ impl WinWindowAttributesExt for WindowAttributes {
 
 pub trait WinWindowExt {
 	fn attach_menu_bar(&self, menu_bar: &Menu) -> Result<()>;
-	fn show_popup_menu(&self, popup_menu: &Menu, point: LogicalPosition);
+	fn show_popup_menu(&self, popup_menu: &Menu, position: LogicalPosition);
 	fn set_enabled_for_modal(&self, enabled: bool);
 	fn ensure_child_focus(&self, child: &winit::window::Window);
 }
@@ -79,8 +79,8 @@ impl WinWindowExt for Window {
 		menuing::attach_menu_bar(self, menu_bar)
 	}
 
-	fn show_popup_menu(&self, popup_menu: &Menu, point: LogicalPosition) {
-		menuing::show_popup_menu(self, popup_menu, point)
+	fn show_popup_menu(&self, popup_menu: &Menu, position: LogicalPosition) {
+		menuing::show_popup_menu(self, popup_menu, position)
 	}
 
 	fn set_enabled_for_modal(&self, enabled: bool) {

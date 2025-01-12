@@ -238,15 +238,15 @@ impl AppModel {
 			.reset(is_enabled.then_some(&self.preferences.borrow().paths), &windowing);
 	}
 
-	pub fn show_popup_menu(&self, popup_menu: Menu, point: LogicalPosition) {
+	pub fn show_popup_menu(&self, popup_menu: Menu, position: LogicalPosition) {
 		let app_window = self.app_window();
 		match self.menuing_type {
 			MenuingType::Native => {
-				app_window.window().show_popup_menu(&popup_menu, point);
+				app_window.window().show_popup_menu(&popup_menu, position);
 			}
 			MenuingType::Slint => {
 				let entries = popup_menu.slint_menu_entries(None);
-				app_window.invoke_show_context_menu(entries, point);
+				app_window.invoke_show_context_menu(entries, position);
 			}
 		}
 	}
@@ -469,18 +469,18 @@ pub fn create(args: AppArgs) -> AppWindow {
 
 	// collections popup menus
 	let model_clone = model.clone();
-	app_window.on_collections_row_pointer_event(move |index, evt, point| {
+	app_window.on_collections_row_pointer_event(move |index, evt, position| {
 		if is_context_menu_event(&evt) {
 			let index = usize::try_from(index).ok();
 			if let Some(popup_menu) = model_clone.with_collections_view_model(|x| x.context_commands(index)) {
-				model_clone.show_popup_menu(popup_menu, point);
+				model_clone.show_popup_menu(popup_menu, position);
 			}
 		}
 	});
 
 	// items popup menus
 	let model_clone = model.clone();
-	app_window.on_items_row_pointer_event(move |index, evt, point| {
+	app_window.on_items_row_pointer_event(move |index, evt, position| {
 		if is_context_menu_event(&evt) {
 			let index = usize::try_from(index).unwrap();
 			let folder_info = get_folder_collections(&model_clone.preferences.borrow().collections);
@@ -488,7 +488,7 @@ pub fn create(args: AppArgs) -> AppWindow {
 			if let Some(popup_menu) =
 				model_clone.with_items_table_model(|x| x.context_commands(index, &folder_info, has_mame_initialized))
 			{
-				model_clone.show_popup_menu(popup_menu, point);
+				model_clone.show_popup_menu(popup_menu, position);
 			}
 		}
 	});
