@@ -19,9 +19,12 @@ pub struct Header {
 	pub machine_count: u32,
 	pub chips_count: u32,
 	pub device_count: u32,
+	pub slot_count: u32,
+	pub slot_option_count: u32,
 	pub software_list_count: u32,
 	pub software_list_machine_count: u32,
 	pub machine_software_lists_count: u32,
+	pub ram_option_count: u32,
 }
 
 #[derive(Clone, Copy, Debug, Default, BinarySerde)]
@@ -37,8 +40,14 @@ pub struct Machine {
 	pub chips_end: u32,
 	pub devices_start: u32,
 	pub devices_end: u32,
+	pub slots_start: u32,
+	pub slots_end: u32,
+	pub slot_options_start: u32,
+	pub slot_options_end: u32,
 	pub machine_software_lists_start: u32,
 	pub machine_software_lists_end: u32,
+	pub ram_options_start: u32,
+	pub ram_options_end: u32,
 	pub runnable: bool,
 }
 
@@ -75,11 +84,31 @@ pub struct Device {
 }
 
 #[derive(Clone, Copy, Debug, BinarySerde)]
+pub struct Slot {
+	pub name_strindex: u32,
+	pub options_start: u32,
+	pub options_end: u32,
+	pub default_option_index: u32,
+}
+
+#[derive(Clone, Copy, Debug, BinarySerde)]
+pub struct SlotOption {
+	pub name_strindex: u32,
+	pub devname_strindex: u32,
+}
+
+#[derive(Clone, Copy, Debug, BinarySerde)]
 pub struct MachineSoftwareList {
 	pub tag_strindex: u32,
 	pub software_list_index: u32,
 	pub status: SoftwareListStatus,
 	pub filter_strindex: u32,
+}
+
+#[derive(Clone, Copy, Debug, BinarySerde)]
+pub struct RamOption {
+	pub size: u64,
+	pub is_default: bool,
 }
 
 impl Fixup for MachineSoftwareList {

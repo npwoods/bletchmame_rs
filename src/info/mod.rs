@@ -35,6 +35,8 @@ pub use self::entities::Chip;
 pub use self::entities::Device;
 pub use self::entities::MachineSoftwareList;
 pub use self::entities::MachinesView;
+pub use self::entities::Slot;
+pub use self::entities::SlotOption;
 pub use self::entities::SoftwareList;
 pub use self::smallstr::SmallStrRef;
 
@@ -51,9 +53,12 @@ pub struct InfoDb {
 	machines: RootView<binary::Machine>,
 	chips: RootView<binary::Chip>,
 	devices: RootView<binary::Device>,
+	slots: RootView<binary::Slot>,
+	slot_options: RootView<binary::SlotOption>,
 	software_lists: RootView<binary::SoftwareList>,
 	software_list_machine_indexes: RootView<u32>,
 	machine_software_lists: RootView<binary::MachineSoftwareList>,
+	ram_options: RootView<binary::RamOption>,
 	strings_offset: usize,
 	build: MameVersion,
 }
@@ -72,9 +77,12 @@ impl InfoDb {
 		let machines = next_root_view(&mut cursor, hdr.machine_count)?;
 		let chips = next_root_view(&mut cursor, hdr.chips_count)?;
 		let devices = next_root_view(&mut cursor, hdr.device_count)?;
+		let slots = next_root_view(&mut cursor, hdr.slot_count)?;
+		let slot_options = next_root_view(&mut cursor, hdr.slot_option_count)?;
 		let software_lists = next_root_view(&mut cursor, hdr.software_list_count)?;
 		let software_list_machine_indexes = next_root_view(&mut cursor, hdr.software_list_machine_count)?;
 		let machine_software_lists = next_root_view(&mut cursor, hdr.machine_software_lists_count)?;
+		let ram_options = next_root_view(&mut cursor, hdr.ram_option_count)?;
 
 		// validations we want to skip if we're creating things ourselves
 		if !skip_validations {
@@ -91,10 +99,13 @@ impl InfoDb {
 			machines,
 			chips,
 			devices,
+			slots,
+			slot_options,
 			software_lists,
 			software_list_machine_indexes,
 			machine_software_lists,
 			strings_offset: cursor.start,
+			ram_options,
 			build,
 		};
 
@@ -155,6 +166,14 @@ impl InfoDb {
 
 	pub fn devices(&self) -> impl View<'_, Device<'_>> {
 		self.make_view(&self.devices)
+	}
+
+	pub fn slots(&self) -> impl View<'_, Slot<'_>> {
+		self.make_view(&self.slots)
+	}
+
+	pub fn slot_options(&self) -> impl View<'_, SlotOption<'_>> {
+		self.make_view(&self.slot_options)
 	}
 
 	pub fn software_lists(&self) -> SoftwareListsView<'_> {
@@ -610,6 +629,60 @@ mod test {
 			expected_type.to_string(),
 			expected_interface.to_string(),
 			expected_extensions.iter().map(|x| x.to_string()).collect::<Vec<_>>(),
+		);
+		assert_eq!(expected, actual);
+	}
+
+	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", &["rs232", "ext", "ext:fdcv11:wd17xx:0", "ext:fdcv11:wd17xx:1", "ext:fdcv11:wd17xx:2", "ext:fdcv11:wd17xx:3"])]
+	#[test_case(1, include_str!("test_data/listxml_fake.xml"), "fake", &["ext", "ext:fdcv11:wd17xx:0", "ext:fdcv11:wd17xx:1"])]
+	pub fn slots(_index: usize, xml: &str, machine: &str, expected: &[&str]) {
+		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
+		let actual = db
+			.machines()
+			.find(machine)
+			.unwrap()
+			.slots()
+			.iter()
+			.map(|s| s.name().to_string())
+			.collect::<Vec<_>>();
+
+		let expected = expected.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+		assert_eq!(expected, actual);
+	}
+
+	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", "ext", Some(8), &[("cp450_fdc", "cp450_fdc"), ("cd6809_fdc", "cd6809_fdc"), ("fdc", "coco_fdc"),	("cc3hdb1", "coco3_hdb1")])]
+	pub fn slot_options(
+		_index: usize,
+		xml: &str,
+		machine: &str,
+		slot: &str,
+		expected_default_opt: Option<usize>,
+		expected_options: &[(&str, &str)],
+	) {
+		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
+		let slot = db
+			.machines()
+			.find(machine)
+			.unwrap()
+			.slots()
+			.iter()
+			.find(|x| x.name() == slot)
+			.unwrap();
+
+		let actual = slot
+			.options()
+			.iter()
+			.map(|o| (o.name().to_string(), o.devname().to_string()))
+			.take(expected_options.len())
+			.collect::<Vec<_>>();
+		let actual = (slot.default_option_index(), actual);
+
+		let expected = (
+			expected_default_opt,
+			expected_options
+				.iter()
+				.map(|x| (x.0.to_string(), x.1.to_string()))
+				.collect::<Vec<_>>(),
 		);
 		assert_eq!(expected, actual);
 	}

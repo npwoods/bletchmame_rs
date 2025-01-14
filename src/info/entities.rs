@@ -15,6 +15,8 @@ pub type Machine<'a> = Object<'a, binary::Machine>;
 pub type MachinesView<'a> = SimpleView<'a, binary::Machine>;
 pub type Chip<'a> = Object<'a, binary::Chip>;
 pub type Device<'a> = Object<'a, binary::Device>;
+pub type Slot<'a> = Object<'a, binary::Slot>;
+pub type SlotOption<'a> = Object<'a, binary::SlotOption>;
 pub type SoftwareList<'a> = Object<'a, binary::SoftwareList>;
 pub type SoftwareListsView<'a> = SimpleView<'a, binary::SoftwareList>;
 pub type MachineSoftwareList<'a> = Object<'a, binary::MachineSoftwareList>;
@@ -62,6 +64,10 @@ impl<'a> Machine<'a> {
 		self.db
 			.devices()
 			.sub_view(self.obj().devices_start..self.obj().devices_end)
+	}
+
+	pub fn slots(&self) -> impl View<'a, Slot<'a>> {
+		self.db.slots().sub_view(self.obj().slots_start..self.obj().slots_end)
 	}
 
 	pub fn machine_software_lists(&self) -> impl View<'a, MachineSoftwareList<'a>> {
@@ -126,6 +132,33 @@ impl<'a> Device<'a> {
 
 	pub fn extensions(&self) -> impl Iterator<Item = Cow<'a, str>> {
 		self.string(|x| x.extensions_strindex).split('\0')
+	}
+}
+
+impl<'a> Slot<'a> {
+	pub fn name(&self) -> SmallStrRef<'a> {
+		self.string(|x| x.name_strindex)
+	}
+
+	pub fn options(&self) -> impl View<'a, SlotOption<'a>> {
+		self.db
+			.slot_options()
+			.sub_view(self.obj().options_start..self.obj().options_end)
+	}
+
+	pub fn default_option_index(&self) -> Option<usize> {
+		let index = self.obj().default_option_index as usize;
+		(index < self.options().len()).then_some(index)
+	}
+}
+
+impl<'a> SlotOption<'a> {
+	pub fn name(&self) -> SmallStrRef<'a> {
+		self.string(|x| x.name_strindex)
+	}
+
+	pub fn devname(&self) -> SmallStrRef<'a> {
+		self.string(|x| x.devname_strindex)
 	}
 }
 

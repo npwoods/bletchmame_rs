@@ -179,6 +179,15 @@
 			<control type="joy" player="2" buttons="2" ways="8"/>
 		</input>
 		<driver status="good" emulation="good" savestate="supported"/>
+		<slot name=":ext:">
+			<slotoption name="fdcv11" devname="coco_fdc_v11" default="yes"/>
+		</slot>
+		<slot name="ext::fdcv11:wd17xx:0">
+			<slotoption name="qd" devname="floppy_525_qd" default="yes"/>
+		</slot>
+		<slot name="ext:fdcv11:wd17xx:1">
+			<slotoption name="qd" devname="floppy_525_qd" default="yes"/>
+		</slot>
 	</machine>
 	<machine name="blah" sourcefile="fake_machine.cpp" cloneof="fake">
 		<description>Fake Machine</description>
