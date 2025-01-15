@@ -5,6 +5,7 @@ use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Read;
 use std::io::Write;
+use std::iter::once;
 use std::process::Child;
 use std::process::Command;
 use std::process::Stdio;
@@ -328,6 +329,11 @@ fn command_text(command: &MameCommand<'_>) -> Cow<'static, str> {
 		MameCommand::Throttled(throttled) => format!("THROTTLED {}", bool_str(*throttled)).into(),
 		MameCommand::ThrottleRate(throttle) => format!("THROTTLE_RATE {}", throttle).into(),
 		MameCommand::SetAttenuation(attenuation) => format!("SET_ATTENUATION {}", attenuation).into(),
+		MameCommand::LoadImage(loads) => once("LOAD")
+			.chain(loads.iter().flat_map(|(tag, filename)| [*tag, *filename]))
+			.join(" ")
+			.into(),
+		MameCommand::UnloadImage(tag) => format!("UNLOAD {}", tag).into(),
 	}
 }
 

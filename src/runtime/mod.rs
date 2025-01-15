@@ -34,6 +34,8 @@ pub enum MameCommand<'a> {
 	Throttled(bool),
 	ThrottleRate(f32),
 	SetAttenuation(i32),
+	LoadImage(&'a [(&'a str, &'a str)]),
+	UnloadImage(&'a str),
 }
 
 #[derive(Debug)]

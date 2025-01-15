@@ -30,6 +30,7 @@ use tracing::event;
 use tracing::Level;
 
 use crate::appcommand::AppCommand;
+use crate::channel::Channel;
 use crate::childwindow::ChildWindow;
 use crate::collections::add_items_to_existing_folder_collection;
 use crate::collections::add_items_to_new_folder_collection;
@@ -38,8 +39,11 @@ use crate::collections::get_folder_collection_names;
 use crate::collections::get_folder_collections;
 use crate::collections::remove_items_from_folder_collection;
 use crate::collections::toggle_builtin_collection;
+use crate::devimageconfig::DevicesImagesConfig;
+use crate::dialogs::devimages::dialog_devices_and_images;
 use crate::dialogs::file::file_dialog;
 use crate::dialogs::file::PathType;
+use crate::dialogs::image::dialog_load_image;
 use crate::dialogs::loading::dialog_load_mame_info;
 use crate::dialogs::messagebox::dialog_message_box;
 use crate::dialogs::messagebox::OkCancel;
@@ -99,6 +103,7 @@ struct AppModel {
 	mame_controller: MameController,
 	running_state: Cell<MameRunningState>,
 	running_status: RefCell<Status>,
+	status_changed_channel: Channel<Status>,
 	child_window: ChildWindow,
 	build_skew_state: Cell<BuildSkewState>,
 }
@@ -211,6 +216,7 @@ impl AppModel {
 
 	pub fn update_from_status(&self) {
 		let status = self.running_status.borrow();
+		self.status_changed_channel.publish(&status);
 
 		// machine description
 		let machine_desc = status
@@ -286,6 +292,7 @@ pub fn create(args: AppArgs) -> AppWindow {
 		mame_controller: MameController::new(args.mame_stderr),
 		running_state: Cell::new(MameRunningState::Normal),
 		running_status: RefCell::new(Status::default()),
+		status_changed_channel: Channel::default(),
 		child_window,
 		build_skew_state: Cell::new(BuildSkewState::Normal),
 	};
@@ -525,7 +532,7 @@ fn create_menu_bar() -> Menu {
 				&MenuItem::with_id(AppCommand::FileStop, "Stop", false, None),
 				&CheckMenuItem::with_id(AppCommand::FilePause, "Pause", false, false, accel("Pause")),
 				&PredefinedMenuItem::separator(),
-				&MenuItem::new("Devices and Images...", false, None),
+				&MenuItem::with_id(AppCommand::FileDevicesAndImages,"Devices and Images...", false, None),
 				&PredefinedMenuItem::separator(),
 				&MenuItem::new("Quick Load State", false, accel("F7")),
 				&MenuItem::new("Quick Save State", false, accel("Shift+F7")),
@@ -646,6 +653,19 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			} else {
 				model.mame_controller.issue_command(MameCommand::Pause);
 			}
+		}
+		AppCommand::FileDevicesAndImages => {
+			let info_db = model.info_db.borrow().clone().unwrap();
+			let diconfig = DevicesImagesConfig::new(info_db);
+			let (diconfig, _) = diconfig.update_status(&model.running_status.borrow());
+			let status_update_channel = model.status_changed_channel.clone();
+			let fut = dialog_devices_and_images(
+				model.app_window_weak.clone(),
+				diconfig,
+				status_update_channel,
+				model.menuing_type,
+			);
+			spawn_local(fut).unwrap();
 		}
 		AppCommand::FileResetSoft => {
 			model.mame_controller.issue_command(MameCommand::SoftReset);
@@ -902,6 +922,31 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				prefs.collections.push(collection);
 			})
 		}
+		AppCommand::LoadImageDialog { tag } => {
+			let parent = model.app_window_weak.clone();
+			let status = model.running_status.borrow();
+			let image = status
+				.running
+				.as_ref()
+				.unwrap()
+				.images
+				.iter()
+				.find(|x| x.tag == tag)
+				.unwrap();
+			if let Some(filename) = dialog_load_image(parent, image) {
+				let command = AppCommand::LoadImage { tag, filename };
+				handle_command(model, command);
+			}
+		}
+		AppCommand::LoadImage { tag, filename } => {
+			let loads = [(tag.as_str(), filename.as_str())];
+			model.mame_controller.issue_command(MameCommand::LoadImage(&loads));
+		}
+		AppCommand::UnloadImage { tag } => {
+			model
+				.mame_controller
+				.issue_command(MameCommand::UnloadImage(tag.as_str()));
+		}
 	};
 }
 
@@ -997,6 +1042,7 @@ fn update_menus(model: &AppModel) {
 			Ok(AppCommand::HelpRefreshInfoDb) => (Some(has_mame_executable), None),
 			Ok(AppCommand::FileStop) => (Some(is_running), None),
 			Ok(AppCommand::FilePause) => (Some(is_running), Some(is_paused)),
+			Ok(AppCommand::FileDevicesAndImages) => (Some(is_running), None),
 			Ok(AppCommand::FileResetSoft) => (Some(is_running), None),
 			Ok(AppCommand::FileResetHard) => (Some(is_running), None),
 			Ok(AppCommand::OptionsThrottleRate(x)) => (Some(is_running), Some(Some(x) == throttle_rate)),

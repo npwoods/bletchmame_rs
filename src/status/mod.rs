@@ -3,6 +3,7 @@ mod parse;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::io::BufRead;
+use std::sync::Arc;
 
 use anyhow::Result;
 use serde::Deserialize;
@@ -26,13 +27,34 @@ pub struct Status {
 impl Status {
 	pub fn merge(&mut self, update: Update) {
 		let running = update.running.map(|running| {
-			let status_running = self.running.take().unwrap_or_default();
+			let mut status_running = self.running.take().unwrap_or_default();
 
 			let machine_name = running.machine_name;
 			let is_paused = running.is_paused.unwrap_or(status_running.is_paused);
 			let is_throttled = running.is_throttled.unwrap_or(status_running.is_throttled);
 			let throttle_rate = running.throttle_rate.unwrap_or(status_running.throttle_rate);
 			let sound_attenuation = running.sound_attenuation.unwrap_or(status_running.sound_attenuation);
+			let images = if let Some(images) = running.images {
+				images
+					.into_iter()
+					.filter_map(|update_image| {
+						let details = update_image.details.or_else(|| {
+							let idx = status_running.images.iter().position(|x| x.tag == update_image.tag)?;
+							Some(status_running.images.remove(idx).details)
+						})?;
+
+						let new_status_image = Image {
+							tag: update_image.tag,
+							filename: update_image.filename,
+							details,
+						};
+						Some(new_status_image)
+					})
+					.collect::<Vec<_>>()
+			} else {
+				status_running.images
+			};
+			let slots = running.slots.unwrap_or(status_running.slots);
 
 			Running {
 				machine_name,
@@ -40,6 +62,8 @@ impl Status {
 				is_throttled,
 				throttle_rate,
 				sound_attenuation,
+				images,
+				slots,
 			}
 		});
 		event!(LOG, "Status::merge(): running={:?}", running);
@@ -66,6 +90,32 @@ pub struct Running {
 	pub is_throttled: bool,
 	pub throttle_rate: f32,
 	pub sound_attenuation: i32,
+	pub images: Vec<Image>,
+	pub slots: Vec<Slot>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+pub struct Image {
+	pub tag: String,
+	pub filename: Option<String>,
+	pub details: ImageDetails,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+pub struct ImageDetails {
+	pub instance_name: String,
+	pub is_readable: bool,
+	pub is_writeable: bool,
+	pub is_creatable: bool,
+	pub must_be_loaded: bool,
+	pub formats: Arc<[ImageFormat]>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Hash, Eq)]
+pub struct ImageFormat {
+	pub name: String,
+	pub description: String,
+	pub extensions: Vec<String>,
 }
 
 #[derive(Clone, Deserialize, Serialize, PartialEq)]
@@ -96,6 +146,30 @@ struct RunningUpdate {
 	pub is_throttled: Option<bool>,
 	pub throttle_rate: Option<f32>,
 	pub sound_attenuation: Option<i32>,
+	pub images: Option<Vec<ImageUpdate>>,
+	pub slots: Option<Vec<Slot>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
+struct ImageUpdate {
+	pub tag: String,
+	pub filename: Option<String>,
+	pub details: Option<ImageDetails>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
+pub struct Slot {
+	pub name: String,
+	pub fixed: bool,
+	pub has_selectable_options: bool,
+	pub options: Vec<SlotOption>,
+	pub current_option: Option<usize>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
+pub struct SlotOption {
+	pub name: String,
+	pub selectable: bool,
 }
 
 #[cfg(test)]

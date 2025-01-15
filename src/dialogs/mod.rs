@@ -3,7 +3,9 @@ use std::rc::Rc;
 
 use tokio::sync::Notify;
 
+pub mod devimages;
 pub mod file;
+pub mod image;
 pub mod loading;
 pub mod messagebox;
 pub mod namecollection;

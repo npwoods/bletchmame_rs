@@ -1,9 +1,11 @@
 #![cfg_attr(not(test), windows_subsystem = "windows")]
 mod appcommand;
 mod appwindow;
+mod channel;
 mod childwindow;
 mod collections;
 mod debugstr;
+mod devimageconfig;
 mod diagnostics;
 mod dialogs;
 mod guiutils;

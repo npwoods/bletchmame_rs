@@ -20,6 +20,7 @@ pub enum AppCommand {
 	// File menu
 	FileStop,
 	FilePause,
+	FileDevicesAndImages,
 	FileResetSoft,
 	FileResetHard,
 	FileExit,
@@ -79,6 +80,16 @@ pub enum AppCommand {
 	},
 	ChoosePath(PathType),
 	BookmarkCurrentCollection,
+	LoadImageDialog {
+		tag: String,
+	},
+	LoadImage {
+		tag: String,
+		filename: String,
+	},
+	UnloadImage {
+		tag: String,
+	},
 }
 
 const MENU_PREFIX: &str = "MENU_";

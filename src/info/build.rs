@@ -38,12 +38,15 @@ enum Phase {
 	MachineYear,
 	MachineManufacturer,
 	MachineDevice,
+	MachineSlot,
+	MachineRamOption,
 }
 
 const TEXT_CAPTURE_PHASES: &[Phase] = &[
 	Phase::MachineDescription,
 	Phase::MachineYear,
 	Phase::MachineManufacturer,
+	Phase::MachineRamOption,
 ];
 
 struct State {
@@ -51,15 +54,19 @@ struct State {
 	machines: BinBuilder<binary::Machine>,
 	chips: BinBuilder<binary::Chip>,
 	devices: BinBuilder<binary::Device>,
+	slots: BinBuilder<binary::Slot>,
+	slot_options: BinBuilder<binary::SlotOption>,
 	machine_software_lists: BinBuilder<binary::MachineSoftwareList>,
 	strings: StringTableBuilder,
 	software_lists: BTreeMap<String, SoftwareListBuild>,
+	ram_options: BinBuilder<binary::RamOption>,
 	build_strindex: u32,
 	phase_specific: Option<PhaseSpecificState>,
 }
 
 enum PhaseSpecificState {
 	Extensions(String),
+	RamOption(bool),
 }
 
 #[derive(Debug, Default)]
@@ -88,7 +95,10 @@ impl State {
 			machines: BinBuilder::new(48000),              // 44092 machines,
 			chips: BinBuilder::new(190000),                // 174679 chips
 			devices: BinBuilder::new(12000),               // 10738 devices
+			slots: BinBuilder::new(1000),                  // ??? slots
+			slot_options: BinBuilder::new(1000),           // ??? slot options
 			machine_software_lists: BinBuilder::new(6800), // 6337 software lists
+			ram_options: BinBuilder::new(6800),            // 6383 ram options
 			software_lists: BTreeMap::new(),
 			strings,
 			build_strindex,
@@ -134,8 +144,12 @@ impl State {
 					chips_end: self.chips.len(),
 					devices_start: self.devices.len(),
 					devices_end: self.devices.len(),
+					slots_start: self.slots.len(),
+					slots_end: self.slots.len(),
 					machine_software_lists_start: self.machine_software_lists.len(),
 					machine_software_lists_end: self.machine_software_lists.len(),
+					ram_options_start: self.ram_options.len(),
+					ram_options_end: self.ram_options.len(),
 					runnable,
 					..Default::default()
 				};
@@ -189,6 +203,21 @@ impl State {
 				self.phase_specific = Some(PhaseSpecificState::Extensions(String::with_capacity(1024)));
 				Some(Phase::MachineDevice)
 			}
+			(Phase::Machine, b"slot") => {
+				let [name] = evt.find_attributes([b"name"])?;
+				let name = name.ok_or(ThisError::MissingMandatoryAttribute("slot"))?;
+				let name = normalize_tag(name);
+				let name_strindex: u32 = self.strings.lookup(&name);
+				let slot = binary::Slot {
+					name_strindex,
+					options_start: self.slot_options.len(),
+					options_end: self.slot_options.len(),
+					default_option_index: !0,
+				};
+				self.slots.push(slot);
+				self.machines.increment(|m| &mut m.slots_end)?;
+				Some(Phase::MachineSlot)
+			}
 			(Phase::Machine, b"softwarelist") => {
 				let [tag, name, status, filter] = evt.find_attributes([b"tag", b"name", b"status", b"filter"])?;
 				let status = status.ok_or(ThisError::MissingMandatoryAttribute("status"))?;
@@ -218,15 +247,42 @@ impl State {
 				list.push(self.machines.items().next_back().unwrap().name_strindex);
 				None
 			}
+			(Phase::Machine, b"ramoption") => {
+				let [is_default] = evt.find_attributes([b"default"])?;
+				let is_default = is_default.map(parse_mame_bool).transpose()?.unwrap_or_default();
+				self.phase_specific = Some(PhaseSpecificState::RamOption(is_default));
+				Some(Phase::MachineRamOption)
+			}
 			(Phase::MachineDevice, b"extension") => {
 				let [name] = evt.find_attributes([b"name"])?;
 				if let Some(name) = name {
-					let PhaseSpecificState::Extensions(extensions) = self.phase_specific.as_mut().unwrap();
+					let PhaseSpecificState::Extensions(extensions) = self.phase_specific.as_mut().unwrap() else {
+						unreachable!();
+					};
 					if !extensions.is_empty() {
 						extensions.push('\0');
 					}
 					extensions.push_str(name.as_ref());
 				}
+				None
+			}
+			(Phase::MachineSlot, b"slotoption") => {
+				let [name, devname, is_default] = evt.find_attributes([b"name", b"devname", b"default"])?;
+				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?;
+				let devname = devname.ok_or(ThisError::MissingMandatoryAttribute("devname"))?;
+				let name_strindex = self.strings.lookup(&name);
+				let devname_strindex = self.strings.lookup(&devname);
+				let is_default = is_default.map(parse_mame_bool).transpose()?.unwrap_or_default();
+				if is_default {
+					self.slots
+						.tweak(|s| s.default_option_index = s.options_end - s.options_start);
+				}
+				let slot_option = binary::SlotOption {
+					name_strindex,
+					devname_strindex,
+				};
+				self.slots.increment(|s| &mut s.options_end)?;
+				self.slot_options.push(slot_option);
 				None
 			}
 			_ => None,
@@ -255,10 +311,22 @@ impl State {
 				self.machines.tweak(|x| x.manufacturer_strindex = manufacturer_strindex);
 			}
 			Phase::MachineDevice => {
-				let PhaseSpecificState::Extensions(extensions) = self.phase_specific.take().unwrap();
+				let PhaseSpecificState::Extensions(extensions) = self.phase_specific.take().unwrap() else {
+					unreachable!();
+				};
 				let extensions = extensions.split('\0').sorted().join("\0");
 				let extensions_strindex = self.strings.lookup(&extensions);
 				self.devices.tweak(|d| d.extensions_strindex = extensions_strindex);
+			}
+			Phase::MachineRamOption => {
+				let PhaseSpecificState::RamOption(is_default) = self.phase_specific.take().unwrap() else {
+					unreachable!();
+				};
+				if let Ok(size) = text.unwrap().parse::<u64>() {
+					let ram_option = binary::RamOption { size, is_default };
+					self.ram_options.push(ram_option);
+					self.machines.increment(|x| &mut x.ram_options_end)?;
+				}
 			}
 			_ => {}
 		};
@@ -381,9 +449,12 @@ impl State {
 			machine_count: self.machines.len(),
 			chips_count: self.chips.len(),
 			device_count: self.devices.len(),
+			slot_count: self.slots.len(),
+			slot_option_count: self.slot_options.len(),
 			software_list_count: software_lists.len(),
 			software_list_machine_count: software_list_machine_indexes.len(),
 			machine_software_lists_count: self.machine_software_lists.len(),
+			ram_option_count: self.ram_options.len(),
 		};
 		let mut header_bytes = [0u8; binary::Header::SERIALIZED_SIZE];
 		header.binary_serialize(&mut header_bytes, ENDIANNESS);
@@ -394,9 +465,12 @@ impl State {
 			.chain(self.machines.into_iter())
 			.chain(self.chips.into_iter())
 			.chain(self.devices.into_iter())
+			.chain(self.slots.into_iter())
+			.chain(self.slot_options.into_iter())
 			.chain(software_lists.into_iter())
 			.chain(software_list_machine_indexes.into_iter())
 			.chain(self.machine_software_lists.into_iter())
+			.chain(self.ram_options.into_iter())
 			.chain(self.strings.into_iter())
 			.collect();
 		Ok(bytes)
@@ -619,8 +693,11 @@ pub fn calculate_sizes_hash() -> u64 {
 		binary::Machine::SERIALIZED_SIZE,
 		binary::Chip::SERIALIZED_SIZE,
 		binary::Device::SERIALIZED_SIZE,
+		binary::Slot::SERIALIZED_SIZE,
+		binary::SlotOption::SERIALIZED_SIZE,
 		binary::SoftwareList::SERIALIZED_SIZE,
 		binary::MachineSoftwareList::SERIALIZED_SIZE,
+		binary::RamOption::SERIALIZED_SIZE,
 	]
 	.into_iter()
 	.fold(0, |value, item| {
