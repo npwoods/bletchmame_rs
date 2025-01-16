@@ -164,9 +164,9 @@ fn internal_update_status(info_db: Rc<InfoDb>, status: &Status) -> DevicesImages
 	let entries = statuses
 		.into_iter()
 		.zip(hierarchy)
-		.map(|(status, (indent, subtag_start))| {
+		.filter_map(|(status, (indent, subtag_start))| {
 			let details = match status {
-				StatusEntity::Slot(status) => {
+				StatusEntity::Slot(status) if status.has_selectable_options => {
 					let info = machine
 						.slots()
 						.iter()
@@ -185,21 +185,23 @@ fn internal_update_status(info_db: Rc<InfoDb>, status: &Status) -> DevicesImages
 							.position(|x| x.name() == option_name)
 							.unwrap_or_else(|| panic!("Unknown slot option {:?}", option_name))
 					});
-					InternalEntryDetails::Slot { current_option_index }
+					Some(InternalEntryDetails::Slot { current_option_index })
 				}
+				StatusEntity::Slot(_) => None,
 				StatusEntity::Image(status) => {
 					let filename = status.filename.clone();
-					InternalEntryDetails::Image { filename }
+					Some(InternalEntryDetails::Image { filename })
 				}
-			};
+			}?;
 
 			let tag = status.tag().to_string();
-			InternalEntry {
+			let entry = InternalEntry {
 				tag,
 				subtag_start,
 				indent,
 				details,
-			}
+			};
+			Some(entry)
 		})
 		.collect::<Vec<_>>();
 
@@ -257,7 +259,33 @@ where
 
 #[cfg(test)]
 mod test {
+	use std::rc::Rc;
+
 	use test_case::test_case;
+
+	use crate::info::InfoDb;
+	use crate::status::Status;
+	use crate::status::Update;
+
+	use super::DevicesImagesConfig;
+
+	#[test_case(0, include_str!("info/test_data/listxml_c64.xml"), include_str!("status/test_data/status_mame0273_c64_1.xml"))]
+	fn test(_index: usize, info_xml: &str, status_xml: &str) {
+		// build the InfoDB
+		let info_db = InfoDb::from_listxml_output(info_xml.as_bytes(), |_| false)
+			.unwrap()
+			.unwrap();
+		let info_db = Rc::new(info_db);
+
+		// build the status
+		let mut status = Status::default();
+		let update = Update::parse(status_xml.as_bytes()).unwrap();
+		status.merge(update);
+
+		// now try to create a config
+		let config = DevicesImagesConfig::new(info_db);
+		let _ = config.update_status(&status);
+	}
 
 	#[test_case(0, &["alpha", "alpha:bravo", "alpha:charlie", "delta", "echo", "echo:foxtrot"], &["alpha", "-bravo", "-charlie", "delta", "echo", "-foxtrot"])]
 	#[test_case(1, &["alpha", "alpha:foo:bar:bravo", "alpha:foo:bar:charlie", "alpha:foo:bar:charlie:delta", "echo", "echo:foxtrot"], &["alpha", "-foo:bar:bravo", "-foo:bar:charlie", "--delta", "echo", "-foxtrot"])]

@@ -1,0 +1,3561 @@
+<?xml version="1.0"?>
+<!DOCTYPE mame [
+<!ELEMENT mame (machine+)>
+	<!ATTLIST mame build CDATA #IMPLIED>
+	<!ATTLIST mame debug (yes|no) "no">
+	<!ATTLIST mame mameconfig CDATA #REQUIRED>
+	<!ELEMENT machine (description, year?, manufacturer?, biosset*, rom*, disk*, device_ref*, sample*, chip*, display*, sound?, input?, dipswitch*, configuration*, port*, adjuster*, driver?, feature*, device*, slot*, softwarelist*, ramoption*)>
+		<!ATTLIST machine name CDATA #REQUIRED>
+		<!ATTLIST machine sourcefile CDATA #IMPLIED>
+		<!ATTLIST machine isbios (yes|no) "no">
+		<!ATTLIST machine isdevice (yes|no) "no">
+		<!ATTLIST machine ismechanical (yes|no) "no">
+		<!ATTLIST machine runnable (yes|no) "yes">
+		<!ATTLIST machine cloneof CDATA #IMPLIED>
+		<!ATTLIST machine romof CDATA #IMPLIED>
+		<!ATTLIST machine sampleof CDATA #IMPLIED>
+		<!ELEMENT description (#PCDATA)>
+		<!ELEMENT year (#PCDATA)>
+		<!ELEMENT manufacturer (#PCDATA)>
+		<!ELEMENT biosset EMPTY>
+			<!ATTLIST biosset name CDATA #REQUIRED>
+			<!ATTLIST biosset description CDATA #REQUIRED>
+			<!ATTLIST biosset default (yes|no) "no">
+		<!ELEMENT rom EMPTY>
+			<!ATTLIST rom name CDATA #REQUIRED>
+			<!ATTLIST rom bios CDATA #IMPLIED>
+			<!ATTLIST rom size CDATA #REQUIRED>
+			<!ATTLIST rom crc CDATA #IMPLIED>
+			<!ATTLIST rom sha1 CDATA #IMPLIED>
+			<!ATTLIST rom merge CDATA #IMPLIED>
+			<!ATTLIST rom region CDATA #IMPLIED>
+			<!ATTLIST rom offset CDATA #IMPLIED>
+			<!ATTLIST rom status (baddump|nodump|good) "good">
+			<!ATTLIST rom optional (yes|no) "no">
+		<!ELEMENT disk EMPTY>
+			<!ATTLIST disk name CDATA #REQUIRED>
+			<!ATTLIST disk sha1 CDATA #IMPLIED>
+			<!ATTLIST disk merge CDATA #IMPLIED>
+			<!ATTLIST disk region CDATA #IMPLIED>
+			<!ATTLIST disk index CDATA #IMPLIED>
+			<!ATTLIST disk writable (yes|no) "no">
+			<!ATTLIST disk status (baddump|nodump|good) "good">
+			<!ATTLIST disk optional (yes|no) "no">
+		<!ELEMENT device_ref EMPTY>
+			<!ATTLIST device_ref name CDATA #REQUIRED>
+		<!ELEMENT sample EMPTY>
+			<!ATTLIST sample name CDATA #REQUIRED>
+		<!ELEMENT chip EMPTY>
+			<!ATTLIST chip name CDATA #REQUIRED>
+			<!ATTLIST chip tag CDATA #IMPLIED>
+			<!ATTLIST chip type (cpu|audio) #REQUIRED>
+			<!ATTLIST chip clock CDATA #IMPLIED>
+		<!ELEMENT display EMPTY>
+			<!ATTLIST display tag CDATA #IMPLIED>
+			<!ATTLIST display type (raster|vector|lcd|svg|unknown) #REQUIRED>
+			<!ATTLIST display rotate (0|90|180|270) #IMPLIED>
+			<!ATTLIST display flipx (yes|no) "no">
+			<!ATTLIST display width CDATA #IMPLIED>
+			<!ATTLIST display height CDATA #IMPLIED>
+			<!ATTLIST display refresh CDATA #REQUIRED>
+			<!ATTLIST display pixclock CDATA #IMPLIED>
+			<!ATTLIST display htotal CDATA #IMPLIED>
+			<!ATTLIST display hbend CDATA #IMPLIED>
+			<!ATTLIST display hbstart CDATA #IMPLIED>
+			<!ATTLIST display vtotal CDATA #IMPLIED>
+			<!ATTLIST display vbend CDATA #IMPLIED>
+			<!ATTLIST display vbstart CDATA #IMPLIED>
+		<!ELEMENT sound EMPTY>
+			<!ATTLIST sound channels CDATA #REQUIRED>
+		<!ELEMENT condition EMPTY>
+			<!ATTLIST condition tag CDATA #REQUIRED>
+			<!ATTLIST condition mask CDATA #REQUIRED>
+			<!ATTLIST condition relation (eq|ne|gt|le|lt|ge) #REQUIRED>
+			<!ATTLIST condition value CDATA #REQUIRED>
+		<!ELEMENT input (control*)>
+			<!ATTLIST input service (yes|no) "no">
+			<!ATTLIST input tilt (yes|no) "no">
+			<!ATTLIST input players CDATA #REQUIRED>
+			<!ATTLIST input coins CDATA #IMPLIED>
+			<!ELEMENT control EMPTY>
+				<!ATTLIST control type CDATA #REQUIRED>
+				<!ATTLIST control player CDATA #IMPLIED>
+				<!ATTLIST control buttons CDATA #IMPLIED>
+				<!ATTLIST control reqbuttons CDATA #IMPLIED>
+				<!ATTLIST control minimum CDATA #IMPLIED>
+				<!ATTLIST control maximum CDATA #IMPLIED>
+				<!ATTLIST control sensitivity CDATA #IMPLIED>
+				<!ATTLIST control keydelta CDATA #IMPLIED>
+				<!ATTLIST control reverse (yes|no) "no">
+				<!ATTLIST control ways CDATA #IMPLIED>
+				<!ATTLIST control ways2 CDATA #IMPLIED>
+				<!ATTLIST control ways3 CDATA #IMPLIED>
+		<!ELEMENT dipswitch (condition?, diplocation*, dipvalue*)>
+			<!ATTLIST dipswitch name CDATA #REQUIRED>
+			<!ATTLIST dipswitch tag CDATA #REQUIRED>
+			<!ATTLIST dipswitch mask CDATA #REQUIRED>
+			<!ELEMENT diplocation EMPTY>
+				<!ATTLIST diplocation name CDATA #REQUIRED>
+				<!ATTLIST diplocation number CDATA #REQUIRED>
+				<!ATTLIST diplocation inverted (yes|no) "no">
+			<!ELEMENT dipvalue (condition?)>
+				<!ATTLIST dipvalue name CDATA #REQUIRED>
+				<!ATTLIST dipvalue value CDATA #REQUIRED>
+				<!ATTLIST dipvalue default (yes|no) "no">
+		<!ELEMENT configuration (condition?, conflocation*, confsetting*)>
+			<!ATTLIST configuration name CDATA #REQUIRED>
+			<!ATTLIST configuration tag CDATA #REQUIRED>
+			<!ATTLIST configuration mask CDATA #REQUIRED>
+			<!ELEMENT conflocation EMPTY>
+				<!ATTLIST conflocation name CDATA #REQUIRED>
+				<!ATTLIST conflocation number CDATA #REQUIRED>
+				<!ATTLIST conflocation inverted (yes|no) "no">
+			<!ELEMENT confsetting (condition?)>
+				<!ATTLIST confsetting name CDATA #REQUIRED>
+				<!ATTLIST confsetting value CDATA #REQUIRED>
+				<!ATTLIST confsetting default (yes|no) "no">
+		<!ELEMENT port (analog*)>
+			<!ATTLIST port tag CDATA #REQUIRED>
+			<!ELEMENT analog EMPTY>
+				<!ATTLIST analog mask CDATA #REQUIRED>
+		<!ELEMENT adjuster (condition?)>
+			<!ATTLIST adjuster name CDATA #REQUIRED>
+			<!ATTLIST adjuster default CDATA #REQUIRED>
+		<!ELEMENT driver EMPTY>
+			<!ATTLIST driver status (good|imperfect|preliminary) #REQUIRED>
+			<!ATTLIST driver emulation (good|imperfect|preliminary) #REQUIRED>
+			<!ATTLIST driver cocktail (good|imperfect|preliminary) #IMPLIED>
+			<!ATTLIST driver savestate (supported|unsupported) #REQUIRED>
+			<!ATTLIST driver requiresartwork (yes|no) "no">
+			<!ATTLIST driver unofficial (yes|no) "no">
+			<!ATTLIST driver nosoundhardware (yes|no) "no">
+			<!ATTLIST driver incomplete (yes|no) "no">
+		<!ELEMENT feature EMPTY>
+			<!ATTLIST feature type (protection|timing|graphics|palette|sound|capture|camera|microphone|controls|keyboard|mouse|media|disk|printer|tape|punch|drum|rom|comms|lan|wan) #REQUIRED>
+			<!ATTLIST feature status (unemulated|imperfect) #IMPLIED>
+			<!ATTLIST feature overall (unemulated|imperfect) #IMPLIED>
+		<!ELEMENT device (instance?, extension*)>
+			<!ATTLIST device type CDATA #REQUIRED>
+			<!ATTLIST device tag CDATA #IMPLIED>
+			<!ATTLIST device fixed_image CDATA #IMPLIED>
+			<!ATTLIST device mandatory CDATA #IMPLIED>
+			<!ATTLIST device interface CDATA #IMPLIED>
+			<!ELEMENT instance EMPTY>
+				<!ATTLIST instance name CDATA #REQUIRED>
+				<!ATTLIST instance briefname CDATA #REQUIRED>
+			<!ELEMENT extension EMPTY>
+				<!ATTLIST extension name CDATA #REQUIRED>
+		<!ELEMENT slot (slotoption*)>
+			<!ATTLIST slot name CDATA #REQUIRED>
+			<!ELEMENT slotoption EMPTY>
+				<!ATTLIST slotoption name CDATA #REQUIRED>
+				<!ATTLIST slotoption devname CDATA #REQUIRED>
+				<!ATTLIST slotoption default (yes|no) "no">
+		<!ELEMENT softwarelist EMPTY>
+			<!ATTLIST softwarelist tag CDATA #REQUIRED>
+			<!ATTLIST softwarelist name CDATA #REQUIRED>
+			<!ATTLIST softwarelist status (original|compatible) #REQUIRED>
+			<!ATTLIST softwarelist filter CDATA #IMPLIED>
+		<!ELEMENT ramoption (#PCDATA)>
+			<!ATTLIST ramoption name CDATA #REQUIRED>
+			<!ATTLIST ramoption default CDATA #IMPLIED>
+]>
+
+<mame build="0.273 (mame0273)" debug="no" mameconfig="10">
+	<machine name="c64" sourcefile="commodore/c64.cpp">
+		<description>Commodore 64 (NTSC)</description>
+		<year>1982</year>
+		<manufacturer>Commodore Business Machines</manufacturer>
+		<biosset name="r1" description="Kernal rev. 1"/>
+		<biosset name="r2" description="Kernal rev. 2"/>
+		<biosset name="r3" description="Kernal rev. 3" default="yes"/>
+		<biosset name="jiffydos" description="JiffyDOS v6.01"/>
+		<biosset name="speeddos" description="SpeedDOS"/>
+		<biosset name="speeddos20" description="SpeedDOS-Plus+ v2.0"/>
+		<biosset name="speeddos27" description="SpeedDOS-Plus+ v2.7"/>
+		<biosset name="prodos" description="Professional-DOS v1"/>
+		<biosset name="prodos2" description="Professional-DOS Release 2/4L2"/>
+		<biosset name="prodos3" description="Professional-DOS Release 3/5L2"/>
+		<biosset name="turborom" description="Cockroach Turbo-ROM"/>
+		<biosset name="dosrom" description="DOS-ROM v1.2"/>
+		<biosset name="turborom2" description="Datel Turbo ROM II (PAL)"/>
+		<biosset name="mercury" description="Mercury-ROM v3 (NTSC)"/>
+		<biosset name="dolphin" description="Dolphin-DOS 1.0"/>
+		<biosset name="dolphin201au" description="Dolphin-DOS 2.0 1 au"/>
+		<biosset name="dolphin201" description="Dolphin-DOS 2.0 1"/>
+		<biosset name="dolphin202" description="Dolphin-DOS 2.0 2"/>
+		<biosset name="dolphin203" description="Dolphin-DOS 2.0 3"/>
+		<biosset name="dolphin30" description="Dolphin-DOS 3.0"/>
+		<biosset name="taccess" description="TurboAccess v2.6"/>
+		<biosset name="ttrans301" description="TurboTrans v3.0 1"/>
+		<biosset name="ttrans302" description="TurboTrans v3.0 2"/>
+		<biosset name="tprocess" description="Turbo-Process (PAL)"/>
+		<biosset name="tprocessn" description="Turbo-Process (NTSC)"/>
+		<biosset name="exos3" description="EXOS v3"/>
+		<biosset name="exos4" description="EXOS v4"/>
+		<biosset name="digidos" description="DigiDOS"/>
+		<biosset name="magnum" description="Magnum Load"/>
+		<biosset name="mercury31s" description="Mercury-ROM v3.1s"/>
+		<rom name="901227-01.u4" bios="r1" size="8192" crc="dce782fa" sha1="87cc04d61fc748b82df09856847bb5c2754a2033" region="kernal" offset="0"/>
+		<rom name="901227-02.u4" bios="r2" size="8192" crc="a5c687b3" sha1="0e2e4ee3f2d41f00bed72f9ab588b83e306fdb13" region="kernal" offset="0"/>
+		<rom name="901227-03.u4" bios="r3" size="8192" crc="dbe3e7c7" sha1="1d503e56df85a62fee696e7618dc5b4e781df1bb" region="kernal" offset="0"/>
+		<rom name="jiffydos c64.u4" bios="jiffydos" size="8192" crc="2f79984c" sha1="31e73e66eccb28732daea8ec3ad1addd9b39a017" region="kernal" offset="0"/>
+		<rom name="speed-dos.u4" bios="speeddos" size="8192" crc="5beb9ac8" sha1="8896c8de9e26ef1396eb46020b2de346a3eeab7e" region="kernal" offset="0"/>
+		<rom name="speed-dosplus.u4" bios="speeddos20" size="8192" crc="10aee0ae" sha1="6cebd4dc0c5e8c0b073586a3f1c43cc3349b9736" region="kernal" offset="0"/>
+		<rom name="speed-dosplus27.u4" bios="speeddos27" size="8192" crc="ff59995e" sha1="c8d864e5fc7089af8afce97dc0a0224df11df1c3" region="kernal" offset="0"/>
+		<rom name="prodos.u4" bios="prodos" size="8192" crc="37ed83a2" sha1="35f4f0fe03c0b7b3762b526ba855de41b496fb60" region="kernal" offset="0"/>
+		<rom name="prodos24l2.u4" bios="prodos2" size="8192" crc="41dad9fe" sha1="fbf3dcc2ed40e58b07595740ea6fbff7ab19ebad" region="kernal" offset="0"/>
+		<rom name="prodos35l2.u4" bios="prodos3" size="8192" crc="2822eee7" sha1="77356b84c1648018863d1c8dd5bc3a37485bc00e" region="kernal" offset="0"/>
+		<rom name="turborom.u4" bios="turborom" size="8192" crc="e6c763a2" sha1="eff5a4b6bc65daa9421bd3856dd99a3195068e1c" region="kernal" offset="0"/>
+		<rom name="dosrom12.u4" bios="dosrom" size="8192" crc="ac030fc0" sha1="0e4b38e81b49f55d52162154a44f0fffd2b0d04f" region="kernal" offset="0"/>
+		<rom name="turborom2.u4" bios="turborom2" size="8192" crc="ea3ba683" sha1="4bb23f764a3d255119fbae37202ca820caa04e1f" region="kernal" offset="0"/>
+		<rom name="mercury3.u4" bios="mercury" size="8192" crc="6eac46a2" sha1="4e351aa5fcb97c4c21e565aa2c830cc09bd47533" region="kernal" offset="0"/>
+		<rom name="kernal-10-mager.u4" bios="dolphin" size="8192" crc="c9bb21bc" sha1="e305216e50ff8a7acf102be6c6343e3d44a16233" region="kernal" offset="0"/>
+		<rom name="kernal-20-1_au.u4" bios="dolphin201au" size="8192" crc="7068bbcc" sha1="325ce7e32609a8fc704aaa76f5eb4cd7d8099a92" region="kernal" offset="0"/>
+		<rom name="kernal-20-1.u4" bios="dolphin201" size="8192" crc="c9c4c44e" sha1="7f5d8f08c5ed2182ffb415a3d777fdd922496d02" region="kernal" offset="0"/>
+		<rom name="kernal-20-2.u4" bios="dolphin202" size="8192" crc="ffaeb9bc" sha1="5f6c1bad379da16f77bccb58e80910f307dfd5f8" region="kernal" offset="0"/>
+		<rom name="kernal-20-3.u4" bios="dolphin203" size="8192" crc="4fd511f2" sha1="316fba280dcb29496d593c0c4e3ee9a19844054e" region="kernal" offset="0"/>
+		<rom name="kernal-30.u4" bios="dolphin30" size="8192" crc="5402d643" sha1="733acb96fead2fb4df77840c5bb618f08439fc7e" region="kernal" offset="0"/>
+		<rom name="turboaccess26.u4" bios="taccess" size="8192" crc="93de6cd9" sha1="a74478f3b9153c13176eac80ebfacc512ae7cbf0" region="kernal" offset="0"/>
+		<rom name="turboaccess301.u4" bios="ttrans301" size="8192" crc="b3304dcf" sha1="4d47a265ef65e4823f862cfc3d514c2a71473580" region="kernal" offset="0"/>
+		<rom name="turboaccess302.u4" bios="ttrans302" size="8192" crc="9e696a7b" sha1="5afae75d66d539f4bb4af763f029f0ef6523a4eb" region="kernal" offset="0"/>
+		<rom name="turboprocess.u4" bios="tprocess" size="8192" crc="e5610d76" sha1="e3f35777cfd16cce4717858f77ff354763395ba9" region="kernal" offset="0"/>
+		<rom name="turboprocessus.u4" bios="tprocessn" size="8192" crc="7480b76a" sha1="ef1664b5057ae3cc6d104fc2f5c1fb29ee5a1b2b" region="kernal" offset="0"/>
+		<rom name="exos3.u4" bios="exos3" size="8192" crc="4e54d020" sha1="f8931b7c0b26807f4de0cc241f0b1e2c8f5271e9" region="kernal" offset="0"/>
+		<rom name="exos4.u4" bios="exos4" size="8192" crc="d5cf83a9" sha1="d5f03a5c0e9d00032d4751ecc6bcd6385879c9c7" region="kernal" offset="0"/>
+		<rom name="digidos.u4" bios="digidos" size="8192" crc="2b0c8e89" sha1="542d6f61c318bced0642e7c2d4d3b34a0f13e634" region="kernal" offset="0"/>
+		<rom name="magnum.u4" bios="magnum" size="8192" crc="b2cffcc6" sha1="827c782c1723b5d0992c05c00738ae4b2133b641" region="kernal" offset="0"/>
+		<rom name="mercury31s.u4" bios="mercury31s" size="8192" crc="97aa5d2f" sha1="9fc653e61c34225245036f266db14e05feeadb21" region="kernal" offset="0"/>
+		<rom name="901226-01.u3" size="8192" crc="f833d117" sha1="79015323128650c742a3694c9429aa91f355905e" region="basic" offset="0"/>
+		<rom name="901225-01.u5" size="4096" crc="ec4272ee" sha1="adc7c31e18c7c7413d54802ef2f4193da14711aa" region="charom" offset="0"/>
+		<rom name="906114-01.u17" size="245" crc="54c89351" sha1="efb315f560b6f72444b8f0b2ca4b0ccbcd144a1b" region="u17" offset="0"/>
+		<device_ref name="m6510"/>
+		<device_ref name="ipt_merge_any_hi"/>
+		<device_ref name="ipt_merge_any_hi"/>
+		<device_ref name="mos6567"/>
+		<device_ref name="screen"/>
+		<device_ref name="speaker"/>
+		<device_ref name="mos6581"/>
+		<device_ref name="pls100"/>
+		<device_ref name="mos6526"/>
+		<device_ref name="mos6526"/>
+		<device_ref name="pet_datassette_port"/>
+		<device_ref name="c1530"/>
+		<device_ref name="cassette_image"/>
+		<device_ref name="cbm_iec_slot"/>
+		<device_ref name="cbm_iec_slot"/>
+		<device_ref name="c1541"/>
+		<device_ref name="m6502"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="c64h156"/>
+		<device_ref name="floppy_connector"/>
+		<device_ref name="alps_3255190x"/>
+		<device_ref name="speaker"/>
+		<device_ref name="flopsnd"/>
+		<device_ref name="cbm_iec_slot"/>
+		<device_ref name="cbm_iec_slot"/>
+		<device_ref name="cbm_iec_slot"/>
+		<device_ref name="cbm_iec"/>
+		<device_ref name="vcs_control_port"/>
+		<device_ref name="vcs_control_port"/>
+		<device_ref name="vcs_joystick"/>
+		<device_ref name="c64_expansion_slot"/>
+		<device_ref name="pet_user_port"/>
+		<device_ref name="quickload"/>
+		<device_ref name="software_list"/>
+		<device_ref name="software_list"/>
+		<device_ref name="software_list"/>
+		<device_ref name="software_list"/>
+		<device_ref name="software_list"/>
+		<device_ref name="ram"/>
+		<chip type="cpu" tag="u7" name="MOS Technology 6510" clock="1022727"/>
+		<chip type="cpu" tag="u19" name="MOS 6567 VIC-II" clock="1022727"/>
+		<chip type="cpu" tag="u1" name="MOS 6526 CIA" clock="1022727"/>
+		<chip type="cpu" tag="u2" name="MOS 6526 CIA" clock="1022727"/>
+		<chip type="cpu" tag="iec8:c1541:ucd5" name="MOS Technology 6502" clock="1000000"/>
+		<chip type="audio" tag="mono" name="Speaker"/>
+		<chip type="audio" tag="u18" name="MOS 6581 SID" clock="1022727"/>
+		<chip type="audio" tag="tape:c1530:cassette" name="Cassette"/>
+		<chip type="audio" tag="iec8:c1541:uc4:0:525ssqd:flopsndout" name="Speaker"/>
+		<chip type="audio" tag="iec8:c1541:uc4:0:525ssqd:floppysound" name="Floppy sound" clock="44100"/>
+		<display tag="screen" type="raster" rotate="0" width="418" height="235" refresh="59.826102" pixclock="8055943" htotal="512" hbend="0" hbstart="418" vtotal="263" vbend="0" vbstart="235" />
+		<sound channels="2"/>
+		<input players="1">
+			<control type="joy" buttons="1" ways="8"/>
+			<control type="keyboard" buttons="66"/>
+		</input>
+		<dipswitch name="Device Address" tag="iec8:c1541:ADDRESS" mask="3">
+			<dipvalue name="8" value="0" default="yes"/>
+			<dipvalue name="9" value="1"/>
+			<dipvalue name="10" value="2"/>
+			<dipvalue name="11" value="3"/>
+		</dipswitch>
+		<port tag=":LOCK">
+		</port>
+		<port tag=":RESTORE">
+		</port>
+		<port tag=":ROW0">
+		</port>
+		<port tag=":ROW1">
+		</port>
+		<port tag=":ROW2">
+		</port>
+		<port tag=":ROW3">
+		</port>
+		<port tag=":ROW4">
+		</port>
+		<port tag=":ROW5">
+		</port>
+		<port tag=":ROW6">
+		</port>
+		<port tag=":ROW7">
+		</port>
+		<port tag=":iec8:c1541:ADDRESS">
+		</port>
+		<port tag=":joy2:joy:JOY">
+		</port>
+		<driver status="good" emulation="good" savestate="supported"/>
+		<device type="cassette" tag="tape:c1530:cassette" interface="cbm_cass">
+			<instance name="cassette" briefname="cass"/>
+			<extension name="wav"/>
+			<extension name="flac"/>
+			<extension name="tap"/>
+		</device>
+		<device type="floppydisk" tag="iec8:c1541:uc4:0:525ssqd" interface="floppy_5_25">
+			<instance name="floppydisk" briefname="flop"/>
+			<extension name="mfi"/>
+			<extension name="dfi"/>
+			<extension name="d64"/>
+			<extension name="g64"/>
+			<extension name="g41"/>
+			<extension name="g71"/>
+		</device>
+		<device type="cartridge" tag="exp" interface="c64_cart,vic10_cart">
+			<instance name="cartridge" briefname="cart"/>
+			<extension name="80"/>
+			<extension name="a0"/>
+			<extension name="e0"/>
+			<extension name="crt"/>
+		</device>
+		<device type="quickload" tag="quickload">
+			<instance name="quickload" briefname="quik"/>
+			<extension name="p00"/>
+			<extension name="prg"/>
+			<extension name="t64"/>
+		</device>
+		<slot name="tape">
+			<slotoption name="c1530" devname="c1530" default="yes"/>
+			<slotoption name="c2n" devname="c2n"/>
+		</slot>
+		<slot name="iec4">
+			<slotoption name="mps1250" devname="mps1250"/>
+			<slotoption name="msdsd2" devname="msdsd2"/>
+			<slotoption name="msdsd1" devname="msdsd1"/>
+			<slotoption name="fd148" devname="fd148"/>
+			<slotoption name="c1581" devname="c1581"/>
+			<slotoption name="c1526" devname="c1526"/>
+			<slotoption name="c1541pd" devname="c1541pd"/>
+			<slotoption name="minichief" devname="minichif"/>
+			<slotoption name="vic1520" devname="vic1520"/>
+			<slotoption name="csd1" devname="csd1"/>
+			<slotoption name="c1541pdc" devname="c1541pdc"/>
+			<slotoption name="c1541dd" devname="c1541dd"/>
+			<slotoption name="c1570" devname="c1570"/>
+			<slotoption name="indusgt" devname="indusgt"/>
+			<slotoption name="fsd2" devname="fsd2"/>
+			<slotoption name="fsd1" devname="fsd1"/>
+			<slotoption name="c1540" devname="c1540"/>
+			<slotoption name="c1571" devname="c1571"/>
+			<slotoption name="c1541ii" devname="c1541ii"/>
+			<slotoption name="interpod" devname="cbm_interpod"/>
+			<slotoption name="c1541c" devname="c1541c"/>
+			<slotoption name="c1541" devname="c1541"/>
+			<slotoption name="cmdhd" devname="cmdhd"/>
+			<slotoption name="fd2000" devname="fd2000"/>
+			<slotoption name="bluechip" devname="bluechip"/>
+			<slotoption name="fd4000" devname="fd4000"/>
+			<slotoption name="serialbox" devname="cbm_serbox"/>
+			<slotoption name="nl10" devname="c64_nl10"/>
+			<slotoption name="mps1200" devname="mps1200"/>
+			<slotoption name="vic1515" devname="vic1515"/>
+			<slotoption name="diag264" devname="diag264_serial_loopback"/>
+			<slotoption name="enh2000" devname="enh2000"/>
+			<slotoption name="technica" devname="technica"/>
+			<slotoption name="cmdrc2" devname="cmdrc2"/>
+		</slot>
+		<slot name="iec8">
+			<slotoption name="mps1250" devname="mps1250"/>
+			<slotoption name="msdsd2" devname="msdsd2"/>
+			<slotoption name="msdsd1" devname="msdsd1"/>
+			<slotoption name="fd148" devname="fd148"/>
+			<slotoption name="c1581" devname="c1581"/>
+			<slotoption name="c1526" devname="c1526"/>
+			<slotoption name="c1541pd" devname="c1541pd"/>
+			<slotoption name="minichief" devname="minichif"/>
+			<slotoption name="vic1520" devname="vic1520"/>
+			<slotoption name="csd1" devname="csd1"/>
+			<slotoption name="c1541pdc" devname="c1541pdc"/>
+			<slotoption name="c1541dd" devname="c1541dd"/>
+			<slotoption name="c1570" devname="c1570"/>
+			<slotoption name="indusgt" devname="indusgt"/>
+			<slotoption name="fsd2" devname="fsd2"/>
+			<slotoption name="fsd1" devname="fsd1"/>
+			<slotoption name="c1540" devname="c1540"/>
+			<slotoption name="c1571" devname="c1571"/>
+			<slotoption name="c1541ii" devname="c1541ii"/>
+			<slotoption name="interpod" devname="cbm_interpod"/>
+			<slotoption name="c1541c" devname="c1541c"/>
+			<slotoption name="c1541" devname="c1541" default="yes"/>
+			<slotoption name="cmdhd" devname="cmdhd"/>
+			<slotoption name="fd2000" devname="fd2000"/>
+			<slotoption name="bluechip" devname="bluechip"/>
+			<slotoption name="fd4000" devname="fd4000"/>
+			<slotoption name="serialbox" devname="cbm_serbox"/>
+			<slotoption name="nl10" devname="c64_nl10"/>
+			<slotoption name="mps1200" devname="mps1200"/>
+			<slotoption name="vic1515" devname="vic1515"/>
+			<slotoption name="diag264" devname="diag264_serial_loopback"/>
+			<slotoption name="enh2000" devname="enh2000"/>
+			<slotoption name="technica" devname="technica"/>
+			<slotoption name="cmdrc2" devname="cmdrc2"/>
+		</slot>
+		<slot name="iec9">
+			<slotoption name="mps1250" devname="mps1250"/>
+			<slotoption name="msdsd2" devname="msdsd2"/>
+			<slotoption name="msdsd1" devname="msdsd1"/>
+			<slotoption name="fd148" devname="fd148"/>
+			<slotoption name="c1581" devname="c1581"/>
+			<slotoption name="c1526" devname="c1526"/>
+			<slotoption name="c1541pd" devname="c1541pd"/>
+			<slotoption name="minichief" devname="minichif"/>
+			<slotoption name="vic1520" devname="vic1520"/>
+			<slotoption name="csd1" devname="csd1"/>
+			<slotoption name="c1541pdc" devname="c1541pdc"/>
+			<slotoption name="c1541dd" devname="c1541dd"/>
+			<slotoption name="c1570" devname="c1570"/>
+			<slotoption name="indusgt" devname="indusgt"/>
+			<slotoption name="fsd2" devname="fsd2"/>
+			<slotoption name="fsd1" devname="fsd1"/>
+			<slotoption name="c1540" devname="c1540"/>
+			<slotoption name="c1571" devname="c1571"/>
+			<slotoption name="c1541ii" devname="c1541ii"/>
+			<slotoption name="interpod" devname="cbm_interpod"/>
+			<slotoption name="c1541c" devname="c1541c"/>
+			<slotoption name="c1541" devname="c1541"/>
+			<slotoption name="cmdhd" devname="cmdhd"/>
+			<slotoption name="fd2000" devname="fd2000"/>
+			<slotoption name="bluechip" devname="bluechip"/>
+			<slotoption name="fd4000" devname="fd4000"/>
+			<slotoption name="serialbox" devname="cbm_serbox"/>
+			<slotoption name="nl10" devname="c64_nl10"/>
+			<slotoption name="mps1200" devname="mps1200"/>
+			<slotoption name="vic1515" devname="vic1515"/>
+			<slotoption name="diag264" devname="diag264_serial_loopback"/>
+			<slotoption name="enh2000" devname="enh2000"/>
+			<slotoption name="technica" devname="technica"/>
+			<slotoption name="cmdrc2" devname="cmdrc2"/>
+		</slot>
+		<slot name="iec10">
+			<slotoption name="mps1250" devname="mps1250"/>
+			<slotoption name="msdsd2" devname="msdsd2"/>
+			<slotoption name="msdsd1" devname="msdsd1"/>
+			<slotoption name="fd148" devname="fd148"/>
+			<slotoption name="c1581" devname="c1581"/>
+			<slotoption name="c1526" devname="c1526"/>
+			<slotoption name="c1541pd" devname="c1541pd"/>
+			<slotoption name="minichief" devname="minichif"/>
+			<slotoption name="vic1520" devname="vic1520"/>
+			<slotoption name="csd1" devname="csd1"/>
+			<slotoption name="c1541pdc" devname="c1541pdc"/>
+			<slotoption name="c1541dd" devname="c1541dd"/>
+			<slotoption name="c1570" devname="c1570"/>
+			<slotoption name="indusgt" devname="indusgt"/>
+			<slotoption name="fsd2" devname="fsd2"/>
+			<slotoption name="fsd1" devname="fsd1"/>
+			<slotoption name="c1540" devname="c1540"/>
+			<slotoption name="c1571" devname="c1571"/>
+			<slotoption name="c1541ii" devname="c1541ii"/>
+			<slotoption name="interpod" devname="cbm_interpod"/>
+			<slotoption name="c1541c" devname="c1541c"/>
+			<slotoption name="c1541" devname="c1541"/>
+			<slotoption name="cmdhd" devname="cmdhd"/>
+			<slotoption name="fd2000" devname="fd2000"/>
+			<slotoption name="bluechip" devname="bluechip"/>
+			<slotoption name="fd4000" devname="fd4000"/>
+			<slotoption name="serialbox" devname="cbm_serbox"/>
+			<slotoption name="nl10" devname="c64_nl10"/>
+			<slotoption name="mps1200" devname="mps1200"/>
+			<slotoption name="vic1515" devname="vic1515"/>
+			<slotoption name="diag264" devname="diag264_serial_loopback"/>
+			<slotoption name="enh2000" devname="enh2000"/>
+			<slotoption name="technica" devname="technica"/>
+			<slotoption name="cmdrc2" devname="cmdrc2"/>
+		</slot>
+		<slot name="iec11">
+			<slotoption name="mps1250" devname="mps1250"/>
+			<slotoption name="msdsd2" devname="msdsd2"/>
+			<slotoption name="msdsd1" devname="msdsd1"/>
+			<slotoption name="fd148" devname="fd148"/>
+			<slotoption name="c1581" devname="c1581"/>
+			<slotoption name="c1526" devname="c1526"/>
+			<slotoption name="c1541pd" devname="c1541pd"/>
+			<slotoption name="minichief" devname="minichif"/>
+			<slotoption name="vic1520" devname="vic1520"/>
+			<slotoption name="csd1" devname="csd1"/>
+			<slotoption name="c1541pdc" devname="c1541pdc"/>
+			<slotoption name="c1541dd" devname="c1541dd"/>
+			<slotoption name="c1570" devname="c1570"/>
+			<slotoption name="indusgt" devname="indusgt"/>
+			<slotoption name="fsd2" devname="fsd2"/>
+			<slotoption name="fsd1" devname="fsd1"/>
+			<slotoption name="c1540" devname="c1540"/>
+			<slotoption name="c1571" devname="c1571"/>
+			<slotoption name="c1541ii" devname="c1541ii"/>
+			<slotoption name="interpod" devname="cbm_interpod"/>
+			<slotoption name="c1541c" devname="c1541c"/>
+			<slotoption name="c1541" devname="c1541"/>
+			<slotoption name="cmdhd" devname="cmdhd"/>
+			<slotoption name="fd2000" devname="fd2000"/>
+			<slotoption name="bluechip" devname="bluechip"/>
+			<slotoption name="fd4000" devname="fd4000"/>
+			<slotoption name="serialbox" devname="cbm_serbox"/>
+			<slotoption name="nl10" devname="c64_nl10"/>
+			<slotoption name="mps1200" devname="mps1200"/>
+			<slotoption name="vic1515" devname="vic1515"/>
+			<slotoption name="diag264" devname="diag264_serial_loopback"/>
+			<slotoption name="enh2000" devname="enh2000"/>
+			<slotoption name="technica" devname="technica"/>
+			<slotoption name="cmdrc2" devname="cmdrc2"/>
+		</slot>
+		<slot name="joy1">
+			<slotoption name="trakball" devname="atari_trakball"/>
+			<slotoption name="wheel" devname="vcs_wheel"/>
+			<slotoption name="joybstr" devname="vcs_joystick_booster"/>
+			<slotoption name="cx85" devname="atari_cx85"/>
+			<slotoption name="keypad" devname="vcs_keypad"/>
+			<slotoption name="lp" devname="vcs_lightpen"/>
+			<slotoption name="pad" devname="vcs_paddles"/>
+			<slotoption name="mouse" devname="vcs_mouse"/>
+			<slotoption name="joy" devname="vcs_joystick"/>
+		</slot>
+		<slot name="joy2">
+			<slotoption name="trakball" devname="atari_trakball"/>
+			<slotoption name="wheel" devname="vcs_wheel"/>
+			<slotoption name="joybstr" devname="vcs_joystick_booster"/>
+			<slotoption name="cx85" devname="atari_cx85"/>
+			<slotoption name="keypad" devname="vcs_keypad"/>
+			<slotoption name="lp" devname="vcs_lightpen"/>
+			<slotoption name="pad" devname="vcs_paddles"/>
+			<slotoption name="mouse" devname="vcs_mouse"/>
+			<slotoption name="joy" devname="vcs_joystick" default="yes"/>
+		</slot>
+		<slot name="exp">
+			<slotoption name="turbo232" devname="c64_turbo232"/>
+			<slotoption name="supercpu" devname="c64_supercpu"/>
+			<slotoption name="speakez" devname="c64_speakeasy"/>
+			<slotoption name="sfxse" devname="c64_sfxse"/>
+			<slotoption name="easyflash" devname="c64_easyflash"/>
+			<slotoption name="reu1750" devname="c64_1750reu"/>
+			<slotoption name="reu1700" devname="c64_1700reu"/>
+			<slotoption name="16k" devname="c64_16kb"/>
+			<slotoption name="midisiel" devname="c64_midisiel"/>
+			<slotoption name="midisci" devname="c64_midisci"/>
+			<slotoption name="swiftlink" devname="c64_swiftlink"/>
+			<slotoption name="buscard" devname="c64_buscard"/>
+			<slotoption name="cpm" devname="c64_cpm"/>
+			<slotoption name="midins" devname="c64_midins"/>
+			<slotoption name="dqbb" devname="c64_dqbb"/>
+			<slotoption name="ide64" devname="c64_ide64"/>
+			<slotoption name="georam" devname="c64_georam"/>
+			<slotoption name="reu1764" devname="c64_1764reu"/>
+			<slotoption name="tibdd001" devname="c64_tibdd001"/>
+			<slotoption name="buscard2" devname="c64_buscard2"/>
+			<slotoption name="music64" devname="c64_music64"/>
+			<slotoption name="midimap" devname="c64_midimap"/>
+			<slotoption name="neoram" devname="c64_neoram"/>
+			<slotoption name="midipp" devname="c64_midipp"/>
+		</slot>
+		<slot name="user">
+			<slotoption name="geocable" devname="c64_geocable"/>
+			<slotoption name="rs232" devname="vic1011"/>
+			<slotoption name="bn1541" devname="c64_bn1541"/>
+			<slotoption name="4tba" devname="c64_4tba"/>
+			<slotoption name="4dxh" devname="c64_4dxh"/>
+			<slotoption name="4ksa" devname="c64_4ksa"/>
+			<slotoption name="4cga" devname="c64_4cga"/>
+		</slot>
+		<softwarelist tag="cart_list_vic10" name="vic10" status="original" filter="NTSC"/>
+		<softwarelist tag="cart_list_c64" name="c64_cart" status="original" filter="NTSC"/>
+		<softwarelist tag="cass_list" name="c64_cass" status="original" filter="NTSC"/>
+		<softwarelist tag="flop525_orig" name="c64_flop_orig" status="original" filter="NTSC"/>
+		<softwarelist tag="flop525_misc" name="c64_flop_misc" status="original" filter="NTSC"/>
+		<ramoption name="64K" default="yes">65536</ramoption>
+	</machine>
+	<machine name="acia6850" sourcefile="devices/machine/6850acia.cpp" isdevice="yes" runnable="no">
+		<description>MC6850 ACIA</description>
+	</machine>
+	<machine name="alps_3255190x" sourcefile="devices/imagedev/floppy.cpp" isdevice="yes" runnable="no">
+		<description>ALPS 32551901/32551902 Floppy Drive</description>
+		<device_ref name="speaker"/>
+		<device_ref name="flopsnd"/>
+		<chip type="audio" tag=":flopsndout" name="Speaker"/>
+		<chip type="audio" tag=":floppysound" name="Floppy sound" clock="44100"/>
+		<sound channels="1"/>
+	</machine>
+	<machine name="amd_29f040" sourcefile="devices/machine/intelfsh.cpp" isdevice="yes" runnable="no">
+		<description>AMD 29F040 Flash</description>
+	</machine>
+	<machine name="ata_interface" sourcefile="devices/bus/ata/ataintf.cpp" isdevice="yes" runnable="no">
+		<description>ATA Interface</description>
+		<device_ref name="ata_slot"/>
+		<device_ref name="ata_slot"/>
+		<slot name=":0">
+		</slot>
+		<slot name=":1">
+		</slot>
+	</machine>
+	<machine name="ata_slot" sourcefile="devices/bus/ata/atadev.cpp" isdevice="yes" runnable="no">
+		<description>ATA Connector</description>
+	</machine>
+	<machine name="atari_cx85" sourcefile="devices/bus/vcs_ctrl/cx85.cpp" isdevice="yes" runnable="no">
+		<description>Atari CX85 Numeric Keypad</description>
+		<device_ref name="mm74c923"/>
+		<input players="1">
+			<control type="keypad" buttons="17"/>
+		</input>
+	</machine>
+	<machine name="atari_trakball" sourcefile="devices/bus/vcs_ctrl/trakball.cpp" isdevice="yes" runnable="no">
+		<description>Atari CX22/CX80 Trak-Ball</description>
+		<input players="1">
+			<control type="trackball" buttons="1" minimum="0" maximum="255" sensitivity="80"/>
+		</input>
+	</machine>
+	<machine name="atmel_29c010" sourcefile="devices/machine/intelfsh.cpp" isdevice="yes" runnable="no">
+		<description>Atmel 29C010 Flash</description>
+	</machine>
+	<machine name="bluechip" sourcefile="devices/bus/cbmiec/c1541.cpp" isdevice="yes" runnable="no">
+		<description>Amtech Blue Chip Disk Drive</description>
+		<biosset name="1" description="1"/>
+		<biosset name="2" description="2"/>
+		<rom name="bluechip_fd_stockrom.bin" bios="1" size="16384" crc="d4293619" sha1="18b3dc4c2f919ac8f288d0199e29993a0b53a9bd" region="ucd5" offset="0"/>
+		<rom name="amtech_bluechip_rom.bin" bios="2" size="16384" crc="3733ccea" sha1="c11317cb9370e722950579a610a3effda313aeee" region="ucd5" offset="0"/>
+		<device_ref name="m6502"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="c64h156"/>
+		<device_ref name="floppy_connector"/>
+		<chip type="cpu" tag=":ucd5" name="MOS Technology 6502" clock="1000000"/>
+		<dipswitch name="Device Address" tag=":ADDRESS" mask="3">
+			<dipvalue name="8" value="0" default="yes"/>
+			<dipvalue name="9" value="1"/>
+			<dipvalue name="10" value="2"/>
+			<dipvalue name="11" value="3"/>
+		</dipswitch>
+	</machine>
+	<machine name="c128_comal80" sourcefile="devices/bus/c64/c128_comal80.cpp" isdevice="yes" runnable="no">
+		<description>C128 COMAL 80 cartridge</description>
+	</machine>
+	<machine name="c128_partner" sourcefile="devices/bus/c64/c128_partner.cpp" isdevice="yes" runnable="no">
+		<description>PARTNER 128 cartridge</description>
+	</machine>
+	<machine name="c1526" sourcefile="devices/bus/cbmiec/c1526.cpp" isdevice="yes" runnable="no">
+		<description>Commodore 1526/MPS-802 Dot Matrix Printer</description>
+		<biosset name="r05" description="Revision 5"/>
+		<biosset name="r07c" description="Revision 7c"/>
+		<biosset name="r07b" description="Revision 7b (Swe/Fin)"/>
+		<biosset name="grafik" description="MPS802 GrafikROM II v60.12"/>
+		<rom name="325341-05.u8d" bios="r05" size="8192" crc="3ef63c59" sha1="a71be83a476d2777d33dddb0103c036a047975ba" region="u7d" offset="0"/>
+		<rom name="325341-08.u8d" bios="r07c" size="8192" crc="38f85b4a" sha1="25880091979b21fdaf713b53ef2f1cb8063a3505" region="u7d" offset="0"/>
+		<rom name="cbm 1526 vers. 1.0 skand.gen.u8d" bios="r07b" size="8192" crc="21051f69" sha1="7e622fc39985ebe9333d2b546b3c85fd6ab17a53" region="u7d" offset="0"/>
+		<rom name="mps802 grafikrom ii v60.12.u8d" bios="grafik" size="8192" crc="9f5e6b18" sha1="8b7f620a8f85e250b142d72b812a67fd0e292d68" region="u7d" offset="0"/>
+		<device_ref name="m6504"/>
+		<chip type="cpu" tag=":u7d" name="MOS Technology 6504" clock="1000000"/>
+	</machine>
+	<machine name="c1530" sourcefile="devices/bus/pet/c2n.cpp" isdevice="yes" runnable="no">
+		<description>Commodore 1530 Datassette</description>
+		<device_ref name="cassette_image"/>
+		<chip type="audio" tag=":cassette" name="Cassette"/>
+		<sound channels="0"/>
+		<device type="cassette" tag=":cassette" interface="cbm_cass">
+			<instance name="cassette" briefname="cass"/>
+			<extension name="wav"/>
+			<extension name="flac"/>
+			<extension name="tap"/>
+		</device>
+	</machine>
+	<machine name="c1540" sourcefile="devices/bus/cbmiec/c1541.cpp" isdevice="yes" runnable="no">
+		<description>Commodore 1540 Disk Drive</description>
+		<rom name="325302-01.uab4" size="8192" crc="29ae9752" sha1="8e0547430135ba462525c224e76356bd3d430f11" region="ucd5" offset="0"/>
+		<rom name="325303-01.uab5" size="8192" crc="10b39158" sha1="56dfe79b26f50af4e83fd9604857756d196516b9" region="ucd5" offset="2000"/>
+		<device_ref name="m6502"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="c64h156"/>
+		<device_ref name="floppy_connector"/>
+		<chip type="cpu" tag=":ucd5" name="MOS Technology 6502" clock="1000000"/>
+		<dipswitch name="Device Address" tag=":ADDRESS" mask="3">
+			<dipvalue name="8" value="0" default="yes"/>
+			<dipvalue name="9" value="1"/>
+			<dipvalue name="10" value="2"/>
+			<dipvalue name="11" value="3"/>
+		</dipswitch>
+	</machine>
+	<machine name="c1541" sourcefile="devices/bus/cbmiec/c1541.cpp" isdevice="yes" runnable="no">
+		<description>Commodore 1541 Disk Drive</description>
+		<biosset name="r1" description="Revision 1"/>
+		<biosset name="r2" description="Revision 2"/>
+		<biosset name="r3" description="Revision 3"/>
+		<biosset name="r4" description="Revision 4"/>
+		<biosset name="r5" description="Revision 5"/>
+		<biosset name="r6" description="Revision 6" default="yes"/>
+		<biosset name="jiffydos" description="JiffyDOS v6.01"/>
+		<biosset name="speeddos" description="SpeedDOS-Plus+"/>
+		<biosset name="rolo27" description="Rolo DOS v2.7"/>
+		<biosset name="tt34" description="TurboTrans v3.4"/>
+		<biosset name="digidos" description="DigiDOS"/>
+		<rom name="901229-01.uab5" bios="r1" size="8192" crc="9a48d3f0" sha1="7a1054c6156b51c25410caec0f609efb079d3a77" region="ucd5" offset="2000"/>
+		<rom name="901229-02.uab5" bios="r2" size="8192" crc="b29bab75" sha1="91321142e226168b1139c30c83896933f317d000" region="ucd5" offset="2000"/>
+		<rom name="901229-03.uab5" bios="r3" size="8192" crc="9126e74a" sha1="03d17bd745066f1ead801c5183ac1d3af7809744" region="ucd5" offset="2000"/>
+		<rom name="901229-04.uab5" bios="r4" size="8192" status="nodump" region="ucd5" offset="2000"/>
+		<rom name="901229-05 ae.uab5" bios="r5" size="8192" crc="361c9f37" sha1="f5d60777440829e46dc91285e662ba072acd2d8b" region="ucd5" offset="2000"/>
+		<rom name="901229-06 aa.uab5" bios="r6" size="8192" crc="3a235039" sha1="c7f94f4f51d6de4cdc21ecbb7e57bb209f0530c0" region="ucd5" offset="2000"/>
+		<rom name="jiffydos 1541.uab5" bios="jiffydos" size="8192" crc="bc7e4aeb" sha1="db6cfaa6d9b78d58746c811de29f3b1f44d99ddf" region="ucd5" offset="2000"/>
+		<rom name="speed-dosplus.uab5" bios="speeddos" size="16384" crc="f9db1eac" sha1="95407e59a9c1d26a0e4bcf2c244cfe8942576e2c" region="ucd5" offset="0"/>
+		<rom name="rolo27.uab5" bios="rolo27" size="8192" crc="171c7962" sha1="04c892c4b3d7c74750576521fa081f07d8ca8557" region="ucd5" offset="0"/>
+		<rom name="ttd34.uab5" bios="tt34" size="32768" crc="518d34a1" sha1="4d6ffdce6ab122e9627b0a839861687bcd4e03ec" region="ucd5" offset="0"/>
+		<rom name="digidos.uab5" bios="digidos" size="8192" crc="b3f05ea3" sha1="99d3d848344c68410b686cda812f3788b41fead3" region="ucd5" offset="0"/>
+		<rom name="325302-01.uab4" size="8192" crc="29ae9752" sha1="8e0547430135ba462525c224e76356bd3d430f11" region="ucd5" offset="0"/>
+		<device_ref name="m6502"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="c64h156"/>
+		<device_ref name="floppy_connector"/>
+		<chip type="cpu" tag=":ucd5" name="MOS Technology 6502" clock="1000000"/>
+		<dipswitch name="Device Address" tag=":ADDRESS" mask="3">
+			<dipvalue name="8" value="0" default="yes"/>
+			<dipvalue name="9" value="1"/>
+			<dipvalue name="10" value="2"/>
+			<dipvalue name="11" value="3"/>
+		</dipswitch>
+	</machine>
+	<machine name="c1541c" sourcefile="devices/bus/cbmiec/c1541.cpp" isdevice="yes" runnable="no">
+		<description>Commodore 1541C Disk Drive</description>
+		<biosset name="r1" description="Revision 1"/>
+		<biosset name="r2" description="Revision 2" default="yes"/>
+		<rom name="251968-01.ua2" bios="r1" size="16384" crc="1b3ca08d" sha1="8e893932de8cce244117fcea4c46b7c39c6a7765" region="ucd5" offset="0"/>
+		<rom name="251968-02.ua2" bios="r2" size="16384" crc="2d862d20" sha1="38a7a489c7bbc8661cf63476bf1eb07b38b1c704" region="ucd5" offset="0"/>
+		<device_ref name="m6502"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="c64h156"/>
+		<device_ref name="floppy_connector"/>
+		<chip type="cpu" tag=":ucd5" name="MOS Technology 6502" clock="1000000"/>
+		<dipswitch name="Device Address" tag=":ADDRESS" mask="3">
+			<dipvalue name="8" value="0" default="yes"/>
+			<dipvalue name="9" value="1"/>
+			<dipvalue name="10" value="2"/>
+			<dipvalue name="11" value="3"/>
+		</dipswitch>
+	</machine>
+	<machine name="c1541dd" sourcefile="devices/bus/cbmiec/c1541.cpp" isdevice="yes" runnable="no">
+		<description>Commodore 1541 Dolphin-DOS 2.0 Disk Drive</description>
+		<rom name="dd20.bin" size="32768" crc="94c7fe19" sha1="e4d5b9ad6b719dd988276214aa4536d3525d313c" region="ucd5" offset="0"/>
+		<device_ref name="m6502"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="c64h156"/>
+		<device_ref name="floppy_connector"/>
+		<chip type="cpu" tag=":ucd5" name="MOS Technology 6502" clock="1000000"/>
+		<dipswitch name="Device Address" tag=":ADDRESS" mask="3">
+			<dipvalue name="8" value="0" default="yes"/>
+			<dipvalue name="9" value="1"/>
+			<dipvalue name="10" value="2"/>
+			<dipvalue name="11" value="3"/>
+		</dipswitch>
+	</machine>
+	<machine name="c1541ii" sourcefile="devices/bus/cbmiec/c1541.cpp" isdevice="yes" runnable="no">
+		<description>Commodore 1541-II Disk Drive</description>
+		<biosset name="r1" description="Revision 1" default="yes"/>
+		<biosset name="jiffydos" description="JiffyDOS v6.01"/>
+		<rom name="355640-01.u4" bios="r1" size="16384" crc="57224cde" sha1="ab16f56989b27d89babe5f89c5a8cb3da71a82f0" region="ucd5" offset="0"/>
+		<rom name="jiffydos 1541-ii.u4" bios="jiffydos" size="16384" crc="dd409902" sha1="b1a5b826304d3df2a27d7163c6a81a532e040d32" region="ucd5" offset="0"/>
+		<rom name="251968-03.u4" size="16384" crc="899fa3c5" sha1="d3b78c3dbac55f5199f33f3fe0036439811f7fb3" region="ucd5" offset="0"/>
+		<device_ref name="m6502"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="c64h156"/>
+		<device_ref name="floppy_connector"/>
+		<chip type="cpu" tag=":ucd5" name="MOS Technology 6502" clock="1000000"/>
+		<dipswitch name="Device Address" tag=":ADDRESS" mask="3">
+			<dipvalue name="8" value="0" default="yes"/>
+			<dipvalue name="9" value="1"/>
+			<dipvalue name="10" value="2"/>
+			<dipvalue name="11" value="3"/>
+		</dipswitch>
+	</machine>
+	<machine name="c1541pd" sourcefile="devices/bus/cbmiec/c1541.cpp" isdevice="yes" runnable="no">
+		<description>Commodore 1541 Professional-DOS v1 Disk Drive</description>
+		<rom name="325302-01.uab4" size="8192" crc="29ae9752" sha1="8e0547430135ba462525c224e76356bd3d430f11" region="ucd5" offset="0"/>
+		<rom name="professionaldos-v1-floppy-expansion-eprom-27128.bin" size="16384" crc="c9abf072" sha1="2b26adc1f4192b6ca1514754f73c929087b24426" region="ucd5" offset="2000"/>
+		<device_ref name="m6502"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="c64h156"/>
+		<device_ref name="floppy_connector"/>
+		<chip type="cpu" tag=":ucd5" name="MOS Technology 6502" clock="1000000"/>
+		<dipswitch name="Device Address" tag=":ADDRESS" mask="3">
+			<dipvalue name="8" value="0" default="yes"/>
+			<dipvalue name="9" value="1"/>
+			<dipvalue name="10" value="2"/>
+			<dipvalue name="11" value="3"/>
+		</dipswitch>
+	</machine>
+	<machine name="c1541pdc" sourcefile="devices/bus/cbmiec/c1541.cpp" isdevice="yes" runnable="no">
+		<description>Commodore 1541 ProLogic-DOS Classic Disk Drive</description>
+		<rom name="325302-01.uab4" size="8192" crc="29ae9752" sha1="8e0547430135ba462525c224e76356bd3d430f11" region="ucd5" offset="0"/>
+		<rom name="901229-06 aa.uab5" size="8192" crc="3a235039" sha1="c7f94f4f51d6de4cdc21ecbb7e57bb209f0530c0" region="ucd5" offset="2000"/>
+		<rom name="kernal.bin" size="16384" crc="79032ed5" sha1="0ca4d5ef41c7e3d18d8945476d1481573af3e27c" region="ucd5" offset="4000"/>
+		<rom name="mmu.bin" size="8192" crc="4c41392c" sha1="78846af2ee6a56fceee44f9246659685ab2cbb7e" region="mmu" offset="0"/>
+		<device_ref name="m6502"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="c64h156"/>
+		<device_ref name="floppy_connector"/>
+		<device_ref name="pia6821"/>
+		<device_ref name="centronics"/>
+		<device_ref name="output_latch"/>
+		<chip type="cpu" tag=":ucd5" name="MOS Technology 6502" clock="1000000"/>
+		<dipswitch name="Device Address" tag=":ADDRESS" mask="3">
+			<dipvalue name="8" value="0" default="yes"/>
+			<dipvalue name="9" value="1"/>
+			<dipvalue name="10" value="2"/>
+			<dipvalue name="11" value="3"/>
+		</dipswitch>
+		<slot name=":centronics">
+			<slotoption name="nlq401" devname="nlq401"/>
+			<slotoption name="digiblst" devname="cpcdigiblst"/>
+			<slotoption name="ex800" devname="ex800"/>
+			<slotoption name="lx800" devname="lx800"/>
+			<slotoption name="ap2000" devname="ap2000"/>
+			<slotoption name="samdac" devname="centronics_samdac"/>
+			<slotoption name="pl80" devname="comx_pl80"/>
+			<slotoption name="lx810l" devname="lx810l"/>
+			<slotoption name="p72" devname="p72"/>
+			<slotoption name="printer" devname="centronics_printer" default="yes"/>
+			<slotoption name="chessmec" devname="centronics_chessmec"/>
+			<slotoption name="covox" devname="covox"/>
+			<slotoption name="covox_stereo" devname="covox_stereo"/>
+			<slotoption name="smartboard" devname="centronics_smartboard"/>
+		</slot>
+	</machine>
+	<machine name="c1570" sourcefile="devices/bus/cbmiec/c1571.cpp" isdevice="yes" runnable="no">
+		<description>Commodore 1570 Disk Drive</description>
+		<rom name="315090-01.u2" size="32768" crc="5a0c7937" sha1="5fc06dc82ff6840f183bd43a4d9b8a16956b2f56" region="u1" offset="0"/>
+		<device_ref name="m6502"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="wd1770"/>
+		<device_ref name="c64h156"/>
+		<device_ref name="floppy_connector"/>
+		<device_ref name="mos6526"/>
+		<chip type="cpu" tag=":u1" name="MOS Technology 6502" clock="1000000"/>
+		<chip type="cpu" tag=":u20" name="MOS 6526 CIA" clock="1000000"/>
+		<dipswitch name="Device Address" tag=":ADDRESS" mask="3">
+			<dipvalue name="8" value="0" default="yes"/>
+			<dipvalue name="9" value="1"/>
+			<dipvalue name="10" value="2"/>
+			<dipvalue name="11" value="3"/>
+		</dipswitch>
+	</machine>
+	<machine name="c1571" sourcefile="devices/bus/cbmiec/c1571.cpp" isdevice="yes" runnable="no">
+		<description>Commodore 1571 Disk Drive</description>
+		<biosset name="r3" description="Revision 3"/>
+		<biosset name="r5" description="Revision 5" default="yes"/>
+		<biosset name="jiffydos" description="JiffyDOS v6.01"/>
+		<rom name="310654-03.u2" bios="r3" size="32768" crc="3889b8b8" sha1="e649ef4419d65829d2afd65e07d31f3ce147d6eb" region="u1" offset="0"/>
+		<rom name="310654-05.u2" bios="r5" size="32768" crc="5755bae3" sha1="f1be619c106641a685f6609e4d43d6fc9eac1e70" region="u1" offset="0"/>
+		<rom name="jiffydos 1571.u2" bios="jiffydos" size="32768" crc="fe6cac6d" sha1="d4b79b60cf1eaa399d0932200eb7811e00455249" region="u1" offset="0"/>
+		<device_ref name="m6502"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="wd1770"/>
+		<device_ref name="c64h156"/>
+		<device_ref name="floppy_connector"/>
+		<device_ref name="mos6526"/>
+		<chip type="cpu" tag=":u1" name="MOS Technology 6502" clock="1000000"/>
+		<chip type="cpu" tag=":u20" name="MOS 6526 CIA" clock="1000000"/>
+		<dipswitch name="Device Address" tag=":ADDRESS" mask="3">
+			<dipvalue name="8" value="0" default="yes"/>
+			<dipvalue name="9" value="1"/>
+			<dipvalue name="10" value="2"/>
+			<dipvalue name="11" value="3"/>
+		</dipswitch>
+	</machine>
+	<machine name="c1581" sourcefile="devices/bus/cbmiec/c1581.cpp" isdevice="yes" runnable="no">
+		<description>Commodore 1581 3.5&quot; Disk Drive</description>
+		<biosset name="beta" description="Beta"/>
+		<biosset name="r1" description="Revision 1" default="yes"/>
+		<biosset name="r2" description="Revision 2"/>
+		<biosset name="jiffydos" description="JiffyDOS v6.01"/>
+		<rom name="beta.u2" bios="beta" size="32768" crc="ecc223cd" sha1="a331d0d46ead1f0275b4ca594f87c6694d9d9594" region="u1" offset="0"/>
+		<rom name="318045-01.u2" bios="r1" size="32768" crc="113af078" sha1="3fc088349ab83e8f5948b7670c866a3c954e6164" region="u1" offset="0"/>
+		<rom name="318045-02.u2" bios="r2" size="32768" crc="a9011b84" sha1="01228eae6f066bd9b7b2b6a7fa3f667e41dad393" region="u1" offset="0"/>
+		<rom name="jiffydos 1581.u2" bios="jiffydos" size="32768" crc="98873d0f" sha1="65bbf2be7bcd5bdcbff609d6c66471ffb9d04bfe" region="u1" offset="0"/>
+		<device_ref name="m6502"/>
+		<device_ref name="mos8520"/>
+		<device_ref name="wd1772"/>
+		<device_ref name="floppy_connector"/>
+		<chip type="cpu" tag=":u1" name="MOS Technology 6502" clock="2000000"/>
+		<chip type="cpu" tag=":u5" name="MOS 8520 CIA" clock="2000000"/>
+		<dipswitch name="Device Address" tag=":ADDRESS" mask="3">
+			<dipvalue name="8" value="0" default="yes"/>
+			<dipvalue name="9" value="1"/>
+			<dipvalue name="10" value="2"/>
+			<dipvalue name="11" value="3"/>
+		</dipswitch>
+	</machine>
+	<machine name="c2n" sourcefile="devices/bus/pet/c2n.cpp" isdevice="yes" runnable="no">
+		<description>Commodore C2N Datassette</description>
+		<device_ref name="cassette_image"/>
+		<chip type="audio" tag=":cassette" name="Cassette"/>
+		<sound channels="0"/>
+		<device type="cassette" tag=":cassette" interface="cbm_cass">
+			<instance name="cassette" briefname="cass"/>
+			<extension name="wav"/>
+			<extension name="flac"/>
+			<extension name="tap"/>
+		</device>
+	</machine>
+	<machine name="c64_16kb" sourcefile="devices/bus/c64/16kb.cpp" isdevice="yes" runnable="no">
+		<description>C64 16KB EPROM cartridge</description>
+		<device_ref name="generic_cartslot"/>
+		<device_ref name="generic_cartslot"/>
+		<dipswitch name="Mode" tag=":SW1" mask="3">
+			<dipvalue name="Off" value="3"/>
+			<dipvalue name="8 KB" value="2"/>
+			<dipvalue name="16 KB" value="0" default="yes"/>
+			<dipvalue name="Ultimax" value="1"/>
+		</dipswitch>
+		<device type="cartridge" tag=":roml">
+			<instance name="cartridge1" briefname="cart1"/>
+			<extension name="rom"/>
+			<extension name="bin"/>
+			<extension name="80"/>
+		</device>
+		<device type="cartridge" tag=":romh">
+			<instance name="cartridge2" briefname="cart2"/>
+			<extension name="rom"/>
+			<extension name="bin"/>
+			<extension name="a0"/>
+			<extension name="e0"/>
+		</device>
+		<slot name=":roml">
+		</slot>
+		<slot name=":romh">
+		</slot>
+	</machine>
+	<machine name="c64_1700reu" sourcefile="devices/bus/c64/reu.cpp" isdevice="yes" runnable="no">
+		<description>1700 RAM Expansion Unit</description>
+		<device_ref name="mos8726"/>
+		<device_ref name="generic_socket"/>
+		<chip type="cpu" tag=":u1" name="MOS 8726 DMA Controller" clock="1000000"/>
+		<device type="romimage" tag=":rom">
+			<instance name="romimage" briefname="rom"/>
+			<extension name="bin"/>
+			<extension name="rom"/>
+		</device>
+		<slot name=":rom">
+		</slot>
+	</machine>
+	<machine name="c64_1750reu" sourcefile="devices/bus/c64/reu.cpp" isdevice="yes" runnable="no">
+		<description>1750 RAM Expansion Unit</description>
+		<device_ref name="mos8726"/>
+		<device_ref name="generic_socket"/>
+		<chip type="cpu" tag=":u1" name="MOS 8726 DMA Controller" clock="1000000"/>
+		<device type="romimage" tag=":rom">
+			<instance name="romimage" briefname="rom"/>
+			<extension name="bin"/>
+			<extension name="rom"/>
+		</device>
+		<slot name=":rom">
+		</slot>
+	</machine>
+	<machine name="c64_1764reu" sourcefile="devices/bus/c64/reu.cpp" isdevice="yes" runnable="no">
+		<description>1764 RAM Expansion Unit</description>
+		<device_ref name="mos8726"/>
+		<device_ref name="generic_socket"/>
+		<chip type="cpu" tag=":u1" name="MOS 8726 DMA Controller" clock="1000000"/>
+		<device type="romimage" tag=":rom">
+			<instance name="romimage" briefname="rom"/>
+			<extension name="bin"/>
+			<extension name="rom"/>
+		</device>
+		<slot name=":rom">
+		</slot>
+	</machine>
+	<machine name="c64_4cga" sourcefile="devices/bus/vic20/4cga.cpp" isdevice="yes" runnable="no">
+		<description>C64 Protovision 4 Player Interface</description>
+		<input players="2">
+			<control type="joy" player="1" buttons="1" ways="8"/>
+			<control type="joy" player="2" buttons="1" ways="8"/>
+		</input>
+	</machine>
+	<machine name="c64_4dxh" sourcefile="devices/bus/c64/4dxh.cpp" isdevice="yes" runnable="no">
+		<description>C64 DXH 4-Player Adapter</description>
+		<input players="2">
+			<control type="joy" player="1" buttons="1" ways="8"/>
+			<control type="joy" player="2" buttons="1" ways="8"/>
+		</input>
+	</machine>
+	<machine name="c64_4ksa" sourcefile="devices/bus/c64/4ksa.cpp" isdevice="yes" runnable="no">
+		<description>C64 Kingsoft 4-Player Adapter</description>
+		<input players="2">
+			<control type="joy" player="1" buttons="1" ways="8"/>
+			<control type="joy" player="2" buttons="1" ways="8"/>
+		</input>
+	</machine>
+	<machine name="c64_4tba" sourcefile="devices/bus/c64/4tba.cpp" isdevice="yes" runnable="no">
+		<description>C64 Tie Break Adapter</description>
+		<input players="2">
+			<control type="joy" player="1" buttons="1" ways="8"/>
+			<control type="joy" player="2" buttons="1" ways="8"/>
+		</input>
+	</machine>
+	<machine name="c64_bn1541" sourcefile="devices/bus/c64/bn1541.cpp" isdevice="yes" runnable="no">
+		<description>C64 Burst Nibbler 1541/1571 Parallel Cable</description>
+	</machine>
+	<machine name="c64_buscard" sourcefile="devices/bus/c64/buscard.cpp" isdevice="yes" runnable="no">
+		<description>C64 BusCard cartridge</description>
+		<rom name="0.9.u1" size="8192" crc="175e8c96" sha1="8fb4ba7e3d0b58dc01b66ef962955596f1b125b5" region="rom" offset="0"/>
+		<device_ref name="i8255"/>
+		<device_ref name="ds75160a"/>
+		<device_ref name="ds75161a"/>
+		<device_ref name="ieee488"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="centronics"/>
+		<device_ref name="c64_expansion_slot"/>
+		<dipswitch name="Device #4" tag=":S1" mask="3">
+			<diplocation name="S1" number="1"/>
+			<diplocation name="S1" number="2"/>
+			<dipvalue name="Serial" value="0" default="yes"/>
+			<dipvalue name="Parallel w/conv." value="1"/>
+			<dipvalue name="IEEE" value="2"/>
+			<dipvalue name="Parallel" value="3"/>
+		</dipswitch>
+		<dipswitch name="Device #5" tag=":S1" mask="4">
+			<diplocation name="S1" number="3"/>
+			<dipvalue name="IEEE" value="0"/>
+			<dipvalue name="Serial" value="4" default="yes"/>
+		</dipswitch>
+		<dipswitch name="Device #6" tag=":S1" mask="8">
+			<diplocation name="S1" number="4"/>
+			<dipvalue name="IEEE" value="0"/>
+			<dipvalue name="Serial" value="8" default="yes"/>
+		</dipswitch>
+		<dipswitch name="Device #7" tag=":S1" mask="16">
+			<diplocation name="S1" number="5"/>
+			<dipvalue name="IEEE" value="0"/>
+			<dipvalue name="Serial" value="16" default="yes"/>
+		</dipswitch>
+		<dipswitch name="Device #8" tag=":S1" mask="32">
+			<diplocation name="S1" number="6"/>
+			<dipvalue name="IEEE" value="0"/>
+			<dipvalue name="Serial" value="32" default="yes"/>
+		</dipswitch>
+		<dipswitch name="Device #9" tag=":S1" mask="64">
+			<diplocation name="S1" number="7"/>
+			<dipvalue name="IEEE" value="0"/>
+			<dipvalue name="Serial" value="64" default="yes"/>
+		</dipswitch>
+		<dipswitch name="Device #10" tag=":S1" mask="128">
+			<diplocation name="S1" number="8"/>
+			<dipvalue name="IEEE" value="0"/>
+			<dipvalue name="Serial" value="128" default="yes"/>
+		</dipswitch>
+		<device type="cartridge" tag=":exp" interface="c64_cart,vic10_cart">
+			<instance name="cartridge" briefname="cart"/>
+			<extension name="80"/>
+			<extension name="a0"/>
+			<extension name="e0"/>
+			<extension name="crt"/>
+		</device>
+		<slot name=":ieee4">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee8">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee9">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee10">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee11">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee12">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee13">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee14">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee15">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":p4">
+			<slotoption name="nlq401" devname="nlq401"/>
+			<slotoption name="digiblst" devname="cpcdigiblst"/>
+			<slotoption name="ex800" devname="ex800"/>
+			<slotoption name="lx800" devname="lx800"/>
+			<slotoption name="ap2000" devname="ap2000"/>
+			<slotoption name="samdac" devname="centronics_samdac"/>
+			<slotoption name="pl80" devname="comx_pl80"/>
+			<slotoption name="lx810l" devname="lx810l"/>
+			<slotoption name="p72" devname="p72"/>
+			<slotoption name="printer" devname="centronics_printer"/>
+			<slotoption name="chessmec" devname="centronics_chessmec"/>
+			<slotoption name="covox" devname="covox"/>
+			<slotoption name="covox_stereo" devname="covox_stereo"/>
+			<slotoption name="smartboard" devname="centronics_smartboard"/>
+		</slot>
+		<slot name=":exp">
+			<slotoption name="turbo232" devname="c64_turbo232"/>
+			<slotoption name="supercpu" devname="c64_supercpu"/>
+			<slotoption name="speakez" devname="c64_speakeasy"/>
+			<slotoption name="sfxse" devname="c64_sfxse"/>
+			<slotoption name="easyflash" devname="c64_easyflash"/>
+			<slotoption name="reu1750" devname="c64_1750reu"/>
+			<slotoption name="reu1700" devname="c64_1700reu"/>
+			<slotoption name="16k" devname="c64_16kb"/>
+			<slotoption name="midisiel" devname="c64_midisiel"/>
+			<slotoption name="midisci" devname="c64_midisci"/>
+			<slotoption name="swiftlink" devname="c64_swiftlink"/>
+			<slotoption name="buscard" devname="c64_buscard"/>
+			<slotoption name="cpm" devname="c64_cpm"/>
+			<slotoption name="midins" devname="c64_midins"/>
+			<slotoption name="dqbb" devname="c64_dqbb"/>
+			<slotoption name="ide64" devname="c64_ide64"/>
+			<slotoption name="georam" devname="c64_georam"/>
+			<slotoption name="reu1764" devname="c64_1764reu"/>
+			<slotoption name="tibdd001" devname="c64_tibdd001"/>
+			<slotoption name="buscard2" devname="c64_buscard2"/>
+			<slotoption name="music64" devname="c64_music64"/>
+			<slotoption name="midimap" devname="c64_midimap"/>
+			<slotoption name="neoram" devname="c64_neoram"/>
+			<slotoption name="midipp" devname="c64_midipp"/>
+		</slot>
+	</machine>
+	<machine name="c64_buscard2" sourcefile="devices/bus/c64/buscard2.cpp" isdevice="yes" runnable="no">
+		<description>C64 BusCard II cartridge</description>
+		<rom name="v2.12.bin" size="8192" crc="1c9b2edb" sha1="04f0a248370281fd42389928e32d11aba597cf01" region="rom" offset="0"/>
+		<rom name="82s129.1" size="256" status="nodump" region="prom" offset="0"/>
+		<rom name="82s129.2" size="256" status="nodump" region="prom" offset="100"/>
+		<device_ref name="mos6532"/>
+		<device_ref name="pia6821"/>
+		<device_ref name="ieee488"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="centronics"/>
+		<device_ref name="c64_expansion_slot"/>
+		<dipswitch name="Device #4" tag=":S1" mask="3">
+			<diplocation name="S1" number="1"/>
+			<diplocation name="S1" number="2"/>
+			<dipvalue name="Serial" value="0" default="yes"/>
+			<dipvalue name="Parallel w/conv." value="1"/>
+			<dipvalue name="IEEE" value="2"/>
+			<dipvalue name="Parallel" value="3"/>
+		</dipswitch>
+		<dipswitch name="Device #5" tag=":S1" mask="4">
+			<diplocation name="S1" number="3"/>
+			<dipvalue name="IEEE" value="0"/>
+			<dipvalue name="Serial" value="4" default="yes"/>
+		</dipswitch>
+		<dipswitch name="Device #6" tag=":S1" mask="8">
+			<diplocation name="S1" number="4"/>
+			<dipvalue name="IEEE" value="0"/>
+			<dipvalue name="Serial" value="8" default="yes"/>
+		</dipswitch>
+		<dipswitch name="Device #7" tag=":S1" mask="16">
+			<diplocation name="S1" number="5"/>
+			<dipvalue name="IEEE" value="0"/>
+			<dipvalue name="Serial" value="16" default="yes"/>
+		</dipswitch>
+		<dipswitch name="Device #8" tag=":S1" mask="32">
+			<diplocation name="S1" number="6"/>
+			<dipvalue name="IEEE" value="0"/>
+			<dipvalue name="Serial" value="32" default="yes"/>
+		</dipswitch>
+		<dipswitch name="Device #9" tag=":S1" mask="64">
+			<diplocation name="S1" number="7"/>
+			<dipvalue name="IEEE" value="0"/>
+			<dipvalue name="Serial" value="64" default="yes"/>
+		</dipswitch>
+		<dipswitch name="Device #10" tag=":S1" mask="128">
+			<diplocation name="S1" number="8"/>
+			<dipvalue name="IEEE" value="0"/>
+			<dipvalue name="Serial" value="128" default="yes"/>
+		</dipswitch>
+		<device type="cartridge" tag=":exp" interface="c64_cart,vic10_cart">
+			<instance name="cartridge" briefname="cart"/>
+			<extension name="80"/>
+			<extension name="a0"/>
+			<extension name="e0"/>
+			<extension name="crt"/>
+		</device>
+		<slot name=":ieee4">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee8">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee9">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee10">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee11">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee12">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee13">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee14">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee15">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":centronics">
+			<slotoption name="nlq401" devname="nlq401"/>
+			<slotoption name="digiblst" devname="cpcdigiblst"/>
+			<slotoption name="ex800" devname="ex800"/>
+			<slotoption name="lx800" devname="lx800"/>
+			<slotoption name="ap2000" devname="ap2000"/>
+			<slotoption name="samdac" devname="centronics_samdac"/>
+			<slotoption name="pl80" devname="comx_pl80"/>
+			<slotoption name="lx810l" devname="lx810l"/>
+			<slotoption name="p72" devname="p72"/>
+			<slotoption name="printer" devname="centronics_printer"/>
+			<slotoption name="chessmec" devname="centronics_chessmec"/>
+			<slotoption name="covox" devname="covox"/>
+			<slotoption name="covox_stereo" devname="covox_stereo"/>
+			<slotoption name="smartboard" devname="centronics_smartboard"/>
+		</slot>
+		<slot name=":exp">
+			<slotoption name="turbo232" devname="c64_turbo232"/>
+			<slotoption name="supercpu" devname="c64_supercpu"/>
+			<slotoption name="speakez" devname="c64_speakeasy"/>
+			<slotoption name="sfxse" devname="c64_sfxse"/>
+			<slotoption name="easyflash" devname="c64_easyflash"/>
+			<slotoption name="reu1750" devname="c64_1750reu"/>
+			<slotoption name="reu1700" devname="c64_1700reu"/>
+			<slotoption name="16k" devname="c64_16kb"/>
+			<slotoption name="midisiel" devname="c64_midisiel"/>
+			<slotoption name="midisci" devname="c64_midisci"/>
+			<slotoption name="swiftlink" devname="c64_swiftlink"/>
+			<slotoption name="buscard" devname="c64_buscard"/>
+			<slotoption name="cpm" devname="c64_cpm"/>
+			<slotoption name="midins" devname="c64_midins"/>
+			<slotoption name="dqbb" devname="c64_dqbb"/>
+			<slotoption name="ide64" devname="c64_ide64"/>
+			<slotoption name="georam" devname="c64_georam"/>
+			<slotoption name="reu1764" devname="c64_1764reu"/>
+			<slotoption name="tibdd001" devname="c64_tibdd001"/>
+			<slotoption name="buscard2" devname="c64_buscard2"/>
+			<slotoption name="music64" devname="c64_music64"/>
+			<slotoption name="midimap" devname="c64_midimap"/>
+			<slotoption name="neoram" devname="c64_neoram"/>
+			<slotoption name="midipp" devname="c64_midipp"/>
+		</slot>
+	</machine>
+	<machine name="c64_comal80" sourcefile="devices/bus/c64/comal80.cpp" isdevice="yes" runnable="no">
+		<description>C64 COMAL 80 cartridge</description>
+	</machine>
+	<machine name="c64_cpm" sourcefile="devices/bus/c64/cpm.cpp" isdevice="yes" runnable="no">
+		<description>C64 CP/M cartridge</description>
+		<device_ref name="z80"/>
+		<chip type="cpu" tag=":z80" name="Zilog Z80" clock="3000000"/>
+	</machine>
+	<machine name="c64_cspeech" sourcefile="devices/bus/c64/currah_speech.cpp" isdevice="yes" runnable="no">
+		<description>C64 Currah Speech</description>
+		<rom name="sp0256a-al2" size="2048" crc="b504ac15" sha1="e60fcb5fa16ff3f3b69d36c7a6e955744d3feafc" region="sp0256" offset="1000"/>
+		<device_ref name="speaker"/>
+		<device_ref name="sp0256"/>
+		<chip type="audio" tag=":mono" name="Speaker"/>
+		<chip type="audio" tag=":sp0256" name="GI SP0256 Narrator Speech Processor" clock="4000000"/>
+		<sound channels="1"/>
+	</machine>
+	<machine name="c64_dela_ep256" sourcefile="devices/bus/c64/dela_ep256.cpp" isdevice="yes" runnable="no">
+		<description>C64 Dela 256KB EPROM cartridge</description>
+		<device_ref name="generic_socket"/>
+		<device_ref name="generic_socket"/>
+		<device_ref name="generic_socket"/>
+		<device_ref name="generic_socket"/>
+		<device_ref name="generic_socket"/>
+		<device_ref name="generic_socket"/>
+		<device_ref name="generic_socket"/>
+		<device_ref name="generic_socket"/>
+		<device type="romimage" tag=":rom1">
+			<instance name="romimage1" briefname="rom1"/>
+			<extension name="bin"/>
+			<extension name="rom"/>
+		</device>
+		<device type="romimage" tag=":rom2">
+			<instance name="romimage2" briefname="rom2"/>
+			<extension name="bin"/>
+			<extension name="rom"/>
+		</device>
+		<device type="romimage" tag=":rom3">
+			<instance name="romimage3" briefname="rom3"/>
+			<extension name="bin"/>
+			<extension name="rom"/>
+		</device>
+		<device type="romimage" tag=":rom4">
+			<instance name="romimage4" briefname="rom4"/>
+			<extension name="bin"/>
+			<extension name="rom"/>
+		</device>
+		<device type="romimage" tag=":rom5">
+			<instance name="romimage5" briefname="rom5"/>
+			<extension name="bin"/>
+			<extension name="rom"/>
+		</device>
+		<device type="romimage" tag=":rom6">
+			<instance name="romimage6" briefname="rom6"/>
+			<extension name="bin"/>
+			<extension name="rom"/>
+		</device>
+		<device type="romimage" tag=":rom7">
+			<instance name="romimage7" briefname="rom7"/>
+			<extension name="bin"/>
+			<extension name="rom"/>
+		</device>
+		<device type="romimage" tag=":rom8">
+			<instance name="romimage8" briefname="rom8"/>
+			<extension name="bin"/>
+			<extension name="rom"/>
+		</device>
+		<slot name=":rom1">
+		</slot>
+		<slot name=":rom2">
+		</slot>
+		<slot name=":rom3">
+		</slot>
+		<slot name=":rom4">
+		</slot>
+		<slot name=":rom5">
+		</slot>
+		<slot name=":rom6">
+		</slot>
+		<slot name=":rom7">
+		</slot>
+		<slot name=":rom8">
+		</slot>
+	</machine>
+	<machine name="c64_dela_ep64" sourcefile="devices/bus/c64/dela_ep64.cpp" isdevice="yes" runnable="no">
+		<description>C64 Rex 64KB EPROM cartridge</description>
+		<device_ref name="generic_socket"/>
+		<device_ref name="generic_socket"/>
+		<device type="romimage" tag=":eprom1">
+			<instance name="romimage1" briefname="rom1"/>
+			<extension name="rom"/>
+			<extension name="bin"/>
+		</device>
+		<device type="romimage" tag=":eprom2">
+			<instance name="romimage2" briefname="rom2"/>
+			<extension name="rom"/>
+			<extension name="bin"/>
+		</device>
+		<slot name=":eprom1">
+		</slot>
+		<slot name=":eprom2">
+		</slot>
+	</machine>
+	<machine name="c64_dela_ep7x8" sourcefile="devices/bus/c64/dela_ep7x8.cpp" isdevice="yes" runnable="no">
+		<description>C64 Dela 7x8KB EPROM cartridge</description>
+		<device_ref name="generic_socket"/>
+		<device_ref name="generic_socket"/>
+		<device_ref name="generic_socket"/>
+		<device_ref name="generic_socket"/>
+		<device_ref name="generic_socket"/>
+		<device_ref name="generic_socket"/>
+		<device_ref name="generic_socket"/>
+		<device type="romimage" tag=":rom1">
+			<instance name="romimage1" briefname="rom1"/>
+			<extension name="bin"/>
+			<extension name="rom"/>
+		</device>
+		<device type="romimage" tag=":rom2">
+			<instance name="romimage2" briefname="rom2"/>
+			<extension name="bin"/>
+			<extension name="rom"/>
+		</device>
+		<device type="romimage" tag=":rom3">
+			<instance name="romimage3" briefname="rom3"/>
+			<extension name="bin"/>
+			<extension name="rom"/>
+		</device>
+		<device type="romimage" tag=":rom4">
+			<instance name="romimage4" briefname="rom4"/>
+			<extension name="bin"/>
+			<extension name="rom"/>
+		</device>
+		<device type="romimage" tag=":rom5">
+			<instance name="romimage5" briefname="rom5"/>
+			<extension name="bin"/>
+			<extension name="rom"/>
+		</device>
+		<device type="romimage" tag=":rom6">
+			<instance name="romimage6" briefname="rom6"/>
+			<extension name="bin"/>
+			<extension name="rom"/>
+		</device>
+		<device type="romimage" tag=":rom7">
+			<instance name="romimage7" briefname="rom7"/>
+			<extension name="bin"/>
+			<extension name="rom"/>
+		</device>
+		<slot name=":rom1">
+		</slot>
+		<slot name=":rom2">
+		</slot>
+		<slot name=":rom3">
+		</slot>
+		<slot name=":rom4">
+		</slot>
+		<slot name=":rom5">
+		</slot>
+		<slot name=":rom6">
+		</slot>
+		<slot name=":rom7">
+		</slot>
+	</machine>
+	<machine name="c64_dinamic" sourcefile="devices/bus/c64/dinamic.cpp" isdevice="yes" runnable="no">
+		<description>C64 Dinamic cartridge</description>
+	</machine>
+	<machine name="c64_dqbb" sourcefile="devices/bus/c64/dqbb.cpp" isdevice="yes" runnable="no">
+		<description>C64 Double Quick Brown Box cartridge</description>
+	</machine>
+	<machine name="c64_easy_calc_result" sourcefile="devices/bus/c64/easy_calc_result.cpp" isdevice="yes" runnable="no">
+		<description>C64 Easy Calc Result cartridge</description>
+	</machine>
+	<machine name="c64_easyflash" sourcefile="devices/bus/c64/easyflash.cpp" isdevice="yes" runnable="no">
+		<description>C64 EasyFlash cartridge</description>
+		<device_ref name="amd_29f040"/>
+		<device_ref name="amd_29f040"/>
+		<dipswitch name="Boot" tag=":JP1" mask="1">
+			<dipvalue name="Disable" value="0" default="yes"/>
+			<dipvalue name="Boot" value="1"/>
+		</dipswitch>
+	</machine>
+	<machine name="c64_epyx_fast_load" sourcefile="devices/bus/c64/epyx_fast_load.cpp" isdevice="yes" runnable="no">
+		<description>C64 Epyx Fast Load cartridge</description>
+	</machine>
+	<machine name="c64_exos" sourcefile="devices/bus/c64/exos.cpp" isdevice="yes" runnable="no">
+		<description>C64 ExOS cartridge</description>
+	</machine>
+	<machine name="c64_expansion_slot" sourcefile="devices/bus/c64/exp.cpp" isdevice="yes" runnable="no">
+		<description>C64 expansion port</description>
+	</machine>
+	<machine name="c64_fcc" sourcefile="devices/bus/c64/fcc.cpp" isdevice="yes" runnable="no">
+		<description>C64 Final ChessCard</description>
+		<device_ref name="g65sc02"/>
+		<device_ref name="generic_latch_8"/>
+		<device_ref name="generic_latch_8"/>
+		<chip type="cpu" tag=":maincpu" name="GTE G65SC02" clock="5000000"/>
+	</machine>
+	<machine name="c64_final" sourcefile="devices/bus/c64/final.cpp" isdevice="yes" runnable="no">
+		<description>C64 Final Cartridge</description>
+	</machine>
+	<machine name="c64_final3" sourcefile="devices/bus/c64/final3.cpp" isdevice="yes" runnable="no">
+		<description>C64 Final Cartridge III</description>
+	</machine>
+	<machine name="c64_fun_play" sourcefile="devices/bus/c64/fun_play.cpp" isdevice="yes" runnable="no">
+		<description>C64 Fun Play cartridge</description>
+	</machine>
+	<machine name="c64_geocable" sourcefile="devices/bus/c64/geocable.cpp" isdevice="yes" runnable="no">
+		<description>C64 geoCable</description>
+		<device_ref name="centronics"/>
+		<slot name=":centronics">
+			<slotoption name="nlq401" devname="nlq401"/>
+			<slotoption name="digiblst" devname="cpcdigiblst"/>
+			<slotoption name="ex800" devname="ex800"/>
+			<slotoption name="lx800" devname="lx800"/>
+			<slotoption name="ap2000" devname="ap2000"/>
+			<slotoption name="samdac" devname="centronics_samdac"/>
+			<slotoption name="pl80" devname="comx_pl80"/>
+			<slotoption name="lx810l" devname="lx810l"/>
+			<slotoption name="p72" devname="p72"/>
+			<slotoption name="printer" devname="centronics_printer" default="yes"/>
+			<slotoption name="chessmec" devname="centronics_chessmec"/>
+			<slotoption name="covox" devname="covox"/>
+			<slotoption name="covox_stereo" devname="covox_stereo"/>
+			<slotoption name="smartboard" devname="centronics_smartboard"/>
+		</slot>
+	</machine>
+	<machine name="c64_georam" sourcefile="devices/bus/c64/georam.cpp" isdevice="yes" runnable="no">
+		<description>C64 GeoRAM cartridge</description>
+	</machine>
+	<machine name="c64_ide64" sourcefile="devices/bus/c64/ide64.cpp" isdevice="yes" runnable="no">
+		<description>C64 IDE64 cartridge</description>
+		<device_ref name="atmel_29c010"/>
+		<device_ref name="ds1302"/>
+		<device_ref name="ata_interface"/>
+		<device_ref name="ata_slot"/>
+		<device_ref name="ata_slot"/>
+		<dipswitch name="Flash ROM Write Protect" tag=":JP1" mask="1">
+			<dipvalue name="Disabled" value="0"/>
+			<dipvalue name="Enabled" value="1" default="yes"/>
+		</dipswitch>
+		<slot name=":ata:0">
+			<slotoption name="px320a" devname="px320a"/>
+			<slotoption name="zip100" devname="zip100_ide"/>
+			<slotoption name="cr589" devname="cr589"/>
+			<slotoption name="cp2024" devname="cp2024"/>
+			<slotoption name="xm3301" devname="xm3301"/>
+			<slotoption name="cf" devname="atacf"/>
+			<slotoption name="cdrom" devname="cdrom"/>
+			<slotoption name="hdd" devname="idehd" default="yes"/>
+		</slot>
+		<slot name=":ata:1">
+			<slotoption name="px320a" devname="px320a"/>
+			<slotoption name="zip100" devname="zip100_ide"/>
+			<slotoption name="cr589" devname="cr589"/>
+			<slotoption name="cp2024" devname="cp2024"/>
+			<slotoption name="xm3301" devname="xm3301"/>
+			<slotoption name="cf" devname="atacf"/>
+			<slotoption name="cdrom" devname="cdrom"/>
+			<slotoption name="hdd" devname="idehd"/>
+		</slot>
+	</machine>
+	<machine name="c64_ieee488" sourcefile="devices/bus/c64/ieee488.cpp" isdevice="yes" runnable="no">
+		<description>C64 IEEE-488 cartridge</description>
+		<device_ref name="tpi6525"/>
+		<device_ref name="ieee488"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="c64_expansion_slot"/>
+		<device type="cartridge" tag=":exp" interface="c64_cart,vic10_cart">
+			<instance name="cartridge" briefname="cart"/>
+			<extension name="80"/>
+			<extension name="a0"/>
+			<extension name="e0"/>
+			<extension name="crt"/>
+		</device>
+		<slot name=":ieee4">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee8">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee9">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee10">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee11">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee12">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee13">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee14">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee15">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":exp">
+			<slotoption name="turbo232" devname="c64_turbo232"/>
+			<slotoption name="supercpu" devname="c64_supercpu"/>
+			<slotoption name="speakez" devname="c64_speakeasy"/>
+			<slotoption name="sfxse" devname="c64_sfxse"/>
+			<slotoption name="easyflash" devname="c64_easyflash"/>
+			<slotoption name="reu1750" devname="c64_1750reu"/>
+			<slotoption name="reu1700" devname="c64_1700reu"/>
+			<slotoption name="16k" devname="c64_16kb"/>
+			<slotoption name="midisiel" devname="c64_midisiel"/>
+			<slotoption name="midisci" devname="c64_midisci"/>
+			<slotoption name="swiftlink" devname="c64_swiftlink"/>
+			<slotoption name="buscard" devname="c64_buscard"/>
+			<slotoption name="cpm" devname="c64_cpm"/>
+			<slotoption name="midins" devname="c64_midins"/>
+			<slotoption name="dqbb" devname="c64_dqbb"/>
+			<slotoption name="ide64" devname="c64_ide64"/>
+			<slotoption name="georam" devname="c64_georam"/>
+			<slotoption name="reu1764" devname="c64_1764reu"/>
+			<slotoption name="tibdd001" devname="c64_tibdd001"/>
+			<slotoption name="buscard2" devname="c64_buscard2"/>
+			<slotoption name="music64" devname="c64_music64"/>
+			<slotoption name="midimap" devname="c64_midimap"/>
+			<slotoption name="neoram" devname="c64_neoram"/>
+			<slotoption name="midipp" devname="c64_midipp"/>
+		</slot>
+	</machine>
+	<machine name="c64_kingsoft" sourcefile="devices/bus/c64/kingsoft.cpp" isdevice="yes" runnable="no">
+		<description>C64 Kingsoft cartridge</description>
+	</machine>
+	<machine name="c64_mach5" sourcefile="devices/bus/c64/mach5.cpp" isdevice="yes" runnable="no">
+		<description>C64 MACH5 cartridge</description>
+		<dipswitch name="Mode" tag=":S1" mask="1">
+			<dipvalue name="C64" value="0" default="yes"/>
+			<dipvalue name="C128" value="1"/>
+		</dipswitch>
+	</machine>
+	<machine name="c64_magic_desk" sourcefile="devices/bus/c64/magic_desk.cpp" isdevice="yes" runnable="no">
+		<description>C64 Magic Desk cartridge</description>
+	</machine>
+	<machine name="c64_magic_formel" sourcefile="devices/bus/c64/magic_formel.cpp" isdevice="yes" runnable="no">
+		<description>C64 Magic Formel cartridge</description>
+		<device_ref name="pia6821"/>
+	</machine>
+	<machine name="c64_magic_voice" sourcefile="devices/bus/c64/magic_voice.cpp" isdevice="yes" runnable="no">
+		<description>C64 Magic Voice cartridge</description>
+		<device_ref name="tpi6525"/>
+		<device_ref name="cd40105"/>
+		<device_ref name="speaker"/>
+		<device_ref name="t6721a"/>
+		<device_ref name="c64_expansion_slot"/>
+		<chip type="audio" tag=":mono" name="Speaker"/>
+		<chip type="audio" tag=":u5" name="Toshiba T6721A" clock="640000"/>
+		<sound channels="1"/>
+		<device type="cartridge" tag=":exp" interface="c64_cart,vic10_cart">
+			<instance name="cartridge" briefname="cart"/>
+			<extension name="80"/>
+			<extension name="a0"/>
+			<extension name="e0"/>
+			<extension name="crt"/>
+		</device>
+		<slot name=":exp">
+			<slotoption name="turbo232" devname="c64_turbo232"/>
+			<slotoption name="supercpu" devname="c64_supercpu"/>
+			<slotoption name="speakez" devname="c64_speakeasy"/>
+			<slotoption name="sfxse" devname="c64_sfxse"/>
+			<slotoption name="easyflash" devname="c64_easyflash"/>
+			<slotoption name="reu1750" devname="c64_1750reu"/>
+			<slotoption name="reu1700" devname="c64_1700reu"/>
+			<slotoption name="16k" devname="c64_16kb"/>
+			<slotoption name="midisiel" devname="c64_midisiel"/>
+			<slotoption name="midisci" devname="c64_midisci"/>
+			<slotoption name="swiftlink" devname="c64_swiftlink"/>
+			<slotoption name="buscard" devname="c64_buscard"/>
+			<slotoption name="cpm" devname="c64_cpm"/>
+			<slotoption name="midins" devname="c64_midins"/>
+			<slotoption name="dqbb" devname="c64_dqbb"/>
+			<slotoption name="ide64" devname="c64_ide64"/>
+			<slotoption name="georam" devname="c64_georam"/>
+			<slotoption name="reu1764" devname="c64_1764reu"/>
+			<slotoption name="tibdd001" devname="c64_tibdd001"/>
+			<slotoption name="buscard2" devname="c64_buscard2"/>
+			<slotoption name="music64" devname="c64_music64"/>
+			<slotoption name="midimap" devname="c64_midimap"/>
+			<slotoption name="neoram" devname="c64_neoram"/>
+			<slotoption name="midipp" devname="c64_midipp"/>
+		</slot>
+	</machine>
+	<machine name="c64_midimap" sourcefile="devices/bus/c64/midi_maplin.cpp" isdevice="yes" runnable="no">
+		<description>C64 Maplin MIDI</description>
+		<device_ref name="acia6850"/>
+		<device_ref name="midi_port"/>
+		<device_ref name="midi_port"/>
+		<device_ref name="clock"/>
+		<slot name=":mdin">
+			<slotoption name="midiin" devname="midiin_port" default="yes"/>
+		</slot>
+		<slot name=":mdout">
+			<slotoption name="midiout" devname="midiout_port" default="yes"/>
+		</slot>
+	</machine>
+	<machine name="c64_midins" sourcefile="devices/bus/c64/midi_namesoft.cpp" isdevice="yes" runnable="no">
+		<description>C64 Namesoft MIDI</description>
+		<device_ref name="acia6850"/>
+		<device_ref name="midi_port"/>
+		<device_ref name="midi_port"/>
+		<device_ref name="clock"/>
+		<slot name=":mdin">
+			<slotoption name="midiin" devname="midiin_port" default="yes"/>
+		</slot>
+		<slot name=":mdout">
+			<slotoption name="midiout" devname="midiout_port" default="yes"/>
+		</slot>
+	</machine>
+	<machine name="c64_midipp" sourcefile="devices/bus/c64/midi_passport.cpp" isdevice="yes" runnable="no">
+		<description>C64 Passport MIDI</description>
+		<device_ref name="acia6850"/>
+		<device_ref name="ptm6840"/>
+		<device_ref name="midi_port"/>
+		<device_ref name="midi_port"/>
+		<device_ref name="clock"/>
+		<slot name=":mdin">
+			<slotoption name="midiin" devname="midiin_port" default="yes"/>
+		</slot>
+		<slot name=":mdout">
+			<slotoption name="midiout" devname="midiout_port" default="yes"/>
+		</slot>
+	</machine>
+	<machine name="c64_midisci" sourcefile="devices/bus/c64/midi_sci.cpp" isdevice="yes" runnable="no">
+		<description>C64 Sequential Circuits MIDI</description>
+		<device_ref name="acia6850"/>
+		<device_ref name="midi_port"/>
+		<device_ref name="midi_port"/>
+		<device_ref name="clock"/>
+		<slot name=":mdin">
+			<slotoption name="midiin" devname="midiin_port" default="yes"/>
+		</slot>
+		<slot name=":mdout">
+			<slotoption name="midiout" devname="midiout_port" default="yes"/>
+		</slot>
+	</machine>
+	<machine name="c64_midisiel" sourcefile="devices/bus/c64/midi_siel.cpp" isdevice="yes" runnable="no">
+		<description>C64 Siel MIDI</description>
+		<device_ref name="acia6850"/>
+		<device_ref name="midi_port"/>
+		<device_ref name="midi_port"/>
+		<device_ref name="clock"/>
+		<slot name=":mdin">
+			<slotoption name="midiin" devname="midiin_port" default="yes"/>
+		</slot>
+		<slot name=":mdout">
+			<slotoption name="midiout" devname="midiout_port" default="yes"/>
+		</slot>
+	</machine>
+	<machine name="c64_mikro_assembler" sourcefile="devices/bus/c64/mikro_assembler.cpp" isdevice="yes" runnable="no">
+		<description>C64 Mikro Assembler cartridge</description>
+	</machine>
+	<machine name="c64_mscr" sourcefile="devices/bus/c64/multiscreen.cpp" isdevice="yes" runnable="no">
+		<description>C64 Multiscreen cartridge</description>
+		<rom name="1" size="4096" crc="35be02a8" sha1="5912bc3d8e0c0949c1e66c19116d6b71c7574e46" region="m6802" offset="0"/>
+		<rom name="2 cr" size="4096" crc="76a9ac6d" sha1="87e7335e626bdb73498b46c28c7baab72df38d1f" region="m6802" offset="1000"/>
+		<device_ref name="m6802"/>
+		<device_ref name="pia6821"/>
+		<device_ref name="pia6821"/>
+		<chip type="cpu" tag=":m6802" name="Motorola MC6802" clock="4000000"/>
+	</machine>
+	<machine name="c64_music64" sourcefile="devices/bus/c64/music64.cpp" isdevice="yes" runnable="no">
+		<description>C64 Music 64 cartridge</description>
+		<device_ref name="c64_expansion_slot"/>
+		<input players="1">
+			<control type="keyboard" buttons="49"/>
+		</input>
+		<device type="cartridge" tag=":exp" interface="c64_cart,vic10_cart">
+			<instance name="cartridge" briefname="cart"/>
+			<extension name="80"/>
+			<extension name="a0"/>
+			<extension name="e0"/>
+			<extension name="crt"/>
+		</device>
+		<slot name=":exp">
+			<slotoption name="turbo232" devname="c64_turbo232"/>
+			<slotoption name="supercpu" devname="c64_supercpu"/>
+			<slotoption name="speakez" devname="c64_speakeasy"/>
+			<slotoption name="sfxse" devname="c64_sfxse"/>
+			<slotoption name="easyflash" devname="c64_easyflash"/>
+			<slotoption name="reu1750" devname="c64_1750reu"/>
+			<slotoption name="reu1700" devname="c64_1700reu"/>
+			<slotoption name="16k" devname="c64_16kb"/>
+			<slotoption name="midisiel" devname="c64_midisiel"/>
+			<slotoption name="midisci" devname="c64_midisci"/>
+			<slotoption name="swiftlink" devname="c64_swiftlink"/>
+			<slotoption name="buscard" devname="c64_buscard"/>
+			<slotoption name="cpm" devname="c64_cpm"/>
+			<slotoption name="midins" devname="c64_midins"/>
+			<slotoption name="dqbb" devname="c64_dqbb"/>
+			<slotoption name="ide64" devname="c64_ide64"/>
+			<slotoption name="georam" devname="c64_georam"/>
+			<slotoption name="reu1764" devname="c64_1764reu"/>
+			<slotoption name="tibdd001" devname="c64_tibdd001"/>
+			<slotoption name="buscard2" devname="c64_buscard2"/>
+			<slotoption name="music64" devname="c64_music64"/>
+			<slotoption name="midimap" devname="c64_midimap"/>
+			<slotoption name="neoram" devname="c64_neoram"/>
+			<slotoption name="midipp" devname="c64_midipp"/>
+		</slot>
+	</machine>
+	<machine name="c64_neoram" sourcefile="devices/bus/c64/neoram.cpp" isdevice="yes" runnable="no">
+		<description>C64 NeoRAM cartridge</description>
+	</machine>
+	<machine name="c64_nl10" sourcefile="devices/bus/cbmiec/c64_nl10.cpp" isdevice="yes" runnable="no">
+		<description>Star NL-10 C64 Interface Cartridge</description>
+		<rom name="nlc 1.5.ic2" size="32768" crc="748840b6" sha1="5b3b9e8a93d5d77a49160b3d0c2489ba7be99c9a" region="rom" offset="0"/>
+		<device_ref name="hd6303y"/>
+		<chip type="cpu" tag=":bufcpu" name="Hitachi HD6303Y" clock="8000000"/>
+	</machine>
+	<machine name="c64_ocean" sourcefile="devices/bus/c64/ocean.cpp" isdevice="yes" runnable="no">
+		<description>C64 Ocean cartridge</description>
+	</machine>
+	<machine name="c64_pagefox" sourcefile="devices/bus/c64/pagefox.cpp" isdevice="yes" runnable="no">
+		<description>C64 Pagefox cartridge</description>
+	</machine>
+	<machine name="c64_partner" sourcefile="devices/bus/c64/partner.cpp" isdevice="yes" runnable="no">
+		<description>C64 PARTNER 64 cartridge</description>
+	</machine>
+	<machine name="c64_prophet64" sourcefile="devices/bus/c64/prophet64.cpp" isdevice="yes" runnable="no">
+		<description>PROPHET64</description>
+	</machine>
+	<machine name="c64_ps64" sourcefile="devices/bus/c64/ps64.cpp" isdevice="yes" runnable="no">
+		<description>C64 PS-64</description>
+	</machine>
+	<machine name="c64_rex" sourcefile="devices/bus/c64/rex.cpp" isdevice="yes" runnable="no">
+		<description>C64 Rex cartridge</description>
+	</machine>
+	<machine name="c64_rex_ep256" sourcefile="devices/bus/c64/rex_ep256.cpp" isdevice="yes" runnable="no">
+		<description>C64 Rex 256KB EPROM cartridge</description>
+		<device_ref name="generic_socket"/>
+		<device_ref name="generic_socket"/>
+		<device_ref name="generic_socket"/>
+		<device_ref name="generic_socket"/>
+		<device_ref name="generic_socket"/>
+		<device_ref name="generic_socket"/>
+		<device_ref name="generic_socket"/>
+		<device_ref name="generic_socket"/>
+		<device type="romimage" tag=":rom1">
+			<instance name="romimage1" briefname="rom1"/>
+			<extension name="bin"/>
+			<extension name="rom"/>
+		</device>
+		<device type="romimage" tag=":rom2">
+			<instance name="romimage2" briefname="rom2"/>
+			<extension name="bin"/>
+			<extension name="rom"/>
+		</device>
+		<device type="romimage" tag=":rom3">
+			<instance name="romimage3" briefname="rom3"/>
+			<extension name="bin"/>
+			<extension name="rom"/>
+		</device>
+		<device type="romimage" tag=":rom4">
+			<instance name="romimage4" briefname="rom4"/>
+			<extension name="bin"/>
+			<extension name="rom"/>
+		</device>
+		<device type="romimage" tag=":rom5">
+			<instance name="romimage5" briefname="rom5"/>
+			<extension name="bin"/>
+			<extension name="rom"/>
+		</device>
+		<device type="romimage" tag=":rom6">
+			<instance name="romimage6" briefname="rom6"/>
+			<extension name="bin"/>
+			<extension name="rom"/>
+		</device>
+		<device type="romimage" tag=":rom7">
+			<instance name="romimage7" briefname="rom7"/>
+			<extension name="bin"/>
+			<extension name="rom"/>
+		</device>
+		<device type="romimage" tag=":rom8">
+			<instance name="romimage8" briefname="rom8"/>
+			<extension name="bin"/>
+			<extension name="rom"/>
+		</device>
+		<slot name=":rom1">
+		</slot>
+		<slot name=":rom2">
+		</slot>
+		<slot name=":rom3">
+		</slot>
+		<slot name=":rom4">
+		</slot>
+		<slot name=":rom5">
+		</slot>
+		<slot name=":rom6">
+		</slot>
+		<slot name=":rom7">
+		</slot>
+		<slot name=":rom8">
+		</slot>
+	</machine>
+	<machine name="c64_ross" sourcefile="devices/bus/c64/ross.cpp" isdevice="yes" runnable="no">
+		<description>C64 Ross cartridge</description>
+	</machine>
+	<machine name="c64_sfxse" sourcefile="devices/bus/c64/sfx_sound_expander.cpp" isdevice="yes" runnable="no">
+		<description>C64 SFX Sound Expander cartridge</description>
+		<device_ref name="speaker"/>
+		<device_ref name="ym3526"/>
+		<device_ref name="c64_expansion_slot"/>
+		<chip type="audio" tag=":mono" name="Speaker"/>
+		<chip type="audio" tag=":ic3" name="YM3526 OPL" clock="3579545"/>
+		<sound channels="1"/>
+		<input players="1">
+			<control type="keyboard" buttons="61"/>
+		</input>
+		<device type="cartridge" tag=":exp" interface="c64_cart,vic10_cart">
+			<instance name="cartridge" briefname="cart"/>
+			<extension name="80"/>
+			<extension name="a0"/>
+			<extension name="e0"/>
+			<extension name="crt"/>
+		</device>
+		<slot name=":exp">
+			<slotoption name="turbo232" devname="c64_turbo232"/>
+			<slotoption name="supercpu" devname="c64_supercpu"/>
+			<slotoption name="speakez" devname="c64_speakeasy"/>
+			<slotoption name="sfxse" devname="c64_sfxse"/>
+			<slotoption name="easyflash" devname="c64_easyflash"/>
+			<slotoption name="reu1750" devname="c64_1750reu"/>
+			<slotoption name="reu1700" devname="c64_1700reu"/>
+			<slotoption name="16k" devname="c64_16kb"/>
+			<slotoption name="midisiel" devname="c64_midisiel"/>
+			<slotoption name="midisci" devname="c64_midisci"/>
+			<slotoption name="swiftlink" devname="c64_swiftlink"/>
+			<slotoption name="buscard" devname="c64_buscard"/>
+			<slotoption name="cpm" devname="c64_cpm"/>
+			<slotoption name="midins" devname="c64_midins"/>
+			<slotoption name="dqbb" devname="c64_dqbb"/>
+			<slotoption name="ide64" devname="c64_ide64"/>
+			<slotoption name="georam" devname="c64_georam"/>
+			<slotoption name="reu1764" devname="c64_1764reu"/>
+			<slotoption name="tibdd001" devname="c64_tibdd001"/>
+			<slotoption name="buscard2" devname="c64_buscard2"/>
+			<slotoption name="music64" devname="c64_music64"/>
+			<slotoption name="midimap" devname="c64_midimap"/>
+			<slotoption name="neoram" devname="c64_neoram"/>
+			<slotoption name="midipp" devname="c64_midipp"/>
+		</slot>
+	</machine>
+	<machine name="c64_silverrock" sourcefile="devices/bus/c64/silverrock.cpp" isdevice="yes" runnable="no">
+		<description>C64 SilverRock cartridge</description>
+	</machine>
+	<machine name="c64_simons_basic" sourcefile="devices/bus/c64/simons_basic.cpp" isdevice="yes" runnable="no">
+		<description>C64 Simons' BASIC</description>
+	</machine>
+	<machine name="c64_speakeasy" sourcefile="devices/bus/c64/speakeasy.cpp" isdevice="yes" runnable="no">
+		<description>PPP Speakeasy 64</description>
+		<device_ref name="speaker"/>
+		<device_ref name="votrsc01a"/>
+		<chip type="audio" tag=":mono" name="Speaker"/>
+		<chip type="audio" tag=":sc01a" name="Votrax SC-01-A" clock="720000"/>
+		<sound channels="1"/>
+	</machine>
+	<machine name="c64_standard" sourcefile="devices/bus/c64/std.cpp" isdevice="yes" runnable="no">
+		<description>C64 standard cartridge</description>
+	</machine>
+	<machine name="c64_stardos" sourcefile="devices/bus/c64/stardos.cpp" isdevice="yes" runnable="no">
+		<description>C64 StarDOS cartridge</description>
+	</machine>
+	<machine name="c64_structured_basic" sourcefile="devices/bus/c64/structured_basic.cpp" isdevice="yes" runnable="no">
+		<description>C64 Structured Basic cartridge</description>
+	</machine>
+	<machine name="c64_super_explode" sourcefile="devices/bus/c64/super_explode.cpp" isdevice="yes" runnable="no">
+		<description>C64 Super Explode! cartridge</description>
+	</machine>
+	<machine name="c64_super_games" sourcefile="devices/bus/c64/super_games.cpp" isdevice="yes" runnable="no">
+		<description>C64 Super Games cartridge</description>
+	</machine>
+	<machine name="c64_supercpu" sourcefile="devices/bus/c64/supercpu.cpp" isdevice="yes" runnable="no">
+		<description>C64 SuperCPU v2 + SuperRAM</description>
+		<rom name="supercpu_dos_204.bin" size="131072" crc="f4151454" sha1="6aa529a7b1b6de53e8979e407a77b4d5657727f5" region="g65816" offset="0"/>
+		<device_ref name="w65c816"/>
+		<device_ref name="c64_expansion_slot"/>
+		<chip type="cpu" tag=":g65816" name="WDC W65C816" clock="1000000"/>
+		<dipswitch name="Unit" tag=":FRONT" mask="1">
+			<dipvalue name="Off" value="0"/>
+			<dipvalue name="On" value="1" default="yes"/>
+		</dipswitch>
+		<dipswitch name="JiffyDOS" tag=":FRONT" mask="2">
+			<dipvalue name="Off" value="0"/>
+			<dipvalue name="On" value="2" default="yes"/>
+		</dipswitch>
+		<dipswitch name="Speed" tag=":FRONT" mask="4">
+			<dipvalue name="Normal" value="4"/>
+			<dipvalue name="Turbo" value="0" default="yes"/>
+		</dipswitch>
+		<device type="cartridge" tag=":exp" interface="c64_cart,vic10_cart">
+			<instance name="cartridge" briefname="cart"/>
+			<extension name="80"/>
+			<extension name="a0"/>
+			<extension name="e0"/>
+			<extension name="crt"/>
+		</device>
+		<slot name=":exp">
+			<slotoption name="turbo232" devname="c64_turbo232"/>
+			<slotoption name="supercpu" devname="c64_supercpu"/>
+			<slotoption name="speakez" devname="c64_speakeasy"/>
+			<slotoption name="sfxse" devname="c64_sfxse"/>
+			<slotoption name="easyflash" devname="c64_easyflash"/>
+			<slotoption name="reu1750" devname="c64_1750reu"/>
+			<slotoption name="reu1700" devname="c64_1700reu"/>
+			<slotoption name="16k" devname="c64_16kb"/>
+			<slotoption name="midisiel" devname="c64_midisiel"/>
+			<slotoption name="midisci" devname="c64_midisci"/>
+			<slotoption name="swiftlink" devname="c64_swiftlink"/>
+			<slotoption name="buscard" devname="c64_buscard"/>
+			<slotoption name="cpm" devname="c64_cpm"/>
+			<slotoption name="midins" devname="c64_midins"/>
+			<slotoption name="dqbb" devname="c64_dqbb"/>
+			<slotoption name="ide64" devname="c64_ide64"/>
+			<slotoption name="georam" devname="c64_georam"/>
+			<slotoption name="reu1764" devname="c64_1764reu"/>
+			<slotoption name="tibdd001" devname="c64_tibdd001"/>
+			<slotoption name="buscard2" devname="c64_buscard2"/>
+			<slotoption name="music64" devname="c64_music64"/>
+			<slotoption name="midimap" devname="c64_midimap"/>
+			<slotoption name="neoram" devname="c64_neoram"/>
+			<slotoption name="midipp" devname="c64_midipp"/>
+		</slot>
+	</machine>
+	<machine name="c64_sw8k" sourcefile="devices/bus/c64/sw8k.cpp" isdevice="yes" runnable="no">
+		<description>C64 Switchable 8K cartridge</description>
+		<dipswitch name="ROM Select" tag=":SW" mask="1">
+			<dipvalue name="ROM 0" value="0" default="yes"/>
+			<dipvalue name="ROM 1" value="1"/>
+		</dipswitch>
+	</machine>
+	<machine name="c64_swiftlink" sourcefile="devices/bus/c64/swiftlink.cpp" isdevice="yes" runnable="no">
+		<description>C64 SwiftLink cartridge</description>
+		<device_ref name="mos6551"/>
+		<device_ref name="clock"/>
+		<device_ref name="rs232"/>
+		<dipswitch name="Base Address" tag=":CS" mask="3">
+			<dipvalue name="$D700 (C128)" value="0"/>
+			<dipvalue name="$DE00" value="1" default="yes"/>
+			<dipvalue name="$DF00" value="2"/>
+		</dipswitch>
+		<dipswitch name="Interrupt" tag=":IRQ" mask="1">
+			<dipvalue name="IRQ" value="0"/>
+			<dipvalue name="NMI" value="1" default="yes"/>
+		</dipswitch>
+		<slot name=":rs232">
+			<slotoption name="terminal" devname="serial_terminal"/>
+			<slotoption name="sunkbd" devname="sunkbd_adaptor"/>
+			<slotoption name="dec_loopback" devname="dec_rs232_loopback"/>
+			<slotoption name="ie15" devname="ie15_terminal"/>
+			<slotoption name="null_modem" devname="null_modem"/>
+			<slotoption name="keyboard" devname="serial_keyboard"/>
+			<slotoption name="patch" devname="rs232_patch_box"/>
+			<slotoption name="swtpc8212" devname="swtpc8212_terminal"/>
+			<slotoption name="printer" devname="serial_printer"/>
+			<slotoption name="scorpion" devname="scorpion_ic"/>
+			<slotoption name="loopback" devname="rs232_loopback"/>
+			<slotoption name="mockingboard" devname="mockingboardd"/>
+			<slotoption name="msystems_mouse" devname="rs232_mouse_hle_msystems"/>
+			<slotoption name="nss_tvi" devname="nss_tvinterface"/>
+			<slotoption name="rs232_sync_io" devname="rs232_sync_io"/>
+			<slotoption name="pty" devname="pseudo_terminal"/>
+			<slotoption name="rs_printer" devname="rs_serial_printer"/>
+		</slot>
+	</machine>
+	<machine name="c64_system3" sourcefile="devices/bus/c64/system3.cpp" isdevice="yes" runnable="no">
+		<description>C64 System 3 cartridge</description>
+	</machine>
+	<machine name="c64_tdos" sourcefile="devices/bus/c64/tdos.cpp" isdevice="yes" runnable="no">
+		<description>C64 TDOS cartridge</description>
+		<device_ref name="mc6852"/>
+		<device_ref name="c64_expansion_slot"/>
+		<dipswitch name="Enabled" tag=":SW1" mask="1">
+			<dipvalue name="Off" value="0"/>
+			<dipvalue name="On" value="1" default="yes"/>
+		</dipswitch>
+		<device type="cartridge" tag=":exp" interface="c64_cart,vic10_cart">
+			<instance name="cartridge" briefname="cart"/>
+			<extension name="80"/>
+			<extension name="a0"/>
+			<extension name="e0"/>
+			<extension name="crt"/>
+		</device>
+		<slot name=":exp">
+			<slotoption name="turbo232" devname="c64_turbo232"/>
+			<slotoption name="supercpu" devname="c64_supercpu"/>
+			<slotoption name="speakez" devname="c64_speakeasy"/>
+			<slotoption name="sfxse" devname="c64_sfxse"/>
+			<slotoption name="easyflash" devname="c64_easyflash"/>
+			<slotoption name="reu1750" devname="c64_1750reu"/>
+			<slotoption name="reu1700" devname="c64_1700reu"/>
+			<slotoption name="16k" devname="c64_16kb"/>
+			<slotoption name="midisiel" devname="c64_midisiel"/>
+			<slotoption name="midisci" devname="c64_midisci"/>
+			<slotoption name="swiftlink" devname="c64_swiftlink"/>
+			<slotoption name="buscard" devname="c64_buscard"/>
+			<slotoption name="cpm" devname="c64_cpm"/>
+			<slotoption name="midins" devname="c64_midins"/>
+			<slotoption name="dqbb" devname="c64_dqbb"/>
+			<slotoption name="ide64" devname="c64_ide64"/>
+			<slotoption name="georam" devname="c64_georam"/>
+			<slotoption name="reu1764" devname="c64_1764reu"/>
+			<slotoption name="tibdd001" devname="c64_tibdd001"/>
+			<slotoption name="buscard2" devname="c64_buscard2"/>
+			<slotoption name="music64" devname="c64_music64"/>
+			<slotoption name="midimap" devname="c64_midimap"/>
+			<slotoption name="neoram" devname="c64_neoram"/>
+			<slotoption name="midipp" devname="c64_midipp"/>
+		</slot>
+	</machine>
+	<machine name="c64_tibdd001" sourcefile="devices/bus/c64/tibdd001.cpp" isdevice="yes" runnable="no">
+		<description>C64 TIB Disc Drive DD-001 cartridge</description>
+		<device_ref name="wd37c65c"/>
+		<device_ref name="floppy_connector"/>
+	</machine>
+	<machine name="c64_turbo232" sourcefile="devices/bus/c64/turbo232.cpp" isdevice="yes" runnable="no">
+		<description>C64 Turbo232 cartridge</description>
+		<device_ref name="mos6551"/>
+		<device_ref name="clock"/>
+		<device_ref name="rs232"/>
+		<dipswitch name="Base Address" tag=":CS" mask="3">
+			<dipvalue name="$D700 (C128)" value="0"/>
+			<dipvalue name="$DE00" value="1" default="yes"/>
+			<dipvalue name="$DF00" value="2"/>
+		</dipswitch>
+		<dipswitch name="Interrupt" tag=":IRQ" mask="1">
+			<dipvalue name="IRQ" value="0"/>
+			<dipvalue name="NMI" value="1" default="yes"/>
+		</dipswitch>
+		<slot name=":rs232">
+			<slotoption name="terminal" devname="serial_terminal"/>
+			<slotoption name="sunkbd" devname="sunkbd_adaptor"/>
+			<slotoption name="dec_loopback" devname="dec_rs232_loopback"/>
+			<slotoption name="ie15" devname="ie15_terminal"/>
+			<slotoption name="null_modem" devname="null_modem"/>
+			<slotoption name="keyboard" devname="serial_keyboard"/>
+			<slotoption name="patch" devname="rs232_patch_box"/>
+			<slotoption name="swtpc8212" devname="swtpc8212_terminal"/>
+			<slotoption name="printer" devname="serial_printer"/>
+			<slotoption name="scorpion" devname="scorpion_ic"/>
+			<slotoption name="loopback" devname="rs232_loopback"/>
+			<slotoption name="mockingboard" devname="mockingboardd"/>
+			<slotoption name="msystems_mouse" devname="rs232_mouse_hle_msystems"/>
+			<slotoption name="nss_tvi" devname="nss_tvinterface"/>
+			<slotoption name="rs232_sync_io" devname="rs232_sync_io"/>
+			<slotoption name="pty" devname="pseudo_terminal"/>
+			<slotoption name="rs_printer" devname="rs_serial_printer"/>
+		</slot>
+	</machine>
+	<machine name="c64_vizastar" sourcefile="devices/bus/c64/vizastar.cpp" isdevice="yes" runnable="no">
+		<description>VizaStar 64 XL4</description>
+	</machine>
+	<machine name="c64_vizawrite" sourcefile="devices/bus/c64/vw64.cpp" isdevice="yes" runnable="no">
+		<description>VizaWrite 64</description>
+	</machine>
+	<machine name="c64_warp_speed" sourcefile="devices/bus/c64/warp_speed.cpp" isdevice="yes" runnable="no">
+		<description>C64 Warp Speed cartridge</description>
+		<dipswitch name="Mode" tag=":SW1" mask="1">
+			<dipvalue name="C64" value="1" default="yes"/>
+			<dipvalue name="C128" value="0"/>
+		</dipswitch>
+	</machine>
+	<machine name="c64_westermann" sourcefile="devices/bus/c64/westermann.cpp" isdevice="yes" runnable="no">
+		<description>C64 Westermann cartridge</description>
+	</machine>
+	<machine name="c64_xl80" sourcefile="devices/bus/c64/xl80.cpp" isdevice="yes" runnable="no">
+		<description>C64 XL 80 cartridge</description>
+		<rom name="dtc.u14" size="2048" crc="9edf5e58" sha1="4b244e6d94a7653a2e52c351589f0b469119fb04" region="mc6845" offset="0"/>
+		<device_ref name="screen"/>
+		<device_ref name="gfxdecode"/>
+		<device_ref name="palette"/>
+		<device_ref name="hd6845s"/>
+		<display tag=":screen80" type="raster" rotate="0" width="640" height="192" refresh="50.000000" pixclock="6144000" htotal="640" hbend="0" hbstart="640" vtotal="192" vbend="0" vbstart="192" />
+	</machine>
+	<machine name="c64_z80videopak" sourcefile="devices/bus/c64/z80videopak.cpp" isdevice="yes" runnable="no">
+		<description>Data20 Z80 Video Pak</description>
+		<rom name="c68297 vid pak cg.u18" size="2048" crc="9edf5e58" sha1="4b244e6d94a7653a2e52c351589f0b469119fb04" region="mc6845" offset="0"/>
+		<device_ref name="z80"/>
+		<device_ref name="screen"/>
+		<device_ref name="gfxdecode"/>
+		<device_ref name="palette"/>
+		<device_ref name="hd6845s"/>
+		<chip type="cpu" tag=":z80" name="Zilog Z80" clock="3000000"/>
+		<display tag=":screen80" type="raster" rotate="0" width="640" height="192" refresh="50.000000" pixclock="6144000" htotal="640" hbend="0" hbstart="640" vtotal="192" vbend="0" vbstart="192" />
+	</machine>
+	<machine name="c64_zaxxon" sourcefile="devices/bus/c64/zaxxon.cpp" isdevice="yes" runnable="no">
+		<description>C64 Zaxxon cartridge</description>
+	</machine>
+	<machine name="c64h156" sourcefile="devices/machine/64h156.cpp" isdevice="yes" runnable="no">
+		<description>Commodore 64H156</description>
+	</machine>
+	<machine name="cassette_image" sourcefile="devices/imagedev/cassette.cpp" isdevice="yes" runnable="no">
+		<description>Cassette</description>
+		<sound channels="0"/>
+	</machine>
+	<machine name="cbm_iec" sourcefile="devices/bus/cbmiec/cbmiec.cpp" isdevice="yes" runnable="no">
+		<description>CBM IEC bus</description>
+	</machine>
+	<machine name="cbm_iec_slot" sourcefile="devices/bus/cbmiec/cbmiec.cpp" isdevice="yes" runnable="no">
+		<description>CBM IEC slot</description>
+	</machine>
+	<machine name="cbm_interpod" sourcefile="devices/bus/cbmiec/interpod.cpp" isdevice="yes" runnable="no">
+		<description>Oxford Computer Systems Interpod</description>
+		<biosset name="v14" description="Version 1.4"/>
+		<biosset name="v16" description="Version 1.6" default="yes"/>
+		<rom name="1.4.u2" bios="v14" size="2048" crc="c5b71982" sha1="614d677b7c6273f6b84fa61affaf91cfdaeed6a6" region="u1" offset="0"/>
+		<rom name="1.6.u2" bios="v16" size="2048" crc="67bb0436" sha1="7659c45b73f577233f7657c4da9141dcfe8b6d97" region="u1" offset="0"/>
+		<device_ref name="m6502"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="mos6532"/>
+		<device_ref name="acia6850"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488_slot"/>
+		<device_ref name="ieee488"/>
+		<device_ref name="rs232"/>
+		<chip type="cpu" tag=":u1" name="MOS Technology 6502" clock="1000000"/>
+		<slot name=":ieee4">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee8">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee9">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee10">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee11">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee12">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee13">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee14">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":ieee15">
+			<slotoption name="c2040" devname="c2040"/>
+			<slotoption name="d9090" devname="d9090"/>
+			<slotoption name="c4023" devname="c4023"/>
+			<slotoption name="hardbox" devname="hardbox"/>
+			<slotoption name="c3040" devname="c3040"/>
+			<slotoption name="c4040" devname="c4040"/>
+			<slotoption name="c8050" devname="c8050"/>
+			<slotoption name="c8250" devname="c8250"/>
+			<slotoption name="shark" devname="mshark"/>
+			<slotoption name="softbox" devname="pet_softbox"/>
+			<slotoption name="sfd1001" devname="sfd1001"/>
+			<slotoption name="c2031" devname="c2031"/>
+			<slotoption name="c8280" devname="c8280"/>
+			<slotoption name="d9060" devname="d9060"/>
+		</slot>
+		<slot name=":rs232">
+			<slotoption name="terminal" devname="serial_terminal"/>
+			<slotoption name="sunkbd" devname="sunkbd_adaptor"/>
+			<slotoption name="dec_loopback" devname="dec_rs232_loopback"/>
+			<slotoption name="ie15" devname="ie15_terminal"/>
+			<slotoption name="null_modem" devname="null_modem"/>
+			<slotoption name="keyboard" devname="serial_keyboard"/>
+			<slotoption name="patch" devname="rs232_patch_box"/>
+			<slotoption name="swtpc8212" devname="swtpc8212_terminal"/>
+			<slotoption name="printer" devname="serial_printer"/>
+			<slotoption name="scorpion" devname="scorpion_ic"/>
+			<slotoption name="loopback" devname="rs232_loopback"/>
+			<slotoption name="mockingboard" devname="mockingboardd"/>
+			<slotoption name="msystems_mouse" devname="rs232_mouse_hle_msystems"/>
+			<slotoption name="nss_tvi" devname="nss_tvinterface"/>
+			<slotoption name="rs232_sync_io" devname="rs232_sync_io"/>
+			<slotoption name="pty" devname="pseudo_terminal"/>
+			<slotoption name="rs_printer" devname="rs_serial_printer"/>
+		</slot>
+	</machine>
+	<machine name="cbm_serbox" sourcefile="devices/bus/cbmiec/serialbox.cpp" isdevice="yes" runnable="no">
+		<description>Serial Box</description>
+		<rom name="serialbx.bin" size="4096" crc="d0e0218c" sha1="9b922f1e9f9b71e771361c52d4df2aa5695488a5" region="u1" offset="0"/>
+		<device_ref name="w65c02"/>
+		<chip type="cpu" tag=":u1" name="WDC W65C02" clock="1000000"/>
+	</machine>
+	<machine name="cd40105" sourcefile="devices/machine/40105.cpp" isdevice="yes" runnable="no">
+		<description>CD40105B FIFO Register</description>
+	</machine>
+	<machine name="centronics" sourcefile="devices/bus/centronics/ctronics.cpp" isdevice="yes" runnable="no">
+		<description>Centronics</description>
+	</machine>
+	<machine name="clock" sourcefile="devices/machine/clock.cpp" isdevice="yes" runnable="no">
+		<description>Clock</description>
+	</machine>
+	<machine name="cmdhd" sourcefile="devices/bus/cbmiec/cmdhd.cpp" isdevice="yes" runnable="no">
+		<description>CMD HD</description>
+		<rom name="cmd_hd_bootrom_v280.bin" size="32768" crc="da68435d" sha1="defd8bc04a52904b8a3560f11c82126619513a10" region="m6502" offset="0"/>
+		<rom name="pal16l8_1" size="1" status="nodump" region="plds" offset="0"/>
+		<rom name="pal16l8_2" size="1" status="nodump" region="plds" offset="0"/>
+		<rom name="pal16l8_3" size="1" status="nodump" region="plds" offset="0"/>
+		<device_ref name="m6502"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="i8255"/>
+		<device_ref name="rtc72421"/>
+		<device_ref name="scsi"/>
+		<device_ref name="scsi_slot"/>
+		<device_ref name="scsi_slot"/>
+		<device_ref name="scsi_slot"/>
+		<device_ref name="scsi_slot"/>
+		<device_ref name="scsi_slot"/>
+		<device_ref name="scsi_slot"/>
+		<device_ref name="scsi_slot"/>
+		<chip type="cpu" tag=":m6502" name="MOS Technology 6502" clock="2000000"/>
+		<slot name=":scsi:1">
+			<slotoption name="harddisk" devname="scsihd" default="yes"/>
+		</slot>
+		<slot name=":scsi:2">
+		</slot>
+		<slot name=":scsi:3">
+		</slot>
+		<slot name=":scsi:4">
+		</slot>
+		<slot name=":scsi:5">
+		</slot>
+		<slot name=":scsi:6">
+		</slot>
+		<slot name=":scsi:7">
+		</slot>
+	</machine>
+	<machine name="cmdrc2" sourcefile="devices/bus/cbmiec/c1541.cpp" isdevice="yes" runnable="no">
+		<description>Commander C-II Disk Drive</description>
+		<rom name="commander_c-ii_8k_rom1.bin" size="8192" crc="cb19daf3" sha1="9fab414451af54d0bed9d4c9fd5fab1b8720c269" region="ucd5" offset="0"/>
+		<rom name="commander_c-ii_8k_rom2.bin" size="8192" crc="ed85a390" sha1="eecf92fb8cc20a6c86e30f897d09d427509dd3d3" region="ucd5" offset="2000"/>
+		<device_ref name="m6502"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="c64h156"/>
+		<device_ref name="floppy_connector"/>
+		<chip type="cpu" tag=":ucd5" name="MOS Technology 6502" clock="1000000"/>
+		<dipswitch name="Device Address" tag=":ADDRESS" mask="3">
+			<dipvalue name="8" value="0" default="yes"/>
+			<dipvalue name="9" value="1"/>
+			<dipvalue name="10" value="2"/>
+			<dipvalue name="11" value="3"/>
+		</dipswitch>
+	</machine>
+	<machine name="csd1" sourcefile="devices/bus/cbmiec/c1541.cpp" isdevice="yes" runnable="no">
+		<description>CSD-1 Disk Drive</description>
+		<rom name="ic14" size="8192" crc="adb6980e" sha1="13051587dfe43b04ce1bf354b89438ddf6d8d76b" region="ucd5" offset="0"/>
+		<rom name="ic15" size="8192" crc="b0cecfa1" sha1="c67e79a7ffefc9e9eafc238cb6ff6bb718f19afb" region="ucd5" offset="2000"/>
+		<device_ref name="m6502"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="c64h156"/>
+		<device_ref name="floppy_connector"/>
+		<chip type="cpu" tag=":ucd5" name="MOS Technology 6502" clock="1000000"/>
+		<dipswitch name="Device Address" tag=":ADDRESS" mask="3">
+			<dipvalue name="8" value="0" default="yes"/>
+			<dipvalue name="9" value="1"/>
+			<dipvalue name="10" value="2"/>
+			<dipvalue name="11" value="3"/>
+		</dipswitch>
+	</machine>
+	<machine name="diag264_serial_loopback" sourcefile="devices/bus/cbmiec/diag264_lb_iec.cpp" isdevice="yes" runnable="no">
+		<description>Diag264 Serial Loopback</description>
+	</machine>
+	<machine name="dp8473" sourcefile="devices/machine/upd765.cpp" isdevice="yes" runnable="no">
+		<description>National Semiconductor DP8473 FDC</description>
+	</machine>
+	<machine name="ds1302" sourcefile="devices/machine/ds1302.cpp" isdevice="yes" runnable="no">
+		<description>Dallas DS1302 Trickle-Charge Timekeeping Chip</description>
+	</machine>
+	<machine name="ds75160a" sourcefile="devices/machine/ds75160a.cpp" isdevice="yes" runnable="no">
+		<description>DS75160A GPIB Transceiver</description>
+	</machine>
+	<machine name="ds75161a" sourcefile="devices/machine/ds75161a.cpp" isdevice="yes" runnable="no">
+		<description>DS75161A GPIB Transceiver</description>
+	</machine>
+	<machine name="enh2000" sourcefile="devices/bus/cbmiec/c1541.cpp" isdevice="yes" runnable="no">
+		<description>Enhancer 2000 Disk Drive</description>
+		<rom name="enhancer 2000 comtel 2.6.bin" size="16384" crc="20353d3b" sha1="473dd2e06037799e6f562c443165d9b2b9f4a368" region="ucd5" offset="0"/>
+		<device_ref name="m6502"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="c64h156"/>
+		<device_ref name="floppy_connector"/>
+		<chip type="cpu" tag=":ucd5" name="MOS Technology 6502" clock="1000000"/>
+		<dipswitch name="Device Address" tag=":ADDRESS" mask="3">
+			<dipvalue name="8" value="0" default="yes"/>
+			<dipvalue name="9" value="1"/>
+			<dipvalue name="10" value="2"/>
+			<dipvalue name="11" value="3"/>
+		</dipswitch>
+	</machine>
+	<machine name="fd148" sourcefile="devices/bus/cbmiec/c1541.cpp" isdevice="yes" runnable="no">
+		<description>Rapid Access FD-148 Disk Drive</description>
+		<rom name="rapid access fd148.bin" size="16384" crc="3733ccea" sha1="c11317cb9370e722950579a610a3effda313aeee" region="ucd5" offset="0"/>
+		<device_ref name="m6502"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="c64h156"/>
+		<device_ref name="floppy_connector"/>
+		<chip type="cpu" tag=":ucd5" name="MOS Technology 6502" clock="1000000"/>
+		<dipswitch name="Device Address" tag=":ADDRESS" mask="3">
+			<dipvalue name="8" value="0" default="yes"/>
+			<dipvalue name="9" value="1"/>
+			<dipvalue name="10" value="2"/>
+			<dipvalue name="11" value="3"/>
+		</dipswitch>
+	</machine>
+	<machine name="fd2000" sourcefile="devices/bus/cbmiec/fd2000.cpp" isdevice="yes" runnable="no">
+		<description>FD-2000 Disk Drive</description>
+		<biosset name="v134" description="Version 1.34"/>
+		<biosset name="v140" description="Version 1.40" default="yes"/>
+		<rom name="cmd fd-2000 dos v1.34 fd-350026.bin" bios="v134" size="32768" crc="859a5edc" sha1="487fa82a7977e5208d5088f3580f34e8c89560d1" region="m6502" offset="0"/>
+		<rom name="cmd fd-2000 dos v1.40 cs 33cc6f.bin" bios="v140" size="32768" crc="4e6ca15c" sha1="0c61ba58269baf2b8aadf3bbc4648c7a5a6d2128" region="m6502" offset="0"/>
+		<device_ref name="w65c02"/>
+		<device_ref name="r65c22"/>
+		<device_ref name="dp8473"/>
+		<device_ref name="floppy_connector"/>
+		<chip type="cpu" tag=":m6502" name="WDC W65C02" clock="2000000"/>
+	</machine>
+	<machine name="fd4000" sourcefile="devices/bus/cbmiec/fd2000.cpp" isdevice="yes" runnable="no">
+		<description>FD-4000 Disk Drive</description>
+		<biosset name="v134" description="Version 1.34"/>
+		<biosset name="v140" description="Version 1.40" default="yes"/>
+		<rom name="cmd fd-4000 dos v1.34 fd-350022.bin" bios="v134" size="32768" crc="1f4820c1" sha1="7a2966662e7840fd9377549727ccba62e4349c6f" region="m6502" offset="0"/>
+		<rom name="cmd fd-4000 dos v1.40 fd-350022.bin" bios="v140" size="32768" crc="b563ef10" sha1="d936d76fd8b50ce4c65f885703653d7c1bd7d3c9" region="m6502" offset="0"/>
+		<device_ref name="w65c02"/>
+		<device_ref name="r65c22"/>
+		<device_ref name="pc8477a"/>
+		<device_ref name="floppy_connector"/>
+		<chip type="cpu" tag=":m6502" name="WDC W65C02" clock="2000000"/>
+	</machine>
+	<machine name="floppy_connector" sourcefile="devices/imagedev/floppy.cpp" isdevice="yes" runnable="no">
+		<description>Floppy drive connector abstraction</description>
+	</machine>
+	<machine name="flopsnd" sourcefile="devices/imagedev/floppy.cpp" isdevice="yes" runnable="no">
+		<description>Floppy sound</description>
+		<sound channels="0"/>
+	</machine>
+	<machine name="fsd1" sourcefile="devices/bus/cbmiec/c1541.cpp" isdevice="yes" runnable="no">
+		<description>FSD-1 Disk Drive</description>
+		<rom name="fsd1.bin" size="16384" crc="57224cde" sha1="ab16f56989b27d89babe5f89c5a8cb3da71a82f0" region="ucd5" offset="0"/>
+		<device_ref name="m6502"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="c64h156"/>
+		<device_ref name="floppy_connector"/>
+		<chip type="cpu" tag=":ucd5" name="MOS Technology 6502" clock="1000000"/>
+		<dipswitch name="Device Address" tag=":ADDRESS" mask="3">
+			<dipvalue name="8" value="0" default="yes"/>
+			<dipvalue name="9" value="1"/>
+			<dipvalue name="10" value="2"/>
+			<dipvalue name="11" value="3"/>
+		</dipswitch>
+	</machine>
+	<machine name="fsd2" sourcefile="devices/bus/cbmiec/c1541.cpp" isdevice="yes" runnable="no">
+		<description>FSD-2 Disk Drive</description>
+		<biosset name="ra" description="Revision A"/>
+		<biosset name="rb" description="Revision B" default="yes"/>
+		<biosset name="jiffydos" description="JiffyDOS v5.0"/>
+		<biosset name="rexdos" description="REX-DOS"/>
+		<rom name="fsd2a.u3" bios="ra" size="16384" crc="edf18265" sha1="47a7c4bdcc20ecc5e59d694b151f493229becaea" region="ucd5" offset="0"/>
+		<rom name="fsd2b.u3" bios="rb" size="16384" crc="b39e4600" sha1="991132fcc6e70e9a428062ae76055a150f2f7ac6" region="ucd5" offset="0"/>
+		<rom name="jiffydos v5.0.u3" bios="jiffydos" size="16384" crc="46c3302c" sha1="e3623658cb7af30c9d3bce2ba3b6ad5ee89ac1b8" region="ucd5" offset="0"/>
+		<rom name="rdos.bin" bios="rexdos" size="16384" crc="8ad6dba1" sha1="f279d327d5e16ea1b62fb18514fb679d0b442941" region="ucd5" offset="0"/>
+		<device_ref name="m6502"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="c64h156"/>
+		<device_ref name="floppy_connector"/>
+		<chip type="cpu" tag=":ucd5" name="MOS Technology 6502" clock="1000000"/>
+		<dipswitch name="Device Address" tag=":ADDRESS" mask="3">
+			<dipvalue name="8" value="0" default="yes"/>
+			<dipvalue name="9" value="1"/>
+			<dipvalue name="10" value="2"/>
+			<dipvalue name="11" value="3"/>
+		</dipswitch>
+	</machine>
+	<machine name="g65sc02" sourcefile="devices/cpu/m6502/g65sc02.cpp" isdevice="yes" runnable="no">
+		<description>GTE G65SC02</description>
+	</machine>
+	<machine name="generic_cartslot" sourcefile="devices/bus/generic/slot.cpp" isdevice="yes" runnable="no">
+		<description>Generic Cartridge Slot</description>
+	</machine>
+	<machine name="generic_latch_8" sourcefile="devices/machine/gen_latch.cpp" isdevice="yes" runnable="no">
+		<description>Generic 8-bit latch</description>
+	</machine>
+	<machine name="generic_socket" sourcefile="devices/bus/generic/slot.cpp" isdevice="yes" runnable="no">
+		<description>Generic ROM Socket / RAM Socket</description>
+	</machine>
+	<machine name="gfxdecode" sourcefile="emu/drawgfx.cpp" isdevice="yes" runnable="no">
+		<description>gfxdecode</description>
+	</machine>
+	<machine name="hd6303y" sourcefile="devices/cpu/m6800/m6801.cpp" isdevice="yes" runnable="no">
+		<description>Hitachi HD6303Y</description>
+	</machine>
+	<machine name="hd6845s" sourcefile="devices/video/mc6845.cpp" isdevice="yes" runnable="no">
+		<description>Hitachi HD6845S CRTC</description>
+	</machine>
+	<machine name="i8039" sourcefile="devices/cpu/mcs48/mcs48.cpp" isdevice="yes" runnable="no">
+		<description>Intel 8039</description>
+	</machine>
+	<machine name="i8255" sourcefile="devices/machine/i8255.cpp" isdevice="yes" runnable="no">
+		<description>Intel 8255 PPI</description>
+	</machine>
+	<machine name="ieee488" sourcefile="devices/bus/ieee488/ieee488.cpp" isdevice="yes" runnable="no">
+		<description>IEEE-488 bus</description>
+	</machine>
+	<machine name="ieee488_slot" sourcefile="devices/bus/ieee488/ieee488.cpp" isdevice="yes" runnable="no">
+		<description>IEEE-488 slot</description>
+	</machine>
+	<machine name="indusgt" sourcefile="devices/bus/cbmiec/c1541.cpp" isdevice="yes" runnable="no">
+		<description>Indus GT Disk Drive</description>
+		<rom name="u18 v1.1.u18" size="8192" crc="e401ce56" sha1="9878053bdff7a036f57285c2c4974459df2602d8" region="ucd5" offset="0"/>
+		<rom name="u17 v1.1.u17" size="8192" crc="575ad906" sha1="f48837b024add84f888acd83a9cf9eb7d2379172" region="ucd5" offset="2000"/>
+		<rom name="u19 v1.1.u19" size="8192" crc="8f83e7a5" sha1="5bceaad520dac9d0527723b3b454e8ec99748e5b" region="romdisk" offset="0"/>
+		<device_ref name="m6502"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="c64h156"/>
+		<device_ref name="floppy_connector"/>
+		<chip type="cpu" tag=":ucd5" name="MOS Technology 6502" clock="1000000"/>
+		<dipswitch name="Device Address" tag=":ADDRESS" mask="3">
+			<dipvalue name="8" value="0" default="yes"/>
+			<dipvalue name="9" value="1"/>
+			<dipvalue name="10" value="2"/>
+			<dipvalue name="11" value="3"/>
+		</dipswitch>
+	</machine>
+	<machine name="ipt_merge_any_hi" sourcefile="devices/machine/input_merger.cpp" isdevice="yes" runnable="no">
+		<description>Input Merger (any high)</description>
+	</machine>
+	<machine name="isa8" sourcefile="devices/bus/isa/isa.cpp" isdevice="yes" runnable="no">
+		<description>8-bit ISA bus</description>
+	</machine>
+	<machine name="isa8_slot" sourcefile="devices/bus/isa/isa.cpp" isdevice="yes" runnable="no">
+		<description>8-bit ISA slot</description>
+	</machine>
+	<machine name="m50734" sourcefile="devices/cpu/m6502/m50734.cpp" isdevice="yes" runnable="no">
+		<description>Mitsubishi M50734</description>
+	</machine>
+	<machine name="m6500_1" sourcefile="devices/cpu/m6502/m6500_1.cpp" isdevice="yes" runnable="no">
+		<description>MOS Technology 6500/1</description>
+	</machine>
+	<machine name="m6502" sourcefile="devices/cpu/m6502/m6502.cpp" isdevice="yes" runnable="no">
+		<description>MOS Technology 6502</description>
+	</machine>
+	<machine name="m6504" sourcefile="devices/cpu/m6502/m6504.cpp" isdevice="yes" runnable="no">
+		<description>MOS Technology 6504</description>
+	</machine>
+	<machine name="m6510" sourcefile="devices/cpu/m6502/m6510.cpp" isdevice="yes" runnable="no">
+		<description>MOS Technology 6510</description>
+	</machine>
+	<machine name="m6802" sourcefile="devices/cpu/m6800/m6800.cpp" isdevice="yes" runnable="no">
+		<description>Motorola MC6802</description>
+	</machine>
+	<machine name="mc6852" sourcefile="devices/machine/mc6852.cpp" isdevice="yes" runnable="no">
+		<description>Motorola MC6852 SSDA</description>
+	</machine>
+	<machine name="midi_port" sourcefile="devices/bus/midi/midi.cpp" isdevice="yes" runnable="no">
+		<description>MIDI port</description>
+	</machine>
+	<machine name="minichif" sourcefile="devices/bus/cbmiec/c1571.cpp" isdevice="yes" runnable="no">
+		<description>ICT Mini Chief Disk Drive</description>
+		<rom name="ictdos710.u2" size="32768" crc="aaacf7e9" sha1="c1296995238ef23f18e7fec70a144a0566a25a27" region="u1" offset="0"/>
+		<device_ref name="m6502"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="wd1770"/>
+		<device_ref name="c64h156"/>
+		<device_ref name="floppy_connector"/>
+		<device_ref name="mos6526"/>
+		<device_ref name="isa8"/>
+		<device_ref name="isa8_slot"/>
+		<chip type="cpu" tag=":u1" name="MOS Technology 6502" clock="1000000"/>
+		<chip type="cpu" tag=":u20" name="MOS 6526 CIA" clock="1000000"/>
+		<dipswitch name="Device Address" tag=":ADDRESS" mask="3">
+			<dipvalue name="8" value="0" default="yes"/>
+			<dipvalue name="9" value="1"/>
+			<dipvalue name="10" value="2"/>
+			<dipvalue name="11" value="3"/>
+		</dipswitch>
+		<slot name=":isa1">
+			<slotoption name="wd1002a_wx1" devname="wd1002a_wx1" default="yes"/>
+		</slot>
+	</machine>
+	<machine name="mm74c923" sourcefile="devices/machine/mm74c922.cpp" isdevice="yes" runnable="no">
+		<description>MM74C923 20-Key Encoder</description>
+	</machine>
+	<machine name="mos6522" sourcefile="devices/machine/6522via.cpp" isdevice="yes" runnable="no">
+		<description>MOS 6522 VIA</description>
+	</machine>
+	<machine name="mos6526" sourcefile="devices/machine/mos6526.cpp" isdevice="yes" runnable="no">
+		<description>MOS 6526 CIA</description>
+	</machine>
+	<machine name="mos6532" sourcefile="devices/machine/mos6530.cpp" isdevice="yes" runnable="no">
+		<description>MOS 6532 RIOT</description>
+	</machine>
+	<machine name="mos6551" sourcefile="devices/machine/mos6551.cpp" isdevice="yes" runnable="no">
+		<description>MOS 6551 ACIA</description>
+		<device_ref name="clock"/>
+	</machine>
+	<machine name="mos6567" sourcefile="devices/video/mos6566.cpp" isdevice="yes" runnable="no">
+		<description>MOS 6567 VIC-II</description>
+	</machine>
+	<machine name="mos6581" sourcefile="devices/sound/mos6581.cpp" isdevice="yes" runnable="no">
+		<description>MOS 6581 SID</description>
+		<sound channels="0"/>
+	</machine>
+	<machine name="mos8520" sourcefile="devices/machine/mos6526.cpp" isdevice="yes" runnable="no">
+		<description>MOS 8520 CIA</description>
+	</machine>
+	<machine name="mos8726" sourcefile="devices/machine/mos8726.cpp" isdevice="yes" runnable="no">
+		<description>MOS 8726 DMA Controller</description>
+	</machine>
+	<machine name="mps1200" sourcefile="devices/bus/cbmiec/mps1200.cpp" isdevice="yes" runnable="no">
+		<description>Commodore MPS-1200 Dot Matrix Printer</description>
+		<rom name="mps1200-k405-0202.bin" size="65536" crc="87aa884a" sha1="0ceb753c17599bc69458cfbb1cb3e81c2b60d107" region="firmware" offset="0"/>
+		<device_ref name="m50734"/>
+		<chip type="cpu" tag=":mpscpu" name="Mitsubishi M50734" clock="8000000"/>
+		<dipswitch name="Character Spacing" tag=":SW" mask="1">
+			<diplocation name="SW1" number="8"/>
+			<dipvalue name="Pica / 10 cpi" value="1" default="yes"/>
+			<dipvalue name="Compressed / 17 cpi" value="0"/>
+		</dipswitch>
+		<dipswitch name="Automatic Line Feed" tag=":SW" mask="2">
+			<diplocation name="SW1" number="7"/>
+			<dipvalue name="Disabled" value="2" default="yes"/>
+			<dipvalue name="Enabled" value="0"/>
+		</dipswitch>
+		<dipswitch name="Paper End Detect" tag=":SW" mask="4">
+			<diplocation name="SW1" number="6"/>
+			<dipvalue name="Enabled" value="4"/>
+			<dipvalue name="Disabled" value="0" default="yes"/>
+		</dipswitch>
+		<dipswitch name="Page Length" tag=":SW" mask="8">
+			<diplocation name="SW1" number="5"/>
+			<dipvalue name="11 inch" value="8" default="yes"/>
+			<dipvalue name="12 inch" value="0"/>
+		</dipswitch>
+		<dipswitch name="Print Quality" tag=":SW" mask="16">
+			<diplocation name="SW1" number="4"/>
+			<dipvalue name="Draft" value="16" default="yes"/>
+			<dipvalue name="NLQ" value="0"/>
+		</dipswitch>
+		<dipswitch name="Control Code Mode" tag=":SW" mask="32">
+			<diplocation name="SW1" number="3"/>
+			<dipvalue name="Commodore" value="32" default="yes"/>
+			<dipvalue name="Epson FX" value="0"/>
+		</dipswitch>
+		<dipswitch name="ASCII Translation" tag=":SW" mask="64">
+			<diplocation name="SW1" number="2"/>
+			<dipvalue name="PET ASCII" value="64" default="yes"/>
+			<dipvalue name="ASCII" value="0"/>
+		</dipswitch>
+		<dipswitch name="Device Number" tag=":SW" mask="128">
+			<diplocation name="SW1" number="1"/>
+			<dipvalue name="4" value="128" default="yes"/>
+			<dipvalue name="5" value="0"/>
+		</dipswitch>
+		<dipswitch name="Unused" tag=":SW" mask="4096">
+			<diplocation name="SW2" number="4"/>
+			<dipvalue name="Off" value="4096" default="yes"/>
+			<dipvalue name="On" value="0"/>
+		</dipswitch>
+		<dipswitch name="International Character Set" tag=":SW" mask="57344">
+			<diplocation name="SW2" number="1"/>
+			<diplocation name="SW2" number="2"/>
+			<diplocation name="SW2" number="3"/>
+			<dipvalue name="US/UK/Netherlands" value="57344" default="yes"/>
+			<dipvalue name="Switzerland" value="49152"/>
+			<dipvalue name="Italy" value="40960"/>
+			<dipvalue name="Unused" value="32768"/>
+			<dipvalue name="France/Belgium" value="24576"/>
+			<dipvalue name="Sweden/Finland" value="16384"/>
+			<dipvalue name="Denmark/Norway" value="8192"/>
+			<dipvalue name="Spain" value="0"/>
+		</dipswitch>
+		<feature type="printer" status="unemulated"/>
+	</machine>
+	<machine name="mps1250" sourcefile="devices/bus/cbmiec/mps1200.cpp" isdevice="yes" runnable="no">
+		<description>Commodore MPS-1250 Dot Matrix Printer</description>
+		<rom name="mps1250_k111_0201.bin" size="65536" crc="f2de9b69" sha1="bb7357e83497b333e3f95548d94970003b2dfa9d" region="firmware" offset="0"/>
+		<device_ref name="m50734"/>
+		<chip type="cpu" tag=":mpscpu" name="Mitsubishi M50734" clock="8000000"/>
+		<dipswitch name="Character Spacing" tag=":SW" mask="1">
+			<condition tag="SW" mask="128" relation="eq" value="128"/>
+			<diplocation name="SW1" number="8"/>
+			<dipvalue name="Pica / 10 cpi" value="1" default="yes"/>
+			<dipvalue name="Compressed / 17 cpi" value="0"/>
+		</dipswitch>
+		<dipswitch name="Character Spacing" tag=":SW" mask="1">
+			<condition tag="SW" mask="176" relation="eq" value="48"/>
+			<diplocation name="SW1" number="8"/>
+			<dipvalue name="Pica / 10 cpi" value="1" default="yes"/>
+			<dipvalue name="Compressed / 17 cpi" value="0"/>
+		</dipswitch>
+		<dipswitch name="Page Length" tag=":SW" mask="1">
+			<condition tag="SW" mask="176" relation="eq" value="32"/>
+			<diplocation name="SW1" number="8"/>
+			<dipvalue name="11 inch" value="1" default="yes"/>
+			<dipvalue name="12 inch" value="0"/>
+		</dipswitch>
+		<dipswitch name="Character Spacing" tag=":SW" mask="1">
+			<condition tag="SW" mask="176" relation="eq" value="16"/>
+			<diplocation name="SW1" number="8"/>
+			<dipvalue name="Pica / 10 cpi" value="1" default="yes"/>
+			<dipvalue name="Compressed / 17 cpi" value="0"/>
+		</dipswitch>
+		<dipswitch name="Buffer-Full Printing" tag=":SW" mask="1">
+			<condition tag="SW" mask="176" relation="eq" value="0"/>
+			<diplocation name="SW1" number="8"/>
+			<dipvalue name="Enabled" value="1" default="yes"/>
+			<dipvalue name="Disabled" value="0"/>
+		</dipswitch>
+		<dipswitch name="Automatic Line Feed" tag=":SW" mask="2">
+			<condition tag="SW" mask="128" relation="eq" value="128"/>
+			<diplocation name="SW1" number="7"/>
+			<dipvalue name="Disabled" value="2" default="yes"/>
+			<dipvalue name="Enabled" value="0"/>
+		</dipswitch>
+		<dipswitch name="Print Quality" tag=":SW" mask="2">
+			<condition tag="SW" mask="176" relation="eq" value="48"/>
+			<diplocation name="SW1" number="7"/>
+			<dipvalue name="Draft" value="2" default="yes"/>
+			<dipvalue name="NLQ" value="0"/>
+		</dipswitch>
+		<dipswitch name="Auto Carriage Return" tag=":SW" mask="2">
+			<condition tag="SW" mask="176" relation="eq" value="0"/>
+			<diplocation name="SW1" number="7"/>
+			<dipvalue name="Enabled" value="2" default="yes"/>
+			<dipvalue name="Disabled" value="0"/>
+		</dipswitch>
+		<dipswitch name="Line Spacing" tag=":SW" mask="4">
+			<condition tag="SW" mask="176" relation="eq" value="0"/>
+			<diplocation name="SW1" number="6"/>
+			<dipvalue name="1/6 inch" value="4" default="yes"/>
+			<dipvalue name="1/8 inch" value="0"/>
+		</dipswitch>
+		<dipswitch name="International Character Set" tag=":SW" mask="6">
+			<condition tag="SW" mask="176" relation="eq" value="16"/>
+			<diplocation name="SW1" number="6"/>
+			<diplocation name="SW1" number="7"/>
+			<dipvalue name="USA" value="6" default="yes"/>
+			<dipvalue name="France" value="4"/>
+			<dipvalue name="Germany" value="2"/>
+			<dipvalue name="England" value="0"/>
+		</dipswitch>
+		<dipswitch name="ASCII Codes 128-159" tag=":SW" mask="8">
+			<condition tag="SW" mask="176" relation="eq" value="16"/>
+			<diplocation name="SW1" number="5"/>
+			<dipvalue name="High-bit Control Codes" value="8" default="yes"/>
+			<dipvalue name="Line and Block Graphics" value="0"/>
+		</dipswitch>
+		<dipswitch name="ASCII Codes 128-159" tag=":SW" mask="8">
+			<condition tag="SW" mask="176" relation="eq" value="0"/>
+			<diplocation name="SW1" number="5"/>
+			<dipvalue name="High-bit Control Codes" value="8" default="yes"/>
+			<dipvalue name="Accented Characters" value="0"/>
+		</dipswitch>
+		<dipswitch name="International Character Set" tag=":SW" mask="14">
+			<condition tag="SW" mask="176" relation="eq" value="32"/>
+			<diplocation name="SW1" number="5"/>
+			<diplocation name="SW1" number="6"/>
+			<diplocation name="SW1" number="7"/>
+			<dipvalue name="USA" value="14" default="yes"/>
+			<dipvalue name="England" value="12"/>
+			<dipvalue name="Sweden" value="10"/>
+			<dipvalue name="France" value="8"/>
+			<dipvalue name="Italy" value="6"/>
+			<dipvalue name="Germany" value="4"/>
+			<dipvalue name="Denmark" value="2"/>
+			<dipvalue name="Spain" value="0"/>
+		</dipswitch>
+		<dipswitch name="Paper End Detect" tag=":SW" mask="4">
+			<condition tag="SW" mask="128" relation="eq" value="128"/>
+			<diplocation name="SW1" number="6"/>
+			<dipvalue name="Enabled" value="4"/>
+			<dipvalue name="Disabled" value="0" default="yes"/>
+		</dipswitch>
+		<dipswitch name="Zero" tag=":SW" mask="4">
+			<condition tag="SW" mask="176" relation="eq" value="48"/>
+			<diplocation name="SW1" number="6"/>
+			<dipvalue name="Not Slashed" value="4" default="yes"/>
+			<dipvalue name="Slashed" value="0"/>
+		</dipswitch>
+		<dipswitch name="Device Number" tag=":SW" mask="8">
+			<condition tag="SW" mask="128" relation="eq" value="128"/>
+			<diplocation name="SW1" number="5"/>
+			<dipvalue name="4" value="8" default="yes"/>
+			<dipvalue name="5" value="0"/>
+		</dipswitch>
+		<dipswitch name="ASCII Codes 128-159" tag=":SW" mask="8">
+			<condition tag="SW" mask="176" relation="eq" value="48"/>
+			<diplocation name="SW1" number="5"/>
+			<dipvalue name="High-bit Control Codes" value="8" default="yes"/>
+			<dipvalue name="Line and Block Graphics" value="0"/>
+		</dipswitch>
+		<dipswitch name="Print Quality" tag=":SW" mask="16">
+			<condition tag="SW" mask="128" relation="eq" value="128"/>
+			<diplocation name="SW1" number="4"/>
+			<dipvalue name="Draft" value="16" default="yes"/>
+			<dipvalue name="NLQ" value="0"/>
+		</dipswitch>
+		<dipswitch name="Printer Configuration" tag=":SW" mask="48">
+			<condition tag="SW" mask="128" relation="eq" value="0"/>
+			<diplocation name="SW1" number="3"/>
+			<diplocation name="SW1" number="4"/>
+			<dipvalue name="Epson #1" value="48" default="yes"/>
+			<dipvalue name="Epson #2" value="32"/>
+			<dipvalue name="Epson #3" value="16"/>
+			<dipvalue name="IBM Graphics Printer" value="0"/>
+		</dipswitch>
+		<dipswitch name="Control Code Mode" tag=":SW" mask="32">
+			<condition tag="SW" mask="128" relation="eq" value="128"/>
+			<diplocation name="SW1" number="3"/>
+			<dipvalue name="Commodore" value="32" default="yes"/>
+			<dipvalue name="Epson FX" value="0"/>
+		</dipswitch>
+		<dipswitch name="ASCII Translation" tag=":SW" mask="64">
+			<condition tag="SW" mask="128" relation="eq" value="128"/>
+			<diplocation name="SW1" number="2"/>
+			<dipvalue name="PET ASCII" value="64" default="yes"/>
+			<dipvalue name="ASCII" value="0"/>
+		</dipswitch>
+		<dipswitch name="Automatic Line Feed" tag=":SW" mask="64">
+			<condition tag="SW" mask="128" relation="eq" value="0"/>
+			<diplocation name="SW1" number="2"/>
+			<dipvalue name="Disabled" value="64" default="yes"/>
+			<dipvalue name="Enabled" value="0"/>
+		</dipswitch>
+		<dipswitch name="Interface" tag=":SW" mask="128">
+			<diplocation name="SW1" number="1"/>
+			<dipvalue name="Commodore Serial IEC" value="128" default="yes"/>
+			<dipvalue name="Parallel" value="0"/>
+		</dipswitch>
+		<feature type="printer" status="unemulated"/>
+	</machine>
+	<machine name="msdsd1" sourcefile="devices/bus/cbmiec/c1541.cpp" isdevice="yes" runnable="no">
+		<description>MSD SD-1 Disk Drive</description>
+		<rom name="sd-1-1.3-c000.bin" size="8192" crc="f399778d" sha1="c0d939c354d84018038c60a231fc43fb9279d8a4" region="ucd5" offset="0"/>
+		<rom name="sd-1-1.3-e000.bin" size="8192" crc="7ac80da4" sha1="99dd15c6d97938eba73880b18986a037e90742ab" region="ucd5" offset="2000"/>
+		<device_ref name="m6502"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="c64h156"/>
+		<device_ref name="floppy_connector"/>
+		<chip type="cpu" tag=":ucd5" name="MOS Technology 6502" clock="1000000"/>
+		<dipswitch name="Device Address" tag=":ADDRESS" mask="3">
+			<dipvalue name="8" value="0" default="yes"/>
+			<dipvalue name="9" value="1"/>
+			<dipvalue name="10" value="2"/>
+			<dipvalue name="11" value="3"/>
+		</dipswitch>
+	</machine>
+	<machine name="msdsd2" sourcefile="devices/bus/cbmiec/c1541.cpp" isdevice="yes" runnable="no">
+		<description>MSD SD-2 Disk Drive</description>
+		<rom name="sd-2-2.3-c000.bin" size="8192" crc="2207560e" sha1="471e9b4a4ac09ceee9acc1774534510396f98b9a" region="ucd5" offset="0"/>
+		<rom name="sd-2-2.3-e000.bin" size="8192" crc="4efd87a2" sha1="4beec0b7ce2349add3b0a5bceee60826637df8d9" region="ucd5" offset="2000"/>
+		<device_ref name="m6502"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="c64h156"/>
+		<device_ref name="floppy_connector"/>
+		<chip type="cpu" tag=":ucd5" name="MOS Technology 6502" clock="1000000"/>
+		<dipswitch name="Device Address" tag=":ADDRESS" mask="3">
+			<dipvalue name="8" value="0" default="yes"/>
+			<dipvalue name="9" value="1"/>
+			<dipvalue name="10" value="2"/>
+			<dipvalue name="11" value="3"/>
+		</dipswitch>
+	</machine>
+	<machine name="output_latch" sourcefile="devices/machine/output_latch.cpp" isdevice="yes" runnable="no">
+		<description>Output Latch</description>
+	</machine>
+	<machine name="palette" sourcefile="emu/emupal.cpp" isdevice="yes" runnable="no">
+		<description>palette</description>
+	</machine>
+	<machine name="pc8477a" sourcefile="devices/machine/upd765.cpp" isdevice="yes" runnable="no">
+		<description>National Semiconductor PC8477A FDC</description>
+	</machine>
+	<machine name="pet_datassette_port" sourcefile="devices/bus/pet/cass.cpp" isdevice="yes" runnable="no">
+		<description>Commodore Datasette Port</description>
+	</machine>
+	<machine name="pet_user_port" sourcefile="devices/bus/pet/user.cpp" isdevice="yes" runnable="no">
+		<description>PET user port</description>
+	</machine>
+	<machine name="pia6821" sourcefile="devices/machine/6821pia.cpp" isdevice="yes" runnable="no">
+		<description>6821 PIA</description>
+	</machine>
+	<machine name="pls100" sourcefile="devices/machine/pla.cpp" isdevice="yes" runnable="no">
+		<description>82S100-series PLA</description>
+	</machine>
+	<machine name="ptm6840" sourcefile="devices/machine/6840ptm.cpp" isdevice="yes" runnable="no">
+		<description>MC6840 PTM</description>
+	</machine>
+	<machine name="quickload" sourcefile="devices/imagedev/snapquik.cpp" isdevice="yes" runnable="no">
+		<description>Quickload</description>
+	</machine>
+	<machine name="r65c22" sourcefile="devices/machine/6522via.cpp" isdevice="yes" runnable="no">
+		<description>Rockwell R65C22 VIA</description>
+	</machine>
+	<machine name="ram" sourcefile="devices/machine/ram.cpp" isdevice="yes" runnable="no">
+		<description>RAM</description>
+	</machine>
+	<machine name="rs232" sourcefile="devices/bus/rs232/rs232.cpp" isdevice="yes" runnable="no">
+		<description>RS-232 Port</description>
+	</machine>
+	<machine name="rtc72421" sourcefile="devices/machine/msm6242.cpp" isdevice="yes" runnable="no">
+		<description>Epson RTC-72421 RTC</description>
+	</machine>
+	<machine name="screen" sourcefile="emu/screen.cpp" isdevice="yes" runnable="no">
+		<description>Video Screen</description>
+	</machine>
+	<machine name="scsi" sourcefile="devices/bus/scsi/scsi.cpp" isdevice="yes" runnable="no">
+		<description>SCSI Port</description>
+		<device_ref name="scsi_slot"/>
+		<device_ref name="scsi_slot"/>
+		<device_ref name="scsi_slot"/>
+		<device_ref name="scsi_slot"/>
+		<device_ref name="scsi_slot"/>
+		<device_ref name="scsi_slot"/>
+		<device_ref name="scsi_slot"/>
+		<slot name=":1">
+		</slot>
+		<slot name=":2">
+		</slot>
+		<slot name=":3">
+		</slot>
+		<slot name=":4">
+		</slot>
+		<slot name=":5">
+		</slot>
+		<slot name=":6">
+		</slot>
+		<slot name=":7">
+		</slot>
+	</machine>
+	<machine name="scsi_slot" sourcefile="devices/bus/scsi/scsi.cpp" isdevice="yes" runnable="no">
+		<description>SCSI Connector</description>
+	</machine>
+	<machine name="software_list" sourcefile="emu/softlist_dev.cpp" isdevice="yes" runnable="no">
+		<description>Software List</description>
+	</machine>
+	<machine name="sp0256" sourcefile="devices/sound/sp0256.cpp" isdevice="yes" runnable="no">
+		<description>GI SP0256 Narrator Speech Processor</description>
+		<sound channels="0"/>
+	</machine>
+	<machine name="speaker" sourcefile="emu/speaker.cpp" isdevice="yes" runnable="no">
+		<description>Speaker</description>
+		<sound channels="1"/>
+	</machine>
+	<machine name="t6721a" sourcefile="devices/sound/t6721a.cpp" isdevice="yes" runnable="no">
+		<description>Toshiba T6721A</description>
+		<sound channels="0"/>
+	</machine>
+	<machine name="technica" sourcefile="devices/bus/cbmiec/c1541.cpp" isdevice="yes" runnable="no">
+		<description>Westfalia Technica Disk Drive</description>
+		<rom name="technica dos plus.bin" size="16384" crc="6a1ef3ff" sha1="1aaa52ed4a3f120ec8664bcefec890c7f9aaecf2" status="baddump" region="ucd5" offset="0"/>
+		<device_ref name="m6502"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="mos6522"/>
+		<device_ref name="c64h156"/>
+		<device_ref name="floppy_connector"/>
+		<chip type="cpu" tag=":ucd5" name="MOS Technology 6502" clock="1000000"/>
+		<dipswitch name="Device Address" tag=":ADDRESS" mask="3">
+			<dipvalue name="8" value="0" default="yes"/>
+			<dipvalue name="9" value="1"/>
+			<dipvalue name="10" value="2"/>
+			<dipvalue name="11" value="3"/>
+		</dipswitch>
+	</machine>
+	<machine name="tpi6525" sourcefile="devices/machine/6525tpi.cpp" isdevice="yes" runnable="no">
+		<description>6525 TPI</description>
+	</machine>
+	<machine name="vcs_control_port" sourcefile="devices/bus/vcs_ctrl/ctrl.cpp" isdevice="yes" runnable="no">
+		<description>Atari VCS controller port</description>
+	</machine>
+	<machine name="vcs_joystick" sourcefile="devices/bus/vcs_ctrl/joystick.cpp" isdevice="yes" runnable="no">
+		<description>Atari / CBM Digital joystick</description>
+		<input players="1">
+			<control type="joy" buttons="1" ways="8"/>
+		</input>
+	</machine>
+	<machine name="vcs_joystick_booster" sourcefile="devices/bus/vcs_ctrl/joybooster.cpp" isdevice="yes" runnable="no">
+		<description>CBS Electronics Booster-Grip Joystick Adaptor</description>
+		<input players="1">
+			<control type="joy" buttons="3" ways="8"/>
+		</input>
+	</machine>
+	<machine name="vcs_keypad" sourcefile="devices/bus/vcs_ctrl/keypad.cpp" isdevice="yes" runnable="no">
+		<description>Atari / CBM Keypad</description>
+		<input players="1">
+			<control type="keypad" buttons="12"/>
+		</input>
+	</machine>
+	<machine name="vcs_lightpen" sourcefile="devices/bus/vcs_ctrl/lightpen.cpp" isdevice="yes" runnable="no">
+		<description>Atari / CBM Light Pen</description>
+		<input players="1">
+			<control type="lightgun" buttons="1" minimum="0" maximum="255" sensitivity="45" keydelta="15"/>
+		</input>
+	</machine>
+	<machine name="vcs_mouse" sourcefile="devices/bus/vcs_ctrl/mouse.cpp" isdevice="yes" runnable="no">
+		<description>Atari / CBM Mouse</description>
+		<input players="1">
+			<control type="mouse" buttons="2" minimum="0" maximum="63" sensitivity="15" keydelta="10" reverse="yes"/>
+		</input>
+	</machine>
+	<machine name="vcs_paddles" sourcefile="devices/bus/vcs_ctrl/paddles.cpp" isdevice="yes" runnable="no">
+		<description>Atari / CBM Dual paddles</description>
+		<input players="2">
+			<control type="paddle" player="1" buttons="1" minimum="0" maximum="255" sensitivity="30" keydelta="20" reverse="yes"/>
+			<control type="paddle" player="2" buttons="1" minimum="0" maximum="255" sensitivity="30" keydelta="20" reverse="yes"/>
+		</input>
+	</machine>
+	<machine name="vcs_wheel" sourcefile="devices/bus/vcs_ctrl/wheel.cpp" isdevice="yes" runnable="no">
+		<description>Atari / CBM Driving Wheel</description>
+		<input players="1">
+			<control type="trackball" buttons="1" minimum="0" maximum="255" sensitivity="40" keydelta="5"/>
+		</input>
+	</machine>
+	<machine name="vic1011" sourcefile="devices/bus/vic20/vic1011.cpp" isdevice="yes" runnable="no">
+		<description>VIC-1011 RS-232C</description>
+		<device_ref name="rs232"/>
+		<slot name=":rs232">
+			<slotoption name="terminal" devname="serial_terminal"/>
+			<slotoption name="sunkbd" devname="sunkbd_adaptor"/>
+			<slotoption name="dec_loopback" devname="dec_rs232_loopback"/>
+			<slotoption name="ie15" devname="ie15_terminal"/>
+			<slotoption name="null_modem" devname="null_modem"/>
+			<slotoption name="keyboard" devname="serial_keyboard"/>
+			<slotoption name="patch" devname="rs232_patch_box"/>
+			<slotoption name="swtpc8212" devname="swtpc8212_terminal"/>
+			<slotoption name="printer" devname="serial_printer"/>
+			<slotoption name="scorpion" devname="scorpion_ic"/>
+			<slotoption name="loopback" devname="rs232_loopback"/>
+			<slotoption name="mockingboard" devname="mockingboardd"/>
+			<slotoption name="msystems_mouse" devname="rs232_mouse_hle_msystems"/>
+			<slotoption name="nss_tvi" devname="nss_tvinterface"/>
+			<slotoption name="rs232_sync_io" devname="rs232_sync_io"/>
+			<slotoption name="pty" devname="pseudo_terminal"/>
+			<slotoption name="rs_printer" devname="rs_serial_printer"/>
+		</slot>
+	</machine>
+	<machine name="vic1515" sourcefile="devices/bus/cbmiec/vic1515.cpp" isdevice="yes" runnable="no">
+		<description>VIC-1515 Graphic Printer</description>
+		<rom name="805-5.p4" size="4096" crc="05a99a5a" sha1="035c23dc83923eea34feea260445356a909fbd98" region="rom" offset="0"/>
+		<device_ref name="i8039"/>
+		<chip type="cpu" tag=":maincpu" name="Intel 8039" clock="6000000"/>
+		<dipswitch name="Device Address" tag=":ADDRESS" mask="3">
+			<dipvalue name="4" value="0" default="yes"/>
+			<dipvalue name="5" value="1"/>
+			<dipvalue name="T" value="2"/>
+		</dipswitch>
+	</machine>
+	<machine name="vic1520" sourcefile="devices/bus/cbmiec/vic1520.cpp" isdevice="yes" runnable="no">
+		<description>VIC-1520 Color Printer Plotter</description>
+		<biosset name="r01" description="325340-01"/>
+		<biosset name="r03" description="325340-03"/>
+		<rom name="325340-01.u1" bios="r01" size="2048" crc="3757da6f" sha1="8ab43603f74b0f269bbe890d1939a9ae31307eb1" region="mcu" offset="0"/>
+		<rom name="325340-03.u1" bios="r03" size="2048" crc="f72ea2b6" sha1="74c15b2cc1f7632bffa37439609cbdb50b82ea92" region="mcu" offset="0"/>
+		<device_ref name="m6500_1"/>
+		<chip type="cpu" tag=":mcu" name="MOS Technology 6500/1" clock="2000000"/>
+	</machine>
+	<machine name="votrsc01a" sourcefile="devices/sound/votrax.cpp" isdevice="yes" runnable="no">
+		<description>Votrax SC-01-A</description>
+		<rom name="sc01a.bin" size="512" crc="fc416227" sha1="1d6da90b1807a01b5e186ef08476119a862b5e6d" region="internal" offset="0"/>
+		<sound channels="0"/>
+	</machine>
+	<machine name="w65c02" sourcefile="devices/cpu/m6502/w65c02.cpp" isdevice="yes" runnable="no">
+		<description>WDC W65C02</description>
+	</machine>
+	<machine name="w65c816" sourcefile="devices/cpu/g65816/g65816.cpp" isdevice="yes" runnable="no">
+		<description>WDC W65C816</description>
+	</machine>
+	<machine name="wd1770" sourcefile="devices/machine/wd_fdc.cpp" isdevice="yes" runnable="no">
+		<description>Western Digital WD1770 FDC</description>
+	</machine>
+	<machine name="wd1772" sourcefile="devices/machine/wd_fdc.cpp" isdevice="yes" runnable="no">
+		<description>Western Digital WD1772 FDC</description>
+	</machine>
+	<machine name="wd37c65c" sourcefile="devices/machine/upd765.cpp" isdevice="yes" runnable="no">
+		<description>Western Digital WD37C65C FDC</description>
+	</machine>
+	<machine name="ym3526" sourcefile="devices/sound/ymopl.cpp" isdevice="yes" runnable="no">
+		<description>YM3526 OPL</description>
+		<sound channels="0"/>
+	</machine>
+	<machine name="z80" sourcefile="devices/cpu/z80/z80.cpp" isdevice="yes" runnable="no">
+		<description>Zilog Z80</description>
+	</machine>
+</mame>
