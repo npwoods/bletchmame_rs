@@ -500,8 +500,9 @@ mod test {
 
 	#[allow(clippy::too_many_arguments)]
 	#[test_case(0, include_str!("test_data/listxml_alienar.xml"), "alienar", "Alien Arena", "1985", "Duncan Brown", "williams.cpp", None, None)]
-	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "coco2b", "Color Computer 2B", "1985?", "Tandy Radio Shack", "coco12.cpp", Some("coco"), Some("coco"))]
-	#[test_case(2, include_str!("test_data/listxml_fake.xml"), "fake", "Fake Machine", "2021", "<Bletch>", "fake_machine.cpp", None, None)]
+	#[test_case(1, include_str!("test_data/listxml_c64.xml"), "c64", "Commodore 64 (NTSC)", "1982", "Commodore Business Machines", "commodore/c64.cpp", None, None)]
+	#[test_case(2, include_str!("test_data/listxml_coco.xml"), "coco2b", "Color Computer 2B", "1985?", "Tandy Radio Shack", "coco12.cpp", Some("coco"), Some("coco"))]
+	#[test_case(3, include_str!("test_data/listxml_fake.xml"), "fake", "Fake Machine", "2021", "<Bletch>", "fake_machine.cpp", None, None)]
 	pub fn machine(
 		_index: usize,
 		xml: &str,
