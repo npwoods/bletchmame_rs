@@ -80,13 +80,13 @@ impl Default for SmallStrRef<'_> {
 
 impl Display for SmallStrRef<'_> {
 	fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-		Display::fmt(self.as_ref(), f)
+		write!(f, "{}", self.as_ref())
 	}
 }
 
 impl Debug for SmallStrRef<'_> {
 	fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-		Display::fmt(self.as_ref(), f)
+		write!(f, "{:?}", self.as_ref())
 	}
 }
 
