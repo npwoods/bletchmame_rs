@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 use std::iter::once;
-use std::ops::Range;
 use std::rc::Rc;
 
 use itertools::Itertools;
@@ -24,7 +23,7 @@ struct InternalEntry {
 	details: InternalEntryDetails,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum InternalEntryDetails {
 	Slot { current_option_index: Option<usize> },
 	Image { filename: Option<String> },
@@ -112,12 +111,13 @@ impl DevicesImagesConfig {
 		Some(entry)
 	}
 
-	pub fn update_status(&self, status: &Status) -> (Self, Option<Range<usize>>) {
+	pub fn update_status(&self, status: &Status) -> (Self, Option<Vec<usize>>) {
 		// note that this logic won't error; this is because we expect the InfoDB and Status data
 		// to be in harmony; we really need a status validation step
 		let info_db = self.info_db.clone();
 		let new_status = internal_update_status(info_db, status);
-		(new_status, None)
+		let changed_rows = identify_changed_rows(&self.entries, &new_status.entries);
+		(new_status, changed_rows)
 	}
 }
 
@@ -255,6 +255,18 @@ where
 				.chain(internal_hierarchicalize(&data[next_range], next_depth, next_base_len))
 				.collect::<Vec<_>>()
 		})
+}
+
+fn identify_changed_rows(a: &[InternalEntry], b: &[InternalEntry]) -> Option<Vec<usize>> {
+	(a.len() == b.len()).then(|| {
+		a.iter()
+			.zip(b)
+			.enumerate()
+			.filter_map(|(index, (a_entry, b_entry))| {
+				((a_entry.tag != b_entry.tag) || (a_entry.details != b_entry.details)).then_some(index)
+			})
+			.collect::<Vec<_>>()
+	})
 }
 
 #[cfg(test)]
