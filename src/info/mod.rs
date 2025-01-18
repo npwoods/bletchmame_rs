@@ -463,7 +463,7 @@ mod test {
 	use super::View;
 
 	#[test_case(0, include_str!("test_data/listxml_alienar.xml"), "0.229 (mame0229)", 13, 1, &["alienar", "ipt_merge_any_hi", "ls157"])]
-	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "0.229 (mame0229)", 104, 15, &["acia6850", "address_map_bank", "ay8910"])]
+	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "0.273 (mame0273)", 121, 10, &["acia6850", "address_map_bank", "ata_interface"])]
 	#[test_case(2, include_str!("test_data/listxml_fake.xml"), "<<fake build>>", 4, 3, &["blah", "fake", "fakefake", "mc6809e"])]
 	pub fn test(
 		_index: usize,
@@ -501,7 +501,7 @@ mod test {
 	#[allow(clippy::too_many_arguments)]
 	#[test_case(0, include_str!("test_data/listxml_alienar.xml"), "alienar", "Alien Arena", "1985", "Duncan Brown", "williams.cpp", None, None)]
 	#[test_case(1, include_str!("test_data/listxml_c64.xml"), "c64", "Commodore 64 (NTSC)", "1982", "Commodore Business Machines", "commodore/c64.cpp", None, None)]
-	#[test_case(2, include_str!("test_data/listxml_coco.xml"), "coco2b", "Color Computer 2B", "1985?", "Tandy Radio Shack", "coco12.cpp", Some("coco"), Some("coco"))]
+	#[test_case(2, include_str!("test_data/listxml_coco.xml"), "coco2b", "Color Computer 2B", "1985?", "Tandy Radio Shack", "trs/coco12.cpp", Some("coco"), Some("coco"))]
 	#[test_case(3, include_str!("test_data/listxml_fake.xml"), "fake", "Fake Machine", "2021", "<Bletch>", "fake_machine.cpp", None, None)]
 	pub fn machine(
 		_index: usize,
@@ -554,7 +554,7 @@ mod test {
 	}
 
 	#[test_case(0, include_str!("test_data/listxml_alienar.xml"), "alienar", Some(("Duncan Brown", "1985")))]
-	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "cocoe", Some(("Tandy Radio Shack", "1981")))]
+	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "coco", Some(("Tandy Radio Shack", "1980")))]
 	#[test_case(2, include_str!("test_data/listxml_coco.xml"), "coco2b", Some(("Tandy Radio Shack", "1985?")))]
 	#[test_case(3, include_str!("test_data/listxml_fake.xml"), "fake", Some(("<Bletch>", "2021")))]
 	#[test_case(4, include_str!("test_data/listxml_fake.xml"), "NONEXISTANT", None)]
@@ -598,8 +598,8 @@ mod test {
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", "ext:fdcv11:wd17xx:0:qd", "floppydisk", "floppy_5_25",
-		&["1dd", "cqi", "cqm", "d77", "d88", "dfi", "dmk", "dsk", "hfe", "imd", "ipf", "jvc", "mfi", "mfm", "os9", "sdf", "td0", "vdk"])]
+	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", "ext:fdc:wd17xx:0:525dd", "floppydisk", "floppy_5_25",
+		&["1dd", "86f", "cqi", "cqm", "d77", "d88", "dfi", "dmk", "dsk", "imd", "jvc", "mfi", "mfm", "os9", "sdf", "td0", "vdk"])]
 	pub fn devices(
 		_index: usize,
 		xml: &str,
@@ -618,7 +618,7 @@ mod test {
 			.iter()
 			.filter(|x| x.tag() == device_tag)
 			.exactly_one()
-			.map_err(|_| ())
+			.map_err(|e| e.to_string())
 			.unwrap();
 		let actual = (
 			device.device_type().to_string(),
@@ -634,7 +634,7 @@ mod test {
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", &["rs232", "ext", "ext:fdcv11:wd17xx:0", "ext:fdcv11:wd17xx:1", "ext:fdcv11:wd17xx:2", "ext:fdcv11:wd17xx:3"])]
+	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", &["rs232", "ext", "ext:fdc:wd17xx:0", "ext:fdc:wd17xx:1", "ext:fdc:wd17xx:2", "ext:fdc:wd17xx:3"])]
 	#[test_case(1, include_str!("test_data/listxml_fake.xml"), "fake", &["ext", "ext:fdcv11:wd17xx:0", "ext:fdcv11:wd17xx:1"])]
 	pub fn slots(_index: usize, xml: &str, machine: &str, expected: &[&str]) {
 		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
@@ -651,7 +651,7 @@ mod test {
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", "ext", Some(8), &[("cp450_fdc", "cp450_fdc"), ("cd6809_fdc", "cd6809_fdc"), ("fdc", "coco_fdc"),	("cc3hdb1", "coco3_hdb1")])]
+	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", "ext", Some(16), &[("scii", "coco_scii"), ("cp450_fdc", "cp450_fdc"), ("cd6809_fdc", "cd6809_fdc"), ("sym12", "coco_symphony_twelve")])]
 	pub fn slot_options(
 		_index: usize,
 		xml: &str,
@@ -707,8 +707,8 @@ mod test {
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco_cart", &["coco", "coco2", "coco2b", "coco2bh"], &[])]
-	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "dragon_cart", &[], &["coco", "coco2", "coco2b", "coco2bh"])]
+	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco_cart", &["coco", "coco2b", "coco2bh", "coco3"], &[])]
+	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "dragon_cart", &[], &["coco", "coco2b", "coco2bh", "cocoh"])]
 	pub fn software_lists(
 		_index: usize,
 		xml: &str,
