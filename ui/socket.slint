@@ -1,0 +1,62 @@
+import { Button, VerticalBox, HorizontalBox, LineEdit } from "std-widgets.slint";
+
+export component ConnectToSocketDialog inherits Window {
+    title: "Connect To Socket";
+    icon: @image-url("bletchmame.png");
+    height: 150px;
+    width: 350px;
+    callback accepted();
+    callback cancelled();
+    callback changed();
+    in property <bool> can-accept;
+    in-out property <string> host-text;
+    in-out property <string> port-text;
+    VerticalBox {
+        Text {
+            horizontal-alignment: left;
+            text: "Enter Hostname of Host or IP Address and Port:";
+        }
+
+        HorizontalBox {
+            LineEdit {
+                text <=> root.host-text;
+                accepted => {
+                    root.accepted();
+                }
+                edited => {
+                    root.changed();
+                }
+            }
+
+            LineEdit {
+                width: 100px;
+                text <=> root.port-text;
+                input-type: number;
+                accepted => {
+                    root.accepted();
+                }
+                edited => {
+                    root.changed();
+                }
+            }
+        }
+
+        HorizontalBox {
+            alignment: end;
+            Button {
+                text: "Cancel";
+                clicked => {
+                    root.cancelled();
+                }
+            }
+
+            Button {
+                text: "OK";
+                enabled: root.can-accept;
+                clicked => {
+                    root.accepted();
+                }
+            }
+        }
+    }
+}

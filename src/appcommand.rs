@@ -90,6 +90,9 @@ pub enum AppCommand {
 	UnloadImage {
 		tag: String,
 	},
+	ConnectToSocketDialog {
+		tag: String,
+	},
 	ChangeSlots(Vec<(String, Option<String>)>),
 }
 

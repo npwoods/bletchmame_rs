@@ -54,6 +54,7 @@ win32job = "=2.0.0"
 blockingqueue = "0.1.1"
 is_executable = "1.0.4"
 anyhow = "1.0.94"
+hostname-validator = "1.1.1"
 
 [dev-dependencies]
 assert_matches = "1.5.0"
