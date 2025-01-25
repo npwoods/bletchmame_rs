@@ -90,6 +90,7 @@ pub enum AppCommand {
 	UnloadImage {
 		tag: String,
 	},
+	ChangeSlots(Vec<(String, Option<String>)>),
 }
 
 const MENU_PREFIX: &str = "MENU_";

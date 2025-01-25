@@ -32,6 +32,7 @@ pub async fn dialog_devices_and_images(
 	parent: Weak<impl ComponentHandle + 'static>,
 	diconfig: DevicesImagesConfig,
 	status_update_channel: Channel<Status>,
+	invoke_command: impl Fn(AppCommand) + 'static,
 	menuing_type: MenuingType,
 ) {
 	// prepare the dialog
@@ -54,41 +55,64 @@ pub async fn dialog_devices_and_images(
 	// set up the "ok" button
 	let signaller = single_result.signaller();
 	modal.dialog().on_ok_clicked(move || {
-		signaller.signal(true);
+		signaller.signal(());
+	});
+
+	// set up the "apply changes" button
+	let model_clone = model.clone();
+	modal.dialog().on_apply_changes_clicked(move || {
+		let model = DevicesAndImagesModel::get_model(&model_clone);
+		let changed_slots = model.with_diconfig(DevicesImagesConfig::changed_slots);
+		let command = AppCommand::ChangeSlots(changed_slots);
+		invoke_command(command);
 	});
 
 	// set up the close handler
 	let signaller = single_result.signaller();
 	modal.window().on_close_requested(move || {
-		signaller.signal(false);
+		signaller.signal(());
 		CloseRequestResponse::KeepWindowShown
 	});
 
 	// set up callbacks
-	modal.dialog().on_entry_option_changed(|entry_index, option_index| {
-		todo!("on_entry_option_changed(): entry_index={entry_index} option_index={option_index}");
-	});
+	let model_clone = model.clone();
+	modal
+		.dialog()
+		.on_entry_option_changed(move |entry_index, new_option_name| {
+			let entry_index = entry_index.try_into().unwrap();
+			let new_option_name = (!new_option_name.is_empty()).then_some(new_option_name.as_str());
+			let model = DevicesAndImagesModel::get_model(&model_clone);
+			model.change_diconfig(|diconfig| {
+				let tag = diconfig.entry(entry_index).unwrap().tag;
+				Some(diconfig.set_slot_option(tag, new_option_name))
+			});
+		});
 	let model_clone = model.clone();
 	modal.dialog().on_entry_button_clicked(move |entry_index, point| {
-		let model = &model_clone.as_any().downcast_ref::<DevicesAndImagesModel>().unwrap();
+		let model = DevicesAndImagesModel::get_model(&model_clone);
 		let entry_index = entry_index.try_into().unwrap();
 		entry_popup_menu(model, entry_index, point);
 	});
 
 	// subscribe to status changes
 	let model_clone = model.clone();
+	let dialog_weak = modal.dialog().as_weak();
 	let _subscription = status_update_channel.subscribe(move |status| {
-		let model = &model_clone.as_any().downcast_ref::<DevicesAndImagesModel>().unwrap();
-		model.update_status(status);
+		// update the model
+		let model = DevicesAndImagesModel::get_model(&model_clone);
+		model.change_diconfig(|diconfig| Some(diconfig.update_status(status)));
+
+		// update the dirty flag
+		let dirty = model.with_diconfig(|diconfig| diconfig.is_dirty());
+		dialog_weak.unwrap().set_config_dirty(dirty);
 	});
 
 	// present the modal dialog
-	let _accepted = modal.run(async { single_result.wait().await }).await;
+	modal.run(async { single_result.wait().await }).await;
 }
 
 fn entry_popup_menu(model: &DevicesAndImagesModel, entry_index: usize, point: LogicalPosition) {
-	let menu_items = {
-		let diconfig = model.diconfig.borrow();
+	let menu_items = model.with_diconfig(|diconfig| {
 		let entry = diconfig.entry(entry_index).unwrap();
 		let EntryDetails::Image { filename } = &entry.details else {
 			unreachable!();
@@ -110,7 +134,7 @@ fn entry_popup_menu(model: &DevicesAndImagesModel, entry_index: usize, point: Lo
 			MenuDesc::Item("Load Software List Part...".into(), None),
 			MenuDesc::Item("Unload".into(), unload_command),
 		]
-	};
+	});
 	let popup_menu = MenuDesc::make_popup_menu(menu_items);
 
 	let dialog = model.dialog_weak.unwrap();
@@ -126,7 +150,7 @@ fn entry_popup_menu(model: &DevicesAndImagesModel, entry_index: usize, point: Lo
 }
 
 struct DevicesAndImagesModel {
-	pub diconfig: RefCell<DevicesImagesConfig>,
+	diconfig: RefCell<DevicesImagesConfig>,
 	dialog_weak: Weak<DevicesAndImagesDialog>,
 	menuing_type: MenuingType,
 	none_string: SharedString,
@@ -134,14 +158,21 @@ struct DevicesAndImagesModel {
 }
 
 impl DevicesAndImagesModel {
-	pub fn update_status(&self, status: &Status) {
+	pub fn change_diconfig(&self, callback: impl FnOnce(&DevicesImagesConfig) -> Option<DevicesImagesConfig>) {
+		// update the config in our RefCell
 		let range = {
 			let mut diconfig = self.diconfig.borrow_mut();
-			let (new_diconfig, range) = diconfig.update_status(status);
-			*diconfig = new_diconfig;
-			range
+			let new_diconfig = callback(&diconfig);
+			if let Some(new_diconfig) = new_diconfig {
+				let range = diconfig.identify_changed_rows(&new_diconfig);
+				*diconfig = new_diconfig;
+				range
+			} else {
+				Some(Vec::new())
+			}
 		};
 
+		// notify row changes (if any)
 		if let Some(range) = range {
 			for row in range {
 				self.notify.row_changed(row);
@@ -149,6 +180,15 @@ impl DevicesAndImagesModel {
 		} else {
 			self.notify.reset();
 		}
+	}
+
+	pub fn with_diconfig<R>(&self, callback: impl FnOnce(&DevicesImagesConfig) -> R) -> R {
+		let diconfig = self.diconfig.borrow();
+		callback(&diconfig)
+	}
+
+	pub fn get_model(model: &impl Model) -> &'_ Self {
+		model.as_any().downcast_ref::<DevicesAndImagesModel>().unwrap()
 	}
 }
 
@@ -176,10 +216,17 @@ impl Model for DevicesAndImagesModel {
 			} => {
 				let options = options
 					.into_iter()
-					.map(|opt| match (opt.name, opt.description) {
-						(None, _) => self.none_string.clone(),
-						(Some(name), None) => SharedString::from(name.as_ref()),
-						(Some(name), Some(desc)) => format!("{desc} ({name})").into(),
+					.map(|opt| {
+						if let Some(name) = opt.name {
+							let name = SharedString::from(name.as_ref());
+							if let Some(desc) = opt.description {
+								(name.clone(), format!("{desc} ({name})").into())
+							} else {
+								(name.clone(), name)
+							}
+						} else {
+							("".into(), self.none_string.clone())
+						}
 					})
 					.collect::<Vec<_>>();
 				let current_option_index = current_option_index.try_into().unwrap();
@@ -194,13 +241,18 @@ impl Model for DevicesAndImagesModel {
 				(Vec::default(), -1, filename)
 			}
 		};
-		let options = VecModel::from(options);
-		let options = ModelRc::new(options);
+
+		let (option_names, option_descriptions): (Vec<_>, Vec<_>) = options.into_iter().unzip();
+		let option_names = VecModel::from(option_names);
+		let option_names = ModelRc::new(option_names);
+		let option_descriptions = VecModel::from(option_descriptions);
+		let option_descriptions = ModelRc::new(option_descriptions);
 
 		let result = DeviceAndImageEntry {
 			display_tag,
 			indent,
-			options,
+			option_names,
+			option_descriptions,
 			current_option_index,
 			filename,
 		};

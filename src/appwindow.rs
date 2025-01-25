@@ -657,12 +657,15 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 		AppCommand::FileDevicesAndImages => {
 			let info_db = model.info_db.borrow().clone().unwrap();
 			let diconfig = DevicesImagesConfig::new(info_db);
-			let (diconfig, _) = diconfig.update_status(&model.running_status.borrow());
+			let diconfig = diconfig.update_status(&model.running_status.borrow());
 			let status_update_channel = model.status_changed_channel.clone();
+			let model_clone = model.clone();
+			let invoke_command = move |command| handle_command(&model_clone, command);
 			let fut = dialog_devices_and_images(
 				model.app_window_weak.clone(),
 				diconfig,
 				status_update_channel,
+				invoke_command,
 				model.menuing_type,
 			);
 			spawn_local(fut).unwrap();
@@ -946,6 +949,13 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			model
 				.mame_controller
 				.issue_command(MameCommand::UnloadImage(tag.as_str()));
+		}
+		AppCommand::ChangeSlots(changes) => {
+			let changes = changes
+				.iter()
+				.map(|(slot, opt)| (slot.as_str(), opt.as_deref().unwrap_or_default()))
+				.collect::<Vec<_>>();
+			model.mame_controller.issue_command(MameCommand::ChangeSlots(&changes));
 		}
 	};
 }

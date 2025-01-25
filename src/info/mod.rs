@@ -33,6 +33,7 @@ pub use self::binary::ChipType;
 pub use self::binary::SoftwareListStatus;
 pub use self::entities::Chip;
 pub use self::entities::Device;
+pub use self::entities::Machine;
 pub use self::entities::MachineSoftwareList;
 pub use self::entities::MachinesView;
 pub use self::entities::Slot;

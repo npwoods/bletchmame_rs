@@ -12,6 +12,7 @@ mod guiutils;
 mod history;
 mod icon;
 mod info;
+mod mconfig;
 mod models;
 mod parse;
 mod platform;

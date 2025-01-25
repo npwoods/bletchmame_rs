@@ -326,6 +326,7 @@ fn command_text(command: &MameCommand<'_>) -> Cow<'static, str> {
 		MameCommand::SetAttenuation(attenuation) => format!("SET_ATTENUATION {}", attenuation).into(),
 		MameCommand::LoadImage(loads) => pairs_command_text(&["LOAD"], loads),
 		MameCommand::UnloadImage(tag) => format!("UNLOAD {}", tag).into(),
+		MameCommand::ChangeSlots(changes) => pairs_command_text(&["CHANGE_SLOTS"], changes),
 	}
 }
 
