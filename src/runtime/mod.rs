@@ -36,6 +36,7 @@ pub enum MameCommand<'a> {
 	SetAttenuation(i32),
 	LoadImage(&'a [(&'a str, &'a str)]),
 	UnloadImage(&'a str),
+	ChangeSlots(&'a [(&'a str, &'a str)]),
 }
 
 #[derive(Debug)]

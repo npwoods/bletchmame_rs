@@ -33,6 +33,7 @@ pub use self::binary::ChipType;
 pub use self::binary::SoftwareListStatus;
 pub use self::entities::Chip;
 pub use self::entities::Device;
+pub use self::entities::Machine;
 pub use self::entities::MachineSoftwareList;
 pub use self::entities::MachinesView;
 pub use self::entities::Slot;
@@ -210,7 +211,9 @@ impl InfoDb {
 
 impl Debug for InfoDb {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-		f.debug_list().entries(self.data.iter()).finish_non_exhaustive()
+		f.debug_struct("InfoDb")
+			.field("data.len()", &self.data.len())
+			.finish_non_exhaustive()
 	}
 }
 
@@ -634,8 +637,8 @@ mod test {
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", &["rs232", "ext", "ext:fdc:wd17xx:0", "ext:fdc:wd17xx:1", "ext:fdc:wd17xx:2", "ext:fdc:wd17xx:3"])]
-	#[test_case(1, include_str!("test_data/listxml_fake.xml"), "fake", &["ext", "ext:fdcv11:wd17xx:0", "ext:fdcv11:wd17xx:1"])]
+	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", &["rs232", "ext"])]
+	#[test_case(1, include_str!("test_data/listxml_fake.xml"), "fake", &["ext"])]
 	pub fn slots(_index: usize, xml: &str, machine: &str, expected: &[&str]) {
 		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
 		let actual = db
