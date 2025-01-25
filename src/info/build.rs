@@ -206,6 +206,10 @@ impl State {
 			(Phase::Machine, b"slot") => {
 				let [name] = evt.find_attributes([b"name"])?;
 				let name = name.ok_or(ThisError::MissingMandatoryAttribute("slot"))?;
+				if !name.starts_with(':') && name.contains(':') {
+					// we want to slots in the -listxml output that are there by virtue of having selected options
+					return Ok(None);
+				}
 				let name = normalize_tag(name);
 				let name_strindex: u32 = self.strings.lookup(&name);
 				let slot = binary::Slot {
@@ -687,7 +691,7 @@ where
 }
 
 pub fn calculate_sizes_hash() -> u64 {
-	let multiplicand = 4729; // arbitrary prime number
+	let multiplicand = 4733; // arbitrary prime number
 	[
 		binary::Header::SERIALIZED_SIZE,
 		binary::Machine::SERIALIZED_SIZE,
