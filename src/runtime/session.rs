@@ -5,7 +5,6 @@ use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Read;
 use std::io::Write;
-use std::iter::once;
 use std::process::Child;
 use std::process::Command;
 use std::process::Stdio;
@@ -314,11 +313,7 @@ fn command_text(command: &MameCommand<'_>) -> Cow<'static, str> {
 		MameCommand::Start {
 			machine_name,
 			initial_loads,
-		} => ["START", machine_name]
-			.into_iter()
-			.chain(initial_loads.iter().flat_map(|(dev, target)| [*dev, *target]))
-			.join(" ")
-			.into(),
+		} => pairs_command_text(&["START", machine_name], initial_loads),
 		MameCommand::Stop => "STOP".into(),
 		MameCommand::SoftReset => "SOFT_RESET".into(),
 		MameCommand::HardReset => "HARD_RESET".into(),
@@ -329,10 +324,7 @@ fn command_text(command: &MameCommand<'_>) -> Cow<'static, str> {
 		MameCommand::Throttled(throttled) => format!("THROTTLED {}", bool_str(*throttled)).into(),
 		MameCommand::ThrottleRate(throttle) => format!("THROTTLE_RATE {}", throttle).into(),
 		MameCommand::SetAttenuation(attenuation) => format!("SET_ATTENUATION {}", attenuation).into(),
-		MameCommand::LoadImage(loads) => once("LOAD")
-			.chain(loads.iter().flat_map(|(tag, filename)| [*tag, *filename]))
-			.join(" ")
-			.into(),
+		MameCommand::LoadImage(loads) => pairs_command_text(&["LOAD"], loads),
 		MameCommand::UnloadImage(tag) => format!("UNLOAD {}", tag).into(),
 	}
 }
@@ -342,5 +334,37 @@ fn bool_str(b: bool) -> &'static str {
 		"true"
 	} else {
 		"false"
+	}
+}
+
+fn pairs_command_text(base: &[&str], args: &[(&str, &str)]) -> Cow<'static, str> {
+	base.iter()
+		.copied()
+		.map(Cow::Borrowed)
+		.chain(args.iter().flat_map(|(name, value)| {
+			let name = Cow::Borrowed(*name);
+			let value = if value.contains(' ') {
+				Cow::Owned(format!("\"{}\"", value))
+			} else {
+				Cow::Borrowed(*value)
+			};
+			[name, value]
+		}))
+		.join(" ")
+		.into()
+}
+
+#[cfg(test)]
+mod test {
+	use test_case::test_case;
+
+	use crate::runtime::MameCommand;
+
+	#[test_case(0, MameCommand::Exit, "EXIT")]
+	#[test_case(1, MameCommand::Start { machine_name: "coco2b", initial_loads: &[("ext:fdc:wd17xx:0", "foo.dsk")]}, "START coco2b ext:fdc:wd17xx:0 foo.dsk")]
+	#[test_case(2, MameCommand::LoadImage(&[("ext:fdc:wd17xx:0", "foo bar.dsk")]), "LOAD ext:fdc:wd17xx:0 \"foo bar.dsk\"")]
+	fn command_test(_index: usize, command: MameCommand<'_>, expected: &str) {
+		let actual = super::command_text(&command);
+		assert_eq!(expected, actual);
 	}
 }
