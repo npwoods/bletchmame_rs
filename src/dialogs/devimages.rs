@@ -123,6 +123,11 @@ fn entry_popup_menu(model: &DevicesAndImagesModel, entry_index: usize, point: Lo
 			let command = AppCommand::LoadImageDialog { tag };
 			Some(command.into())
 		};
+		let connect_socket_command = {
+			let tag = entry.tag.to_string();
+			let command = AppCommand::ConnectToSocketDialog { tag };
+			Some(command.into())
+		};
 		let unload_command = filename.is_some().then(|| {
 			let tag = entry.tag.to_string();
 			let command = AppCommand::UnloadImage { tag };
@@ -132,6 +137,7 @@ fn entry_popup_menu(model: &DevicesAndImagesModel, entry_index: usize, point: Lo
 			MenuDesc::Item("Create Image...".into(), None),
 			MenuDesc::Item("Load Image...".into(), load_command),
 			MenuDesc::Item("Load Software List Part...".into(), None),
+			MenuDesc::Item("Connect To Socket...".into(), connect_socket_command),
 			MenuDesc::Item("Unload".into(), unload_command),
 		]
 	});

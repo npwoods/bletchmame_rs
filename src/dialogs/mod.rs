@@ -10,6 +10,7 @@ pub mod loading;
 pub mod messagebox;
 pub mod namecollection;
 pub mod paths;
+pub mod socket;
 
 struct SingleResult<T>(Rc<(Notify, RefCell<Option<T>>)>);
 

@@ -51,6 +51,7 @@ use crate::dialogs::messagebox::OkOnly;
 use crate::dialogs::namecollection::dialog_new_collection;
 use crate::dialogs::namecollection::dialog_rename_collection;
 use crate::dialogs::paths::dialog_paths;
+use crate::dialogs::socket::dialog_connect_to_socket;
 use crate::guiutils::is_context_menu_event;
 use crate::guiutils::menuing::accel;
 use crate::guiutils::menuing::MenuExt;
@@ -949,6 +950,18 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			model
 				.mame_controller
 				.issue_command(MameCommand::UnloadImage(tag.as_str()));
+		}
+		AppCommand::ConnectToSocketDialog { tag } => {
+			let model_clone = model.clone();
+			let fut = async move {
+				let parent = model_clone.app_window_weak.clone();
+				if let Some((hostname, port)) = dialog_connect_to_socket(parent).await {
+					let filename = format!("socket.{hostname}:{port}");
+					let command = AppCommand::LoadImage { tag, filename };
+					handle_command(&model_clone, command);
+				}
+			};
+			spawn_local(fut).unwrap();
 		}
 		AppCommand::ChangeSlots(changes) => {
 			let changes = changes
