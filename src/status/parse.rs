@@ -320,7 +320,8 @@ mod test {
 	#[test_case(4, include_str!("test_data/status_mame0270_coco2b_2.xml"))]
 	#[test_case(5, include_str!("test_data/status_mame0270_coco2b_3.xml"))]
 	#[test_case(6, include_str!("test_data/status_mame0270_coco2b_4.xml"))]
-	#[test_case(7, include_str!("test_data/status_mame0273_c64_1.xml"))]
+	#[test_case(7, include_str!("test_data/status_mame0270_coco2b_5.xml"))]
+	#[test_case(8, include_str!("test_data/status_mame0273_c64_1.xml"))]
 	fn general(_index: usize, xml: &str) {
 		let reader = BufReader::new(xml.as_bytes());
 		let result = parse_update(reader);
