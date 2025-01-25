@@ -34,7 +34,7 @@ impl Debug for State {
 		fmt.debug_map()
 			.entry(&"paths", &self.paths)
 			.entry(&"original_paths", &self.original_paths)
-			.finish()
+			.finish_non_exhaustive()
 	}
 }
 
