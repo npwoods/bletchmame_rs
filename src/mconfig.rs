@@ -17,13 +17,27 @@ const LOG: Level = Level::DEBUG;
 pub struct MachineConfig {
 	info_db: Rc<InfoDb>,
 	pub machine_index: usize,
-	slots: Rc<[Option<SlotData>]>,
+	slots: Rc<[SlotData]>,
 }
 
 #[derive(Clone, Debug)]
-struct SlotData {
-	option_index: usize,
-	config: Rc<MachineConfig>,
+enum SlotData {
+	Unset,
+	Set {
+		option_index: usize,
+		config: Rc<MachineConfig>,
+	},
+	Ignore,
+}
+
+impl SlotData {
+	pub fn option_index(&self) -> Option<usize> {
+		match self {
+			Self::Unset => None,
+			Self::Set { option_index, .. } => Some(*option_index),
+			Self::Ignore => unreachable!(),
+		}
+	}
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -45,13 +59,23 @@ impl MachineConfig {
 			.slots()
 			.iter()
 			.map(|slot| {
-				slot.default_option_index().map(|option_index| {
+				// the InfoDB contains child slots (e.g. - `ext:fdc:wd17xx:0` on `coco2b`), and we want to skip
+				// over these
+				let ignore = machine
+					.slots()
+					.iter()
+					.any(|x| strip_tag_prefix(&slot.name(), &x.name()).is_some_and(|x| !x.is_empty()));
+				if ignore {
+					SlotData::Ignore
+				} else if let Some(option_index) = slot.default_option_index() {
 					let machine_name = slot.options().get(option_index).unwrap().devname();
 					let machine_index = info_db.machines().find_index(&machine_name).unwrap();
 					let config = Self::new(info_db.clone(), machine_index);
 					let config = Rc::new(config);
-					SlotData { option_index, config }
-				})
+					SlotData::Set { option_index, config }
+				} else {
+					SlotData::Unset
+				}
 			})
 			.collect();
 
@@ -69,7 +93,10 @@ impl MachineConfig {
 	pub fn lookup_tag(&self, tag: &str) -> Result<(Machine<'_>, Option<Slot<'_>>)> {
 		match self.traverse_tag(tag)? {
 			ControlFlow::Continue((slot_index, next_tag)) => {
-				self.slots[slot_index].as_ref().unwrap().config.lookup_tag(next_tag)
+				let SlotData::Set { config, .. } = &self.slots[slot_index] else {
+					unreachable!();
+				};
+				config.lookup_tag(next_tag)
 			}
 			ControlFlow::Break(slot_index) => {
 				let machine = self.machine();
@@ -85,15 +112,19 @@ impl MachineConfig {
 		let machine = self.machine();
 		let changes = match self.traverse_tag(tag)? {
 			ControlFlow::Continue((slot_index, next_tag)) => {
-				let slot_data = self.slots[slot_index].as_ref().unwrap();
-				slot_data
-					.config
+				let SlotData::Set {
+					option_index, config, ..
+				} = &self.slots[slot_index]
+				else {
+					unreachable!();
+				};
+				config
 					.set_slot_option(next_tag, new_option_name)?
-					.map(|new_config| (slot_index, Some((slot_data.option_index, new_config))))
+					.map(|new_config| (slot_index, Some((*option_index, new_config))))
 			}
 			ControlFlow::Break(Some(slot_index)) => {
 				let slot = machine.slots().get(slot_index).unwrap();
-				let old_option_index = self.slots[slot_index].as_ref().map(|x| x.option_index);
+				let old_option_index = self.slots[slot_index].option_index();
 				let new_option_index = new_option_name
 					.map(|new_option_name| {
 						slot.options()
@@ -132,17 +163,21 @@ impl MachineConfig {
 		};
 
 		let result = changes.map(|(slot_index, new_slot_data)| {
-			let mut new_slot_data = new_slot_data.map(|(option_index, config)| {
+			let new_slot_data = if let Some((option_index, config)) = new_slot_data {
 				let config = Rc::new(config);
-				SlotData { option_index, config }
-			});
+				SlotData::Set { option_index, config }
+			} else {
+				SlotData::Unset
+			};
+			let mut new_slot_data = Some(new_slot_data);
+
 			let slots = self
 				.slots
 				.iter()
 				.enumerate()
 				.map(|(index, slot_data)| {
 					if index == slot_index {
-						new_slot_data.take()
+						new_slot_data.take().unwrap()
 					} else {
 						slot_data.clone()
 					}
@@ -184,8 +219,8 @@ impl MachineConfig {
 			} else {
 				// we're not at the end; drill down by returning `ControlFlow::Continue`
 				let expected_option = self.slots[slot_index]
-					.as_ref()
-					.map(|x| slot.options().get(x.option_index).unwrap().name());
+					.option_index()
+					.map(|x| slot.options().get(x).unwrap().name());
 				let next_tag = expected_option
 					.and_then(|x| strip_tag_prefix(next_tag, x.as_ref()))
 					.ok_or_else(|| {
@@ -214,17 +249,19 @@ impl MachineConfig {
 	) {
 		let machine = self.machine();
 		for (slot, slot_data) in machine.slots().iter().zip(self.slots.iter()) {
-			let option_index = slot_data.as_ref().map(|x| x.option_index);
-			callback(depth, base_tag, machine, slot, option_index);
+			if !matches!(slot_data, SlotData::Ignore) {
+				// invoke the callback
+				callback(depth, base_tag, machine, slot, slot_data.option_index());
 
-			if let Some(slot_data) = slot_data.as_ref() {
-				let base_tag = format!(
-					"{}{}:{}:",
-					base_tag,
-					slot.name(),
-					slot.options().get(slot_data.option_index).unwrap().name()
-				);
-				slot_data.config.internal_visit_slots(callback, &base_tag, depth + 1);
+				if let SlotData::Set { option_index, config } = &slot_data {
+					let base_tag = format!(
+						"{}{}:{}:",
+						base_tag,
+						slot.name(),
+						slot.options().get(*option_index).unwrap().name()
+					);
+					config.internal_visit_slots(callback, &base_tag, depth + 1);
+				}
 			}
 		}
 	}
@@ -254,9 +291,9 @@ impl MachineConfig {
 			.iter()
 			.zip(base.slots.as_ref())
 			.zip(self.machine().slots().iter())
+			.filter(|((ent, _), _)| !matches!(ent, SlotData::Ignore))
 		{
 			// determine the tag
-			let (ent, base_ent) = (ent.as_ref(), base_ent.as_ref());
 			let slot_tag = if !base_tag.is_empty() {
 				format!("{}:{}", base_tag, slot.name())
 			} else {
@@ -264,17 +301,24 @@ impl MachineConfig {
 			};
 
 			// is this particular slot changed when compared with the base?  if so, emit it
-			if ent.map(|x| x.option_index) != base_ent.map(|x| x.option_index) {
-				let option = ent.map(|x| slot.options().get(x.option_index).unwrap().name());
+			if ent.option_index() != base_ent.option_index() {
+				let option = ent.option_index().map(|x| slot.options().get(x).unwrap().name());
 				let option = option.as_ref().map(|x| x.as_ref());
 				emit(&slot_tag, option);
 			}
 
 			// if an option is specified, we need to recurse into that slot
-			if let Some(ent) = ent {
-				let child_config = ent.config.as_ref();
-				let child_base_config =
-					base_ent.and_then(|x| (ent.option_index == x.option_index).then_some(x.config.as_ref()));
+			if let SlotData::Set { option_index, config } = &ent {
+				let child_config = config.as_ref();
+				let child_base_config = if let SlotData::Set {
+					option_index: base_option_index,
+					config: base_config,
+				} = &base_ent
+				{
+					(base_option_index == option_index).then_some(base_config.as_ref())
+				} else {
+					None
+				};
 				child_config.internal_changed_slots(child_base_config, &slot_tag, emit)
 			}
 		}
