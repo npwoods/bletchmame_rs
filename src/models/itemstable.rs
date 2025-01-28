@@ -148,7 +148,7 @@ impl ItemsTableModel {
 						.find(machine_name)
 						.into_iter()
 						.flat_map(|x| x.machine_software_lists().iter().collect::<Vec<_>>())
-						.filter_map(|x| dispenser.get(&x.software_list().name()).ok())
+						.filter_map(|x| dispenser.get(x.software_list().name()).ok())
 						.flat_map(|(_, list)| {
 							list.software
 								.iter()
@@ -242,7 +242,7 @@ impl ItemsTableModel {
 					machine_name: machine.name().to_string(),
 					initial_loads: vec![],
 				});
-				let text = run_item_text(&machine.description());
+				let text = run_item_text(machine.description());
 				let run_menu_item = MenuDesc::Item(text, command.map(|x| x.into()));
 				let browse_target =
 					(!machine.machine_software_lists().is_empty()).then(|| PrefsCollection::MachineSoftware {
@@ -269,8 +269,8 @@ impl ItemsTableModel {
 								machine
 									.devices()
 									.iter()
-									.find(|dev| part.interface.as_ref() == dev.interface().as_ref())
-									.map(|dev| (Arc::<str>::from(dev.tag().as_ref()), software.name.clone()))
+									.find(|dev| part.interface.as_ref() == dev.interface())
+									.map(|dev| (Arc::<str>::from(dev.tag()), software.name.clone()))
 									.ok_or(())
 							})
 							.collect::<std::result::Result<Vec<_>, ()>>();

@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use binary_search::binary_search;
 use binary_search::Direction;
 
@@ -8,7 +6,6 @@ use crate::info::ChipType;
 use crate::info::IndirectView;
 use crate::info::Object;
 use crate::info::SimpleView;
-use crate::info::SmallStrRef;
 use crate::info::View;
 
 pub type Machine<'a> = Object<'a, binary::Machine>;
@@ -22,23 +19,23 @@ pub type SoftwareListsView<'a> = SimpleView<'a, binary::SoftwareList>;
 pub type MachineSoftwareList<'a> = Object<'a, binary::MachineSoftwareList>;
 
 impl<'a> Machine<'a> {
-	pub fn name(&self) -> SmallStrRef<'a> {
+	pub fn name(&self) -> &'a str {
 		self.string(|x| x.name_strindex)
 	}
 
-	pub fn source_file(&self) -> SmallStrRef<'a> {
+	pub fn source_file(&self) -> &'a str {
 		self.string(|x| x.source_file_strindex)
 	}
 
-	pub fn description(&self) -> SmallStrRef<'a> {
+	pub fn description(&self) -> &'a str {
 		self.string(|x| x.description_strindex)
 	}
 
-	pub fn year(&self) -> SmallStrRef<'a> {
+	pub fn year(&self) -> &'a str {
 		self.string(|x| x.year_strindex)
 	}
 
-	pub fn manufacturer(&self) -> SmallStrRef<'a> {
+	pub fn manufacturer(&self) -> &'a str {
 		self.string(|x| x.manufacturer_strindex)
 	}
 
@@ -84,7 +81,7 @@ impl<'a> MachinesView<'a> {
 		}
 
 		let ((largest_low, _), _) = binary_search((0, ()), (self.len(), ()), |i| {
-			if self.get(i).unwrap().name().as_ref() <= target {
+			if self.get(i).unwrap().name() <= target {
 				Direction::Low(())
 			} else {
 				Direction::High(())
@@ -100,11 +97,11 @@ impl<'a> MachinesView<'a> {
 }
 
 impl<'a> Chip<'a> {
-	pub fn tag(&self) -> SmallStrRef<'a> {
+	pub fn tag(&self) -> &'a str {
 		self.string(|x| x.tag_strindex)
 	}
 
-	pub fn name(&self) -> SmallStrRef<'a> {
+	pub fn name(&self) -> &'a str {
 		self.string(|x| x.name_strindex)
 	}
 
@@ -114,11 +111,11 @@ impl<'a> Chip<'a> {
 }
 
 impl<'a> Device<'a> {
-	pub fn device_type(&self) -> SmallStrRef<'a> {
+	pub fn device_type(&self) -> &'a str {
 		self.string(|x| x.type_strindex)
 	}
 
-	pub fn tag(&self) -> SmallStrRef<'a> {
+	pub fn tag(&self) -> &'a str {
 		self.string(|x| x.tag_strindex)
 	}
 
@@ -126,17 +123,17 @@ impl<'a> Device<'a> {
 		self.obj().mandatory
 	}
 
-	pub fn interface(&self) -> SmallStrRef<'a> {
+	pub fn interface(&self) -> &'a str {
 		self.string(|x| x.interface_strindex)
 	}
 
-	pub fn extensions(&self) -> impl Iterator<Item = Cow<'a, str>> {
+	pub fn extensions(&self) -> impl Iterator<Item = &'a str> {
 		self.string(|x| x.extensions_strindex).split('\0')
 	}
 }
 
 impl<'a> Slot<'a> {
-	pub fn name(&self) -> SmallStrRef<'a> {
+	pub fn name(&self) -> &'a str {
 		self.string(|x| x.name_strindex)
 	}
 
@@ -153,17 +150,17 @@ impl<'a> Slot<'a> {
 }
 
 impl<'a> SlotOption<'a> {
-	pub fn name(&self) -> SmallStrRef<'a> {
+	pub fn name(&self) -> &'a str {
 		self.string(|x| x.name_strindex)
 	}
 
-	pub fn devname(&self) -> SmallStrRef<'a> {
+	pub fn devname(&self) -> &'a str {
 		self.string(|x| x.devname_strindex)
 	}
 }
 
 impl<'a> SoftwareList<'a> {
-	pub fn name(&self) -> SmallStrRef<'a> {
+	pub fn name(&self) -> &'a str {
 		self.string(|x| x.name_strindex)
 	}
 
@@ -197,7 +194,7 @@ impl<'a> SoftwareListsView<'a> {
 }
 
 impl<'a> MachineSoftwareList<'a> {
-	pub fn tag(&self) -> SmallStrRef<'a> {
+	pub fn tag(&self) -> &'a str {
 		self.string(|x| x.tag_strindex)
 	}
 

@@ -116,7 +116,7 @@ impl DevicesImagesConfig {
 				};
 				let options = once(none_option)
 					.chain(slot.options().iter().map(|slot_option| {
-						let devmachine = self.info_db.machines().find(&slot_option.devname()).unwrap();
+						let devmachine = self.info_db.machines().find(slot_option.devname()).unwrap();
 						let name = Some(slot_option.name().into());
 						let description = Some(devmachine.description().into());
 						EntryOption { name, description }

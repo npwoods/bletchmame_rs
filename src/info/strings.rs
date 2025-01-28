@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::hash::DefaultHasher;
 use std::hash::Hasher;
@@ -5,8 +6,6 @@ use std::hash::Hasher;
 use anyhow::Error;
 use anyhow::Result;
 use smallvec::SmallVec;
-
-use super::smallstr::SmallStrRef;
 
 const SMALL_STRING_CHARS: &[u8; 63] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ";
 
@@ -56,7 +55,7 @@ impl StringTableBuilder {
 		self.map_lookup(s).or_else(|| lookup_small(s.as_bytes()))
 	}
 
-	pub fn index(&self, offset: u32) -> SmallStrRef<'_> {
+	pub fn index(&self, offset: u32) -> Cow<'_, str> {
 		read_string(&self.data, offset).unwrap()
 	}
 
@@ -101,12 +100,12 @@ fn lookup_small(s: &[u8]) -> Option<u32> {
 		.flatten()
 }
 
-pub fn read_string(data: &[u8], offset: u32) -> Result<SmallStrRef<'_>> {
+pub fn read_string(data: &[u8], offset: u32) -> Result<Cow<'_, str>> {
 	let result = if (offset & 0xC0000000) == 0xC0000000 {
 		let iter = (0..5)
 			.filter_map(|i| SMALL_STRING_CHARS.get(((offset >> (i * 6)) & 0x3F) as usize))
 			.map(|&x| char::from_u32(x as u32).unwrap());
-		SmallStrRef::from_small_chars(iter)
+		Cow::Owned(iter.collect())
 	} else {
 		let offset = offset as usize;
 		let data = data.get(offset..).ok_or_else(|| {
@@ -147,11 +146,11 @@ fn hash(s: &str) -> u64 {
 
 #[cfg(test)]
 mod test {
+	use std::borrow::Cow;
+
 	use assert_matches::assert_matches;
 	use itertools::Itertools;
 	use test_case::test_case;
-
-	use crate::info::SmallStrRef;
 
 	use super::StringTableBuilder;
 
@@ -204,7 +203,7 @@ mod test {
 			let idx = builder.lookup(other);
 			let result = builder.index(idx);
 
-			assert_matches!(result, SmallStrRef::Ref(_));
+			assert_matches!(result, Cow::Borrowed(_));
 			assert_eq!((*other, len), (result.as_ref(), builder.data.len()));
 		}
 	}
