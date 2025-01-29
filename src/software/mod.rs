@@ -107,7 +107,7 @@ impl<'a> SoftwareListDispenser<'a> {
 				.iter()
 				.map(|info_db_software_list| {
 					scope.spawn(move || {
-						load_software_list(paths, info_db_software_list.name().as_ref())
+						load_software_list(paths, info_db_software_list.name())
 							.map(|software_list| (info_db_software_list, software_list))
 					})
 				})

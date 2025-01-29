@@ -1,11 +1,10 @@
 //! Logic for parsing "InfoDb" databases; our internal representation of --listml output
-#![allow(dead_code)]
 mod binary;
 mod build;
 mod entities;
-mod smallstr;
 mod strings;
 
+use std::borrow::Cow;
 use std::cmp::min;
 use std::fmt::Debug;
 use std::fmt::Formatter;
@@ -25,6 +24,7 @@ use binary_serde::BinarySerde;
 use binary_serde::DeserializeError;
 use binary_serde::Endianness;
 use entities::SoftwareListsView;
+use internment::Arena;
 
 use crate::prefs::prefs_filename;
 use crate::version::MameVersion;
@@ -39,7 +39,6 @@ pub use self::entities::MachinesView;
 pub use self::entities::Slot;
 pub use self::entities::SlotOption;
 pub use self::entities::SoftwareList;
-pub use self::smallstr::SmallStrRef;
 
 use self::build::calculate_sizes_hash;
 use self::build::data_from_listxml_output;
@@ -59,8 +58,8 @@ pub struct InfoDb {
 	software_lists: RootView<binary::SoftwareList>,
 	software_list_machine_indexes: RootView<u32>,
 	machine_software_lists: RootView<binary::MachineSoftwareList>,
-	ram_options: RootView<binary::RamOption>,
 	strings_offset: usize,
+	strings_arena: Arena<str>,
 	build: MameVersion,
 }
 
@@ -83,7 +82,7 @@ impl InfoDb {
 		let software_lists = next_root_view(&mut cursor, hdr.software_list_count)?;
 		let software_list_machine_indexes = next_root_view(&mut cursor, hdr.software_list_machine_count)?;
 		let machine_software_lists = next_root_view(&mut cursor, hdr.machine_software_lists_count)?;
-		let ram_options = next_root_view(&mut cursor, hdr.ram_option_count)?;
+		let _ram_options: RootView<binary::RamOption> = next_root_view(&mut cursor, hdr.ram_option_count)?;
 
 		// validations we want to skip if we're creating things ourselves
 		if !skip_validations {
@@ -106,7 +105,7 @@ impl InfoDb {
 			software_list_machine_indexes,
 			machine_software_lists,
 			strings_offset: cursor.start,
-			ram_options,
+			strings_arena: Arena::new(),
 			build,
 		};
 
@@ -189,8 +188,11 @@ impl InfoDb {
 		self.make_view(&self.software_list_machine_indexes)
 	}
 
-	fn string(&self, offset: u32) -> SmallStrRef<'_> {
-		read_string(&self.data[self.strings_offset..], offset).unwrap_or_default()
+	fn string(&self, offset: u32) -> &'_ str {
+		match read_string(&self.data[self.strings_offset..], offset).unwrap_or_default() {
+			Cow::Borrowed(s) => s,
+			Cow::Owned(s) => self.strings_arena.intern_string(s).into_ref(),
+		}
 	}
 
 	fn make_view<B>(&self, root_view: &RootView<B>) -> SimpleView<'_, B>
@@ -431,7 +433,7 @@ where
 		B::binary_deserialize(buf, ENDIANNESS).unwrap()
 	}
 
-	fn string(&self, func: impl FnOnce(B) -> u32) -> SmallStrRef<'a> {
+	fn string(&self, func: impl FnOnce(B) -> u32) -> &'a str {
 		let offset = func(self.obj());
 		self.db.string(offset)
 	}
@@ -576,7 +578,7 @@ mod test {
 	pub fn machines_find_everything(_index: usize, xml: &str) {
 		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
 		for machine in db.machines().iter() {
-			let other_machine = db.machines().find(&machine.name());
+			let other_machine = db.machines().find(machine.name());
 			assert_eq!(other_machine.map(|m| m.name()), Some(machine.name()));
 		}
 	}

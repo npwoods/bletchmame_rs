@@ -64,12 +64,12 @@ impl MachineConfig {
 				let ignore = machine
 					.slots()
 					.iter()
-					.any(|x| strip_tag_prefix(&slot.name(), &x.name()).is_some_and(|x| !x.is_empty()));
+					.any(|x| strip_tag_prefix(slot.name(), x.name()).is_some_and(|x| !x.is_empty()));
 				if ignore {
 					SlotData::Ignore
 				} else if let Some(option_index) = slot.default_option_index() {
 					let machine_name = slot.options().get(option_index).unwrap().devname();
-					let machine_index = info_db.machines().find_index(&machine_name).unwrap();
+					let machine_index = info_db.machines().find_index(machine_name).unwrap();
 					let config = Self::new(info_db.clone(), machine_index);
 					let config = Rc::new(config);
 					SlotData::Set { option_index, config }
@@ -146,7 +146,7 @@ impl MachineConfig {
 							.info_db
 							.clone()
 							.machines()
-							.find_index(&new_option.devname())
+							.find_index(new_option.devname())
 							.unwrap();
 						let new_config = Self::new(self.info_db.clone(), machine_index);
 						(option_index, new_config)
@@ -207,7 +207,7 @@ impl MachineConfig {
 				.iter()
 				.enumerate()
 				.filter_map(|(slot_index, slot)| {
-					strip_tag_prefix(tag, &slot.name()).map(|next_tag| (slot_index, slot, next_tag))
+					strip_tag_prefix(tag, slot.name()).map(|next_tag| (slot_index, slot, next_tag))
 				})
 				.next()
 				.ok_or_else(|| ThisError::UnknownSlot(machine.name().to_string(), tag.to_string()))?;
@@ -222,12 +222,12 @@ impl MachineConfig {
 					.option_index()
 					.map(|x| slot.options().get(x).unwrap().name());
 				let next_tag = expected_option
-					.and_then(|x| strip_tag_prefix(next_tag, x.as_ref()))
+					.and_then(|x| strip_tag_prefix(next_tag, x))
 					.ok_or_else(|| {
 						ThisError::WrongOption(
 							machine.name().to_string(),
 							slot.name().to_string(),
-							expected_option.as_deref().map(str::to_string),
+							expected_option.map(str::to_string),
 							next_tag.to_string(),
 						)
 					})?;
@@ -303,7 +303,6 @@ impl MachineConfig {
 			// is this particular slot changed when compared with the base?  if so, emit it
 			if ent.option_index() != base_ent.option_index() {
 				let option = ent.option_index().map(|x| slot.options().get(x).unwrap().name());
-				let option = option.as_ref().map(|x| x.as_ref());
 				emit(&slot_tag, option);
 			}
 

@@ -1,10 +1,11 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::hash::DefaultHasher;
 use std::hash::Hasher;
 
+use anyhow::Error;
+use anyhow::Result;
 use smallvec::SmallVec;
-
-use super::smallstr::SmallStrRef;
 
 const SMALL_STRING_CHARS: &[u8; 63] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ";
 
@@ -54,7 +55,7 @@ impl StringTableBuilder {
 		self.map_lookup(s).or_else(|| lookup_small(s.as_bytes()))
 	}
 
-	pub fn index(&self, offset: u32) -> SmallStrRef<'_> {
+	pub fn index(&self, offset: u32) -> Cow<'_, str> {
 		read_string(&self.data, offset).unwrap()
 	}
 
@@ -99,26 +100,31 @@ fn lookup_small(s: &[u8]) -> Option<u32> {
 		.flatten()
 }
 
-pub fn read_string(data: &[u8], offset: u32) -> std::result::Result<SmallStrRef<'_>, ()> {
+pub fn read_string(data: &[u8], offset: u32) -> Result<Cow<'_, str>> {
 	let result = if (offset & 0xC0000000) == 0xC0000000 {
 		let iter = (0..5)
 			.filter_map(|i| SMALL_STRING_CHARS.get(((offset >> (i * 6)) & 0x3F) as usize))
 			.map(|&x| char::from_u32(x as u32).unwrap());
-		SmallStrRef::from_small_chars(iter)
+		Cow::Owned(iter.collect())
 	} else {
 		let offset = offset as usize;
-		let data = data.get(offset..).ok_or(())?;
+		let data = data.get(offset..).ok_or_else(|| {
+			let message = format!("read_string(): Invalid offset {offset}");
+			Error::msg(message)
+		})?;
 		data.utf8_chunks().next().map(|x| x.valid()).unwrap_or_default().into()
 	};
 	Ok(result)
 }
 
-pub fn validate_string_table(data: &[u8]) -> std::result::Result<(), ()> {
+pub fn validate_string_table(data: &[u8]) -> Result<()> {
 	if data.get(..MAGIC_STRINGTABLE_BEGIN.len()) != Some(MAGIC_STRINGTABLE_BEGIN) {
-		return Err(());
+		let message = "Invalid magic bytes at beginning of string table";
+		return Err(Error::msg(message));
 	}
 	if data.get((data.len() - MAGIC_STRINGTABLE_END.len())..) != Some(MAGIC_STRINGTABLE_END) {
-		return Err(());
+		let message = "Invalid magic bytes at end of string table";
+		return Err(Error::msg(message));
 	}
 
 	let middle_data = &data[(MAGIC_STRINGTABLE_BEGIN.len())..(data.len() - MAGIC_STRINGTABLE_END.len())];
@@ -126,7 +132,10 @@ pub fn validate_string_table(data: &[u8]) -> std::result::Result<(), ()> {
 		.utf8_chunks()
 		.all(|chunk| chunk.invalid().is_empty() || chunk.invalid() == [0x80])
 		.then_some(())
-		.ok_or(())
+		.ok_or_else(|| {
+			let message = "Corrupt data within string table";
+			Error::msg(message)
+		})
 }
 
 fn hash(s: &str) -> u64 {
@@ -137,11 +146,11 @@ fn hash(s: &str) -> u64 {
 
 #[cfg(test)]
 mod test {
+	use std::borrow::Cow;
+
 	use assert_matches::assert_matches;
 	use itertools::Itertools;
 	use test_case::test_case;
-
-	use crate::info::SmallStrRef;
 
 	use super::StringTableBuilder;
 
@@ -179,7 +188,7 @@ mod test {
 	pub fn read_string(_index: usize, offset: u32, expected: std::result::Result<&str, ()>, bytes: &[u8]) {
 		let expected = expected.map(String::from);
 		let actual = super::read_string(bytes, offset);
-		let actual = actual.map(String::from);
+		let actual = actual.map(String::from).map_err(|_| ());
 		assert_eq!(expected, actual);
 	}
 
@@ -194,7 +203,7 @@ mod test {
 			let idx = builder.lookup(other);
 			let result = builder.index(idx);
 
-			assert_matches!(result, SmallStrRef::Ref(_));
+			assert_matches!(result, Cow::Borrowed(_));
 			assert_eq!((*other, len), (result.as_ref(), builder.data.len()));
 		}
 	}

@@ -55,6 +55,7 @@ blockingqueue = "0.1.1"
 is_executable = "1.0.4"
 anyhow = "1.0.94"
 hostname-validator = "1.1.1"
+internment = { version = "0.8.6", features = ["arena"] }
 
 [dev-dependencies]
 assert_matches = "1.5.0"
