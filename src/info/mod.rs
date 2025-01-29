@@ -1,5 +1,4 @@
 //! Logic for parsing "InfoDb" databases; our internal representation of --listml output
-#![allow(dead_code)]
 mod binary;
 mod build;
 mod entities;
@@ -59,7 +58,6 @@ pub struct InfoDb {
 	software_lists: RootView<binary::SoftwareList>,
 	software_list_machine_indexes: RootView<u32>,
 	machine_software_lists: RootView<binary::MachineSoftwareList>,
-	ram_options: RootView<binary::RamOption>,
 	strings_offset: usize,
 	strings_arena: Arena<str>,
 	build: MameVersion,
@@ -84,7 +82,7 @@ impl InfoDb {
 		let software_lists = next_root_view(&mut cursor, hdr.software_list_count)?;
 		let software_list_machine_indexes = next_root_view(&mut cursor, hdr.software_list_machine_count)?;
 		let machine_software_lists = next_root_view(&mut cursor, hdr.machine_software_lists_count)?;
-		let ram_options = next_root_view(&mut cursor, hdr.ram_option_count)?;
+		let _ram_options: RootView<binary::RamOption> = next_root_view(&mut cursor, hdr.ram_option_count)?;
 
 		// validations we want to skip if we're creating things ourselves
 		if !skip_validations {
@@ -107,7 +105,6 @@ impl InfoDb {
 			software_list_machine_indexes,
 			machine_software_lists,
 			strings_offset: cursor.start,
-			ram_options,
 			strings_arena: Arena::new(),
 			build,
 		};
