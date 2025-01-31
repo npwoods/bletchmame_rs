@@ -29,7 +29,7 @@ pub enum AppCommand {
 	OptionsThrottleRate(f32),
 	OptionsToggleWarp,
 	OptionsToggleSound,
-	#[strum(props(MinimumMame = "0.273"))] // should be 0.274
+	#[strum(props(MinimumMame = "0.274"))]
 	OptionsClassic,
 
 	// Settings menu
