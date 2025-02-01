@@ -1,0 +1,180 @@
+import { HorizontalBox, VerticalBox, Button, StandardListView, StandardTableView, LineEdit, ListView, ScrollView, GridBox } from "std-widgets.slint";
+import { MagicListView, MagicListViewItem, Icons, FilledButton } from "@vivi/magic.slint";
+
+export component AppWindow inherits Window {
+    min-width: 100px;
+    min-height: 100px;
+    max-width: 10000px;
+    max-height: 10000px;
+    icon: @image-url("bletchmame.png");
+    title: @tr("BletchMAME 3.0 prototype: ") + (running-machine-description != "" ? ": " + running-machine-description : "");
+    callback empty-action-clicked();
+    callback find-software-lists-clicked();
+    in property <string> running-machine-description;
+    in property <bool> is-empty;
+    in property <string> is-empty-reason;
+    in property <string> is-empty-button-text;
+    in property <bool> history-can-go-back;
+    in property <bool> history-can-go-forward;
+    in property <bool> bookmark-collection-enabled;
+    in property <string> current-collection-text;
+    in-out property <int> items-view-selected-index <=> items-table-view.current-row;
+    in-out property <string> items-search-text;
+    in-out property <[TableColumn]> items-columns <=> items-table-view.columns;
+    callback collections-view-selected(int);
+    callback collections-row-pointer-event(int, PointerEvent, Point);
+    callback items-search-text-changed(string);
+    callback items-sort-ascending(int);
+    callback items-sort-descending(int);
+    callback items-current-row-changed();
+    callback items-row-pointer-event(int, PointerEvent, Point);
+    callback history-advance-clicked(int);
+    callback bookmark-collection-clicked();
+    in property <[MagicListViewItem]> collections-model;
+    in property <[[StandardListViewItem]]> items-model;
+    in property <[MenuEntry]> menubar-entries;
+    public function menubar-height() -> length {
+        return hbox.absolute-position.y - self.absolute-position.y;
+    }
+    public function show-context-menu(entries: [MenuEntry], point: Point) {
+        context-menu.show(entries, point);
+    }
+    callback menubar-sub-menu-selected(MenuEntry) -> [MenuEntry];
+    callback menu-entry-activated(MenuEntry);
+    public function collections-view-select(index: int) {
+        collections-list-view.current_index = index;
+    }
+    public function items-view-select(index: int) {
+        items-table-view.set-current-row(index);
+    }
+    MenuBar {
+        entries: menubar-entries;
+        sub-menu(entry) => {
+            return menubar-sub-menu-selected(entry);
+        }
+        activated(entry) => {
+            menu-entry-activated(entry)
+        }
+    }
+
+    context-menu := ContextMenu {
+        sub-menu(entry) => {
+            return menubar-sub-menu-selected(entry);
+        }
+        activated(entry) => {
+            menu-entry-activated(entry)
+        }
+    }
+
+    hbox := HorizontalBox {
+        visible: running-machine-description == "";
+        alignment: stretch;
+        collections-list-view := MagicListView {
+            width: 250px;
+            horizontal-stretch: 0;
+            vertical-stretch: 1;
+            model: collections-model;
+            selected(index) => {
+                collections-view-selected(index)
+            }
+            row-pointer-event(row, event, point) => {
+                collections-row-pointer-event(row, event, {
+                    x: point.x + collections-list-view.absolute-position.x,
+                    y: point.y + collections-list-view.absolute-position.y
+                })
+            }
+        }
+
+        VerticalBox {
+            alignment: stretch;
+            Text {
+                text: current-collection-text;
+            }
+
+            HorizontalBox {
+                height: 50px;
+                alignment: stretch;
+                horizontal-stretch: 1;
+                vertical-stretch: 0;
+                preferred-width: 100%;
+                FilledButton {
+                    prefix_icon: Icons.arrow_back;
+                    enabled: history-can-go-back;
+                    clicked => {
+                        history-advance-clicked(-1)
+                    }
+                }
+
+                FilledButton {
+                    prefix_icon: Icons.book;
+                    enabled: bookmark-collection-enabled;
+                    clicked => {
+                        bookmark-collection-clicked();
+                    }
+                }
+
+                FilledButton {
+                    prefix_icon: Icons.arrow_forward;
+                    enabled: history-can-go-forward;
+                    clicked => {
+                        history-advance-clicked(+1)
+                    }
+                }
+
+                LineEdit {
+                    text <=> items-search-text;
+                    edited(text) => {
+                        items-search-text-changed(text)
+                    }
+                }
+            }
+
+            VerticalBox {
+                alignment: stretch;
+                if is-empty-reason != "": HorizontalBox {
+                    horizontal-stretch: 0;
+                    vertical-stretch: 1;
+                    preferred-height: 100%;
+                    alignment: center;
+                    VerticalBox {
+                        width: 300px;
+                        alignment: center;
+                        Text {
+                            text: is-empty-reason;
+                            font-size: 24px;
+                            wrap: word-wrap;
+                        }
+
+                        Button {
+                            text: is-empty-button-text;
+                            visible: is-empty-button-text != "";
+                            clicked => {
+                                root.empty-action-clicked();
+                            }
+                        }
+                    }
+                }
+                items-table-view := StandardTableView {
+                    visible: !is-empty;
+                    horizontal-stretch: 1;
+                    rows: items-model;
+                    sort-ascending(index) => {
+                        items-sort-ascending(index)
+                    }
+                    sort-descending(index) => {
+                        items-sort-descending(index)
+                    }
+                    current-row-changed(index) => {
+                        items-current-row-changed()
+                    }
+                    row-pointer-event(row, event, point) => {
+                        items-row-pointer-event(row, event, {
+                            x: point.x + items-table-view.absolute-position.x,
+                            y: point.y + items-table-view.absolute-position.y
+                        })
+                    }
+                }
+            }
+        }
+    }
+}
