@@ -290,14 +290,14 @@ impl State {
 		Ok(new_phase)
 	}
 
-	pub fn handle_end(&mut self, callback: &mut impl FnMut(&str) -> bool, text: Option<String>) -> Result<()> {
+	pub fn handle_end(&mut self, callback: &mut impl FnMut(&str) -> bool, text: Option<String>) -> Result<Option<()>> {
 		event!(LOG, "handle_end(): self={:?}", self);
 
 		match self.phase_stack.last().unwrap_or(&Phase::Root) {
 			Phase::MachineDescription => {
 				let description = text.unwrap();
 				if !description.is_empty() && callback(&description) {
-					return Ok(());
+					return Ok(None);
 				}
 				let description_strindex = self.strings.lookup(&description);
 				self.machines.tweak(|x| x.description_strindex = description_strindex);
@@ -330,7 +330,7 @@ impl State {
 			}
 			_ => {}
 		};
-		Ok(())
+		Ok(Some(()))
 	}
 
 	pub fn into_data(mut self) -> Result<Box<[u8]>> {
@@ -548,9 +548,13 @@ pub fn data_from_listxml_output(
 			}
 
 			XmlEvent::End(s) => {
-				state
+				let result = state
 					.handle_end(&mut callback, s)
 					.map_err(|e| listxml_err(&reader, e))?;
+				if result.is_none() {
+					// user cancelled out
+					return Ok(None);
+				}
 				state.phase_stack.pop().unwrap();
 			}
 
