@@ -118,7 +118,15 @@ fn platform_specific_args() -> Vec<&'static str> {
 	}
 }
 
-fn preflight_checks(
+/// FIXME
+pub fn preflight_checks_public(
+	mame_executable_path: Option<&str>,
+	plugins_paths: &[impl AsRef<str>],
+) -> Vec<PreflightProblem> {
+	preflight_checks(mame_executable_path, plugins_paths, current_exe_lookup)
+}
+
+pub fn preflight_checks(
 	mame_executable_path: Option<&str>,
 	plugins_paths: &[impl AsRef<str>],
 	current_exe_lookup: impl Fn() -> Option<PathBuf>,

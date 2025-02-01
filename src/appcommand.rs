@@ -38,7 +38,6 @@ pub enum AppCommand {
 	SettingsReset,
 
 	// Help menu
-	HelpRefreshInfoDb,
 	HelpWebSite,
 	HelpAbout,
 
@@ -50,7 +49,6 @@ pub enum AppCommand {
 	ErrorMessageBox(String),
 
 	// Other
-	Shutdown,
 	RunMame {
 		machine_name: String,
 		initial_loads: Vec<(Arc<str>, Arc<str>)>,
@@ -94,6 +92,14 @@ pub enum AppCommand {
 		tag: String,
 	},
 	ChangeSlots(Vec<(String, Option<String>)>),
+	InfoDbBuildLoad {
+		force_refresh: bool,
+	},
+	InfoDbBuildProgress {
+		machine_description: String,
+	},
+	InfoDbBuildComplete,
+	InfoDbBuildCancel,
 }
 
 const MENU_PREFIX: &str = "MENU_";

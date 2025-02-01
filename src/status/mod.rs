@@ -17,7 +17,7 @@ use crate::version::MameVersion;
 
 const LOG: Level = Level::TRACE;
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct Status {
 	pub has_initialized: bool,
 	pub running: Option<Running>,

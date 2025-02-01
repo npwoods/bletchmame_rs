@@ -23,7 +23,6 @@ use tracing::Level;
 use unicase::UniCase;
 
 use crate::appcommand::AppCommand;
-use crate::dialogs::file::PathType;
 use crate::guiutils::menuing::MenuDesc;
 use crate::info;
 use crate::info::InfoDb;
@@ -534,19 +533,6 @@ pub enum EmptyReason {
 	Folder,
 	#[strum(to_string = "Nothing to show for some reason!")]
 	Unknown,
-}
-
-impl EmptyReason {
-	pub fn action(&self) -> Option<(AppCommand, &'static str)> {
-		match self {
-			EmptyReason::NoInfoDb => Some((AppCommand::ChoosePath(PathType::MameExecutable), "Find MAME")),
-			EmptyReason::NoSoftwareLists => Some((
-				AppCommand::ChoosePath(PathType::SoftwareLists),
-				"Find Software Lists...",
-			)),
-			_ => None,
-		}
-	}
 }
 
 #[derive(Clone)]

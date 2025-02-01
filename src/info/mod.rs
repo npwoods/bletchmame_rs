@@ -17,6 +17,8 @@ use std::marker::PhantomData;
 use std::ops::Range;
 use std::path::Path;
 use std::path::PathBuf;
+use std::process::Command;
+use std::process::Stdio;
 
 use anyhow::Error;
 use anyhow::Result;
@@ -26,6 +28,7 @@ use binary_serde::Endianness;
 use entities::SoftwareListsView;
 use internment::Arena;
 
+use crate::platform::CommandExt;
 use crate::prefs::prefs_filename;
 use crate::version::MameVersion;
 
@@ -150,6 +153,34 @@ impl InfoDb {
 		// we've succeeded at this point (or else we did something absurdly wrong)
 		let info_db = Self::new_internal(data, true).expect("data_from_listxml_output() created an invalid InfoDB");
 		Ok(Some(info_db))
+	}
+
+	pub fn from_child_process(mame_executable_path: &str, callback: impl FnMut(&str) -> bool) -> Result<Option<Self>> {
+		// launch the process
+		let mut process = Command::new(mame_executable_path)
+			.arg("-listxml")
+			.arg("-nodtd")
+			.stdout(Stdio::piped())
+			.create_no_window(true)
+			.spawn()?;
+
+		// access the MAME process stdout (which is input to us)
+		let input = process.stdout.as_mut().unwrap();
+
+		// process the InfoDB output
+		let reader = BufReader::new(input);
+		let db = InfoDb::from_listxml_output(reader, callback);
+
+		// if we either cancelled or errored, try to kill the process
+		if !matches!(db, Ok(Some(_))) {
+			let _ = process.kill();
+		}
+
+		// and close out the process (we don't want it to zombie)
+		let _ = process.wait();
+
+		// and return!
+		db
 	}
 
 	pub fn build(&self) -> &MameVersion {
