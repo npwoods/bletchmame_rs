@@ -6,20 +6,18 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
-use std::time::Instant;
 
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
 use slint::SharedString;
 use slint::Weak;
+use throttle::Throttle;
 use tokio::task::spawn_blocking;
 
 use crate::guiutils::modal::Modal;
 use crate::info::InfoDb;
 use crate::platform::CommandExt;
 use crate::ui::LoadingDialog;
-
-const UPDATE_INTERVAL: Duration = Duration::from_millis(250);
 
 /// Presents a modal dialog for loading InfoDb from `mame -listxml`
 pub async fn dialog_load_mame_info(
@@ -67,7 +65,8 @@ fn load_mame_info_thread_proc(
 	mut process: Child,
 	cancelled: Arc<AtomicBool>,
 ) -> Option<InfoDb> {
-	let mut last_updated_time = None;
+	// progress messages need to be throttled
+	let mut throttle = Throttle::new(Duration::from_millis(100), 1);
 
 	// access the MAME process stdout (which is input to us)
 	let input = process.stdout.as_mut().unwrap();
@@ -76,12 +75,8 @@ fn load_mame_info_thread_proc(
 	let dialog_weak_clone = dialog_weak.clone();
 	let info_db_callback = move |machine_description: &str| {
 		// do we need to update
-		if last_updated_time
-			.map(|x: Instant| x.elapsed() < UPDATE_INTERVAL)
-			.unwrap_or(true)
-		{
+		if throttle.accept().is_ok() {
 			// we do need to update
-			last_updated_time = Some(Instant::now());
 
 			// issue the request to update the machine on the dialog, and poll for
 			// cancellation while we're at it
