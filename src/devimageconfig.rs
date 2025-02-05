@@ -388,9 +388,8 @@ mod test {
 		let info_db = Rc::new(info_db);
 
 		// build the status
-		let mut status = Status::default();
 		let update = Update::parse(status_xml.as_bytes()).unwrap();
-		status.merge(update);
+		let status = Status::default().merge(update);
 
 		// now create the config and update the status
 		let config = DevicesImagesConfig::new(info_db);
