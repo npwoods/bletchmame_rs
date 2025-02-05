@@ -151,8 +151,7 @@ impl State {
 					must_be_loaded,
 					formats: Default::default(),
 				};
-				let image = self.running.images.as_mut().unwrap().last_mut().unwrap();
-				image.details = Some(details);
+				self.running.images.as_mut().unwrap().last_mut().unwrap().details = Some(details);
 				self.phase_specific = Some(PhaseSpecificState::Formats(Vec::with_capacity(32)));
 				Some(Phase::ImageDetails)
 			}

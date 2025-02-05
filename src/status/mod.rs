@@ -1,5 +1,6 @@
 mod parse;
 
+use std::borrow::Cow;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::io::BufRead;
@@ -25,9 +26,14 @@ pub struct Status {
 }
 
 impl Status {
-	pub fn merge(&mut self, update: Update) {
+	pub fn merge(&self, update: Update) -> Self {
 		let running = update.running.map(|running| {
-			let mut status_running = self.running.take().unwrap_or_default();
+			let status_running = self
+				.running
+				.as_ref()
+				.map(Cow::Borrowed)
+				.unwrap_or_else(|| Cow::Owned(Running::default()));
+			let mut status_running_images = status_running.images.iter().collect::<Vec<_>>();
 
 			let machine_name = running.machine_name;
 			let is_paused = running.is_paused.unwrap_or(status_running.is_paused);
@@ -38,10 +44,12 @@ impl Status {
 				images
 					.into_iter()
 					.filter_map(|update_image| {
-						let details = update_image.details.or_else(|| {
-							let idx = status_running.images.iter().position(|x| x.tag == update_image.tag)?;
-							Some(status_running.images.remove(idx).details)
-						})?;
+						let details = if let Some(details) = update_image.details {
+							details
+						} else {
+							let idx = status_running_images.iter().position(|x| x.tag == update_image.tag)?;
+							status_running_images.remove(idx).details.clone()
+						};
 
 						let new_status_image = Image {
 							tag: update_image.tag,
@@ -50,11 +58,15 @@ impl Status {
 						};
 						Some(new_status_image)
 					})
-					.collect::<Vec<_>>()
+					.collect()
 			} else {
-				status_running.images
+				status_running.images.clone()
 			};
-			let slots = running.slots.unwrap_or(status_running.slots);
+			let slots = if let Some(slots) = running.slots {
+				slots.into_iter().collect()
+			} else {
+				status_running.slots.clone()
+			};
 
 			Running {
 				machine_name,
@@ -67,9 +79,11 @@ impl Status {
 			}
 		});
 		event!(LOG, "Status::merge(): running={:?}", running);
-		self.running = running;
-		self.has_initialized = true;
-		self.build = update.build
+		Self {
+			running,
+			has_initialized: true,
+			build: update.build,
+		}
 	}
 }
 
@@ -90,8 +104,8 @@ pub struct Running {
 	pub is_throttled: bool,
 	pub throttle_rate: f32,
 	pub sound_attenuation: i32,
-	pub images: Vec<Image>,
-	pub slots: Vec<Slot>,
+	pub images: Arc<[Image]>,
+	pub slots: Arc<[Slot]>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
@@ -194,7 +208,7 @@ mod test {
 		}
 
 		// fresh status
-		let mut status = Status::default();
+		let status = Status::default();
 		assert!(status.running.is_none());
 
 		// status after a non-running update
@@ -202,25 +216,25 @@ mod test {
 		assert!(status.running.is_none());
 
 		// status after running
-		status.merge(update(xml1));
+		let status = status.merge(update(xml1));
 		let run = status.running.as_ref().unwrap();
 		let actual = (run.is_paused, run.is_throttled, run.throttle_rate);
 		assert_eq!((true, true, 1.0), actual);
 
 		// unpaused...
-		status.merge(update(xml2));
+		let status = status.merge(update(xml2));
 		let run = status.running.as_ref().unwrap();
 		let actual = (run.is_paused, run.is_throttled, run.throttle_rate);
 		assert_eq!((false, true, 1.0), actual);
 
 		// null update
-		status.merge(update(xml3));
+		let status = status.merge(update(xml3));
 		let run = status.running.as_ref().unwrap();
 		let actual = (run.is_paused, run.is_throttled, run.throttle_rate);
 		assert_eq!((false, true, 1.0), actual);
 
 		// speed it up!
-		status.merge(update(xml4));
+		let status = status.merge(update(xml4));
 		let run = status.running.as_ref().unwrap();
 		let actual = (run.is_paused, run.is_throttled, run.throttle_rate);
 		assert_eq!((false, false, 3.0), actual);

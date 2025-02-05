@@ -244,12 +244,7 @@ impl AppState {
 
 	/// Apply a `worker_ui` status update
 	pub fn status_update(&self, update: Update) -> Option<Self> {
-		let status = {
-			let mut status = self.status().unwrap().clone();
-			status.merge(update);
-			Rc::new(status)
-		};
-
+		let status = Rc::new(self.status().unwrap().merge(update));
 		let phase = Phase::Active { status };
 		let new_state = Self { phase, ..self.clone() };
 		Some(new_state)
