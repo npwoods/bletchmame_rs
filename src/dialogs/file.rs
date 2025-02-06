@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::path::Path;
 
 use derive_enum_all_values::AllValues;
@@ -6,13 +7,25 @@ use rfd::FileDialog;
 use serde::Deserialize;
 use serde::Serialize;
 use slint::ComponentHandle;
+use strum_macros::EnumString;
 
 use crate::prefs::PrefsPaths;
 
 const EXE_EXTENSION: &str = if cfg!(target_os = "windows") { "exe" } else { "" };
 
 #[derive(
-	AllValues, Clone, Copy, Debug, Default, strum_macros::Display, PartialEq, Eq, Hash, Serialize, Deserialize,
+	AllValues,
+	Clone,
+	Copy,
+	Debug,
+	Default,
+	strum_macros::Display,
+	EnumString,
+	PartialEq,
+	Eq,
+	Hash,
+	Serialize,
+	Deserialize,
 )]
 pub enum PathType {
 	#[default]
@@ -111,8 +124,34 @@ enum PickType {
 	Dir,
 }
 
-pub fn file_dialog(_parent: &impl ComponentHandle, path_type: PathType) -> Option<String> {
+pub fn file_dialog(_parent: &impl ComponentHandle, path_type: PathType, initial: Option<&Path>) -> Option<String> {
+	// determine the initial directory and/or file
+	let (initial_directory, initial_file) = if let Some(initial) = initial {
+		let metadata = initial.metadata().ok();
+		if metadata.as_ref().is_some_and(|x| x.is_dir()) {
+			(Some(initial), None)
+		} else if metadata.as_ref().is_some_and(|x| x.is_file()) {
+			(initial.parent(), initial.file_name().and_then(OsStr::to_str))
+		} else {
+			(None, None)
+		}
+	} else {
+		(None, None)
+	};
+
+	// create the dialog and specify the initials
 	let dialog = FileDialog::new();
+	let dialog = if let Some(initial_directory) = initial_directory {
+		dialog.set_directory(initial_directory)
+	} else {
+		dialog
+	};
+	let dialog = if let Some(initial_file) = initial_file {
+		dialog.set_file_name(initial_file)
+	} else {
+		dialog
+	};
+
 	let path = match path_type.pick_type() {
 		PickType::File { name, extension } => dialog.add_filter(name, &[extension]).pick_file(),
 		PickType::Dir => dialog.pick_folder(),

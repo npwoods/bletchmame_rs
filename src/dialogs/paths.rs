@@ -2,6 +2,7 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::default::Default;
 use std::fmt::Debug;
+use std::path::Path;
 use std::rc::Rc;
 
 use slint::CloseRequestResponse;
@@ -151,7 +152,17 @@ fn update_paths_entries(dialog: &PathsDialog, paths: &PrefsPaths) {
 
 fn browse_clicked(dialog: &PathsDialog) {
 	let path_type = path_type(dialog);
-	let Some(path) = file_dialog(dialog, path_type) else {
+	let existing_path = usize::try_from(dialog.get_path_entry_index()).ok().and_then(|index| {
+		dialog
+			.get_path_entries()
+			.as_any()
+			.downcast_ref::<PathEntriesModel>()
+			.unwrap()
+			.entry(index)
+	});
+	let existing_path = existing_path.as_ref().map(Path::new);
+
+	let Some(path) = file_dialog(dialog, path_type, existing_path) else {
 		return;
 	};
 	let Ok(row) = usize::try_from(dialog.get_path_entry_index()) else {
@@ -248,6 +259,10 @@ impl PathEntriesModel {
 	pub fn entries(&self) -> Vec<SharedString> {
 		let data = self.data.borrow();
 		data.0.iter().map(|(s, _)| s.clone()).collect()
+	}
+
+	pub fn entry(&self, index: usize) -> Option<SharedString> {
+		self.data.borrow().0.get(index).cloned().map(|x| x.0)
 	}
 
 	pub fn set_entry(&self, row: usize, text: impl Into<SharedString>, exists: bool) {

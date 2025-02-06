@@ -1184,7 +1184,7 @@ fn update_empty_reason(model: &AppModel, empty_reason: Option<EmptyReason>) {
 
 fn choose_path(model: &Rc<AppModel>, path_type: PathType) {
 	// open the file dialog
-	let Some(path) = file_dialog(&model.app_window(), path_type) else {
+	let Some(path) = file_dialog(&model.app_window(), path_type, None) else {
 		return;
 	};
 
