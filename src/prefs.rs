@@ -30,7 +30,7 @@ const LOG: Level = Level::DEBUG;
 #[serde(rename_all = "camelCase")]
 pub struct Preferences {
 	#[serde(skip)]
-	pub prefs_path: Option<PathBuf>,
+	pub prefs_path: PathBuf,
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub paths: Rc<PrefsPaths>,
@@ -212,7 +212,9 @@ const PREFS: Option<&str> = Some("BletchMAME.json");
 const PREFS_BACKUP: Option<&str> = Some("BletchMAME.backup.json");
 
 impl Preferences {
-	pub fn load(prefs_path: Option<impl AsRef<Path> + Copy>) -> Result<Option<Self>> {
+	pub fn load(prefs_path: impl AsRef<Path>) -> Result<Option<Self>> {
+		let prefs_path = prefs_path.as_ref();
+
 		// try to load the preferences
 		let path = prefs_filename(prefs_path, PREFS)?;
 		let result = load_prefs(&path);
@@ -229,7 +231,7 @@ impl Preferences {
 
 		// store the prefs_path and return
 		if let Ok(Some(mut result)) = result {
-			result.prefs_path = prefs_path.map(|x| x.as_ref().to_path_buf());
+			result.prefs_path = prefs_path.to_path_buf();
 			Ok(Some(result))
 		} else {
 			result
@@ -237,32 +239,23 @@ impl Preferences {
 	}
 
 	pub fn save(&self) -> Result<()> {
-		if let Some(prefs_path) = &self.prefs_path {
-			ensure_directory(prefs_path);
-		}
-		let path = prefs_filename(self.prefs_path.as_ref(), PREFS)?;
+		ensure_directory(&self.prefs_path);
+		let path = prefs_filename(&self.prefs_path, PREFS)?;
 		save_prefs(self, &path)
 	}
 
-	pub fn fresh(prefs_path: Option<PathBuf>) -> Self {
+	pub fn fresh(prefs_path: PathBuf) -> Self {
 		let json = include_str!("prefs_fresh.json");
 		let mut result = load_prefs_from_reader(json.as_bytes()).unwrap();
-		Rc::get_mut(&mut result.paths).unwrap().cfg = prefs_path
-			.as_ref()
-			.and_then(|x| x.clone().into_os_string().into_string().ok());
-		Rc::get_mut(&mut result.paths).unwrap().nvram = prefs_path
-			.as_ref()
-			.and_then(|x| x.clone().into_os_string().into_string().ok());
+		Rc::get_mut(&mut result.paths).unwrap().cfg = prefs_path.to_str().map(str::to_string);
+		Rc::get_mut(&mut result.paths).unwrap().nvram = prefs_path.to_str().map(str::to_string);
 		result.prefs_path = prefs_path;
 		result
 	}
 }
 
-pub fn prefs_filename(prefs_path: Option<impl AsRef<Path>>, filename: Option<&str>) -> Result<PathBuf> {
-	let mut pathbuf = prefs_path
-		.ok_or_else(|| Error::msg("Cannot find preferences directory"))?
-		.as_ref()
-		.to_path_buf();
+pub fn prefs_filename(prefs_path: impl AsRef<Path>, filename: Option<&str>) -> Result<PathBuf> {
+	let mut pathbuf = prefs_path.as_ref().to_path_buf();
 	if let Some(filename) = filename {
 		pathbuf.push(filename);
 	}
@@ -305,7 +298,7 @@ fn prefs_treatments(prefs: &mut Preferences) {
 
 	// ensure that history is not empty
 	if prefs.history.is_empty() {
-		prefs.history = Preferences::fresh(None).history;
+		prefs.history = Preferences::fresh("".into()).history;
 	}
 
 	// enforce that history_position points to a valid entry
@@ -313,7 +306,7 @@ fn prefs_treatments(prefs: &mut Preferences) {
 
 	// enforce that we have at least one column
 	if prefs.items_columns.is_empty() {
-		prefs.items_columns = Preferences::fresh(None).items_columns;
+		prefs.items_columns = Preferences::fresh("".into()).items_columns;
 		assert!(!prefs.items_columns.is_empty());
 	}
 }
@@ -344,6 +337,7 @@ fn ensure_directory(path: &impl AsRef<Path>) {
 #[cfg(test)]
 mod test {
 	use std::fs::File;
+	use std::path::PathBuf;
 
 	use assert_matches::assert_matches;
 	use tempdir::TempDir;
@@ -355,13 +349,18 @@ mod test {
 
 	#[test]
 	pub fn test() {
-		let prefs = Preferences::fresh(None);
+		let prefs_path = PathBuf::from("/cfg/BletchMAME");
+		let prefs = Preferences::fresh(prefs_path.clone());
 		let json = save_prefs_to_string(&prefs).expect("Failed to save fresh prefs");
 
 		let fresh_json = include_str!("prefs_fresh.json");
 		assert_eq!(fresh_json.replace('\r', ""), json.replace('\r', ""));
 
 		let new_prefs = load_prefs_from_reader(json.as_bytes()).expect("Failed to load saved fresh prefs");
+		let new_prefs = Preferences {
+			prefs_path,
+			..new_prefs
+		};
 		assert_eq!(prefs, new_prefs);
 	}
 
