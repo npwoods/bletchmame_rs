@@ -23,7 +23,7 @@ const LOG: Level = Level::TRACE;
 #[derive(Clone)]
 pub struct Status {
 	pub running: Option<Running>,
-	pub build: Option<MameVersion>,
+	pub build: MameVersion,
 }
 
 impl Status {
@@ -133,7 +133,7 @@ pub struct ImageFormat {
 #[derive(Clone, Deserialize, Serialize, PartialEq)]
 pub struct Update {
 	running: Option<RunningUpdate>,
-	build: Option<MameVersion>,
+	build: MameVersion,
 }
 
 impl Update {

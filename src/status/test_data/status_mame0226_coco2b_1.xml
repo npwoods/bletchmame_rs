@@ -1,5 +1,6 @@
 <status
 	romname="coco2b"
+	app_version="0.226"
 	phase="running"
 	polling_input_seq="false"
 	natural_keyboard_in_use="false"

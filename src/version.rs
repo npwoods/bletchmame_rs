@@ -26,6 +26,12 @@ impl MameVersion {
 		self.major_minor.is_none() || !self.full_text.is_empty()
 	}
 
+	pub fn parse_simple(s: impl AsRef<str>) -> Option<Self> {
+		let (major, minor) = s.as_ref().split_once('.')?;
+		let (major, minor) = (major.parse().ok()?, minor.parse().ok()?);
+		Some(Self::new(major, minor))
+	}
+
 	fn proxy_key(self: &MameVersion) -> Option<impl Ord> {
 		self.major_minor
 			.map(|(major, minor)| (major, minor, self.is_dirty() as u8))

@@ -968,7 +968,7 @@ async fn show_paths_dialog(model: Rc<AppModel>) {
 fn update_menus(model: &AppModel) {
 	// calculate properties
 	let state = model.state.borrow();
-	let build = state.status().and_then(|s| s.build.as_ref());
+	let build = state.status().map(|s| &s.build);
 	let running = state.status().and_then(|s| s.running.as_ref());
 	let has_mame_executable = model.preferences.borrow().paths.mame_executable.is_some();
 	let is_running = running.is_some();
