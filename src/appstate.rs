@@ -8,6 +8,7 @@ use std::thread::spawn;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
+use anyhow::Error;
 use anyhow::Result;
 use slint::invoke_from_event_loop;
 use strum::EnumProperty;
@@ -39,7 +40,8 @@ enum Phase {
 		issues: Rc<[Message]>,
 	},
 	InfoDbBuilding {
-		job: Rc<RefCell<Option<InfoDbBuildJob>>>,
+		job: Job<Result<Option<InfoDb>>>,
+		cancelled: Arc<AtomicBool>,
 		machine_description: Option<String>,
 	},
 	Active {
@@ -65,10 +67,7 @@ pub struct Button {
 }
 
 #[derive(Debug)]
-struct InfoDbBuildJob {
-	cancelled: Arc<AtomicBool>,
-	join_handle: JoinHandle<Result<Option<InfoDb>>>,
-}
+struct Job<T>(Rc<RefCell<Option<JoinHandle<T>>>>);
 
 #[derive(strum::Display, Clone, Debug, EnumProperty)]
 pub enum Message {
@@ -144,14 +143,14 @@ impl AppState {
 				issues,
 			}
 		} else if info_db.is_none() || force_refresh {
-			let job = spawn_infodb_build_thread(
+			let (job, cancelled) = spawn_infodb_build_thread(
 				prefs_path,
 				paths.mame_executable.as_ref().unwrap(),
 				self.callback.clone(),
 			);
-			let job = Rc::new(RefCell::new(Some(job)));
 			Phase::InfoDbBuilding {
 				job,
+				cancelled,
 				machine_description: None,
 			}
 		} else {
@@ -168,12 +167,13 @@ impl AppState {
 	}
 
 	pub fn infodb_build_progress(&self, machine_description: String) -> Option<Self> {
-		let Phase::InfoDbBuilding { job, .. } = &self.phase else {
+		let Phase::InfoDbBuilding { job, cancelled, .. } = &self.phase else {
 			unreachable!()
 		};
 
 		let phase = Phase::InfoDbBuilding {
 			job: job.clone(),
+			cancelled: cancelled.clone(),
 			machine_description: Some(machine_description),
 		};
 		let new_state = Self { phase, ..self.clone() };
@@ -190,14 +190,13 @@ impl AppState {
 
 	fn internal_infodb_build_complete(&self, cancel: bool) -> Option<Self> {
 		// we expect to be in the process of building, and to be able to "take" the job
-		let Phase::InfoDbBuilding { job, .. } = &self.phase else {
+		let Phase::InfoDbBuilding { job, cancelled, .. } = &self.phase else {
 			unreachable!()
 		};
-		let job = job.borrow_mut().take().unwrap();
 
 		// if specified, cancel the build
 		if cancel {
-			job.cancelled.store(true, Ordering::Relaxed);
+			cancelled.store(true, Ordering::Relaxed);
 		}
 
 		// join the job (which we expect to complete) and digest the result
@@ -206,7 +205,7 @@ impl AppState {
 		//   - we ignore the result from the job; there can be a race condition where the
 		//     job actually yields something other than `Ok(None)`
 		//   - we might have had an existing InfoDb; it should be used if available
-		let result = job.join_handle.join().unwrap();
+		let result = job.join().unwrap();
 		let result = if cancel { Ok(None) } else { result };
 		let result = match (result, &self.info_db) {
 			(Ok(Some(info_db)), _) => Ok(Rc::new(info_db)),
@@ -415,15 +414,16 @@ fn spawn_infodb_build_thread(
 	prefs_path: &Path,
 	mame_executable_path: &str,
 	callback: CommandCallback,
-) -> InfoDbBuildJob {
+) -> (Job<Result<Option<InfoDb>>>, Arc<AtomicBool>) {
 	let prefs_path = prefs_path.to_path_buf();
 	let mame_executable_path = mame_executable_path.to_string();
 	let callback_bubble = ThreadLocalBubble::new(callback);
 	let cancelled = Arc::new(AtomicBool::from(false));
-	let cancelled_clone = cancelled.clone();
-	let join_handle =
-		spawn(move || infodb_build_thread_proc(&prefs_path, &mame_executable_path, callback_bubble, cancelled_clone));
-	InfoDbBuildJob { cancelled, join_handle }
+	let job = {
+		let cancelled = cancelled.clone();
+		Job::new(move || infodb_build_thread_proc(&prefs_path, &mame_executable_path, callback_bubble, cancelled))
+	};
+	(job, cancelled)
 }
 
 fn infodb_build_thread_proc(
@@ -477,4 +477,32 @@ fn infodb_build_thread_proc(
 
 	// and return the result
 	result
+}
+
+impl<T> Job<T>
+where
+	T: Send + 'static,
+{
+	pub fn new(f: impl FnOnce() -> T + Send + 'static) -> Self {
+		let join_handle = spawn(f);
+		Self(Rc::new(RefCell::new(Some(join_handle))))
+	}
+
+	pub fn join(&self) -> Result<T> {
+		let join_handle = self.0.borrow_mut().take().ok_or_else(|| {
+			let message = "Job::join() invoked multiple times";
+			Error::msg(message)
+		})?;
+		let result = join_handle.join().map_err(|_| {
+			let message = "JoinHandle::join() failed";
+			Error::msg(message)
+		})?;
+		Ok(result)
+	}
+}
+
+impl<T> Clone for Job<T> {
+	fn clone(&self) -> Self {
+		Self(Rc::clone(&self.0))
+	}
 }
