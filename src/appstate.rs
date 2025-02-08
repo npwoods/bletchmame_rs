@@ -29,6 +29,8 @@ use crate::runtime::MameStderr;
 use crate::runtime::MameWindowing;
 use crate::status::Status;
 use crate::status::Update;
+use crate::status::UpdateXmlProblem;
+use crate::status::ValidationError;
 use crate::threadlocalbubble::ThreadLocalBubble;
 
 #[derive(Clone)]
@@ -60,6 +62,7 @@ struct Session {
 enum Failure {
 	Preflight(Vec<PreflightProblem>),
 	SessionError(Error),
+	InvalidStatusUpdate(Vec<UpdateXmlProblem>),
 	InfoDbBuild(Error),
 	InfoDbBuildCancelled,
 }
@@ -330,6 +333,21 @@ impl AppState {
 
 	/// Apply a `worker_ui` status update
 	pub fn status_update(&self, update: Update) -> Option<Self> {
+		// validate the status update
+		if let Err(e) = update.validate(self.info_db.as_ref().unwrap()) {
+			return match e {
+				ValidationError::VersionMismatch(_, _) => self.reset(true, true),
+				ValidationError::Invalid(errors) => {
+					let failure = Some(Rc::new(Failure::InvalidStatusUpdate(errors)));
+					let new_status = Self {
+						failure,
+						..self.clone()
+					};
+					Some(new_status)
+				}
+			};
+		}
+
 		// merge the new status
 		let new_status = self.status().unwrap().merge(update);
 
@@ -423,6 +441,7 @@ impl AppState {
 			ShuttingDown,
 			PreflightFailure(&'a [PreflightProblem]),
 			SessionError(&'a Error),
+			InvalidStatusUpdate(&'a [UpdateXmlProblem]),
 			InfoDbBuildFailure(Option<&'a Error>),
 		}
 
@@ -444,6 +463,9 @@ impl AppState {
 				Some(ReportType::PreflightFailure(preflight_problems.as_slice()))
 			}
 			(None, Some(Failure::SessionError(e)), false, false) => Some(ReportType::SessionError(e)),
+			(None, Some(Failure::InvalidStatusUpdate(e)), false, false) => {
+				Some(ReportType::InvalidStatusUpdate(e.as_slice()))
+			}
 			(None, Some(Failure::InfoDbBuild(e)), false, false) => Some(ReportType::InfoDbBuildFailure(Some(e))),
 			(None, Some(Failure::InfoDbBuildCancelled), false, false) => Some(ReportType::InfoDbBuildFailure(None)),
 			(None, None, false, false) => None,
@@ -502,6 +524,20 @@ impl AppState {
 				submessage: Some(format!("{error}").into()),
 				..Default::default()
 			},
+			ReportType::InvalidStatusUpdate(errors) => {
+				let issues = errors
+					.iter()
+					.map(|e| Issue {
+						text: format!("{e}").into(),
+						button: None,
+					})
+					.collect();
+				Report {
+					message: "Status update from MAME is incorrect".into(),
+					issues,
+					..Default::default()
+				}
+			}
 			ReportType::InfoDbBuildFailure(error) => {
 				let message = if error.is_some() {
 					"Failure processing machine information from MAME"

@@ -1,5 +1,5 @@
 mod parse;
-
+mod validate;
 use std::borrow::Cow;
 use std::fmt::Debug;
 use std::fmt::Formatter;
@@ -11,8 +11,10 @@ use serde::Deserialize;
 use serde::Serialize;
 use tracing::event;
 use tracing::Level;
+use validate::validate_update;
 
 use crate::debugstr::DebugString;
+use crate::info::InfoDb;
 use crate::status::parse::parse_update;
 use crate::version::MameVersion;
 
@@ -142,6 +144,10 @@ impl Update {
 	pub fn parse(reader: impl BufRead) -> Result<Self> {
 		parse_update(reader)
 	}
+
+	pub fn validate(&self, info_db: &InfoDb) -> std::result::Result<(), ValidationError> {
+		validate_update(self, info_db)
+	}
 }
 
 impl Debug for Update {
@@ -184,6 +190,20 @@ pub struct Slot {
 pub struct SlotOption {
 	pub name: String,
 	pub selectable: bool,
+}
+
+#[derive(thiserror::Error, Debug, PartialEq)]
+pub enum ValidationError {
+	#[error("Version mismatch; MAME is {0} InfoDb is {1}")]
+	VersionMismatch(MameVersion, MameVersion),
+	#[error("Invalid Update: {0:?}")]
+	Invalid(Vec<UpdateXmlProblem>),
+}
+
+#[derive(thiserror::Error, Debug, PartialEq)]
+pub enum UpdateXmlProblem {
+	#[error("Machine {0} not found in InfoDb")]
+	UnknownMachine(String),
 }
 
 #[cfg(test)]
