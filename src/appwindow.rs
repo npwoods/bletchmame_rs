@@ -478,12 +478,7 @@ pub fn create(args: AppArgs) -> AppWindow {
 		if is_context_menu_event(&evt) {
 			let index = usize::try_from(index).unwrap();
 			let folder_info = get_folder_collections(&model_clone.preferences.borrow().collections);
-			let has_mame_initialized = model_clone
-				.state
-				.borrow()
-				.status()
-				.map(|s| s.has_initialized)
-				.unwrap_or_default();
+			let has_mame_initialized = model_clone.state.borrow().status().is_some();
 			if let Some(popup_menu) =
 				model_clone.with_items_table_model(|x| x.context_commands(index, &folder_info, has_mame_initialized))
 			{

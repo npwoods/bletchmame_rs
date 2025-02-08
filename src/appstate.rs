@@ -55,7 +55,7 @@ struct InfoDbBuild {
 #[derive(Clone)]
 struct Session {
 	mame_session: Rc<RefCell<Option<MameSession>>>,
-	status: Rc<Status>,
+	status: Option<Rc<Status>>,
 }
 
 #[derive(Debug)]
@@ -171,7 +171,7 @@ impl AppState {
 	pub fn is_running_with_queue_empty(&self) -> bool {
 		self.session
 			.as_ref()
-			.map(|s| s.status.has_initialized && !s.mame_session.borrow().as_ref().unwrap().has_pending_commands())
+			.map(|s| s.status.is_some() && !s.mame_session.borrow().as_ref().unwrap().has_pending_commands())
 			.unwrap_or_default()
 	}
 
@@ -253,8 +253,10 @@ impl AppState {
 			let mame_args = MameArgumentsSource::new(self.paths.as_ref(), &self.fixed.mame_windowing).into();
 			let mame_session = MameSession::new(mame_args, event_callback, self.fixed.mame_stderr);
 			let mame_session = Rc::new(RefCell::new(Some(mame_session)));
-			let status = Rc::new(Status::default());
-			Session { mame_session, status }
+			Session {
+				mame_session,
+				status: None,
+			}
 		});
 
 		// format the preflight failures (if present)
@@ -349,11 +351,19 @@ impl AppState {
 		}
 
 		// merge the new status
-		let new_status = self.status().unwrap().merge(update);
+		let new_status = self
+			.session
+			.as_ref()
+			.unwrap()
+			.status
+			.as_deref()
+			.map(Cow::Borrowed)
+			.unwrap_or_else(|| Cow::Owned(Status::default()))
+			.merge(update);
 
 		// update the session
 		let session = Session {
-			status: Rc::new(new_status),
+			status: Some(Rc::new(new_status)),
 			..self.session.as_ref().unwrap().clone()
 		};
 
@@ -415,7 +425,7 @@ impl AppState {
 	}
 
 	pub fn status(&self) -> Option<&'_ Status> {
-		self.session.as_ref().map(|x| x.status.as_ref())
+		self.session.as_ref().and_then(|x| x.status.as_deref())
 	}
 
 	pub fn running_machine_description(&self) -> &'_ str {
@@ -447,7 +457,7 @@ impl AppState {
 
 		// upfront logic to determine the type of report presented, if any; keep
 		// this logic distinct from the mechanics of displaying the report
-		let is_starting_up = self.status().is_some_and(|s| !s.has_initialized);
+		let is_starting_up = self.session.as_ref().is_some_and(|x| x.status.is_none());
 		let report_type = match (
 			self.info_db_build.as_ref(),
 			self.failure.as_deref(),

@@ -22,7 +22,6 @@ const LOG: Level = Level::TRACE;
 
 #[derive(Clone, Default)]
 pub struct Status {
-	pub has_initialized: bool,
 	pub running: Option<Running>,
 	pub build: Option<MameVersion>,
 }
@@ -83,7 +82,6 @@ impl Status {
 		event!(LOG, "Status::merge(): running={:?}", running);
 		Self {
 			running,
-			has_initialized: true,
 			build: update.build,
 		}
 	}
@@ -92,7 +90,6 @@ impl Status {
 impl Debug for Status {
 	fn fmt(&self, fmt: &mut Formatter<'_>) -> std::fmt::Result {
 		fmt.debug_struct("Status")
-			.field("has_initialized", &self.has_initialized)
 			.field("running", &self.running.as_ref().map(DebugString::elipsis))
 			.field("build", &self.build)
 			.finish()
