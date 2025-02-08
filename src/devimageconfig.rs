@@ -389,7 +389,7 @@ mod test {
 
 		// build the status
 		let update = Update::parse(status_xml.as_bytes()).unwrap();
-		let status = Status::default().merge(update);
+		let status = Status::new(None, update);
 
 		// now create the config and update the status
 		let config = DevicesImagesConfig::new(info_db);

@@ -6,8 +6,8 @@ use crate::status::ValidationError;
 
 pub fn validate_update(update: &Update, info_db: &InfoDb) -> Result<(), ValidationError> {
 	// first order of business is to check for a version mismatch
-	if let Some(mame_build) = update.build.as_ref().and_then(|b| (b != info_db.build()).then_some(b)) {
-		let mame_build = mame_build.clone();
+	if update.build != *info_db.build() {
+		let mame_build = update.build.clone();
 		let infodb_build = info_db.build().clone();
 		Err(ValidationError::VersionMismatch(mame_build, infodb_build))
 	} else {
@@ -47,13 +47,12 @@ mod test {
 	use crate::version::MameVersion;
 
 	fn vers(s: &str) -> MameVersion {
-		let (major, minor) = s.split_once('.').unwrap();
-		MameVersion::new(major.parse().unwrap(), minor.parse().unwrap())
+		MameVersion::parse_simple(s).unwrap()
 	}
 
-	#[test_case(0, include_str!("../info/test_data/listxml_coco.xml"), include_str!("test_data/status_mame0270_coco2b_1.xml"), Ok(()))]
+	#[test_case(0, include_str!("../info/test_data/listxml_c64.xml"), include_str!("test_data/status_mame0273_c64_1.xml"), Ok(()))]
 	#[test_case(1, include_str!("../info/test_data/listxml_alienar.xml"), include_str!("test_data/status_mame0273_c64_1.xml"), Err(VersionMismatch(vers("0.273"), vers("0.229"))))]
-	#[test_case(2, include_str!("../info/test_data/listxml_fake.xml"), include_str!("test_data/status_mame0270_coco2b_1.xml"), Err(Invalid(vec![UnknownMachine("coco2b".into())])))]
+	#[test_case(2, include_str!("../info/test_data/listxml_c64.xml"), include_str!("test_data/status_mame0273_alienar_1.xml"), Err(Invalid(vec![UnknownMachine("alienar".into())])))]
 	pub fn test(_index: usize, info_xml: &str, update_xml: &str, expected: Result<(), ValidationError>) {
 		let info_db = InfoDb::from_listxml_output(info_xml.as_bytes(), |_| false)
 			.unwrap()

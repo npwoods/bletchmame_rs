@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::cell::RefCell;
 use std::iter::once;
 use std::path::PathBuf;
@@ -478,12 +477,7 @@ pub fn create(args: AppArgs) -> AppWindow {
 		if is_context_menu_event(&evt) {
 			let index = usize::try_from(index).unwrap();
 			let folder_info = get_folder_collections(&model_clone.preferences.borrow().collections);
-			let has_mame_initialized = model_clone
-				.state
-				.borrow()
-				.status()
-				.map(|s| s.has_initialized)
-				.unwrap_or_default();
+			let has_mame_initialized = model_clone.state.borrow().status().is_some();
 			if let Some(popup_menu) =
 				model_clone.with_items_table_model(|x| x.context_commands(index, &folder_info, has_mame_initialized))
 			{
@@ -974,21 +968,14 @@ async fn show_paths_dialog(model: Rc<AppModel>) {
 fn update_menus(model: &AppModel) {
 	// calculate properties
 	let state = model.state.borrow();
-	let running_status = state
-		.status()
-		.map(Cow::Borrowed)
-		.unwrap_or_else(|| Cow::Owned(Status::default()));
+	let build = state.status().map(|s| &s.build);
+	let running = state.status().and_then(|s| s.running.as_ref());
 	let has_mame_executable = model.preferences.borrow().paths.mame_executable.is_some();
-	let is_running = running_status.running.is_some();
-	let is_paused = running_status.running.as_ref().map(|r| r.is_paused).unwrap_or_default();
-	let is_throttled = running_status
-		.running
-		.as_ref()
-		.map(|r| r.is_throttled)
-		.unwrap_or_default();
-	let throttle_rate = running_status.running.as_ref().map(|r| r.throttle_rate);
-	let is_sound_enabled = running_status
-		.running
+	let is_running = running.is_some();
+	let is_paused = running.as_ref().map(|r| r.is_paused).unwrap_or_default();
+	let is_throttled = running.as_ref().map(|r| r.is_throttled).unwrap_or_default();
+	let throttle_rate = running.as_ref().map(|r| r.throttle_rate);
+	let is_sound_enabled = running
 		.as_ref()
 		.map(|r| r.sound_attenuation > SOUND_ATTENUATION_OFF)
 		.unwrap_or_default();
@@ -1017,7 +1004,7 @@ fn update_menus(model: &AppModel) {
 				.as_ref()
 				.ok()
 				.and_then(AppCommand::minimum_mame_version)
-				.is_none_or(|a| running_status.build.as_ref().is_some_and(|b| b >= &a))
+				.is_none_or(|a| build.is_some_and(|b| b >= &a))
 		});
 		MenuItemUpdate { enabled, checked }
 	});

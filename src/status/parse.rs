@@ -64,7 +64,8 @@ impl State {
 		let phase = self.phase_stack.last().unwrap_or(&Phase::Root);
 		let new_phase = match (phase, evt.name().as_ref()) {
 			(Phase::Root, b"status") => {
-				let [romname, is_paused, app_build] = evt.find_attributes([b"romname", b"paused", b"app_build"])?;
+				let [romname, is_paused, app_build, app_version] =
+					evt.find_attributes([b"romname", b"paused", b"app_build", b"app_version"])?;
 				let machine_name = romname.unwrap_or_default().to_string();
 				let is_paused = is_paused.map(|x| parse_mame_bool(x.as_ref())).transpose()?;
 				event!(
@@ -74,7 +75,10 @@ impl State {
 					is_paused
 				);
 
-				self.build = app_build.map(MameVersion::from);
+				let app_build = app_build.map(MameVersion::from);
+				let app_version = app_version.and_then(MameVersion::parse_simple);
+
+				self.build = app_build.or(app_version);
 				self.running.machine_name = machine_name;
 				self.running.is_paused = is_paused;
 				Some(Phase::Status)
@@ -291,10 +295,11 @@ pub fn parse_update(reader: impl BufRead) -> Result<Update> {
 	}
 
 	let running = (!state.running.machine_name.is_empty()).then_some(state.running);
-	let result = Update {
-		running,
-		build: state.build,
-	};
+	let build = state.build.take().ok_or_else(|| {
+		let message = "Could not identify build";
+		Error::msg(message)
+	})?;
+	let result = Update { running, build };
 	Ok(result)
 }
 

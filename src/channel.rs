@@ -2,12 +2,10 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-#[derive(Default)]
 pub struct Channel<T>(Rc<RefCell<ChannelInner<T>>>);
 
 type Callback<T> = Box<dyn Fn(&T) + 'static>;
 
-#[derive(Default)]
 struct ChannelInner<T> {
 	subscribers: Vec<Option<Callback<T>>>,
 }
@@ -70,5 +68,14 @@ impl<T> Clone for Channel<T> {
 impl<T> Drop for Subscription<T> {
 	fn drop(&mut self) {
 		self.channel.unsubscribe(self.id);
+	}
+}
+
+impl<T> Default for Channel<T> {
+	fn default() -> Self {
+		let inner = ChannelInner {
+			subscribers: Default::default(),
+		};
+		Self(Rc::new(RefCell::new(inner)))
 	}
 }
