@@ -125,7 +125,7 @@ impl InfoDb {
 		Ok(result)
 	}
 
-	pub fn load(prefs_path: Option<impl AsRef<Path>>, mame_executable_path: &str) -> Result<Self> {
+	pub fn load(prefs_path: impl AsRef<Path>, mame_executable_path: &str) -> Result<Self> {
 		let filename = infodb_filename(prefs_path, mame_executable_path).map_err(infodb_load_error)?;
 		let file = File::open(filename).map_err(infodb_load_error)?;
 		let mut reader = BufReader::new(file);
@@ -134,7 +134,7 @@ impl InfoDb {
 		Self::new(data.into())
 	}
 
-	pub fn save(&self, prefs_path: Option<impl AsRef<Path>>, mame_executable_path: &str) -> Result<()> {
+	pub fn save(&self, prefs_path: impl AsRef<Path>, mame_executable_path: &str) -> Result<()> {
 		let filename = infodb_filename(prefs_path, mame_executable_path).map_err(infodb_save_error)?;
 		let mut file = File::create(filename).map_err(infodb_save_error)?;
 		file.write_all(&self.data).map_err(infodb_save_error)?;
@@ -287,7 +287,7 @@ struct RootView<T> {
 	phantom: PhantomData<T>,
 }
 
-fn infodb_filename(prefs_path: Option<impl AsRef<Path>>, mame_executable_path: &str) -> Result<PathBuf> {
+fn infodb_filename(prefs_path: impl AsRef<Path>, mame_executable_path: &str) -> Result<PathBuf> {
 	let file_name = Path::new(mame_executable_path)
 		.file_name()
 		.ok_or_else(infodb_filename_error)?;

@@ -85,11 +85,9 @@ fn main() {
 	}
 
 	// identify the preferences directory
-	let prefs_path = opts.prefs_path.or_else(|| {
-		let mut path = config_local_dir();
-		if let Some(path) = &mut path {
-			path.push("BletchMAME");
-		}
+	let prefs_path = opts.prefs_path.unwrap_or_else(|| {
+		let mut path = config_local_dir().unwrap_or_default();
+		path.push("BletchMAME");
 		path
 	});
 

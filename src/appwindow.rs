@@ -89,7 +89,7 @@ const SOUND_ATTENUATION_ON: i32 = 0;
 /// are power user features or diagnostics
 #[derive(Debug)]
 pub struct AppArgs {
-	pub prefs_path: Option<PathBuf>,
+	pub prefs_path: PathBuf,
 	pub mame_stderr: MameStderr,
 	pub menuing_type: MenuingType,
 }
@@ -198,7 +198,7 @@ impl AppModel {
 			// do we have an InfoDb mismatch?
 			if new_state.has_infodb_mismatch() {
 				let preferences = self.preferences.borrow();
-				let prefs_path = preferences.prefs_path.as_deref();
+				let prefs_path = &preferences.prefs_path;
 				new_state = new_state
 					.infodb_load(prefs_path, &preferences.paths, true)
 					.unwrap_or(new_state);
@@ -305,7 +305,7 @@ impl AppModel {
 	pub fn infodb_load(self: &Rc<Self>, force_refresh: bool) {
 		self.update_state(|state| {
 			let preferences = self.preferences.borrow();
-			let prefs_path = preferences.prefs_path.as_deref();
+			let prefs_path = &preferences.prefs_path;
 			state.infodb_load(prefs_path, &preferences.paths, force_refresh)
 		});
 	}
@@ -336,7 +336,7 @@ pub fn create(args: AppArgs) -> AppWindow {
 
 	// get preferences
 	let prefs_path = args.prefs_path;
-	let preferences = Preferences::load(prefs_path.as_ref())
+	let preferences = Preferences::load(&prefs_path)
 		.ok()
 		.flatten()
 		.unwrap_or_else(|| Preferences::fresh(prefs_path));
@@ -808,8 +808,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			});
 		}
 		AppCommand::SettingsReset => model.modify_prefs(|prefs| {
-			let prefs_path = prefs.prefs_path.take();
-			*prefs = Preferences::fresh(prefs_path);
+			*prefs = Preferences::fresh(prefs.prefs_path.clone());
 		}),
 		AppCommand::HelpWebSite => {
 			let _ = open::that("https://www.bletchmame.org");

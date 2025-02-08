@@ -123,7 +123,7 @@ impl AppState {
 	}
 
 	/// Attempt to load a persisted InfoDB, or if unavailable trigger a rebuild
-	pub fn infodb_load(&self, prefs_path: Option<&Path>, paths: &PrefsPaths, force_refresh: bool) -> Option<Self> {
+	pub fn infodb_load(&self, prefs_path: &Path, paths: &PrefsPaths, force_refresh: bool) -> Option<Self> {
 		// try to load the InfoDb
 		let info_db = paths
 			.mame_executable
@@ -412,24 +412,22 @@ impl From<PreflightProblem> for Message {
 }
 
 fn spawn_infodb_build_thread(
-	prefs_path: Option<&Path>,
+	prefs_path: &Path,
 	mame_executable_path: &str,
 	callback: CommandCallback,
 ) -> InfoDbBuildJob {
-	let prefs_path = prefs_path.map(|x| x.to_path_buf());
+	let prefs_path = prefs_path.to_path_buf();
 	let mame_executable_path = mame_executable_path.to_string();
 	let callback_bubble = ThreadLocalBubble::new(callback);
 	let cancelled = Arc::new(AtomicBool::from(false));
 	let cancelled_clone = cancelled.clone();
-	let join_handle = spawn(move || {
-		let prefs_path = prefs_path.as_deref();
-		infodb_build_thread_proc(prefs_path, &mame_executable_path, callback_bubble, cancelled_clone)
-	});
+	let join_handle =
+		spawn(move || infodb_build_thread_proc(&prefs_path, &mame_executable_path, callback_bubble, cancelled_clone));
 	InfoDbBuildJob { cancelled, join_handle }
 }
 
 fn infodb_build_thread_proc(
-	prefs_path: Option<&Path>,
+	prefs_path: &Path,
 	mame_executable_path: &str,
 	callback_bubble: ThreadLocalBubble<CommandCallback>,
 	cancelled: Arc<AtomicBool>,
