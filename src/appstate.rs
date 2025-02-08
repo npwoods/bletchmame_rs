@@ -351,15 +351,8 @@ impl AppState {
 		}
 
 		// merge the new status
-		let new_status = self
-			.session
-			.as_ref()
-			.unwrap()
-			.status
-			.as_deref()
-			.map(Cow::Borrowed)
-			.unwrap_or_else(|| Cow::Owned(Status::default()))
-			.merge(update);
+		let old_status = self.session.as_ref().unwrap().status.as_deref();
+		let new_status = Status::new(old_status, update);
 
 		// update the session
 		let session = Session {

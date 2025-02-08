@@ -20,18 +20,17 @@ use crate::version::MameVersion;
 
 const LOG: Level = Level::TRACE;
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct Status {
 	pub running: Option<Running>,
 	pub build: Option<MameVersion>,
 }
 
 impl Status {
-	pub fn merge(&self, update: Update) -> Self {
-		let running = update.running.map(|running| {
-			let status_running = self
-				.running
-				.as_ref()
+	pub fn new(old_status: Option<&Self>, update: Update) -> Self {
+		let running: Option<Running> = update.running.map(|running| {
+			let status_running = old_status
+				.and_then(|x| x.running.as_ref())
 				.map(Cow::Borrowed)
 				.unwrap_or_else(|| Cow::Owned(Running::default()));
 			let mut status_running_images = status_running.images.iter().collect::<Vec<_>>();
@@ -224,34 +223,30 @@ mod test {
 			parse_update(reader).unwrap()
 		}
 
-		// fresh status
-		let status = Status::default();
-		assert!(status.running.is_none());
-
 		// status after a non-running update
-		status.merge(update(xml0));
+		let status = Status::new(None, update(xml0));
 		assert!(status.running.is_none());
 
 		// status after running
-		let status = status.merge(update(xml1));
+		let status = Status::new(Some(&status), update(xml1));
 		let run = status.running.as_ref().unwrap();
 		let actual = (run.is_paused, run.is_throttled, run.throttle_rate);
 		assert_eq!((true, true, 1.0), actual);
 
 		// unpaused...
-		let status = status.merge(update(xml2));
+		let status = Status::new(Some(&status), update(xml2));
 		let run = status.running.as_ref().unwrap();
 		let actual = (run.is_paused, run.is_throttled, run.throttle_rate);
 		assert_eq!((false, true, 1.0), actual);
 
 		// null update
-		let status = status.merge(update(xml3));
+		let status = Status::new(Some(&status), update(xml3));
 		let run = status.running.as_ref().unwrap();
 		let actual = (run.is_paused, run.is_throttled, run.throttle_rate);
 		assert_eq!((false, true, 1.0), actual);
 
 		// speed it up!
-		let status = status.merge(update(xml4));
+		let status = Status::new(Some(&status), update(xml4));
 		let run = status.running.as_ref().unwrap();
 		let actual = (run.is_paused, run.is_throttled, run.throttle_rate);
 		assert_eq!((false, false, 3.0), actual);

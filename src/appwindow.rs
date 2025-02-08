@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::cell::RefCell;
 use std::iter::once;
 use std::path::PathBuf;
@@ -969,21 +968,14 @@ async fn show_paths_dialog(model: Rc<AppModel>) {
 fn update_menus(model: &AppModel) {
 	// calculate properties
 	let state = model.state.borrow();
-	let running_status = state
-		.status()
-		.map(Cow::Borrowed)
-		.unwrap_or_else(|| Cow::Owned(Status::default()));
+	let build = state.status().and_then(|s| s.build.as_ref());
+	let running = state.status().and_then(|s| s.running.as_ref());
 	let has_mame_executable = model.preferences.borrow().paths.mame_executable.is_some();
-	let is_running = running_status.running.is_some();
-	let is_paused = running_status.running.as_ref().map(|r| r.is_paused).unwrap_or_default();
-	let is_throttled = running_status
-		.running
-		.as_ref()
-		.map(|r| r.is_throttled)
-		.unwrap_or_default();
-	let throttle_rate = running_status.running.as_ref().map(|r| r.throttle_rate);
-	let is_sound_enabled = running_status
-		.running
+	let is_running = running.is_some();
+	let is_paused = running.as_ref().map(|r| r.is_paused).unwrap_or_default();
+	let is_throttled = running.as_ref().map(|r| r.is_throttled).unwrap_or_default();
+	let throttle_rate = running.as_ref().map(|r| r.throttle_rate);
+	let is_sound_enabled = running
 		.as_ref()
 		.map(|r| r.sound_attenuation > SOUND_ATTENUATION_OFF)
 		.unwrap_or_default();
@@ -1012,7 +1004,7 @@ fn update_menus(model: &AppModel) {
 				.as_ref()
 				.ok()
 				.and_then(AppCommand::minimum_mame_version)
-				.is_none_or(|a| running_status.build.as_ref().is_some_and(|b| b >= &a))
+				.is_none_or(|a| build.is_some_and(|b| b >= &a))
 		});
 		MenuItemUpdate { enabled, checked }
 	});
