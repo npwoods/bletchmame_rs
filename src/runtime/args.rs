@@ -3,38 +3,43 @@ use std::env::current_exe;
 use std::fs::metadata;
 use std::path::Path;
 use std::path::PathBuf;
+use std::str::FromStr;
 
-use anyhow::Result;
+use derive_enum_all_values::AllValues;
 use is_executable::IsExecutable;
 use itertools::Itertools;
+use strum::EnumProperty;
+use strum::EnumString;
 use tracing::event;
 use tracing::Level;
 
+use crate::dialogs::file::PathType;
 use crate::prefs::PrefsPaths;
 use crate::runtime::MameWindowing;
 
 const LOG: Level = Level::DEBUG;
 
-#[derive(Copy, Clone, Debug, strum_macros::Display)]
+#[derive(AllValues, Copy, Clone, Debug, strum_macros::Display, EnumString, EnumProperty)]
 pub enum PreflightProblem {
-	#[strum(to_string = "No MAME executable path specified")]
+	#[strum(to_string = "No MAME executable path specified", props(ProblemType = "MAME Executable"))]
 	NoMameExecutablePath,
-	#[strum(to_string = "No MAME executable found")]
+	#[strum(to_string = "No MAME executable found", props(ProblemType = "MAME Executable"))]
 	NoMameExecutable,
-	#[strum(to_string = "MAME executable file is not executable")]
+	#[strum(to_string = "MAME executable file is not executable", props(ProblemType = "MAME Executable"))]
 	MameExecutableIsNotExecutable,
-	#[strum(to_string = "No valid plugins paths specified")]
+	#[strum(to_string = "No valid plugins paths specified", props(ProblemType = "Plugins"))]
 	NoPluginsPaths,
-	#[strum(to_string = "MAME boot.lua not found")]
+	#[strum(to_string = "MAME boot.lua not found", props(ProblemType = "Plugins"))]
 	PluginsBootNotFound,
-	#[strum(to_string = "BletchMAME worker_ui plugin not found")]
+	#[strum(to_string = "BletchMAME worker_ui plugin not found", props(ProblemType = "Plugins"))]
 	WorkerUiPluginNotFound,
 }
 
-#[derive(thiserror::Error, Debug)]
-enum ThisError {
-	#[error("Problems found during MAME preflight: {0:?}")]
-	MamePreflightProblems(Vec<PreflightProblem>),
+impl PreflightProblem {
+	pub fn problem_type(&self) -> Option<PathType> {
+		let s = self.get_str("ProblemType")?;
+		Some(PathType::from_str(s).unwrap())
+	}
 }
 
 #[derive(Clone, Debug)]
@@ -50,7 +55,7 @@ pub struct MameArgumentsSource<'a> {
 }
 
 impl<'a> MameArgumentsSource<'a> {
-	pub fn new(prefs_paths: &'a PrefsPaths, windowing: &'a MameWindowing) -> Result<Self> {
+	pub fn new(prefs_paths: &'a PrefsPaths, windowing: &'a MameWindowing) -> Self {
 		let mame_executable_path = prefs_paths.mame_executable.as_deref();
 		let roms_paths = prefs_paths.roms.as_slice();
 		let samples_paths = prefs_paths.samples.as_slice();
@@ -58,7 +63,7 @@ impl<'a> MameArgumentsSource<'a> {
 		let software_lists_paths = prefs_paths.software_lists.as_slice();
 		let cfg_path: &[String] = prefs_paths.cfg.as_slice();
 		let nvram_path = prefs_paths.nvram.as_slice();
-		let result: MameArgumentsSource<'a> = Self {
+		Self {
 			windowing,
 			roms_paths,
 			mame_executable_path,
@@ -67,16 +72,6 @@ impl<'a> MameArgumentsSource<'a> {
 			software_lists_paths,
 			cfg_path,
 			nvram_path,
-		};
-		Ok(result)
-	}
-
-	pub fn preflight(&self) -> Result<()> {
-		let results = preflight_checks(self.mame_executable_path, self.plugins_paths, current_exe_lookup);
-		if results.is_empty() {
-			Ok(())
-		} else {
-			Err(ThisError::MamePreflightProblems(results).into())
 		}
 	}
 }
@@ -118,15 +113,14 @@ fn platform_specific_args() -> Vec<&'static str> {
 	}
 }
 
-/// FIXME
-pub fn preflight_checks_public(
+pub fn preflight_checks(
 	mame_executable_path: Option<&str>,
 	plugins_paths: &[impl AsRef<str>],
 ) -> Vec<PreflightProblem> {
-	preflight_checks(mame_executable_path, plugins_paths, current_exe_lookup)
+	internal_preflight_checks(mame_executable_path, plugins_paths, current_exe_lookup)
 }
 
-pub fn preflight_checks(
+fn internal_preflight_checks(
 	mame_executable_path: Option<&str>,
 	plugins_paths: &[impl AsRef<str>],
 	current_exe_lookup: impl Fn() -> Option<PathBuf>,
@@ -292,7 +286,7 @@ mod test {
 
 	use crate::runtime::MameWindowing;
 
-	use super::MameArgumentsSource;
+	use super::{MameArgumentsSource, PreflightProblem};
 
 	#[test_case(0, &["/foo"], "/foo")]
 	#[test_case(1, &["/foo", "/bar"], "/foo;/bar")]
@@ -321,7 +315,7 @@ mod test {
 
 	#[test]
 	pub fn mame_args_from_source() {
-		let windowing = MameWindowing::Attached("1234".to_string());
+		let windowing = MameWindowing::Attached("1234".into());
 		let source = MameArgumentsSource {
 			windowing: &windowing,
 			mame_executable_path: Some("/mydir/mame/mame.exe"),
@@ -364,5 +358,13 @@ mod test {
 			Some("/mydir/mame/nvram"),
 		);
 		assert_eq!(expected, actual);
+	}
+
+	#[test]
+	fn preflight_problem_type() {
+		let _ = PreflightProblem::all_values()
+			.iter()
+			.map(PreflightProblem::problem_type)
+			.collect::<Vec<_>>();
 	}
 }

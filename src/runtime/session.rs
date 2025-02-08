@@ -31,7 +31,7 @@ use crate::status::Update;
 const LOG: Level = Level::DEBUG;
 
 pub struct MameSession {
-	handle: JoinHandle<()>,
+	handle: JoinHandle<Result<()>>,
 	comm: Arc<SessionCommunication>,
 	exit_issued: Cell<bool>,
 }
@@ -96,13 +96,14 @@ impl MameSession {
 		self.comm.message_queue_len.fetch_add(1, Ordering::Relaxed);
 	}
 
-	pub fn shutdown(self) {
+	pub fn shutdown(self) -> Result<()> {
 		if !self.exit_issued.get() {
 			self.issue_command(MameCommand::Exit);
 		}
 		self.handle.join().unwrap()
 	}
 }
+
 impl From<MameCommand<'_>> for ProcessedCommand {
 	fn from(value: MameCommand<'_>) -> Self {
 		let text = command_text(&value);
@@ -116,12 +117,10 @@ fn thread_proc(
 	comm: &SessionCommunication,
 	event_callback: impl Fn(MameEvent),
 	mame_stderr: MameStderr,
-) {
-	event_callback(MameEvent::SessionStarted);
-	if let Err(e) = execute_mame(mame_args, comm, &event_callback, mame_stderr) {
-		event_callback(MameEvent::Error(e));
-	}
+) -> Result<()> {
+	let result = execute_mame(mame_args, comm, &event_callback, mame_stderr);
 	event_callback(MameEvent::SessionEnded);
+	result
 }
 
 fn execute_mame(

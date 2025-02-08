@@ -1,5 +1,7 @@
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::path::Path;
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
@@ -8,196 +10,298 @@ use std::thread::spawn;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
+use anyhow::Error;
 use anyhow::Result;
 use slint::invoke_from_event_loop;
-use strum::EnumProperty;
 use throttle::Throttle;
 
 use crate::appcommand::AppCommand;
+use crate::dialogs::file::PathType;
 use crate::info::InfoDb;
 use crate::prefs::PrefsPaths;
-use crate::runtime::args::preflight_checks_public;
+use crate::runtime::args::preflight_checks;
+use crate::runtime::args::MameArgumentsSource;
 use crate::runtime::args::PreflightProblem;
+use crate::runtime::session::MameSession;
+use crate::runtime::MameCommand;
+use crate::runtime::MameEvent;
+use crate::runtime::MameStderr;
+use crate::runtime::MameWindowing;
 use crate::status::Status;
 use crate::status::Update;
+use crate::status::UpdateXmlProblem;
+use crate::status::ValidationError;
 use crate::threadlocalbubble::ThreadLocalBubble;
 
 #[derive(Clone)]
 pub struct AppState {
-	pub info_db: Option<Rc<InfoDb>>,
-	phase: Phase,
-	shutting_down: bool,
-	callback: CommandCallback,
+	info_db: Option<Rc<InfoDb>>,
+	paths: Rc<PrefsPaths>,
+	info_db_build: Option<InfoDbBuild>,
+	session: Option<Session>,
+	failure: Option<Rc<Failure>>,
+	pending_restart: bool,
+	pending_shutdown: bool,
+	fixed: Rc<Fixed>,
 }
 
-#[derive(Clone, Debug)]
-enum Phase {
-	Inactive {
-		message: Message,
-		submessage: Option<String>,
-		button: Option<Button>,
-		issues: Rc<[Message]>,
-	},
-	InfoDbBuilding {
-		job: Rc<RefCell<Option<InfoDbBuildJob>>>,
-		machine_description: Option<String>,
-	},
-	Active {
-		status: Rc<Status>,
-	},
-	Shutdown,
+#[derive(Clone)]
+struct InfoDbBuild {
+	job: Job<Result<Option<InfoDb>>>,
+	cancelled: Arc<AtomicBool>,
+	machine_description: Option<String>,
+}
+
+#[derive(Clone)]
+struct Session {
+	mame_session: Rc<RefCell<Option<MameSession>>>,
+	status: Rc<Status>,
+}
+
+#[derive(Debug)]
+enum Failure {
+	Preflight(Vec<PreflightProblem>),
+	SessionError(Error),
+	InvalidStatusUpdate(Vec<UpdateXmlProblem>),
+	InfoDbBuild(Error),
+	InfoDbBuildCancelled,
+}
+
+struct Fixed {
+	prefs_path: PathBuf,
+	mame_windowing: MameWindowing,
+	mame_stderr: MameStderr,
+	callback: CommandCallback,
 }
 
 type CommandCallback = Rc<dyn Fn(AppCommand) + 'static>;
 
-#[derive(Debug)]
+#[derive(Default, Debug)]
 pub struct Report<'a> {
-	pub message: &'a Message,
-	pub submessage: Option<&'a str>,
+	pub message: Cow<'a, str>,
+	pub submessage: Option<Cow<'a, str>>,
 	pub button: Option<Button>,
-	pub issues: &'a [Message],
+	pub is_spinning: bool,
+	pub issues: Vec<Issue>,
 }
 
 #[derive(Clone, Debug)]
 pub struct Button {
-	pub text: &'static str,
+	pub text: Cow<'static, str>,
 	pub command: AppCommand,
 }
 
+#[derive(Clone, Debug)]
+pub struct Issue {
+	pub text: Cow<'static, str>,
+	pub button: Option<Button>,
+}
+
 #[derive(Debug)]
-struct InfoDbBuildJob {
-	cancelled: Arc<AtomicBool>,
-	join_handle: JoinHandle<Result<Option<InfoDb>>>,
-}
-
-#[derive(strum::Display, Clone, Debug, EnumProperty)]
-pub enum Message {
-	// blank message
-	#[strum(to_string = "")]
-	Blank,
-
-	// progress messages
-	#[strum(to_string = "Building MAME machine info database...", props(Spinning = "true"))]
-	BuildingInfoDb,
-	#[strum(to_string = "Resetting MAME...", props(Spinning = "true"))]
-	MameResetting,
-
-	// failure conditions
-	#[strum(to_string = "BletchMAME requires additional configuration in order to properly interface with MAME")]
-	InadequateMameSetup,
-	#[strum(to_string = "Processing machine information from MAME was cancelled")]
-	InfoDbBuildCancelled,
-	#[strum(to_string = "Failure processing machine information from MAME")]
-	InfoDbBuildFailure,
-
-	// preflight problems
-	#[strum(to_string = "No MAME executable path specified")]
-	NoMameExecutablePath,
-	#[strum(to_string = "No MAME executable found")]
-	NoMameExecutable,
-	#[strum(to_string = "MAME executable file is not executable")]
-	MameExecutableIsNotExecutable,
-	#[strum(to_string = "No valid plugins paths specified")]
-	NoPluginsPaths,
-	#[strum(to_string = "MAME boot.lua not found")]
-	PluginsBootNotFound,
-	#[strum(to_string = "BletchMAME worker_ui plugin not found")]
-	WorkerUiPluginNotFound,
-}
+struct Job<T>(Rc<RefCell<Option<JoinHandle<T>>>>);
 
 impl AppState {
 	/// Creates an initial `AppState`
-	pub fn new(callback: impl Fn(AppCommand) + 'static) -> Self {
+	pub fn new(
+		prefs_path: PathBuf,
+		paths: Rc<PrefsPaths>,
+		mame_windowing: MameWindowing,
+		mame_stderr: MameStderr,
+		callback: impl Fn(AppCommand) + 'static,
+	) -> Self {
 		let callback = Rc::from(callback);
+		let fixed = Fixed {
+			prefs_path,
+			mame_windowing,
+			mame_stderr,
+			callback,
+		};
+		let fixed = Rc::new(fixed);
 		Self {
 			info_db: None,
-			phase: Phase::Inactive {
-				message: Message::Blank,
-				submessage: None,
-				button: None,
-				issues: [].into(),
-			},
-			shutting_down: false,
-			callback,
+			paths,
+			info_db_build: None,
+			session: None,
+			failure: None,
+			pending_restart: false,
+			pending_shutdown: false,
+			fixed,
 		}
 	}
 
-	/// Attempt to load a persisted InfoDB, or if unavailable trigger a rebuild
-	pub fn infodb_load(&self, prefs_path: &Path, paths: &PrefsPaths, force_refresh: bool) -> Option<Self> {
-		// try to load the InfoDb
-		let info_db = paths
-			.mame_executable
-			.as_deref()
-			.and_then(|mame_executable_path| InfoDb::load(prefs_path, mame_executable_path).ok())
-			.map(Rc::new);
+	/// Creates a "bogus" AppState that should never be used
+	pub fn bogus() -> Self {
+		Self::new(
+			"".into(),
+			Rc::new(PrefsPaths::default()),
+			MameWindowing::Attached("".into()),
+			MameStderr::Capture,
+			|_| unreachable!(),
+		)
+	}
 
-		// quick run of preflight
-		let problems = preflight_checks_public(paths.mame_executable.as_deref(), &paths.plugins);
+	pub fn update_paths(&self, paths: &Rc<PrefsPaths>) -> Option<Self> {
+		if self.paths.as_ref() == paths.as_ref() {
+			return None;
+		}
 
-		// determine the new phase
-		let phase = if !problems.is_empty() {
-			let issues = problems.into_iter().map(Message::from).collect();
-			Phase::Inactive {
-				message: Message::InadequateMameSetup,
-				submessage: None,
-				button: None,
-				issues,
-			}
-		} else if info_db.is_none() || force_refresh {
-			let job = spawn_infodb_build_thread(
-				prefs_path,
-				paths.mame_executable.as_ref().unwrap(),
-				self.callback.clone(),
-			);
-			let job = Rc::new(RefCell::new(Some(job)));
-			Phase::InfoDbBuilding {
-				job,
-				machine_description: None,
-			}
-		} else {
-			Phase::initial_active()
+		let state = Self {
+			info_db: None,
+			paths: paths.clone(),
+			..self.clone()
 		};
 
-		// and return
-		let new_state = Self {
+		let state = if self.paths.as_ref().mame_executable != paths.as_ref().mame_executable {
+			let state = state.infodb_load();
+			state.reset(true, state.info_db.is_none()).unwrap_or(state)
+		} else {
+			state
+		};
+
+		Some(state)
+	}
+
+	/// Issues a command to MAME
+	pub fn issue_command(&self, command: MameCommand<'_>) {
+		let session = self.session.as_ref().unwrap();
+		session.mame_session.borrow().as_ref().unwrap().issue_command(command);
+	}
+
+	/// Do we have an active session, and we have an empty queue?
+	pub fn is_running_with_queue_empty(&self) -> bool {
+		self.session
+			.as_ref()
+			.map(|s| s.status.has_initialized && !s.mame_session.borrow().as_ref().unwrap().has_pending_commands())
+			.unwrap_or_default()
+	}
+
+	/// Attempt to load a persisted InfoDB
+	pub fn infodb_load(&self) -> Self {
+		// try to load the InfoDb
+		let info_db = self
+			.paths
+			.as_ref()
+			.mame_executable
+			.as_deref()
+			.and_then(|mame_executable_path| InfoDb::load(&self.fixed.prefs_path, mame_executable_path).ok())
+			.map(Rc::new);
+
+		Self {
 			info_db,
-			phase,
+			..self.clone()
+		}
+	}
+
+	pub fn reset(&self, mut reset_session: bool, rebuild_info_db: bool) -> Option<Self> {
+		// sanity checks
+		assert!(!rebuild_info_db || self.info_db_build.is_none());
+		if !rebuild_info_db && !reset_session {
+			return None;
+		}
+
+		// quick run of preflight
+		let mame_executable_path = self.paths.mame_executable.as_deref();
+		let preflight_problems = preflight_checks(mame_executable_path, &self.paths.plugins);
+
+		// start an InfoDb build; if we can
+		let rebuild_info_db = rebuild_info_db
+			&& !preflight_problems
+				.iter()
+				.any(|x| x.problem_type() == Some(PathType::MameExecutable));
+		let info_db_build = rebuild_info_db.then(|| {
+			let prefs_path = &self.fixed.prefs_path;
+			let mame_executable_path = mame_executable_path.unwrap();
+			let callback = self.fixed.callback.clone();
+			let (job, cancelled) = spawn_infodb_build_thread(prefs_path, mame_executable_path, callback);
+			InfoDbBuild {
+				job,
+				cancelled,
+				machine_description: None,
+			}
+		});
+
+		// do we need to defer starting a MAME session?
+		let mut pending_restart = false;
+		if let Some(session) = self.session.as_ref() {
+			if reset_session && preflight_problems.is_empty() {
+				session
+					.mame_session
+					.borrow()
+					.as_ref()
+					.unwrap()
+					.issue_command(MameCommand::Exit);
+				pending_restart = true;
+				reset_session = false;
+			}
+		}
+
+		// start a MAME session; if we can
+		let reset_session = reset_session && preflight_problems.is_empty();
+		let session = reset_session.then(|| {
+			let callback_bubble = ThreadLocalBubble::new(self.fixed.callback.clone());
+			let event_callback = move |event| {
+				let callback_bubble = callback_bubble.clone();
+				invoke_from_event_loop(move || {
+					let command = match event {
+						MameEvent::SessionEnded => AppCommand::MameSessionEnded,
+						MameEvent::StatusUpdate(update) => AppCommand::MameStatusUpdate(update),
+					};
+					(callback_bubble.unwrap())(command)
+				})
+				.unwrap();
+			};
+			let mame_args = MameArgumentsSource::new(self.paths.as_ref(), &self.fixed.mame_windowing).into();
+			let mame_session = MameSession::new(mame_args, event_callback, self.fixed.mame_stderr);
+			let mame_session = Rc::new(RefCell::new(Some(mame_session)));
+			let status = Rc::new(Status::default());
+			Session { mame_session, status }
+		});
+
+		// format the preflight failures (if present)
+		let failure = (!preflight_problems.is_empty())
+			.then(|| Rc::new(Failure::Preflight(preflight_problems.into_iter().collect())));
+
+		// assemble and return the new state
+		let info_db_build = info_db_build.or_else(|| self.info_db_build.clone());
+		let session = session.or_else(|| self.session.clone());
+		let new_state = Self {
+			failure,
+			info_db_build,
+			session,
+			pending_restart,
 			..self.clone()
 		};
 		Some(new_state)
 	}
 
-	pub fn infodb_build_progress(&self, machine_description: String) -> Option<Self> {
-		let Phase::InfoDbBuilding { job, .. } = &self.phase else {
-			unreachable!()
-		};
-
-		let phase = Phase::InfoDbBuilding {
-			job: job.clone(),
+	pub fn infodb_build_progress(&self, machine_description: String) -> Self {
+		let info_db_build = InfoDbBuild {
 			machine_description: Some(machine_description),
+			..self.info_db_build.as_ref().unwrap().clone()
 		};
-		let new_state = Self { phase, ..self.clone() };
-		Some(new_state)
+		let info_db_build = Some(info_db_build);
+
+		Self {
+			info_db_build,
+			..self.clone()
+		}
 	}
 
-	pub fn infodb_build_complete(&self) -> Option<Self> {
+	pub fn infodb_build_complete(&self) -> Self {
 		self.internal_infodb_build_complete(false)
 	}
 
-	pub fn infodb_build_cancel(&self) -> Option<Self> {
+	pub fn infodb_build_cancel(&self) -> Self {
 		self.internal_infodb_build_complete(true)
 	}
 
-	fn internal_infodb_build_complete(&self, cancel: bool) -> Option<Self> {
+	fn internal_infodb_build_complete(&self, cancel: bool) -> Self {
 		// we expect to be in the process of building, and to be able to "take" the job
-		let Phase::InfoDbBuilding { job, .. } = &self.phase else {
-			unreachable!()
-		};
-		let job = job.borrow_mut().take().unwrap();
+		let info_db_build = self.info_db_build.as_ref().unwrap();
 
 		// if specified, cancel the build
 		if cancel {
-			job.cancelled.store(true, Ordering::Relaxed);
+			info_db_build.cancelled.store(true, Ordering::Relaxed);
 		}
 
 		// join the job (which we expect to complete) and digest the result
@@ -206,99 +310,112 @@ impl AppState {
 		//   - we ignore the result from the job; there can be a race condition where the
 		//     job actually yields something other than `Ok(None)`
 		//   - we might have had an existing InfoDb; it should be used if available
-		let result = job.join_handle.join().unwrap();
+		let result = info_db_build.job.join().unwrap();
 		let result = if cancel { Ok(None) } else { result };
-		let result = match (result, &self.info_db) {
-			(Ok(Some(info_db)), _) => Ok(Rc::new(info_db)),
-			(Ok(None), None) => Err((Message::InfoDbBuildCancelled, None)),
-			(Ok(None), Some(old_info_db)) => Ok(old_info_db.clone()),
-			(Err(e), _) => Err((Message::InfoDbBuildFailure, Some(e.to_string()))),
-		};
 
 		// get the InfoDb object and the phase
-		let (info_db, phase) = match result {
-			Ok(info_db) => (Some(info_db), Phase::initial_active()),
-			Err((message, submessage)) => {
-				let button = Button {
-					text: "Retry",
-					command: AppCommand::InfoDbBuildLoad { force_refresh: false },
-				};
-				let phase = Phase::Inactive {
-					message,
-					submessage,
-					button: Some(button),
-					issues: [].into(),
-				};
-				(None, phase)
-			}
+		let (info_db, failure) = match (result, self.info_db.as_ref()) {
+			(Ok(Some(info_db)), _) => (Some(Rc::new(info_db)), None),
+			(Ok(None), None) => (None, Some(Failure::InfoDbBuildCancelled)),
+			(Ok(None), Some(old_info_db)) => (Some(old_info_db.clone()), None),
+			(Err(e), old_info_db) => (old_info_db.cloned(), Some(Failure::InfoDbBuild(e))),
 		};
 
 		// and return the new state
-		let new_state = Self {
+		let failure = failure.map(Rc::new).or_else(|| self.failure.clone());
+		Self {
 			info_db,
-			phase,
+			info_db_build: None,
+			failure,
 			..self.clone()
-		};
-		Some(new_state)
+		}
 	}
 
 	/// Apply a `worker_ui` status update
 	pub fn status_update(&self, update: Update) -> Option<Self> {
-		let status = Rc::new(self.status().unwrap().merge(update));
-		let phase = Phase::Active { status };
-		let new_state = Self { phase, ..self.clone() };
-		Some(new_state)
-	}
-
-	/// The MAME session ended; return a new state
-	pub fn session_ended(&self) -> Option<Self> {
-		match &self.phase {
-			Phase::Inactive { .. } => unreachable!(),
-			Phase::InfoDbBuilding { .. } => None,
-			Phase::Active { .. } => {
-				// TODO - we should report errors; for now we're
-				// just going to restart
-				let phase = if self.shutting_down {
-					Phase::Shutdown
-				} else {
-					Phase::initial_active()
-				};
-				let new_state = Self { phase, ..self.clone() };
-				Some(new_state)
-			}
-			Phase::Shutdown => Some(self.clone()),
+		// validate the status update
+		if let Err(e) = update.validate(self.info_db.as_ref().unwrap()) {
+			return match e {
+				ValidationError::VersionMismatch(_, _) => self.reset(true, true),
+				ValidationError::Invalid(errors) => {
+					let failure = Some(Rc::new(Failure::InvalidStatusUpdate(errors)));
+					let new_status = Self {
+						failure,
+						..self.clone()
+					};
+					Some(new_status)
+				}
+			};
 		}
-	}
 
-	pub fn shutdown(&self) -> Option<Self> {
-		let phase = if let Phase::Inactive { .. } = &self.phase {
-			Phase::Shutdown
-		} else {
-			self.phase.clone()
+		// merge the new status
+		let new_status = self.status().unwrap().merge(update);
+
+		// update the session
+		let session = Session {
+			status: Rc::new(new_status),
+			..self.session.as_ref().unwrap().clone()
 		};
+
+		// and return the new state
 		let new_state = Self {
-			phase,
-			shutting_down: true,
+			session: Some(session),
 			..self.clone()
 		};
 		Some(new_state)
 	}
 
-	pub fn status(&self) -> Option<&'_ Status> {
-		if let Phase::Active { status } = &self.phase {
-			Some(status.as_ref())
+	/// The MAME session ended; return a new state
+	pub fn session_ended(&self) -> Self {
+		// join the thread and get the result
+		let Some(session) = self.session.as_ref() else {
+			unreachable!();
+		};
+		let result = session.mame_session.borrow_mut().take().unwrap().shutdown();
+
+		// if we failed, we have to report the error
+		let failure = if let Err(e) = result {
+			Some(Rc::new(Failure::SessionError(e)))
 		} else {
 			None
+		};
+
+		// create the new state
+		let pending_restart = self.pending_restart && failure.is_none();
+		let mut new_state = Self {
+			session: None,
+			pending_restart,
+			failure,
+			..self.clone()
+		};
+
+		// if there is a pending restart, kick it off
+		if new_state.pending_restart {
+			new_state = new_state.reset(true, false).unwrap_or(new_state);
 		}
+
+		// and return
+		new_state
 	}
 
-	pub fn has_infodb_mismatch(&self) -> bool {
-		if let Some(status) = self.status() {
-			Option::zip(self.info_db.as_ref(), status.build.as_ref())
-				.is_some_and(|(info_db, build)| info_db.build() != build)
-		} else {
-			false
-		}
+	pub fn shutdown(&self) -> Option<Self> {
+		(!self.pending_shutdown).then(|| {
+			if self.session.is_some() {
+				self.issue_command(MameCommand::Exit);
+			}
+			Self {
+				pending_shutdown: true,
+				..self.clone()
+			}
+		})
+	}
+
+	pub fn info_db(&self) -> Option<&'_ Rc<InfoDb>> {
+		self.info_db.as_ref()
+	}
+
+	pub fn status(&self) -> Option<&'_ Status> {
+		self.session.as_ref().map(|x| x.status.as_ref())
 	}
 
 	pub fn running_machine_description(&self) -> &'_ str {
@@ -317,97 +434,137 @@ impl AppState {
 	}
 
 	pub fn report(&self) -> Option<Report<'_>> {
-		match &self.phase {
-			Phase::Inactive {
-				message,
-				submessage,
-				button,
-				issues,
-			} => {
-				let report = Report {
-					message,
-					submessage: submessage.as_deref(),
-					button: button.clone(),
-					issues,
-				};
-				Some(report)
-			}
+		#[derive(Debug)]
+		enum ReportType<'a> {
+			InfoDbBuild(Option<&'a str>),
+			Resetting,
+			ShuttingDown,
+			PreflightFailure(&'a [PreflightProblem]),
+			SessionError(&'a Error),
+			InvalidStatusUpdate(&'a [UpdateXmlProblem]),
+			InfoDbBuildFailure(Option<&'a Error>),
+		}
 
-			Phase::InfoDbBuilding {
-				machine_description, ..
-			} => {
-				let message = &Message::BuildingInfoDb;
+		// upfront logic to determine the type of report presented, if any; keep
+		// this logic distinct from the mechanics of displaying the report
+		let is_starting_up = self.status().is_some_and(|s| !s.has_initialized);
+		let report_type = match (
+			self.info_db_build.as_ref(),
+			self.failure.as_deref(),
+			is_starting_up,
+			self.pending_shutdown,
+		) {
+			(Some(info_db_build), _, _, _) => {
+				Some(ReportType::InfoDbBuild(info_db_build.machine_description.as_deref()))
+			}
+			(None, _, _, true) => Some(ReportType::ShuttingDown),
+			(None, _, true, false) => Some(ReportType::Resetting),
+			(None, Some(Failure::Preflight(preflight_problems)), false, false) => {
+				Some(ReportType::PreflightFailure(preflight_problems.as_slice()))
+			}
+			(None, Some(Failure::SessionError(e)), false, false) => Some(ReportType::SessionError(e)),
+			(None, Some(Failure::InvalidStatusUpdate(e)), false, false) => {
+				Some(ReportType::InvalidStatusUpdate(e.as_slice()))
+			}
+			(None, Some(Failure::InfoDbBuild(e)), false, false) => Some(ReportType::InfoDbBuildFailure(Some(e))),
+			(None, Some(Failure::InfoDbBuildCancelled), false, false) => Some(ReportType::InfoDbBuildFailure(None)),
+			(None, None, false, false) => None,
+		};
+
+		report_type.map(|report_type| match report_type {
+			ReportType::InfoDbBuild(machine_description) => {
+				let message = Cow::Borrowed("Building MAME machine info database...");
+				let submessage = machine_description.map(Cow::Borrowed).unwrap_or_default();
 				let button = Button {
-					text: "Cancel",
+					text: "Cancel".into(),
 					command: AppCommand::InfoDbBuildCancel,
-				};
-				let report = Report {
-					message,
-					submessage: machine_description.as_deref(),
-					button: Some(button),
-					issues: &[],
-				};
-				Some(report)
-			}
-
-			Phase::Active { status } => (!status.has_initialized).then(|| {
-				let message = &Message::MameResetting;
-				let button = Button {
-					text: "Cancel",
-					command: AppCommand::FileStop,
 				};
 				Report {
 					message,
-					submessage: None,
+					submessage: Some(submessage),
 					button: Some(button),
-					issues: &[],
+					is_spinning: true,
+					..Default::default()
 				}
-			}),
-
-			Phase::Shutdown => {
-				let report = Report {
-					message: &Message::Blank,
-					submessage: None,
-					button: None,
-					issues: &[],
-				};
-				Some(report)
 			}
-		}
+			ReportType::Resetting => Report {
+				message: "Resetting MAME...".into(),
+				is_spinning: true,
+				..Default::default()
+			},
+			ReportType::ShuttingDown => Report {
+				message: "MAME is shutting down...".into(),
+				is_spinning: true,
+				..Default::default()
+			},
+			ReportType::PreflightFailure(preflight_problems) => {
+				let message = Cow::Borrowed(
+					"BletchMAME requires additional configuration in order to properly interface with MAME",
+				);
+				let issues = preflight_problems
+					.iter()
+					.map(|problem| {
+						let text = problem.to_string().into();
+						let button = problem.problem_type().map(|path_type| {
+							let text = Cow::Owned(format!("Choose {path_type}"));
+							let command = AppCommand::ChoosePath(path_type);
+							Button { text, command }
+						});
+						Issue { text, button }
+					})
+					.collect();
+				Report {
+					message,
+					issues,
+					..Default::default()
+				}
+			}
+			ReportType::SessionError(error) => Report {
+				message: "MAME has errored".into(),
+				submessage: Some(format!("{error}").into()),
+				..Default::default()
+			},
+			ReportType::InvalidStatusUpdate(errors) => {
+				let issues = errors
+					.iter()
+					.map(|e| Issue {
+						text: format!("{e}").into(),
+						button: None,
+					})
+					.collect();
+				Report {
+					message: "Status update from MAME is incorrect".into(),
+					issues,
+					..Default::default()
+				}
+			}
+			ReportType::InfoDbBuildFailure(error) => {
+				let message = if error.is_some() {
+					"Failure processing machine information from MAME"
+				} else {
+					"Processing machine information from MAME was cancelled"
+				};
+				let submessage = error.map(|e| Cow::Owned(e.to_string()));
+				let button = Button {
+					text: "Retry".into(),
+					command: AppCommand::HelpRefreshInfoDb,
+				};
+				Report {
+					message: Cow::Borrowed(message),
+					submessage,
+					button: Some(button),
+					..Default::default()
+				}
+			}
+		})
+	}
+
+	pub fn is_building_infodb(&self) -> bool {
+		self.info_db_build.is_some()
 	}
 
 	pub fn is_shutdown(&self) -> bool {
-		matches!(self.phase, Phase::Shutdown)
-	}
-}
-
-impl Phase {
-	pub fn initial_active() -> Self {
-		let status = Rc::new(Status::default());
-		Phase::Active { status }
-	}
-}
-
-impl Message {
-	pub fn spinning(&self) -> bool {
-		match self.get_str("Spinning") {
-			None => false,
-			Some("true") => true,
-			_ => unreachable!(),
-		}
-	}
-}
-
-impl From<PreflightProblem> for Message {
-	fn from(value: PreflightProblem) -> Self {
-		match value {
-			PreflightProblem::NoMameExecutablePath => Message::NoMameExecutablePath,
-			PreflightProblem::NoMameExecutable => Message::NoMameExecutable,
-			PreflightProblem::MameExecutableIsNotExecutable => Message::MameExecutableIsNotExecutable,
-			PreflightProblem::NoPluginsPaths => Message::NoPluginsPaths,
-			PreflightProblem::PluginsBootNotFound => Message::PluginsBootNotFound,
-			PreflightProblem::WorkerUiPluginNotFound => Message::WorkerUiPluginNotFound,
-		}
+		self.pending_shutdown && self.info_db_build.is_none() && self.session.is_none()
 	}
 }
 
@@ -415,15 +572,16 @@ fn spawn_infodb_build_thread(
 	prefs_path: &Path,
 	mame_executable_path: &str,
 	callback: CommandCallback,
-) -> InfoDbBuildJob {
+) -> (Job<Result<Option<InfoDb>>>, Arc<AtomicBool>) {
 	let prefs_path = prefs_path.to_path_buf();
 	let mame_executable_path = mame_executable_path.to_string();
 	let callback_bubble = ThreadLocalBubble::new(callback);
 	let cancelled = Arc::new(AtomicBool::from(false));
-	let cancelled_clone = cancelled.clone();
-	let join_handle =
-		spawn(move || infodb_build_thread_proc(&prefs_path, &mame_executable_path, callback_bubble, cancelled_clone));
-	InfoDbBuildJob { cancelled, join_handle }
+	let job = {
+		let cancelled = cancelled.clone();
+		Job::new(move || infodb_build_thread_proc(&prefs_path, &mame_executable_path, callback_bubble, cancelled))
+	};
+	(job, cancelled)
 }
 
 fn infodb_build_thread_proc(
@@ -477,4 +635,32 @@ fn infodb_build_thread_proc(
 
 	// and return the result
 	result
+}
+
+impl<T> Job<T>
+where
+	T: Send + 'static,
+{
+	pub fn new(f: impl FnOnce() -> T + Send + 'static) -> Self {
+		let join_handle = spawn(f);
+		Self(Rc::new(RefCell::new(Some(join_handle))))
+	}
+
+	pub fn join(&self) -> Result<T> {
+		let join_handle = self.0.borrow_mut().take().ok_or_else(|| {
+			let message = "Job::join() invoked multiple times";
+			Error::msg(message)
+		})?;
+		let result = join_handle.join().map_err(|_| {
+			let message = "JoinHandle::join() failed";
+			Error::msg(message)
+		})?;
+		Ok(result)
+	}
+}
+
+impl<T> Clone for Job<T> {
+	fn clone(&self) -> Self {
+		Self(Rc::clone(&self.0))
+	}
 }

@@ -66,9 +66,7 @@ use crate::platform::WindowExt;
 use crate::prefs::BuiltinCollection;
 use crate::prefs::Preferences;
 use crate::prefs::SortOrder;
-use crate::runtime::controller::MameController;
 use crate::runtime::MameCommand;
-use crate::runtime::MameEvent;
 use crate::runtime::MameStderr;
 use crate::runtime::MameWindowing;
 use crate::selection::SelectionManager;
@@ -100,7 +98,6 @@ struct AppModel {
 	app_window_weak: Weak<AppWindow>,
 	preferences: RefCell<Preferences>,
 	state: RefCell<AppState>,
-	mame_controller: MameController,
 	status_changed_channel: Channel<Status>,
 	child_window: ChildWindow,
 }
@@ -145,9 +142,10 @@ impl AppModel {
 		let _ = self.preferences.borrow().save();
 
 		// react to all of the possible changes
+		self.update_state(|state| state.update_paths(&prefs.paths));
 		if prefs.collections != old_prefs.collections {
 			event!(LOG_PREFS, "modify_prefs(): prefs.collection changed");
-			let info_db = self.state.borrow().info_db.clone();
+			let info_db = self.state.borrow().info_db().cloned();
 			self.with_collections_view_model(|x| x.update(info_db, &prefs.collections));
 		}
 		if prefs.current_history_entry() != old_prefs.current_history_entry()
@@ -160,58 +158,31 @@ impl AppModel {
 			event!(LOG_PREFS, "modify_prefs(): items_columns changed");
 			update_ui_for_sort_changes(self);
 		}
-		if prefs.paths != old_prefs.paths {
-			if self.mame_controller.has_session() {
-				self.mame_controller.issue_command(MameCommand::Exit);
-			}
-			if prefs.paths.mame_executable != old_prefs.paths.mame_executable {
-				event!(LOG_PREFS, "modify_prefs(): paths.mame_executable changed");
-				self.infodb_load(false);
-			}
-			if prefs.paths.software_lists != old_prefs.paths.software_lists {
-				event!(LOG_PREFS, "modify_prefs(): paths.software_lists changed");
-				software_paths_updated(self);
-			}
+		if prefs.paths.software_lists != old_prefs.paths.software_lists {
+			event!(LOG_PREFS, "modify_prefs(): paths.software_lists changed");
+			software_paths_updated(self);
 		}
 	}
 
 	pub fn update_state(self: &Rc<Self>, callback: impl FnOnce(&AppState) -> Option<AppState>) {
-		let (info_db_changed, active_changed) = {
+		let info_db_changed = {
 			// invoke the callback to get the new state
 			let mut state = self.state.borrow_mut();
-			let Some(mut new_state) = callback(&state) else { return };
+			let Some(new_state) = callback(&state) else { return };
 
 			// did the InfoDB change?
-			let info_db_changed = state.info_db.is_some() != new_state.info_db.is_some()
-				|| Option::zip(state.info_db.as_ref(), new_state.info_db.as_ref())
+			let info_db_changed = state.info_db().is_some() != new_state.info_db().is_some()
+				|| Option::zip(state.info_db().as_ref(), new_state.info_db().as_ref())
 					.is_some_and(|(old, new)| !Rc::ptr_eq(old, new));
-
-			// did the activation state change?
-			let active_changed = state.status().is_some() != new_state.status().is_some();
-
-			// are we shut down?
-			if new_state.is_shutdown() {
-				update_prefs(self);
-				quit_event_loop().unwrap()
-			}
-
-			// do we have an InfoDb mismatch?
-			if new_state.has_infodb_mismatch() {
-				let preferences = self.preferences.borrow();
-				let prefs_path = &preferences.prefs_path;
-				new_state = new_state
-					.infodb_load(prefs_path, &preferences.paths, true)
-					.unwrap_or(new_state);
-			}
 
 			// commit the state and return the changes
 			*state = new_state;
-			(info_db_changed, active_changed)
+			info_db_changed
 		};
 
 		// InfoDb changed?
 		if info_db_changed {
-			let info_db = self.state.borrow().info_db.clone();
+			let info_db = self.state.borrow().info_db().cloned();
 			self.with_items_table_model(|items_model| {
 				let info_db = info_db.clone();
 				items_model.info_db_changed(info_db);
@@ -223,19 +194,11 @@ impl AppModel {
 			});
 		}
 
-		// did the activation state change?
-		if active_changed {
-			let mame_windowing = if let Some(text) = self.child_window.text() {
-				MameWindowing::Attached(text)
-			} else {
-				MameWindowing::Windowed
-			};
-			let run_mame = {
-				let state = self.state.borrow();
-				state.info_db.is_some() && state.status().is_some()
-			};
-			self.mame_controller
-				.reset(run_mame.then_some(&self.preferences.borrow().paths), &mame_windowing);
+		// shutting down?
+		let is_shutdown = self.state.borrow().is_shutdown();
+		if is_shutdown {
+			update_prefs(self);
+			quit_event_loop().unwrap()
 		}
 
 		{
@@ -260,37 +223,32 @@ impl AppModel {
 			app_window.set_report_message(
 				report
 					.as_ref()
-					.map(|r| r.message.to_string())
-					.unwrap_or_default()
-					.into(),
+					.map(|r| SharedString::from(r.message.as_ref()))
+					.unwrap_or_default(),
 			);
 			app_window.set_report_submessage(
 				report
 					.as_ref()
-					.map(|r| r.submessage)
-					.unwrap_or_default()
-					.unwrap_or_default()
-					.into(),
+					.map(|r| SharedString::from(r.submessage.as_deref().unwrap_or_default()))
+					.unwrap_or_default(),
 			);
-			app_window.set_report_spinning(report.as_ref().map(|r| r.message.spinning()).unwrap_or_default());
+			app_window.set_report_spinning(report.as_ref().map(|r| r.is_spinning).unwrap_or_default());
 			app_window.set_report_button_text(
 				report
 					.as_ref()
 					.and_then(|r| r.button.as_ref())
-					.map(|b| b.text)
-					.unwrap_or_default()
-					.into(),
+					.map(|b| SharedString::from(b.text.as_ref()))
+					.unwrap_or_default(),
 			);
 			let issues = report
 				.map(|r| r.issues)
 				.unwrap_or_default()
 				.iter()
 				.map(|issue| {
-					let text = issue.to_string().into();
-					ReportIssue {
-						text,
-						button_text: "".into(),
-					}
+					let text = SharedString::from(issue.text.as_ref());
+					let button_text =
+						SharedString::from(issue.button.as_ref().map(|b| b.text.as_ref()).unwrap_or_default());
+					ReportIssue { text, button_text }
 				})
 				.collect::<Vec<_>>();
 			let issues = VecModel::from(issues);
@@ -300,14 +258,6 @@ impl AppModel {
 
 		// menus
 		update_menus(self);
-	}
-
-	pub fn infodb_load(self: &Rc<Self>, force_refresh: bool) {
-		self.update_state(|state| {
-			let preferences = self.preferences.borrow();
-			let prefs_path = &preferences.prefs_path;
-			state.infodb_load(prefs_path, &preferences.paths, force_refresh)
-		});
 	}
 
 	pub fn show_popup_menu(&self, popup_menu: Menu, position: LogicalPosition) {
@@ -321,6 +271,10 @@ impl AppModel {
 				app_window.invoke_show_context_menu(entries, position);
 			}
 		}
+	}
+
+	pub fn issue_command(&self, command: MameCommand<'_>) {
+		self.state.borrow().issue_command(command);
 	}
 }
 
@@ -347,17 +301,13 @@ pub fn create(args: AppArgs) -> AppWindow {
 		app_window.window().set_size(physical_size);
 	}
 
-	// create a bogus state for now
-	let state = AppState::new(|_| {});
-
 	// create the model
 	let model = AppModel {
 		menu_bar,
 		menuing_type: args.menuing_type,
 		app_window_weak: app_window.as_weak(),
 		preferences: RefCell::new(preferences),
-		state: RefCell::new(state),
-		mame_controller: MameController::new(args.mame_stderr),
+		state: RefCell::new(AppState::bogus()),
 		status_changed_channel: Channel::default(),
 		child_window,
 	};
@@ -386,23 +336,6 @@ pub fn create(args: AppArgs) -> AppWindow {
 			});
 		}
 	}
-
-	// set up a callback for MAME events
-	let bubble = ThreadLocalBubble::new(model.clone());
-	model.mame_controller.set_event_callback(move |event| {
-		let bubble = bubble.clone();
-		invoke_from_event_loop(move || {
-			let model = bubble.unwrap();
-			let command = match event {
-				MameEvent::SessionStarted => AppCommand::MameSessionStarted,
-				MameEvent::SessionEnded => AppCommand::MameSessionEnded,
-				MameEvent::Error(e) => AppCommand::ErrorMessageBox(format!("{e:?}")),
-				MameEvent::StatusUpdate(update) => AppCommand::MameStatusUpdate(update),
-			};
-			handle_command(&model, command);
-		})
-		.unwrap();
-	});
 
 	// create a repeating future that will ping forever
 	let fut = ping_callback(Rc::downgrade(&model));
@@ -569,16 +502,38 @@ pub fn create(args: AppArgs) -> AppWindow {
 		handle_command(&model_clone, command);
 	});
 
+	// issue button
+	let model_clone = model.clone();
+	app_window.on_issue_button_clicked(move |index| {
+		let index = usize::try_from(index).unwrap();
+		let command = {
+			let state = model_clone.state.borrow();
+			let issue = state.report().unwrap().issues.into_iter().nth(index).unwrap();
+			issue.button.unwrap().command
+		};
+		handle_command(&model_clone, command);
+	});
+
 	// now create the "real initial" state, now that we have a model to work with
+	let prefs_path = model.preferences.borrow().prefs_path.clone();
+	let paths = model.preferences.borrow().paths.clone();
+	let mame_windowing = if let Some(text) = model.child_window.text() {
+		MameWindowing::Attached(text.into())
+	} else {
+		MameWindowing::Windowed
+	};
 	let model_weak = Rc::downgrade(&model);
-	let state = AppState::new(move |command| {
+	let state = AppState::new(prefs_path, paths, mame_windowing, args.mame_stderr, move |command| {
 		let model = model_weak.upgrade().unwrap();
 		handle_command(&model, command);
 	});
-	model.update_state(|_| Some(state));
 
-	// and load the InfoDb and update the state
-	model.infodb_load(false);
+	// and lets do something with that state; specifically
+	// - load the InfoDB (if availble)
+	// - start the MAME session (and maybe an InfoDB build in parallel)
+	model.update_state(|_| Some(state));
+	model.update_state(|state| Some(state.infodb_load()));
+	model.update_state(|state| state.reset(true, state.info_db().is_none()));
 
 	// initial updates
 	update_ui_for_current_history_item(&model);
@@ -701,7 +656,7 @@ fn create_menu_bar() -> Menu {
 			"Help",
 			true,
 			&[
-				&MenuItem::with_id(AppCommand::InfoDbBuildLoad { force_refresh: true }, "Refresh MAME machine info...", false, None),
+				&MenuItem::with_id(AppCommand::HelpRefreshInfoDb, "Refresh MAME machine info...", false, None),
 				&MenuItem::with_id(AppCommand::HelpWebSite, "BletchMAME web site...", true, None),
 				&MenuItem::with_id(AppCommand::HelpAbout, "About...", true, None),
 			],
@@ -717,7 +672,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 	event!(LOG_COMMANDS, "handle_command(): command={:?}", &command);
 	match command {
 		AppCommand::FileStop => {
-			model.mame_controller.issue_command(MameCommand::Stop);
+			model.issue_command(MameCommand::Stop);
 		}
 		AppCommand::FilePause => {
 			let is_paused = model
@@ -728,13 +683,13 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				.map(|r| r.is_paused)
 				.unwrap_or_default();
 			if is_paused {
-				model.mame_controller.issue_command(MameCommand::Resume);
+				model.issue_command(MameCommand::Resume);
 			} else {
-				model.mame_controller.issue_command(MameCommand::Pause);
+				model.issue_command(MameCommand::Pause);
 			}
 		}
 		AppCommand::FileDevicesAndImages => {
-			let info_db = model.state.borrow().info_db.clone().unwrap();
+			let info_db = model.state.borrow().info_db().cloned().unwrap();
 			let diconfig = DevicesImagesConfig::new(info_db);
 			let diconfig = diconfig.update_status(model.state.borrow().status().as_ref().unwrap());
 			let status_update_channel = model.status_changed_channel.clone();
@@ -750,19 +705,16 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			spawn_local(fut).unwrap();
 		}
 		AppCommand::FileResetSoft => {
-			model.mame_controller.issue_command(MameCommand::SoftReset);
+			model.issue_command(MameCommand::SoftReset);
 		}
 		AppCommand::FileResetHard => {
-			model.mame_controller.issue_command(MameCommand::HardReset);
+			model.issue_command(MameCommand::HardReset);
 		}
 		AppCommand::FileExit => {
-			if model.mame_controller.has_session() {
-				model.mame_controller.issue_command(MameCommand::Exit);
-			}
 			model.update_state(AppState::shutdown);
 		}
 		AppCommand::OptionsThrottleRate(throttle) => {
-			model.mame_controller.issue_command(MameCommand::ThrottleRate(throttle));
+			model.issue_command(MameCommand::ThrottleRate(throttle));
 		}
 		AppCommand::OptionsToggleWarp => {
 			let is_throttled = model
@@ -772,9 +724,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				.and_then(|s| s.running.as_ref())
 				.map(|r| r.is_throttled)
 				.unwrap_or_default();
-			model
-				.mame_controller
-				.issue_command(MameCommand::Throttled(!is_throttled));
+			model.issue_command(MameCommand::Throttled(!is_throttled));
 		}
 		AppCommand::OptionsToggleSound => {
 			if let Some(sound_attenuation) = model
@@ -790,13 +740,11 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				} else {
 					SOUND_ATTENUATION_ON
 				};
-				model
-					.mame_controller
-					.issue_command(MameCommand::SetAttenuation(new_attenuation));
+				model.issue_command(MameCommand::SetAttenuation(new_attenuation));
 			}
 		}
 		AppCommand::OptionsClassic => {
-			model.mame_controller.issue_command(MameCommand::ClassicMenu);
+			model.issue_command(MameCommand::ClassicMenu);
 		}
 		AppCommand::SettingsPaths => {
 			let fut = show_paths_dialog(model.clone());
@@ -810,6 +758,9 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 		AppCommand::SettingsReset => model.modify_prefs(|prefs| {
 			*prefs = Preferences::fresh(prefs.prefs_path.clone());
 		}),
+		AppCommand::HelpRefreshInfoDb => {
+			model.update_state(|state| state.reset(false, true));
+		}
 		AppCommand::HelpWebSite => {
 			let _ = open::that("https://www.bletchmame.org");
 		}
@@ -817,17 +768,14 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			let modal = Modal::new(&model.app_window(), || AboutDialog::new().unwrap());
 			modal.launch();
 		}
-		AppCommand::MameSessionStarted => {
-			// do nothing
-		}
 		AppCommand::MameSessionEnded => {
-			model.update_state(AppState::session_ended);
+			model.update_state(|state| Some(state.session_ended()));
 		}
 		AppCommand::MameStatusUpdate(update) => {
 			model.update_state(|state| state.status_update(update));
 		}
 		AppCommand::MamePing => {
-			model.mame_controller.issue_command(MameCommand::Ping);
+			model.issue_command(MameCommand::Ping);
 		}
 		AppCommand::ErrorMessageBox(message) => {
 			let parent = model.app_window().as_weak();
@@ -849,7 +797,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				machine_name: &machine_name,
 				initial_loads: initial_loads.as_slice(),
 			};
-			model.mame_controller.issue_command(command);
+			model.issue_command(command);
 		}
 		AppCommand::Browse(collection) => {
 			let collection = Rc::new(collection);
@@ -983,12 +931,10 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 		}
 		AppCommand::LoadImage { tag, filename } => {
 			let loads = [(tag.as_str(), filename.as_str())];
-			model.mame_controller.issue_command(MameCommand::LoadImage(&loads));
+			model.issue_command(MameCommand::LoadImage(&loads));
 		}
 		AppCommand::UnloadImage { tag } => {
-			model
-				.mame_controller
-				.issue_command(MameCommand::UnloadImage(tag.as_str()));
+			model.issue_command(MameCommand::UnloadImage(tag.as_str()));
 		}
 		AppCommand::ConnectToSocketDialog { tag } => {
 			let model_clone = model.clone();
@@ -1007,14 +953,13 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				.iter()
 				.map(|(slot, opt)| (slot.as_str(), opt.as_deref().unwrap_or_default()))
 				.collect::<Vec<_>>();
-			model.mame_controller.issue_command(MameCommand::ChangeSlots(&changes));
+			model.issue_command(MameCommand::ChangeSlots(&changes));
 		}
-		AppCommand::InfoDbBuildLoad { force_refresh } => model.infodb_load(force_refresh),
 		AppCommand::InfoDbBuildProgress { machine_description } => {
-			model.update_state(|state| state.infodb_build_progress(machine_description))
+			model.update_state(|state| Some(state.infodb_build_progress(machine_description)))
 		}
-		AppCommand::InfoDbBuildComplete => model.update_state(AppState::infodb_build_complete),
-		AppCommand::InfoDbBuildCancel => model.update_state(AppState::infodb_build_cancel),
+		AppCommand::InfoDbBuildComplete => model.update_state(|state| Some(state.infodb_build_complete())),
+		AppCommand::InfoDbBuildCancel => model.update_state(|state| Some(state.infodb_build_cancel())),
 	};
 }
 
@@ -1047,12 +992,12 @@ fn update_menus(model: &AppModel) {
 		.as_ref()
 		.map(|r| r.sound_attenuation > SOUND_ATTENUATION_OFF)
 		.unwrap_or_default();
+	let can_refresh_info_db = has_mame_executable && !state.is_building_infodb();
 
 	// update the menu bar
 	model.menu_bar.update(|id| {
 		let command = AppCommand::try_from(id);
 		let (enabled, checked) = match command {
-			Ok(AppCommand::InfoDbBuildLoad { .. }) => (Some(has_mame_executable), None),
 			Ok(AppCommand::FileStop) => (Some(is_running), None),
 			Ok(AppCommand::FilePause) => (Some(is_running), Some(is_paused)),
 			Ok(AppCommand::FileDevicesAndImages) => (Some(is_running), None),
@@ -1062,6 +1007,7 @@ fn update_menus(model: &AppModel) {
 			Ok(AppCommand::OptionsToggleWarp) => (Some(is_running), Some(!is_throttled)),
 			Ok(AppCommand::OptionsToggleSound) => (Some(is_running), Some(is_sound_enabled)),
 			Ok(AppCommand::OptionsClassic) => (Some(is_running), None),
+			Ok(AppCommand::HelpRefreshInfoDb) => (Some(can_refresh_info_db), None),
 			_ => (None, None),
 		};
 
@@ -1098,8 +1044,7 @@ fn update_ui_for_current_history_item(model: &AppModel) {
 	let current_collection_desc = model
 		.state
 		.borrow()
-		.info_db
-		.as_deref()
+		.info_db()
 		.map(|info_db| collection.description(info_db))
 		.unwrap_or_default();
 	app_window.set_current_collection_text(current_collection_desc.as_ref().into());
@@ -1211,19 +1156,12 @@ async fn ping_callback(model_weak: std::rc::Weak<AppModel>) {
 	while let Some(model) = model_weak.upgrade() {
 		event!(LOG_PINGING, "ping_callback(): pinging");
 
-		// are we running?
-		let is_running = model
-			.state
-			.borrow()
-			.status()
-			.map(|s| s.running.is_some())
-			.unwrap_or_default();
-
 		// set the child window size
 		let menubar_height = model.app_window().invoke_menubar_height();
 		model.child_window.update(model.app_window().window(), menubar_height);
 
-		if is_running && model.mame_controller.is_queue_empty() {
+		// ping, if appropriate
+		if model.state.borrow().is_running_with_queue_empty() {
 			handle_command(&model, AppCommand::MamePing);
 		}
 		drop(model);

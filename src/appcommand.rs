@@ -38,11 +38,11 @@ pub enum AppCommand {
 	SettingsReset,
 
 	// Help menu
+	HelpRefreshInfoDb,
 	HelpWebSite,
 	HelpAbout,
 
 	// MAME communication
-	MameSessionStarted,
 	MameSessionEnded,
 	MameStatusUpdate(Update),
 	MamePing,
@@ -92,9 +92,6 @@ pub enum AppCommand {
 		tag: String,
 	},
 	ChangeSlots(Vec<(String, Option<String>)>),
-	InfoDbBuildLoad {
-		force_refresh: bool,
-	},
 	InfoDbBuildProgress {
 		machine_description: String,
 	},
