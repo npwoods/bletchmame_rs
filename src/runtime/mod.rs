@@ -1,15 +1,15 @@
 pub mod args;
-pub mod controller;
-mod session;
+pub mod session;
 
-use anyhow::Error;
+use std::rc::Rc;
+
 use strum::EnumString;
 
 use crate::status::Update;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum MameWindowing {
-	Attached(String),
+	Attached(Rc<str>),
 	Windowed,
 	#[allow(dead_code)]
 	WindowedMaximized,
@@ -41,9 +41,7 @@ pub enum MameCommand<'a> {
 
 #[derive(Debug)]
 pub enum MameEvent {
-	SessionStarted,
 	SessionEnded,
-	Error(Error),
 	StatusUpdate(Update),
 }
 
