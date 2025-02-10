@@ -646,7 +646,6 @@ dependencies = [
  "assert_matches",
  "binary-search",
  "binary_serde",
- "blockingqueue",
  "default-ext",
  "derive-enum-all-values",
  "dirs",
@@ -726,12 +725,6 @@ dependencies = [
  "futures-lite",
  "piper",
 ]
-
-[[package]]
-name = "blockingqueue"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "763bb38f196c65b369c68796e6d15b83d7eb63c354f2ab7c03c13edd13f2c4ff"
 
 [[package]]
 name = "borsh"

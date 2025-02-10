@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::cell::Cell;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::BufWriter;
@@ -8,45 +7,31 @@ use std::io::Write;
 use std::process::Child;
 use std::process::Command;
 use std::process::Stdio;
-use std::sync::atomic::AtomicU64;
-use std::sync::atomic::Ordering;
-use std::sync::Arc;
-use std::thread::spawn;
-use std::thread::JoinHandle;
+use std::rc::Rc;
+use std::sync::mpsc::channel;
+use std::sync::mpsc::Receiver;
+use std::sync::mpsc::RecvTimeoutError;
+use std::sync::mpsc::Sender;
+use std::time::Duration;
 
 use anyhow::Error;
 use anyhow::Result;
-use blockingqueue::BlockingQueue;
-use itertools::Itertools;
+use slint::invoke_from_event_loop;
 use tracing::event;
 use tracing::Level;
 
+use crate::appcommand::AppCommand;
+use crate::job::Job;
 use crate::platform::CommandExt;
+use crate::prefs::PrefsPaths;
 use crate::runtime::args::MameArguments;
-use crate::runtime::MameCommand;
-use crate::runtime::MameEvent;
+use crate::runtime::args::MameArgumentsSource;
 use crate::runtime::MameStderr;
+use crate::runtime::MameWindowing;
 use crate::status::Update;
+use crate::threadlocalbubble::ThreadLocalBubble;
 
 const LOG: Level = Level::DEBUG;
-
-pub struct MameSession {
-	handle: JoinHandle<Result<()>>,
-	comm: Arc<SessionCommunication>,
-	exit_issued: Cell<bool>,
-}
-
-struct SessionCommunication {
-	message_queue: BlockingQueue<ProcessedCommand>,
-	message_queue_len: AtomicU64,
-	mame_pid: AtomicU64,
-}
-
-#[derive(Debug)]
-struct ProcessedCommand {
-	pub text: Cow<'static, str>,
-	pub is_exit: bool,
-}
 
 #[derive(thiserror::Error, Debug)]
 enum ThisError {
@@ -58,74 +43,40 @@ enum ThisError {
 	EofFromMame(String),
 }
 
-impl MameSession {
-	pub fn new(
-		mame_args: MameArguments,
-		event_callback: impl Fn(MameEvent) + Send + 'static,
-		mame_stderr: MameStderr,
-	) -> Self {
-		// prepare communication with the child
-		let comm = SessionCommunication {
-			message_queue: BlockingQueue::new(),
-			mame_pid: (!0).into(),
-			message_queue_len: 0.into(),
-		};
-		let comm = Arc::new(comm);
-
-		// and start the thread
-		let comm_clone = comm.clone();
-		let handle = spawn(move || thread_proc(&mame_args, &comm_clone, event_callback, mame_stderr));
-
-		// and set ourselves up
-		Self {
-			handle,
-			comm,
-			exit_issued: Cell::new(false),
-		}
-	}
-
-	pub fn has_pending_commands(&self) -> bool {
-		self.comm.message_queue_len.load(Ordering::Relaxed) > 0
-	}
-
-	pub fn issue_command(&self, command: MameCommand) {
-		if command == MameCommand::Exit {
-			self.exit_issued.set(true);
-		}
-		self.comm.message_queue.push(command.into());
-		self.comm.message_queue_len.fetch_add(1, Ordering::Relaxed);
-	}
-
-	pub fn shutdown(self) -> Result<()> {
-		if !self.exit_issued.get() {
-			self.issue_command(MameCommand::Exit);
-		}
-		self.handle.join().unwrap()
-	}
+#[derive(Debug)]
+enum MameEvent {
+	SessionEnded,
+	StatusUpdate(Update),
 }
 
-impl From<MameCommand<'_>> for ProcessedCommand {
-	fn from(value: MameCommand<'_>) -> Self {
-		let text = command_text(&value);
-		let is_exit = value == MameCommand::Exit;
-		ProcessedCommand { text, is_exit }
-	}
-}
-
-fn thread_proc(
-	mame_args: &MameArguments,
-	comm: &SessionCommunication,
-	event_callback: impl Fn(MameEvent),
+pub fn spawn_mame_session_thread(
+	prefs_paths: &PrefsPaths,
+	mame_windowing: &MameWindowing,
 	mame_stderr: MameStderr,
-) -> Result<()> {
-	let result = execute_mame(mame_args, comm, &event_callback, mame_stderr);
-	event_callback(MameEvent::SessionEnded);
-	result
+	callback: Rc<dyn Fn(AppCommand) + 'static>,
+) -> (Job<Result<()>>, Sender<Cow<'static, str>>) {
+	let callback_bubble = ThreadLocalBubble::new(callback);
+	let event_callback = move |event| {
+		let callback_bubble = callback_bubble.clone();
+		invoke_from_event_loop(move || {
+			let command = match event {
+				MameEvent::SessionEnded => AppCommand::MameSessionEnded,
+				MameEvent::StatusUpdate(update) => AppCommand::MameStatusUpdate(update),
+			};
+			(callback_bubble.unwrap())(command)
+		})
+		.unwrap();
+	};
+	let mame_args = MameArgumentsSource::new(prefs_paths, mame_windowing).into();
+	let (sender, receiver) = channel();
+
+	let job = Job::new(move || execute_mame(&mame_args, &receiver, &event_callback, mame_stderr));
+	(job, sender)
 }
 
 fn execute_mame(
 	mame_args: &MameArguments,
-	comm: &SessionCommunication,
+	receiver: &Receiver<Cow<'static, str>>,
 	event_callback: &impl Fn(MameEvent),
 	mame_stderr: MameStderr,
 ) -> Result<()> {
@@ -145,24 +96,23 @@ fn execute_mame(
 		.spawn()
 		.map_err(|error| Error::new(error).context("Error launching MAME"))?;
 
-	// MAME launched!  we now have a pid
-	comm.mame_pid.store(child.id().into(), Ordering::Relaxed);
-
 	// interact with MAME, do our thing
-	let mame_result = interact_with_mame(&mut child, comm, &event_callback);
+	let mame_result = interact_with_mame(&mut child, receiver, &event_callback);
 
 	// await the exit status
 	let exit_status = child.wait();
 	event!(LOG, "execute_mame(): MAME exited exit_status={:?}", exit_status);
 
+	// notify the host that the session has ended
+	event_callback(MameEvent::SessionEnded);
+
 	// and we're done
-	comm.mame_pid.store(!0, Ordering::Relaxed);
 	mame_result
 }
 
 fn interact_with_mame(
 	child: &mut Child,
-	comm: &SessionCommunication,
+	receiver: &Receiver<Cow<'static, str>>,
 	event_callback: &impl Fn(MameEvent),
 ) -> Result<()> {
 	// set up what we need to interact with MAME as a child process
@@ -184,7 +134,7 @@ fn interact_with_mame(
 			if is_exiting {
 				break Ok(());
 			}
-			is_exiting = match process_event_from_front_end(comm, &mut mame_stdin) {
+			is_exiting = match process_event_from_front_end(receiver, &mut mame_stdin) {
 				Ok(x) => x,
 				Err(e) => break Err(e),
 			};
@@ -291,80 +241,25 @@ fn read_text_from_reader(read: &mut impl Read) -> String {
 	String::from_utf8(buf).unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).to_string())
 }
 
-fn process_event_from_front_end(comm: &SessionCommunication, mame_stdin: &mut BufWriter<impl Write>) -> Result<bool> {
-	let command = comm.message_queue.pop();
-	comm.message_queue_len.fetch_sub(1, Ordering::Relaxed);
-	event!(LOG, "process_event_from_front_end(): command=\"{:?}\"", command);
+fn process_event_from_front_end(
+	receiver: &Receiver<Cow<'static, str>>,
+	mame_stdin: &mut BufWriter<impl Write>,
+) -> Result<bool> {
+	let timeout = Duration::from_secs(1);
+	let (command_text, is_exit) = match receiver.recv_timeout(timeout) {
+		Ok(command_text) => (command_text, false),
+		Err(RecvTimeoutError::Timeout) => (Cow::Borrowed("PING"), false),
+		Err(RecvTimeoutError::Disconnected) => (Cow::Borrowed("EXIT"), true),
+	};
+
+	event!(LOG, "process_event_from_front_end(): command_text={command_text:?}");
 
 	fn mame_write_err(e: impl Into<Error>) -> Error {
 		e.into().context("Error writing to MAME")
 	}
 
-	writeln!(mame_stdin, "{}", command.text).map_err(mame_write_err)?;
+	writeln!(mame_stdin, "{}", command_text).map_err(mame_write_err)?;
 	mame_stdin.flush().map_err(mame_write_err)?;
 
-	Ok(command.is_exit)
-}
-
-fn command_text(command: &MameCommand<'_>) -> Cow<'static, str> {
-	match command {
-		MameCommand::Exit => "EXIT".into(),
-		MameCommand::Start {
-			machine_name,
-			initial_loads,
-		} => pairs_command_text(&["START", machine_name], initial_loads),
-		MameCommand::Stop => "STOP".into(),
-		MameCommand::SoftReset => "SOFT_RESET".into(),
-		MameCommand::HardReset => "HARD_RESET".into(),
-		MameCommand::Pause => "PAUSE".into(),
-		MameCommand::Resume => "RESUME".into(),
-		MameCommand::Ping => "PING".into(),
-		MameCommand::ClassicMenu => "CLASSIC_MENU".into(),
-		MameCommand::Throttled(throttled) => format!("THROTTLED {}", bool_str(*throttled)).into(),
-		MameCommand::ThrottleRate(throttle) => format!("THROTTLE_RATE {}", throttle).into(),
-		MameCommand::SetAttenuation(attenuation) => format!("SET_ATTENUATION {}", attenuation).into(),
-		MameCommand::LoadImage(loads) => pairs_command_text(&["LOAD"], loads),
-		MameCommand::UnloadImage(tag) => format!("UNLOAD {}", tag).into(),
-		MameCommand::ChangeSlots(changes) => pairs_command_text(&["CHANGE_SLOTS"], changes),
-	}
-}
-
-fn bool_str(b: bool) -> &'static str {
-	if b {
-		"true"
-	} else {
-		"false"
-	}
-}
-
-fn pairs_command_text(base: &[&str], args: &[(&str, &str)]) -> Cow<'static, str> {
-	base.iter()
-		.copied()
-		.map(Cow::Borrowed)
-		.chain(args.iter().flat_map(|(name, value)| {
-			let name = Cow::Borrowed(*name);
-			let value = if value.contains(' ') {
-				Cow::Owned(format!("\"{}\"", value))
-			} else {
-				Cow::Borrowed(*value)
-			};
-			[name, value]
-		}))
-		.join(" ")
-		.into()
-}
-
-#[cfg(test)]
-mod test {
-	use test_case::test_case;
-
-	use crate::runtime::MameCommand;
-
-	#[test_case(0, MameCommand::Exit, "EXIT")]
-	#[test_case(1, MameCommand::Start { machine_name: "coco2b", initial_loads: &[("ext:fdc:wd17xx:0", "foo.dsk")]}, "START coco2b ext:fdc:wd17xx:0 foo.dsk")]
-	#[test_case(2, MameCommand::LoadImage(&[("ext:fdc:wd17xx:0", "foo bar.dsk")]), "LOAD ext:fdc:wd17xx:0 \"foo bar.dsk\"")]
-	fn command_test(_index: usize, command: MameCommand<'_>, expected: &str) {
-		let actual = super::command_text(&command);
-		assert_eq!(expected, actual);
-	}
+	Ok(is_exit)
 }
