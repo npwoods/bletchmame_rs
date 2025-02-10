@@ -6,8 +6,6 @@ use std::rc::Rc;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use std::thread::spawn;
-use std::thread::JoinHandle;
 use std::time::Duration;
 
 use anyhow::Error;
@@ -18,6 +16,7 @@ use throttle::Throttle;
 use crate::appcommand::AppCommand;
 use crate::dialogs::file::PathType;
 use crate::info::InfoDb;
+use crate::job::Job;
 use crate::prefs::PrefsPaths;
 use crate::runtime::args::preflight_checks;
 use crate::runtime::args::MameArgumentsSource;
@@ -96,9 +95,6 @@ pub struct Issue {
 	pub text: Cow<'static, str>,
 	pub button: Option<Button>,
 }
-
-#[derive(Debug)]
-struct Job<T>(Rc<RefCell<Option<JoinHandle<T>>>>);
 
 impl AppState {
 	/// Creates an initial `AppState`
@@ -638,32 +634,4 @@ fn infodb_build_thread_proc(
 
 	// and return the result
 	result
-}
-
-impl<T> Job<T>
-where
-	T: Send + 'static,
-{
-	pub fn new(f: impl FnOnce() -> T + Send + 'static) -> Self {
-		let join_handle = spawn(f);
-		Self(Rc::new(RefCell::new(Some(join_handle))))
-	}
-
-	pub fn join(&self) -> Result<T> {
-		let join_handle = self.0.borrow_mut().take().ok_or_else(|| {
-			let message = "Job::join() invoked multiple times";
-			Error::msg(message)
-		})?;
-		let result = join_handle.join().map_err(|_| {
-			let message = "JoinHandle::join() failed";
-			Error::msg(message)
-		})?;
-		Ok(result)
-	}
-}
-
-impl<T> Clone for Job<T> {
-	fn clone(&self) -> Self {
-		Self(Rc::clone(&self.0))
-	}
 }
