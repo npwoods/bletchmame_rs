@@ -1,19 +1,19 @@
 use crate::info::InfoDb;
-use crate::status::RunningUpdate;
-use crate::status::Update;
+use crate::status::Running;
+use crate::status::Status;
 use crate::status::UpdateXmlProblem;
 use crate::status::ValidationError;
 
-pub fn validate_update(update: &Update, info_db: &InfoDb) -> Result<(), ValidationError> {
+pub fn validate_status(status: &Status, info_db: &InfoDb) -> Result<(), ValidationError> {
 	// first order of business is to check for a version mismatch
-	if update.build != *info_db.build() {
-		let mame_build = update.build.clone();
+	if status.build != *info_db.build() {
+		let mame_build = status.build.clone();
 		let infodb_build = info_db.build().clone();
 		Err(ValidationError::VersionMismatch(mame_build, infodb_build))
 	} else {
 		// with that out of the way, check for specific problems
 		let mut problems = Vec::new();
-		if let Some(running) = &update.running {
+		if let Some(running) = &status.running {
 			validate_running(running, info_db, |x| problems.push(x));
 		}
 
@@ -26,7 +26,7 @@ pub fn validate_update(update: &Update, info_db: &InfoDb) -> Result<(), Validati
 	}
 }
 
-fn validate_running(running: &RunningUpdate, info_db: &InfoDb, mut emit: impl FnMut(UpdateXmlProblem)) {
+fn validate_running(running: &Running, info_db: &InfoDb, mut emit: impl FnMut(UpdateXmlProblem)) {
 	if info_db.machines().find(&running.machine_name).is_none() {
 		emit(UpdateXmlProblem::UnknownMachine(running.machine_name.clone()));
 	}
@@ -39,6 +39,7 @@ mod test {
 	use test_case::test_case;
 
 	use crate::info::InfoDb;
+	use crate::status::Status;
 	use crate::status::Update;
 	use crate::status::UpdateXmlProblem::UnknownMachine;
 	use crate::status::ValidationError;
@@ -59,7 +60,8 @@ mod test {
 			.unwrap();
 		let update_reader = BufReader::new(update_xml.as_bytes());
 		let update = Update::parse(update_reader).unwrap();
-		let actual = update.validate(&info_db);
+		let status = Status::new(None, update);
+		let actual = status.validate(&info_db);
 		assert_eq!(expected, actual);
 	}
 }

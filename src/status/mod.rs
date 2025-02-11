@@ -11,11 +11,11 @@ use serde::Deserialize;
 use serde::Serialize;
 use tracing::event;
 use tracing::Level;
-use validate::validate_update;
 
 use crate::debugstr::DebugString;
 use crate::info::InfoDb;
 use crate::status::parse::parse_update;
+use crate::status::validate::validate_status;
 use crate::version::MameVersion;
 
 const LOG: Level = Level::TRACE;
@@ -84,6 +84,10 @@ impl Status {
 			build: update.build,
 		}
 	}
+
+	pub fn validate(&self, info_db: &InfoDb) -> std::result::Result<(), ValidationError> {
+		validate_status(self, info_db)
+	}
 }
 
 impl Debug for Status {
@@ -142,7 +146,7 @@ impl Update {
 	}
 
 	pub fn validate(&self, info_db: &InfoDb) -> std::result::Result<(), ValidationError> {
-		validate_update(self, info_db)
+		Status::new(None, self.clone()).validate(info_db)
 	}
 }
 

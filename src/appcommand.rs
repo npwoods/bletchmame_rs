@@ -45,7 +45,6 @@ pub enum AppCommand {
 	// MAME communication
 	MameSessionEnded,
 	MameStatusUpdate(Update),
-	MamePing,
 	ErrorMessageBox(String),
 
 	// Other

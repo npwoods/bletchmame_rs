@@ -65,7 +65,7 @@ use crate::platform::WindowExt;
 use crate::prefs::BuiltinCollection;
 use crate::prefs::Preferences;
 use crate::prefs::SortOrder;
-use crate::runtime::MameCommand;
+use crate::runtime::command::MameCommand;
 use crate::runtime::MameStderr;
 use crate::runtime::MameWindowing;
 use crate::selection::SelectionManager;
@@ -77,7 +77,6 @@ use crate::ui::ReportIssue;
 
 const LOG_COMMANDS: Level = Level::DEBUG;
 const LOG_PREFS: Level = Level::DEBUG;
-const LOG_PINGING: Level = Level::TRACE;
 
 const SOUND_ATTENUATION_OFF: i32 = -32;
 const SOUND_ATTENUATION_ON: i32 = 0;
@@ -336,8 +335,8 @@ pub fn create(args: AppArgs) -> AppWindow {
 		}
 	}
 
-	// create a repeating future that will ping forever
-	let fut = ping_callback(Rc::downgrade(&model));
+	// create a repeating future that will update the child window forever
+	let fut = update_child_window_callback(Rc::downgrade(&model));
 	spawn_local(fut).unwrap();
 
 	// set up the collections view model
@@ -525,9 +524,7 @@ pub fn create(args: AppArgs) -> AppWindow {
 	// and lets do something with that state; specifically
 	// - load the InfoDB (if availble)
 	// - start the MAME session (and maybe an InfoDB build in parallel)
-	model.update_state(|_| Some(state));
-	model.update_state(|state| Some(state.infodb_load()));
-	model.update_state(|state| state.reset(true, state.info_db().is_none()));
+	model.update_state(|_| state.activate());
 
 	// initial updates
 	update_ui_for_current_history_item(&model);
@@ -753,7 +750,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			*prefs = Preferences::fresh(prefs.prefs_path.clone());
 		}),
 		AppCommand::HelpRefreshInfoDb => {
-			model.update_state(|state| state.reset(false, true));
+			model.update_state(|state| state.infodb_rebuild());
 		}
 		AppCommand::HelpWebSite => {
 			let _ = open::that("https://www.bletchmame.org");
@@ -767,9 +764,6 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 		}
 		AppCommand::MameStatusUpdate(update) => {
 			model.update_state(|state| state.status_update(update));
-		}
-		AppCommand::MamePing => {
-			model.issue_command(MameCommand::Ping);
 		}
 		AppCommand::ErrorMessageBox(message) => {
 			let parent = model.app_window().as_weak();
@@ -1138,23 +1132,16 @@ fn items_set_sorting(model: &Rc<AppModel>, column: i32, order: SortOrder) {
 	handle_command(model, command);
 }
 
-async fn ping_callback(model_weak: std::rc::Weak<AppModel>) {
+async fn update_child_window_callback(model_weak: std::rc::Weak<AppModel>) {
 	// we really should be turning the timer on and off depending on what is running
 	while let Some(model) = model_weak.upgrade() {
-		event!(LOG_PINGING, "ping_callback(): pinging");
-
 		// set the child window size
 		let menubar_height = model.app_window().invoke_menubar_height();
 		model.child_window.update(model.app_window().window(), menubar_height);
 
-		// ping, if appropriate
-		if model.state.borrow().is_running_with_queue_empty() {
-			handle_command(&model, AppCommand::MamePing);
-		}
 		drop(model);
 		tokio::time::sleep(Duration::from_secs(1)).await;
 	}
-	event!(LOG_PINGING, "ping_callback(): exiting");
 }
 
 #[cfg(test)]
