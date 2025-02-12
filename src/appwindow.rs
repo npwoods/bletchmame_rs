@@ -2,7 +2,6 @@ use std::cell::RefCell;
 use std::iter::once;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::time::Duration;
 
 use muda::CheckMenuItem;
 use muda::IsMenuItem;
@@ -336,8 +335,14 @@ pub fn create(args: AppArgs) -> AppWindow {
 	}
 
 	// create a repeating future that will update the child window forever
-	let fut = update_child_window_callback(Rc::downgrade(&model));
-	spawn_local(fut).unwrap();
+	let model_weak = Rc::downgrade(&model);
+	app_window.on_size_changed(move || {
+		if let Some(model) = model_weak.upgrade() {
+			// set the child window size
+			let menubar_height = model.app_window().invoke_menubar_height();
+			model.child_window.update(model.app_window().window(), menubar_height);
+		}
+	});
 
 	// set up the collections view model
 	let collections_view_model = CollectionsViewModel::new(app_window.as_weak());
@@ -1130,18 +1135,6 @@ fn items_set_sorting(model: &Rc<AppModel>, column: i32, order: SortOrder) {
 	let column = usize::try_from(column).unwrap();
 	let command = AppCommand::ItemsSort(column, order);
 	handle_command(model, command);
-}
-
-async fn update_child_window_callback(model_weak: std::rc::Weak<AppModel>) {
-	// we really should be turning the timer on and off depending on what is running
-	while let Some(model) = model_weak.upgrade() {
-		// set the child window size
-		let menubar_height = model.app_window().invoke_menubar_height();
-		model.child_window.update(model.app_window().window(), menubar_height);
-
-		drop(model);
-		tokio::time::sleep(Duration::from_secs(1)).await;
-	}
 }
 
 #[cfg(test)]

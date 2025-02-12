@@ -14,6 +14,15 @@ export component AppWindow inherits Window {
     icon: @image-url("bletchmame.png");
     title: @tr("BletchMAME 3.0 prototype") + (running-machine-desc != "" ? ": " + running-machine-desc : "");
 
+    // width and height
+    changed width => {
+        self.size-changed();
+    }
+    changed height => {
+        self.size-changed();
+    }
+    callback size-changed();
+
     // the currently running machine (empty if no emulation is running)
     in property <string> running-machine-desc;
 
