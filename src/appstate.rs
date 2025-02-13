@@ -616,7 +616,7 @@ impl AppState {
 						let text = problem.to_string().into();
 						let button = problem.problem_type().map(|path_type| {
 							let text = Cow::Owned(format!("Choose {path_type}"));
-							let command = AppCommand::ChoosePath(path_type);
+							let command = AppCommand::SettingsPaths(Some(path_type));
 							Button { text, command }
 						});
 						Issue { text, button }

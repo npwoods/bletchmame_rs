@@ -33,7 +33,7 @@ pub enum AppCommand {
 	OptionsClassic,
 
 	// Settings menu
-	SettingsPaths,
+	SettingsPaths(Option<PathType>),
 	SettingsToggleBuiltinCollection(BuiltinCollection),
 	SettingsReset,
 
@@ -75,7 +75,6 @@ pub enum AppCommand {
 		index: usize,
 		new_name: String,
 	},
-	ChoosePath(PathType),
 	BookmarkCurrentCollection,
 	LoadImageDialog {
 		tag: String,

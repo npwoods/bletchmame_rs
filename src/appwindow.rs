@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::iter::once;
 use std::path::PathBuf;
 use std::rc::Rc;
 
@@ -40,7 +39,6 @@ use crate::collections::remove_items_from_folder_collection;
 use crate::collections::toggle_builtin_collection;
 use crate::devimageconfig::DevicesImagesConfig;
 use crate::dialogs::devimages::dialog_devices_and_images;
-use crate::dialogs::file::file_dialog;
 use crate::dialogs::file::PathType;
 use crate::dialogs::image::dialog_load_image;
 use crate::dialogs::messagebox::dialog_message_box;
@@ -641,7 +639,7 @@ fn create_menu_bar() -> Menu {
 				&MenuItem::new("Configuration...", false, None),
 				&MenuItem::new("DIP Switches...", false, None),
 				&PredefinedMenuItem::separator(),
-				&MenuItem::with_id(AppCommand::SettingsPaths, "Paths...", true, None),
+				&MenuItem::with_id(AppCommand::SettingsPaths(None), "Paths...", true, None),
 				&Submenu::with_items("Builtin Collections", true, &toggle_builtin_menu_items).unwrap(),
 				&MenuItem::with_id(AppCommand::SettingsReset, "Reset Settings To Default", true, None),
 				&MenuItem::new("Import MAME INI...", false, None),
@@ -742,8 +740,8 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 		AppCommand::OptionsClassic => {
 			model.issue_command(MameCommand::ClassicMenu);
 		}
-		AppCommand::SettingsPaths => {
-			let fut = show_paths_dialog(model.clone());
+		AppCommand::SettingsPaths(path_type) => {
+			let fut = show_paths_dialog(model.clone(), path_type);
 			spawn_local(fut).unwrap();
 		}
 		AppCommand::SettingsToggleBuiltinCollection(col) => {
@@ -897,9 +895,6 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 		AppCommand::RenameCollection { index, new_name } => model.modify_prefs(|prefs| {
 			prefs.rename_folder(index, new_name);
 		}),
-		AppCommand::ChoosePath(path_type) => {
-			choose_path(model, path_type);
-		}
 		AppCommand::BookmarkCurrentCollection => {
 			let (collection, _) = model.preferences.borrow().current_collection();
 			model.modify_prefs(|prefs| {
@@ -956,10 +951,10 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 	};
 }
 
-async fn show_paths_dialog(model: Rc<AppModel>) {
+async fn show_paths_dialog(model: Rc<AppModel>, path_type: Option<PathType>) {
 	let parent = model.app_window_weak.clone();
 	let paths = model.preferences.borrow().paths.clone();
-	if let Some(new_paths) = dialog_paths(parent, paths).await {
+	if let Some(new_paths) = dialog_paths(parent, paths, path_type).await {
 		model.modify_prefs(|prefs| prefs.paths = new_paths.into());
 	}
 }
@@ -1110,20 +1105,6 @@ fn update_empty_reason(model: &AppModel, empty_reason: Option<EmptyReason>) {
 	let app_window = model.app_window();
 	let reason_string = empty_reason.map(|x| format!("{x}")).unwrap_or_default().into();
 	app_window.set_is_empty_reason(reason_string);
-}
-
-fn choose_path(model: &Rc<AppModel>, path_type: PathType) {
-	// open the file dialog
-	let Some(path) = file_dialog(&model.app_window(), path_type, None) else {
-		return;
-	};
-
-	// and respond to the change
-	model.modify_prefs(|prefs| {
-		let mut paths = (*prefs.paths).clone();
-		PathType::store_in_prefs_paths(&mut paths, path_type, once(path));
-		prefs.paths = paths.into();
-	});
 }
 
 fn software_paths_updated(model: &AppModel) {
