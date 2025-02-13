@@ -689,7 +689,7 @@ impl AppState {
 	pub fn is_shutdown(&self) -> bool {
 		self.pending_shutdown
 			&& self.info_db_build.is_none()
-			&& self.live.as_ref().is_some_and(|live| live.session.is_none())
+			&& self.live.as_ref().is_none_or(|live| live.session.is_none())
 	}
 }
 
@@ -790,5 +790,20 @@ fn validate_and_update_status(
 		}
 	} else {
 		(status.cloned(), pending_status.cloned(), result)
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use test_case::test_case;
+
+	use super::AppState;
+
+	#[test_case(0, AppState::bogus(), false)]
+	#[test_case(1, AppState::bogus().shutdown(), true)]
+	pub fn is_shutdown(_index: usize, state: impl Into<Option<AppState>>, expected: bool) {
+		let state = state.into().unwrap();
+		let actual = state.is_shutdown();
+		assert_eq!(expected, actual);
 	}
 }
