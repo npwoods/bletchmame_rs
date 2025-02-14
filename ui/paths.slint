@@ -9,7 +9,7 @@ export component PathsDialog inherits Window {
     in property <bool> ok-enabled;
     in property <bool> browse-enabled;
     in property <bool> delete-enabled;
-    out property <int> path-label-index;
+    in-out property <int> path-label-index;
     out property <int> path-entry-index <=> entries-view.current-index;
     callback ok-clicked();
     callback cancel-clicked();

@@ -39,7 +39,11 @@ impl Debug for State {
 	}
 }
 
-pub async fn dialog_paths(parent: Weak<impl ComponentHandle + 'static>, paths: Rc<PrefsPaths>) -> Option<PrefsPaths> {
+pub async fn dialog_paths(
+	parent: Weak<impl ComponentHandle + 'static>,
+	paths: Rc<PrefsPaths>,
+	path_type: Option<PathType>,
+) -> Option<PrefsPaths> {
 	// prepare the dialog
 	let modal = Modal::new(&parent.unwrap(), || PathsDialog::new().unwrap());
 	let single_result = SingleResult::default();
@@ -106,6 +110,15 @@ pub async fn dialog_paths(parent: Weak<impl ComponentHandle + 'static>, paths: R
 		let dialog = state_clone.dialog_weak.unwrap();
 		update_paths_entries(&dialog, &state_clone.paths.borrow());
 	});
+
+	// set the index on the path type dropdown
+	let path_label_index = path_type.and_then(|path_type| PathType::all_values().iter().position(|&x| x == path_type));
+	if let Some(path_label_index) = path_label_index {
+		let path_label_index = i32::try_from(path_label_index).unwrap();
+		modal.dialog().set_path_label_index(path_label_index);
+	}
+
+	// fresh update of path entries
 	update_paths_entries(modal.dialog(), &state.paths.borrow());
 
 	// update buttons when selected entries changes
