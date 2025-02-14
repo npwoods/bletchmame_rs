@@ -449,7 +449,7 @@ impl AppState {
 		let session = live.session.as_ref().unwrap();
 
 		// join the thread and get the result
-		let result = session.job.join();
+		let result = session.job.join().unwrap();
 
 		// if we failed, we have to report the error
 		let failure = if let Err(e) = result {
@@ -471,6 +471,7 @@ impl AppState {
 		};
 		let new_state = Self {
 			live: Some(new_live),
+			failure,
 			..self.clone()
 		};
 
