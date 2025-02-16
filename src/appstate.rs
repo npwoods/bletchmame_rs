@@ -622,11 +622,18 @@ impl AppState {
 					..Default::default()
 				}
 			}
-			ReportType::SessionError(error) => Report {
-				message: "MAME has errored".into(),
-				submessage: Some(format!("{error}").into()),
-				..Default::default()
-			},
+			ReportType::SessionError(error) => {
+				let button = Button {
+					text: "Continue".into(),
+					command: AppCommand::ReactivateMame
+				};
+				Report {
+					message: "MAME has errored".into(),
+					submessage: Some(format!("{error}").into()),
+					button: Some(button),
+					..Default::default()
+				}
+			}
 			ReportType::InvalidStatusUpdate(errors) => {
 				let issues = errors
 					.iter()
