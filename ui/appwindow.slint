@@ -267,19 +267,17 @@ export component AppWindow inherits Window {
                 }
 
                 // report issues
-                VerticalBox {
-                    for issue[index] in report-issues: HorizontalBox {
-                        Text {
-                            horizontal-alignment: left;
-                            text: issue.text;
-                        }
+                for issue[index] in report-issues: HorizontalBox {
+                    Text {
+                        horizontal-alignment: left;
+                        text: issue.text;
+                    }
 
-                        Button {
-                            visible: issue.button-text != "";
-                            text: issue.button-text;
-                            clicked => {
-                                root.issue-button-clicked(index);
-                            }
+                    Button {
+                        visible: issue.button-text != "";
+                        text: issue.button-text;
+                        clicked => {
+                            root.issue-button-clicked(index);
                         }
                     }
                 }
