@@ -948,6 +948,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 		}
 		AppCommand::InfoDbBuildComplete => model.update_state(|state| Some(state.infodb_build_complete())),
 		AppCommand::InfoDbBuildCancel => model.update_state(|state| Some(state.infodb_build_cancel())),
+		AppCommand::ReactivateMame => model.update_state(AppState::activate),
 	};
 }
 

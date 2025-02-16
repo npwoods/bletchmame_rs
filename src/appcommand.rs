@@ -95,6 +95,7 @@ pub enum AppCommand {
 	},
 	InfoDbBuildComplete,
 	InfoDbBuildCancel,
+	ReactivateMame,
 }
 
 const MENU_PREFIX: &str = "MENU_";
