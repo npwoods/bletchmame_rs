@@ -2,7 +2,6 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::default::Default;
 use std::fmt::Debug;
-use std::path::Path;
 use std::rc::Rc;
 
 use slint::CloseRequestResponse;
@@ -14,6 +13,8 @@ use slint::ModelTracker;
 use slint::SharedString;
 use slint::VecModel;
 use slint::Weak;
+use tracing::event;
+use tracing::Level;
 
 use crate::dialogs::file::file_dialog;
 use crate::dialogs::SingleResult;
@@ -23,6 +24,8 @@ use crate::prefs::pathtype::PathType;
 use crate::prefs::PrefsPaths;
 use crate::ui::MagicListViewItem;
 use crate::ui::PathsDialog;
+
+const LOG: Level = Level::DEBUG;
 
 struct State {
 	dialog_weak: Weak<PathsDialog>,
@@ -79,7 +82,7 @@ pub async fn dialog_paths(
 	let state_clone = state.clone();
 	modal.dialog().on_browse_clicked(move || {
 		let dialog = state_clone.dialog_weak.unwrap();
-		browse_clicked(&dialog);
+		browse_clicked(&dialog, &state_clone.paths);
 		model_contents_changed(&state_clone);
 	});
 
@@ -164,16 +167,24 @@ fn update_paths_entries(dialog: &PathsDialog, paths: &PrefsPaths) {
 	model.update(paths_entries, path_type.is_multi());
 }
 
-fn browse_clicked(dialog: &PathsDialog) {
+fn browse_clicked(dialog: &PathsDialog, paths: &RefCell<PrefsPaths>) {
 	let path_type = path_type(dialog);
 	let model = dialog.get_path_entries();
 	let model = PathEntriesModel::get_model(&model);
+
+	// determine the existing path that should serve as the initial path for the dialog
 	let existing_path = usize::try_from(dialog.get_path_entry_index())
 		.ok()
 		.and_then(|index| model.entry(index));
-	let existing_path = existing_path.as_ref().map(Path::new);
+	let resolved_existing_path = existing_path.as_ref().and_then(|path| paths.borrow().resolve(path));
+	let resolved_existing_path = resolved_existing_path.as_deref();
+	event!(
+		LOG,
+		"browse_clicked(): existing_path={existing_path:?} resolved_existing_path={resolved_existing_path:?}"
+	);
 
-	let Some(path) = file_dialog(dialog, path_type, existing_path) else {
+	// show the file dialog
+	let Some(path) = file_dialog(dialog, path_type, resolved_existing_path) else {
 		return;
 	};
 	let Ok(row) = usize::try_from(dialog.get_path_entry_index()) else {
