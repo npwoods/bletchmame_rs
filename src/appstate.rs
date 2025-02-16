@@ -14,12 +14,11 @@ use slint::invoke_from_event_loop;
 use throttle::Throttle;
 
 use crate::appcommand::AppCommand;
-use crate::dialogs::file::PathType;
 use crate::info::InfoDb;
 use crate::job::Job;
+use crate::prefs::pathtype::PathType;
+use crate::prefs::PreflightProblem;
 use crate::prefs::PrefsPaths;
-use crate::runtime::args::preflight_checks;
-use crate::runtime::args::PreflightProblem;
 use crate::runtime::command::MameCommand;
 use crate::runtime::session::spawn_mame_session_thread;
 use crate::runtime::MameStderr;
@@ -161,7 +160,7 @@ impl AppState {
 		});
 
 		if let Some(info_db) = info_db {
-			let preflight_problems = self.preflight_checks();
+			let preflight_problems = self.paths.preflight();
 			let session = preflight_problems.is_empty().then(|| {
 				let (job, command_sender) = spawn_mame_session_thread(
 					self.paths.as_ref(),
@@ -201,7 +200,7 @@ impl AppState {
 		}
 
 		// quick run of preflight
-		let preflight_problems = self.preflight_checks();
+		let preflight_problems = self.paths.preflight();
 		let new_state = if preflight_problems
 			.iter()
 			.any(|x| x.problem_type() == Some(PathType::MameExecutable))
@@ -277,12 +276,6 @@ impl AppState {
 		if let Some(command_sender) = session.command_sender.as_deref() {
 			command_sender.send(command.text()).unwrap();
 		}
-	}
-
-	fn preflight_checks(&self) -> Vec<PreflightProblem> {
-		let mame_executable_path = self.paths.mame_executable.as_deref();
-		let plugins_paths = self.paths.plugins.as_slice();
-		preflight_checks(mame_executable_path, plugins_paths)
 	}
 
 	pub fn infodb_build_progress(&self, machine_description: String) -> Self {

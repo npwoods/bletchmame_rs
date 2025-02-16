@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::ffi::OsStr;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::BufWriter;
@@ -25,7 +26,6 @@ use crate::job::Job;
 use crate::platform::CommandExt;
 use crate::prefs::PrefsPaths;
 use crate::runtime::args::MameArguments;
-use crate::runtime::args::MameArgumentsSource;
 use crate::runtime::MameStderr;
 use crate::runtime::MameWindowing;
 use crate::status::Update;
@@ -67,7 +67,7 @@ pub fn spawn_mame_session_thread(
 		})
 		.unwrap();
 	};
-	let mame_args = MameArgumentsSource::new(prefs_paths, mame_windowing).into();
+	let mame_args = MameArguments::new(prefs_paths, mame_windowing);
 	let (sender, receiver) = channel();
 
 	let job = Job::new(move || execute_mame(&mame_args, &receiver, &event_callback, mame_stderr));
@@ -82,7 +82,7 @@ fn execute_mame(
 ) -> Result<()> {
 	// launch MAME, launch!
 	event!(LOG, "execute_mame(): Launching MAME: mame_args={mame_args:?}");
-	let args = mame_args.args.iter().map(|x| x.as_ref());
+	let args = mame_args.args.iter().map(OsStr::new);
 	let (mame_stderr, create_no_window_flag) = match mame_stderr {
 		MameStderr::Capture => (Stdio::piped(), true),
 		MameStderr::Inherit => (Stdio::inherit(), false),

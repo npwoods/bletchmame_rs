@@ -16,10 +16,10 @@ use slint::VecModel;
 use slint::Weak;
 
 use crate::dialogs::file::file_dialog;
-use crate::dialogs::file::PathType;
 use crate::dialogs::SingleResult;
 use crate::guiutils::modal::Modal;
 use crate::icon::Icon;
+use crate::prefs::pathtype::PathType;
 use crate::prefs::PrefsPaths;
 use crate::ui::MagicListViewItem;
 use crate::ui::PathsDialog;
@@ -148,11 +148,11 @@ fn path_type(dialog: &PathsDialog) -> PathType {
 fn update_paths_entries(dialog: &PathsDialog, paths: &PrefsPaths) {
 	let path_type = path_type(dialog);
 
-	let path_entries = PathType::load_from_prefs_paths(paths, path_type);
+	let path_entries = paths.by_type(path_type);
 	let paths_entries = path_entries
-		.into_iter()
+		.iter()
 		.map(|path| {
-			let exists = path_type.path_exists(path);
+			let exists = paths.path_exists(path_type, path);
 			let prefix_icon = if exists { Icon::Blank } else { Icon::Clear };
 			let path = SharedString::from(path);
 			(path, prefix_icon)
@@ -214,7 +214,7 @@ fn model_contents_changed(state: &State) {
 
 	let path_type = path_type(&dialog);
 	let entries_iter = model.entries().into_iter().map(|x| x.to_string());
-	PathType::store_in_prefs_paths(&mut paths, path_type, entries_iter);
+	paths.set_by_type(path_type, entries_iter);
 	dialog.set_ok_enabled(*paths != **original_paths);
 }
 

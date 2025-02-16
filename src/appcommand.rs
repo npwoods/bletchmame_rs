@@ -7,7 +7,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use strum::EnumProperty;
 
-use crate::dialogs::file::PathType;
+use crate::prefs::pathtype::PathType;
 use crate::prefs::BuiltinCollection;
 use crate::prefs::PrefsCollection;
 use crate::prefs::PrefsItem;
