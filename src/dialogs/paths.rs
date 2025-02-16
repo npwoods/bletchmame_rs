@@ -16,10 +16,10 @@ use slint::VecModel;
 use slint::Weak;
 
 use crate::dialogs::file::file_dialog;
-use crate::dialogs::file::PathType;
 use crate::dialogs::SingleResult;
 use crate::guiutils::modal::Modal;
 use crate::icon::Icon;
+use crate::prefs::pathtype::PathType;
 use crate::prefs::PrefsPaths;
 use crate::ui::MagicListViewItem;
 use crate::ui::PathsDialog;
@@ -148,13 +148,14 @@ fn path_type(dialog: &PathsDialog) -> PathType {
 fn update_paths_entries(dialog: &PathsDialog, paths: &PrefsPaths) {
 	let path_type = path_type(dialog);
 
-	let path_entries = PathType::load_from_prefs_paths(paths, path_type);
+	let path_entries = paths.by_type(path_type);
 	let paths_entries = path_entries
-		.into_iter()
+		.iter()
 		.map(|path| {
-			let exists = path_type.path_exists(path);
+			let exists = paths.path_exists(path_type, path);
+			let prefix_icon = if exists { Icon::Blank } else { Icon::Clear };
 			let path = SharedString::from(path);
-			(path, exists)
+			(path, prefix_icon)
 		})
 		.collect::<Vec<_>>();
 
@@ -183,7 +184,7 @@ fn browse_clicked(dialog: &PathsDialog) {
 	};
 	let model = dialog.get_path_entries();
 	let model = model.as_any().downcast_ref::<PathEntriesModel>().unwrap();
-	model.set_entry(row, &path, true);
+	model.set_entry(row, &path, Icon::Blank);
 }
 
 fn delete_clicked(dialog: &PathsDialog) {
@@ -213,7 +214,7 @@ fn model_contents_changed(state: &State) {
 
 	let path_type = path_type(&dialog);
 	let entries_iter = model.entries().into_iter().map(|x| x.to_string());
-	PathType::store_in_prefs_paths(&mut paths, path_type, entries_iter);
+	paths.set_by_type(path_type, entries_iter);
 	dialog.set_ok_enabled(*paths != **original_paths);
 }
 
@@ -231,7 +232,7 @@ where
 struct PathEntriesModel {
 	dialog_weak: Weak<PathsDialog>,
 	changed_func: Box<dyn Fn() + 'static>,
-	data: RefCell<(Vec<(SharedString, bool)>, bool)>,
+	data: RefCell<(Vec<(SharedString, Icon)>, bool)>,
 	notify: ModelNotify,
 }
 
@@ -248,7 +249,7 @@ impl PathEntriesModel {
 		}
 	}
 
-	pub fn update(&self, items: Vec<(SharedString, bool)>, is_multi: bool) {
+	pub fn update(&self, items: Vec<(SharedString, Icon)>, is_multi: bool) {
 		self.data.replace((items, is_multi));
 		self.notify.reset();
 	}
@@ -278,8 +279,8 @@ impl PathEntriesModel {
 		self.data.borrow().0.get(index).cloned().map(|x| x.0)
 	}
 
-	pub fn set_entry(&self, row: usize, text: impl Into<SharedString>, exists: bool) {
-		let new_value = (text.into(), exists);
+	pub fn set_entry(&self, row: usize, text: impl Into<SharedString>, prefix_icon: Icon) {
+		let new_value = (text.into(), prefix_icon);
 		let changed = if self.append_row_index() == Some(row) {
 			self.data.borrow_mut().0.push(new_value);
 			self.notify.row_added(row, 1);
@@ -296,8 +297,7 @@ impl PathEntriesModel {
 		}
 	}
 
-	fn make_entry(&self, text: impl Into<SharedString>, exists: bool) -> MagicListViewItem {
-		let prefix_icon = if exists { Icon::Clear } else { Icon::Blank };
+	fn make_entry(&self, text: impl Into<SharedString>, prefix_icon: Icon) -> MagicListViewItem {
 		let prefix_icon = prefix_icon.slint_icon(&self.dialog_weak.unwrap());
 		let text = text.into();
 		MagicListViewItem {
@@ -317,17 +317,17 @@ impl Model for PathEntriesModel {
 	}
 
 	fn row_data(&self, row: usize) -> Option<Self::Data> {
-		let (text, exists) = if self.append_row_index() == Some(row) {
-			("<          >".into(), true)
+		let (text, prefix_icon) = if self.append_row_index() == Some(row) {
+			("<          >".into(), Icon::Blank)
 		} else {
 			self.data.borrow().0.get(row)?.clone()
 		};
-		let data = self.make_entry(text, exists);
+		let data = self.make_entry(text, prefix_icon);
 		Some(data)
 	}
 
 	fn set_row_data(&self, row: usize, data: Self::Data) {
-		self.set_entry(row, data.text, false);
+		self.set_entry(row, data.text, Icon::Blank);
 	}
 
 	fn model_tracker(&self) -> &dyn ModelTracker {

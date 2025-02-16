@@ -1,4 +1,9 @@
+pub mod pathtype;
+mod preflight;
+mod var;
+
 use std::borrow::Cow;
+use std::ffi::OsString;
 use std::fs::create_dir_all;
 use std::fs::rename;
 use std::fs::File;
@@ -9,20 +14,29 @@ use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::str::FromStr;
 
 use anyhow::Error;
 use anyhow::Result;
 use derive_enum_all_values::AllValues;
+use itertools::Itertools;
 use num::clamp;
 use serde::Deserialize;
 use serde::Serialize;
 use slint::LogicalSize;
+use strum::EnumProperty;
+use strum::EnumString;
 use tracing::event;
 use tracing::Level;
 
 use crate::history::History;
 use crate::icon::Icon;
 use crate::info::InfoDb;
+use crate::prefs::pathtype::PathType;
+use crate::prefs::pathtype::PickType;
+use crate::prefs::preflight::preflight_checks;
+use crate::prefs::var::resolve_path;
+use crate::prefs::var::resolve_paths_string;
 
 const LOG: Level = Level::DEBUG;
 
@@ -74,6 +88,93 @@ pub struct PrefsPaths {
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub nvram: Option<String>,
+}
+
+impl PrefsPaths {
+	pub fn by_type(&self, path_type: PathType) -> &[String] {
+		access_paths(path_type).0(self)
+	}
+
+	pub fn set_by_type(&mut self, path_type: PathType, paths_iter: impl Iterator<Item = String>) {
+		let (_, store) = access_paths(path_type);
+		match store {
+			PathsStore::Single(store) => {
+				*store(self) = paths_iter.at_most_one().map_err(|e| e.to_string()).unwrap();
+			}
+			PathsStore::Multiple(store) => {
+				*store(self) = paths_iter.collect();
+			}
+		}
+	}
+
+	pub fn resolve<'a>(&self, path: &'a str) -> Option<Cow<'a, Path>> {
+		resolve_path(path, self.mame_executable.as_deref())
+	}
+
+	pub fn full_string(&self, path_type: PathType) -> Option<OsString> {
+		let paths = self.by_type(path_type);
+		resolve_paths_string(paths, self.mame_executable.as_deref())
+	}
+
+	pub fn path_exists(&self, path_type: PathType, path: &str) -> bool {
+		self.resolve(path)
+			.and_then(|path| std::fs::metadata(path.as_ref()).ok())
+			.is_some_and(|metadata| match path_type.pick_type() {
+				PickType::File { .. } => metadata.is_file(),
+				PickType::Dir => metadata.is_dir(),
+			})
+	}
+
+	pub fn preflight(&self) -> Vec<PreflightProblem> {
+		let mame_executable_path = self.mame_executable.as_ref().and_then(|path| self.resolve(path));
+		let mame_executable_path = mame_executable_path.as_ref().map(|path| path.as_ref());
+		let plugins_path_iter = self.plugins.iter().flat_map(|path| self.resolve(path.as_ref()));
+		preflight_checks(mame_executable_path, plugins_path_iter)
+	}
+}
+
+#[derive(Debug)]
+enum PathsStore {
+	Single(fn(&mut PrefsPaths) -> &mut Option<String>),
+	Multiple(fn(&mut PrefsPaths) -> &mut Vec<String>),
+}
+
+fn access_paths(path_type: PathType) -> (fn(&PrefsPaths) -> &[String], PathsStore) {
+	match path_type {
+		PathType::MameExecutable => (
+			(|x| x.mame_executable.as_slice()),
+			PathsStore::Single(|x| &mut x.mame_executable),
+		),
+		PathType::Roms => ((|x| &x.roms), PathsStore::Multiple(|x| &mut x.roms)),
+		PathType::Samples => ((|x| &x.samples), PathsStore::Multiple(|x| &mut x.samples)),
+		PathType::SoftwareLists => ((|x| &x.software_lists), PathsStore::Multiple(|x| &mut x.software_lists)),
+		PathType::Plugins => ((|x| &x.plugins), PathsStore::Multiple(|x| &mut x.plugins)),
+		PathType::Cfg => ((|x| x.cfg.as_slice()), PathsStore::Single(|x| &mut x.cfg)),
+		PathType::Nvram => ((|x| x.nvram.as_slice()), PathsStore::Single(|x| &mut x.nvram)),
+	}
+}
+
+#[derive(AllValues, Copy, Clone, Debug, strum_macros::Display, EnumString, EnumProperty)]
+pub enum PreflightProblem {
+	#[strum(to_string = "No MAME executable path specified", props(ProblemType = "MAME Executable"))]
+	NoMameExecutablePath,
+	#[strum(to_string = "No MAME executable found", props(ProblemType = "MAME Executable"))]
+	NoMameExecutable,
+	#[strum(to_string = "MAME executable file is not executable", props(ProblemType = "MAME Executable"))]
+	MameExecutableIsNotExecutable,
+	#[strum(to_string = "No valid plugins paths specified", props(ProblemType = "Plugins"))]
+	NoPluginsPaths,
+	#[strum(to_string = "MAME boot.lua not found", props(ProblemType = "Plugins"))]
+	PluginsBootNotFound,
+	#[strum(to_string = "BletchMAME worker_ui plugin not found", props(ProblemType = "Plugins"))]
+	WorkerUiPluginNotFound,
+}
+
+impl PreflightProblem {
+	pub fn problem_type(&self) -> Option<PathType> {
+		let s = self.get_str("ProblemType")?;
+		Some(PathType::from_str(s).unwrap())
+	}
 }
 
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq)]
