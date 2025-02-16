@@ -3,7 +3,7 @@ use slint::Image;
 
 use crate::ui::Icons;
 
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum Icon {
 	#[default]
 	Blank,
