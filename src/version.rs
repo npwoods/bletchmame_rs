@@ -32,7 +32,7 @@ impl MameVersion {
 		Some(Self::new(major, minor))
 	}
 
-	fn proxy_key(self: &MameVersion) -> Option<impl Ord> {
+	fn proxy_key(self: &MameVersion) -> Option<impl Ord + use<>> {
 		self.major_minor
 			.map(|(major, minor)| (major, minor, self.is_dirty() as u8))
 	}

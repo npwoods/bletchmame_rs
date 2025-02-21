@@ -53,21 +53,21 @@ impl<'a> Machine<'a> {
 		self.obj().runnable
 	}
 
-	pub fn chips(&self) -> impl View<'a, Chip<'a>> {
+	pub fn chips(&self) -> impl View<'a, Chip<'a>> + use<'a> {
 		self.db.chips().sub_view(self.obj().chips_start..self.obj().chips_end)
 	}
 
-	pub fn devices(&self) -> impl View<'a, Device<'a>> {
+	pub fn devices(&self) -> impl View<'a, Device<'a>> + use<'a> {
 		self.db
 			.devices()
 			.sub_view(self.obj().devices_start..self.obj().devices_end)
 	}
 
-	pub fn slots(&self) -> impl View<'a, Slot<'a>> {
+	pub fn slots(&self) -> impl View<'a, Slot<'a>> + use<'a> {
 		self.db.slots().sub_view(self.obj().slots_start..self.obj().slots_end)
 	}
 
-	pub fn machine_software_lists(&self) -> impl View<'a, MachineSoftwareList<'a>> {
+	pub fn machine_software_lists(&self) -> impl View<'a, MachineSoftwareList<'a>> + use<'a> {
 		self.db
 			.machine_software_lists()
 			.sub_view(self.obj().machine_software_lists_start..self.obj().machine_software_lists_end)
@@ -127,7 +127,7 @@ impl<'a> Device<'a> {
 		self.string(|x| x.interface_strindex)
 	}
 
-	pub fn extensions(&self) -> impl Iterator<Item = &'a str> {
+	pub fn extensions(&self) -> impl Iterator<Item = &'a str> + use<'a> {
 		self.string(|x| x.extensions_strindex).split('\0')
 	}
 }
@@ -137,7 +137,7 @@ impl<'a> Slot<'a> {
 		self.string(|x| x.name_strindex)
 	}
 
-	pub fn options(&self) -> impl View<'a, SlotOption<'a>> {
+	pub fn options(&self) -> impl View<'a, SlotOption<'a>> + use<'a> {
 		self.db
 			.slot_options()
 			.sub_view(self.obj().options_start..self.obj().options_end)
@@ -164,19 +164,19 @@ impl<'a> SoftwareList<'a> {
 		self.string(|x| x.name_strindex)
 	}
 
-	pub fn original_for_machines(&self) -> impl View<'a, Machine<'a>> {
+	pub fn original_for_machines(&self) -> impl View<'a, Machine<'a>> + use<'a> {
 		let start = self.obj().software_list_original_machines_start;
 		let end = self.obj().software_list_compatible_machines_start;
 		self.make_machine_view(start, end)
 	}
 
-	pub fn compatible_for_machines(&self) -> impl View<'a, Machine<'a>> {
+	pub fn compatible_for_machines(&self) -> impl View<'a, Machine<'a>> + use<'a> {
 		let start = self.obj().software_list_compatible_machines_start;
 		let end = self.obj().software_list_compatible_machines_end;
 		self.make_machine_view(start, end)
 	}
 
-	fn make_machine_view(&self, start: u32, end: u32) -> impl View<'a, Machine<'a>> {
+	fn make_machine_view(&self, start: u32, end: u32) -> impl View<'a, Machine<'a>> + use<'a> {
 		let range = start..end;
 		let index_view = self.db.software_list_machine_indexes().sub_view(range);
 		let object_view = self.db.machines();
