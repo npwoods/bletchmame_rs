@@ -1,7 +1,7 @@
 use std::any::Any;
 use std::cell::RefCell;
-use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use std::thread;
@@ -110,8 +110,8 @@ mod test {
 	use std::rc::Rc;
 	use std::thread::spawn;
 
-	use super::ThreadLocalBubble;
 	use super::LOCAL;
+	use super::ThreadLocalBubble;
 
 	#[test]
 	pub fn test() {

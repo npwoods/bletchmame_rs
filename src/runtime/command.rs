@@ -46,11 +46,7 @@ impl MameCommand<'_> {
 }
 
 fn bool_str(b: bool) -> &'static str {
-	if b {
-		"true"
-	} else {
-		"false"
-	}
+	if b { "true" } else { "false" }
 }
 
 fn pairs_command_text(base: &[&str], args: &[(&str, &str)]) -> Cow<'static, str> {

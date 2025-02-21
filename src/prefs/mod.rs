@@ -4,9 +4,9 @@ mod var;
 
 use std::borrow::Cow;
 use std::ffi::OsString;
+use std::fs::File;
 use std::fs::create_dir_all;
 use std::fs::rename;
-use std::fs::File;
 use std::io::BufReader;
 use std::io::ErrorKind;
 use std::io::Read;
@@ -26,8 +26,8 @@ use serde::Serialize;
 use slint::LogicalSize;
 use strum::EnumProperty;
 use strum::EnumString;
-use tracing::event;
 use tracing::Level;
+use tracing::event;
 
 use crate::history::History;
 use crate::icon::Icon;
@@ -371,7 +371,7 @@ fn load_prefs(path: &Path) -> Result<Option<Preferences>> {
 				Ok(None)
 			} else {
 				Err(Error::new(e))
-			}
+			};
 		}
 	};
 
@@ -444,9 +444,9 @@ mod test {
 	use tempdir::TempDir;
 	use test_case::test_case;
 
+	use super::Preferences;
 	use super::load_prefs_from_reader;
 	use super::save_prefs_to_string;
-	use super::Preferences;
 
 	#[test]
 	pub fn test() {

@@ -3,8 +3,8 @@ use std::ops::ControlFlow;
 use std::rc::Rc;
 
 use anyhow::Result;
-use tracing::event;
 use tracing::Level;
+use tracing::event;
 
 use crate::info::InfoDb;
 use crate::info::Machine;

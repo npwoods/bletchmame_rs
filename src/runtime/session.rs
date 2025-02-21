@@ -9,25 +9,25 @@ use std::process::Child;
 use std::process::Command;
 use std::process::Stdio;
 use std::rc::Rc;
-use std::sync::mpsc::channel;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::RecvTimeoutError;
 use std::sync::mpsc::Sender;
+use std::sync::mpsc::channel;
 use std::time::Duration;
 
 use anyhow::Error;
 use anyhow::Result;
 use slint::invoke_from_event_loop;
-use tracing::event;
 use tracing::Level;
+use tracing::event;
 
 use crate::appcommand::AppCommand;
 use crate::job::Job;
 use crate::platform::CommandExt;
 use crate::prefs::PrefsPaths;
-use crate::runtime::args::MameArguments;
 use crate::runtime::MameStderr;
 use crate::runtime::MameWindowing;
+use crate::runtime::args::MameArguments;
 use crate::status::Update;
 use crate::threadlocalbubble::ThreadLocalBubble;
 

@@ -6,13 +6,13 @@ use std::str::from_utf8;
 
 use anyhow::Error;
 use anyhow::Result;
+use quick_xml::Reader;
 use quick_xml::escape::unescape;
 use quick_xml::events::BytesStart;
 use quick_xml::events::Event;
 use quick_xml::name::QName;
-use quick_xml::Reader;
-use tracing::event;
 use tracing::Level;
+use tracing::event;
 
 const LOG: Level = Level::TRACE;
 

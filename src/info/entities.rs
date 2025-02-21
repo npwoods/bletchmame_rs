@@ -1,12 +1,12 @@
-use binary_search::binary_search;
 use binary_search::Direction;
+use binary_search::binary_search;
 
-use crate::info::binary;
 use crate::info::ChipType;
 use crate::info::IndirectView;
 use crate::info::Object;
 use crate::info::SimpleView;
 use crate::info::View;
+use crate::info::binary;
 
 pub type Machine<'a> = Object<'a, binary::Machine>;
 pub type MachinesView<'a> = SimpleView<'a, binary::Machine>;

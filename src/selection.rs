@@ -1,8 +1,8 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use slint::spawn_local;
 use slint::ComponentHandle;
+use slint::spawn_local;
 
 pub struct SelectionManager {
 	getter: Box<dyn Fn() -> i32 + 'static>,

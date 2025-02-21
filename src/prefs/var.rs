@@ -1,9 +1,9 @@
 use std::borrow::Cow;
 use std::env::current_exe;
 use std::ffi::OsString;
-use std::path::is_separator;
 use std::path::Path;
 use std::path::PathBuf;
+use std::path::is_separator;
 
 pub fn resolve_path<'a>(path: &'a str, mame_executable_path: Option<&str>) -> Option<Cow<'a, Path>> {
 	let lookup_var = |var_name| env_lookup(var_name, mame_executable_path, current_exe_lookup);
@@ -76,8 +76,8 @@ fn current_exe_lookup() -> Option<PathBuf> {
 
 #[cfg(test)]
 mod test {
-	use std::path::Path;
 	use std::path::MAIN_SEPARATOR_STR;
+	use std::path::Path;
 
 	use test_case::test_case;
 
