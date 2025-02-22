@@ -2,6 +2,7 @@ use derive_enum_all_values::AllValues;
 use serde::Deserialize;
 use serde::Serialize;
 use strum::EnumProperty;
+use strum_macros::EnumProperty;
 use strum_macros::EnumString;
 
 use crate::prefs::PathsStore;

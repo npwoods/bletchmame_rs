@@ -6,6 +6,7 @@ use muda::MenuId;
 use serde::Deserialize;
 use serde::Serialize;
 use strum::EnumProperty;
+use strum_macros::EnumProperty;
 
 use crate::prefs::BuiltinCollection;
 use crate::prefs::PrefsCollection;
