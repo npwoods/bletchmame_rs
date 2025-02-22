@@ -3,9 +3,7 @@
     "plugins": [
       "$(BLETCHMAMEPATH)\\plugins",
       "$(MAMEPATH)\\plugins"
-    ],
-    "cfg": "/cfg/BletchMAME",
-    "nvram": "/cfg/BletchMAME"
+    ]
   },
   "itemsColumns": [
     {
