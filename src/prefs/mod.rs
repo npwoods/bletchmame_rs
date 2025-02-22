@@ -25,7 +25,8 @@ use serde::Deserialize;
 use serde::Serialize;
 use slint::LogicalSize;
 use strum::EnumProperty;
-use strum::EnumString;
+use strum_macros::EnumProperty;
+use strum_macros::EnumString;
 use tracing::Level;
 use tracing::event;
 

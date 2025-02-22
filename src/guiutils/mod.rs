@@ -9,7 +9,7 @@ use i_slint_backend_winit::Backend;
 use i_slint_core::items::PointerEvent;
 use i_slint_core::items::PointerEventKind;
 use slint::platform::PointerEventButton;
-use strum::EnumString;
+use strum_macros::EnumString;
 use winit::window::WindowAttributes;
 
 use crate::guiutils::hook::create_window_attributes_hook;
