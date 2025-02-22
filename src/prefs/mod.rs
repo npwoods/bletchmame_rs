@@ -44,9 +44,6 @@ const LOG: Level = Level::DEBUG;
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Preferences {
-	#[serde(skip)]
-	pub prefs_path: PathBuf,
-
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub paths: Rc<PrefsPaths>,
 
@@ -314,9 +311,7 @@ const PREFS: Option<&str> = Some("BletchMAME.json");
 const PREFS_BACKUP: Option<&str> = Some("BletchMAME.backup.json");
 
 impl Preferences {
-	pub fn load(prefs_path: impl AsRef<Path>) -> Result<Option<Self>> {
-		let prefs_path = prefs_path.as_ref();
-
+	pub fn load(prefs_path: &Path) -> Result<Option<Self>> {
 		// try to load the preferences
 		let path = prefs_filename(prefs_path, PREFS)?;
 		let result = load_prefs(&path);
@@ -331,27 +326,21 @@ impl Preferences {
 			}
 		}
 
-		// store the prefs_path and return
-		if let Ok(Some(mut result)) = result {
-			result.prefs_path = prefs_path.to_path_buf();
-			Ok(Some(result))
-		} else {
-			result
-		}
+		result
 	}
 
-	pub fn save(&self) -> Result<()> {
-		ensure_directory(&self.prefs_path);
-		let path = prefs_filename(&self.prefs_path, PREFS)?;
+	pub fn save(&self, prefs_path: &Path) -> Result<()> {
+		ensure_directory(&prefs_path);
+		let path = prefs_filename(prefs_path, PREFS)?;
 		save_prefs(self, &path)
 	}
 
-	pub fn fresh(prefs_path: PathBuf) -> Self {
+	pub fn fresh(prefs_path: Option<String>) -> Self {
 		let json = include_str!("prefs_fresh.json");
 		let mut result = load_prefs_from_reader(json.as_bytes()).unwrap();
-		Rc::get_mut(&mut result.paths).unwrap().cfg = prefs_path.to_str().map(str::to_string);
-		Rc::get_mut(&mut result.paths).unwrap().nvram = prefs_path.to_str().map(str::to_string);
-		result.prefs_path = prefs_path;
+		let result_paths = Rc::get_mut(&mut result.paths).unwrap();
+		result_paths.cfg = prefs_path.clone();
+		result_paths.nvram = prefs_path;
 		result
 	}
 }
@@ -400,7 +389,7 @@ fn prefs_treatments(prefs: &mut Preferences) {
 
 	// ensure that history is not empty
 	if prefs.history.is_empty() {
-		prefs.history = Preferences::fresh("".into()).history;
+		prefs.history = Preferences::fresh(None).history;
 	}
 
 	// enforce that history_position points to a valid entry
@@ -408,7 +397,7 @@ fn prefs_treatments(prefs: &mut Preferences) {
 
 	// enforce that we have at least one column
 	if prefs.items_columns.is_empty() {
-		prefs.items_columns = Preferences::fresh("".into()).items_columns;
+		prefs.items_columns = Preferences::fresh(None).items_columns;
 		assert!(!prefs.items_columns.is_empty());
 	}
 }
@@ -439,7 +428,6 @@ fn ensure_directory(path: &impl AsRef<Path>) {
 #[cfg(test)]
 mod test {
 	use std::fs::File;
-	use std::path::PathBuf;
 
 	use assert_matches::assert_matches;
 	use tempdir::TempDir;
@@ -450,19 +438,14 @@ mod test {
 	use super::save_prefs_to_string;
 
 	#[test]
-	pub fn test() {
-		let prefs_path = PathBuf::from("/cfg/BletchMAME");
-		let prefs = Preferences::fresh(prefs_path.clone());
+	pub fn fresh_is_indeed_fresh() {
+		let prefs = Preferences::fresh(None);
 		let json = save_prefs_to_string(&prefs).expect("Failed to save fresh prefs");
 
 		let fresh_json = include_str!("prefs_fresh.json");
 		assert_eq!(fresh_json.replace('\r', ""), json.replace('\r', ""));
 
 		let new_prefs = load_prefs_from_reader(json.as_bytes()).expect("Failed to load saved fresh prefs");
-		let new_prefs = Preferences {
-			prefs_path,
-			..new_prefs
-		};
 		assert_eq!(prefs, new_prefs);
 	}
 

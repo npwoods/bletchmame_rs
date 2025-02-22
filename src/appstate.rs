@@ -692,6 +692,10 @@ impl AppState {
 			&& self.info_db_build.is_none()
 			&& self.live.as_ref().is_none_or(|live| live.session.is_none())
 	}
+
+	pub fn prefs_path(&self) -> &'_ Path {
+		&self.fixed.prefs_path
+	}
 }
 
 fn spawn_infodb_build_thread(
