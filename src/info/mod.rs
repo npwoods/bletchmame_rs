@@ -39,6 +39,7 @@ pub use self::entities::Device;
 pub use self::entities::Machine;
 pub use self::entities::MachineSoftwareList;
 pub use self::entities::MachinesView;
+pub use self::entities::RamOption;
 pub use self::entities::Slot;
 pub use self::entities::SlotOption;
 pub use self::entities::SoftwareList;
@@ -61,6 +62,7 @@ pub struct InfoDb {
 	software_lists: RootView<binary::SoftwareList>,
 	software_list_machine_indexes: RootView<u32>,
 	machine_software_lists: RootView<binary::MachineSoftwareList>,
+	ram_options: RootView<binary::RamOption>,
 	strings_offset: usize,
 	strings_arena: Arena<str>,
 	build: MameVersion,
@@ -85,7 +87,7 @@ impl InfoDb {
 		let software_lists = next_root_view(&mut cursor, hdr.software_list_count)?;
 		let software_list_machine_indexes = next_root_view(&mut cursor, hdr.software_list_machine_count)?;
 		let machine_software_lists = next_root_view(&mut cursor, hdr.machine_software_lists_count)?;
-		let _ram_options: RootView<binary::RamOption> = next_root_view(&mut cursor, hdr.ram_option_count)?;
+		let ram_options = next_root_view(&mut cursor, hdr.ram_option_count)?;
 
 		// validations we want to skip if we're creating things ourselves
 		if !skip_validations {
@@ -107,6 +109,7 @@ impl InfoDb {
 			software_lists,
 			software_list_machine_indexes,
 			machine_software_lists,
+			ram_options,
 			strings_offset: cursor.start,
 			strings_arena: Arena::new(),
 			build,
@@ -217,6 +220,10 @@ impl InfoDb {
 
 	pub fn software_list_machine_indexes(&self) -> impl View<'_, Object<'_, u32>> {
 		self.make_view(&self.software_list_machine_indexes)
+	}
+
+	pub fn ram_options(&self) -> impl View<'_, RamOption<'_>> {
+		self.make_view(&self.ram_options)
 	}
 
 	fn string(&self, offset: u32) -> &'_ str {

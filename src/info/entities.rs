@@ -17,6 +17,7 @@ pub type SlotOption<'a> = Object<'a, binary::SlotOption>;
 pub type SoftwareList<'a> = Object<'a, binary::SoftwareList>;
 pub type SoftwareListsView<'a> = SimpleView<'a, binary::SoftwareList>;
 pub type MachineSoftwareList<'a> = Object<'a, binary::MachineSoftwareList>;
+pub type RamOption<'a> = Object<'a, binary::RamOption>;
 
 impl<'a> Machine<'a> {
 	pub fn name(&self) -> &'a str {
@@ -71,6 +72,12 @@ impl<'a> Machine<'a> {
 		self.db
 			.machine_software_lists()
 			.sub_view(self.obj().machine_software_lists_start..self.obj().machine_software_lists_end)
+	}
+
+	pub fn ram_options(&self) -> impl View<'a, RamOption<'a>> + use<'a> {
+		self.db
+			.ram_options()
+			.sub_view(self.obj().ram_options_start..self.obj().ram_options_end)
 	}
 }
 
@@ -201,6 +208,16 @@ impl<'a> MachineSoftwareList<'a> {
 	pub fn software_list(&self) -> SoftwareList<'a> {
 		let software_list_index = self.obj().software_list_index.try_into().unwrap();
 		self.db.software_lists().get(software_list_index).unwrap()
+	}
+}
+
+impl RamOption<'_> {
+	pub fn size(&self) -> u64 {
+		self.obj().size
+	}
+
+	pub fn is_default(&self) -> bool {
+		self.obj().is_default
 	}
 }
 
