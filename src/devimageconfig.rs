@@ -3,6 +3,7 @@ use std::iter::once;
 use std::rc::Rc;
 
 use crate::info::InfoDb;
+use crate::info::Machine;
 use crate::info::View;
 use crate::mconfig::MachineConfig;
 use crate::status::Status;
@@ -89,6 +90,10 @@ impl DevicesImagesConfig {
 			.as_ref()
 			.map(|x| x.machine_configs.dirty.is_some())
 			.unwrap_or_default()
+	}
+
+	pub fn machine(&self) -> Option<Machine<'_>> {
+		self.core.as_ref().map(|core| core.machine_configs.clean.machine())
 	}
 
 	pub fn entry_count(&self) -> usize {

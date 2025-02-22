@@ -38,6 +38,7 @@ use crate::collections::get_folder_collections;
 use crate::collections::remove_items_from_folder_collection;
 use crate::collections::toggle_builtin_collection;
 use crate::devimageconfig::DevicesImagesConfig;
+use crate::dialogs::configure::dialog_configure;
 use crate::dialogs::devimages::dialog_devices_and_images;
 use crate::dialogs::image::dialog_load_image;
 use crate::dialogs::messagebox::OkCancel;
@@ -60,6 +61,8 @@ use crate::models::itemstable::ItemsTableModel;
 use crate::platform::WindowExt;
 use crate::prefs::BuiltinCollection;
 use crate::prefs::Preferences;
+use crate::prefs::PrefsCollection;
+use crate::prefs::PrefsItem;
 use crate::prefs::SortOrder;
 use crate::prefs::pathtype::PathType;
 use crate::runtime::MameStderr;
@@ -949,6 +952,35 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 		AppCommand::InfoDbBuildComplete => model.update_state(|state| Some(state.infodb_build_complete())),
 		AppCommand::InfoDbBuildCancel => model.update_state(|state| Some(state.infodb_build_cancel())),
 		AppCommand::ReactivateMame => model.update_state(AppState::activate),
+		AppCommand::ConfigureMachine { folder_name, index } => {
+			let model_clone = model.clone();
+			let info_db = model.state.borrow().info_db().unwrap().clone();
+			let machine_name = model
+				.preferences
+				.borrow()
+				.collections
+				.iter()
+				.filter_map(|x| {
+					if let PrefsCollection::Folder { name, items } = x.as_ref() {
+						(name == &folder_name).then(|| {
+							let PrefsItem::Machine { machine_name } = &items[index] else {
+								unreachable!()
+							};
+							machine_name.clone()
+						})
+					} else {
+						None
+					}
+				})
+				.next()
+				.unwrap();
+
+			let fut = async move {
+				let parent = model_clone.app_window_weak.clone();
+				dialog_configure(parent, info_db, machine_name).await;
+			};
+			spawn_local(fut).unwrap();
+		}
 	};
 }
 
