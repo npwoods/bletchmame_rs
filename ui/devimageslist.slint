@@ -1,0 +1,79 @@
+import { Button, VerticalBox, HorizontalBox, ComboBox, ListView, LineEdit } from "std-widgets.slint";
+
+export struct DeviceAndImageEntry {
+    indent: int,
+    display-tag: string,
+    option-names: [string],
+    option-descriptions: [string],
+    current-option-index: int,
+    filename: string}
+
+export struct DevicesAndImagesState {
+    entries: [DeviceAndImageEntry],
+    none-string: string}
+
+export component DevicesAndImagesList {
+    // properties
+    in property <length> splitter: 160px;
+    in property <DevicesAndImagesState> state;
+    in property <bool> images-button-enabled;
+
+    // callbacks
+    callback entry-option-changed(int, string);
+    callback entry-button-clicked(int, Point);
+    callback menu-entry-activated(MenuEntry);
+
+    // functions
+    public function show-context-menu(entries: [MenuEntry], point: Point) {
+        context-menu.show(entries, point);
+    }
+
+    // controls
+    ListView {
+        for data[index] in root.state.entries: Rectangle {
+            height: 30px;
+            width: parent.width;
+            Text {
+                x: data.indent * 20px;
+                text: data.display_tag;
+            }
+
+            ComboBox {
+                x: root.splitter;
+                width: root.width - root.splitter - 10px;
+                visible: data.current-option-index >= 0;
+                model: data.option-descriptions;
+                current-index: data.current-option-index;
+                selected(value) => {
+                    root.entry-option-changed(index, data.option-names[self.current-index]);
+                }
+            }
+
+            LineEdit {
+                x: root.splitter;
+                width: root.width - root.splitter - 50px;
+                visible: data.current-option-index < 0;
+                placeholder-text: root.state.none-string;
+                text: data.filename;
+                read-only: true;
+            }
+
+            Button {
+                x: root.width - 50px;
+                width: 30px;
+                visible: data.current-option-index < 0;
+                enabled: root.images-button-enabled;
+                text: "...";
+                clicked => {
+                    root.entry-button-clicked(index, { x: self.absolute-position.x, y: self.absolute-position.y + self.height });
+                }
+            }
+        }
+    }
+
+    context-menu := ContextMenu {
+        activated(entry) => {
+            menu-entry-activated(entry)
+        }
+    }
+}

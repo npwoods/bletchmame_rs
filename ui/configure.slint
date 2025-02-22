@@ -1,0 +1,53 @@
+import { Button, HorizontalBox, VerticalBox, TabWidget, ComboBox  } from "std-widgets.slint";
+import { DevicesAndImagesList, DevicesAndImagesState } from "devimageslist.slint";
+
+export component ConfigureDialog inherits Window {
+    title: "Configure";
+    icon: @image-url("bletchmame.png");
+    preferred-width: 600px;
+    preferred-height: 500px;
+
+    // properties
+    in property <DevicesAndImagesState> dev-images-state;
+    in property <[string]> ram-sizes-model;
+
+    // callbacks
+    callback ok-clicked();
+    callback entry-option-changed(int, string);
+
+    // control hierarchy
+    VerticalBox {
+        TabWidget {
+            Tab {
+                title: "Devices";
+                DevicesAndImagesList {
+                    preferred-width: 100%;
+                    preferred-height: 100%;
+                    state: root.dev-images-state;
+                    entry-option-changed(index, option-name) => {
+                        root.entry-option-changed(index, option-name);
+                    }
+                }
+            }
+
+            Tab {
+                title: "RAM Sizes";
+                ComboBox {
+                    model: root.ram-sizes-model;
+                    enabled: false;
+                }
+            }
+        }
+
+        HorizontalBox {
+            alignment: end;
+            Button {
+                max-height: 30px;
+                text: "Ok";
+                clicked => {
+                    root.ok-clicked();
+                }
+            }
+        }
+    }
+}

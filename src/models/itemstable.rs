@@ -234,7 +234,7 @@ impl ItemsTableModel {
 		let items = vec![make_prefs_item(info_db, item)];
 
 		// get the critical information - the description and where (if anyplace) "Browse" would go to
-		let (run_menu_item, browse_target) = match item {
+		let (run_menu_item, browse_target, configure_menu_item) = match item {
 			Item::Machine { machine_index } => {
 				let machine = info_db.machines().get(*machine_index).unwrap();
 				let command = has_mame_initialized.then(|| AppCommand::RunMame {
@@ -247,7 +247,15 @@ impl ItemsTableModel {
 					(!machine.machine_software_lists().is_empty()).then(|| PrefsCollection::MachineSoftware {
 						machine_name: machine.name().to_string(),
 					});
-				(run_menu_item, browse_target)
+
+				// items in folders can be configured
+				let configure_menu_item = folder_name.clone().map(|folder_name| {
+					let text = "Configure...".to_string();
+					let command = AppCommand::ConfigureMachine { folder_name, index };
+					MenuDesc::Item(text, Some(command.into()))
+				});
+
+				(run_menu_item, browse_target, configure_menu_item)
 			}
 			Item::Software {
 				software,
@@ -286,18 +294,21 @@ impl ItemsTableModel {
 					.collect::<Vec<_>>();
 				let text = run_item_text(&software.description);
 				let run_menu_item = MenuDesc::SubMenu(text, true, sub_items);
-				(run_menu_item, None)
+				(run_menu_item, None, None)
 			}
 			Item::UnrecognizedSoftware { error, .. } => {
 				let message = format!("{}", error);
 				let run_menu_item = MenuDesc::Item(message, None);
-				(run_menu_item, None)
+				(run_menu_item, None, None)
 			}
 		};
 
 		// now actually build the context menu
 		let mut menu_items = Vec::new();
 		menu_items.push(run_menu_item);
+		if let Some(configure_menu_item) = configure_menu_item {
+			menu_items.push(configure_menu_item);
+		}
 		menu_items.push(MenuDesc::Separator);
 
 		if let Some(browse_target) = browse_target {

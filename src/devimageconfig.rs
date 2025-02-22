@@ -3,6 +3,7 @@ use std::iter::once;
 use std::rc::Rc;
 
 use crate::info::InfoDb;
+use crate::info::Machine;
 use crate::info::View;
 use crate::mconfig::MachineConfig;
 use crate::status::Status;
@@ -66,15 +67,12 @@ pub struct EntryOption<'a> {
 
 impl DevicesImagesConfig {
 	pub fn new(info_db: Rc<InfoDb>) -> Self {
-		Self::with_machine_name(info_db, None)
+		Self::with_machine_name(info_db, None).unwrap()
 	}
 
-	pub fn with_machine_name(info_db: Rc<InfoDb>, machine_name: Option<&str>) -> Self {
-		if let Some(machine_name) = machine_name {
-			let machine_index = info_db
-				.machines()
-				.find_index(machine_name)
-				.expect("Could not find machine");
+	pub fn with_machine_name(info_db: Rc<InfoDb>, machine_name: Option<&str>) -> Option<Self> {
+		let result = if let Some(machine_name) = machine_name {
+			let machine_index = info_db.machines().find_index(machine_name)?;
 			let machine_config = MachineConfig::new(info_db.clone(), machine_index);
 			let machine_configs = MachineConfigPair {
 				clean: machine_config,
@@ -83,7 +81,8 @@ impl DevicesImagesConfig {
 			diconfig_from_machine_configs_and_images(info_db, machine_configs, [].into())
 		} else {
 			Self { info_db, core: None }
-		}
+		};
+		Some(result)
 	}
 
 	pub fn is_dirty(&self) -> bool {
@@ -91,6 +90,10 @@ impl DevicesImagesConfig {
 			.as_ref()
 			.map(|x| x.machine_configs.dirty.is_some())
 			.unwrap_or_default()
+	}
+
+	pub fn machine(&self) -> Option<Machine<'_>> {
+		self.core.as_ref().map(|core| core.machine_configs.clean.machine())
 	}
 
 	pub fn entry_count(&self) -> usize {
@@ -408,7 +411,7 @@ mod test {
 		let info_db = Rc::new(info_db);
 
 		// now create the config and set the option
-		let config = DevicesImagesConfig::with_machine_name(info_db, Some(machine_name));
+		let config = DevicesImagesConfig::with_machine_name(info_db, Some(machine_name)).unwrap();
 		let new_config = config.set_slot_option(tag, new_option_name);
 
 		// smoke test!

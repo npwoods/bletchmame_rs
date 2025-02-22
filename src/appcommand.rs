@@ -97,6 +97,10 @@ pub enum AppCommand {
 	InfoDbBuildComplete,
 	InfoDbBuildCancel,
 	ReactivateMame,
+	ConfigureMachine {
+		folder_name: String,
+		index: usize,
+	},
 }
 
 const MENU_PREFIX: &str = "MENU_";

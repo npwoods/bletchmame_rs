@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 use tokio::sync::Notify;
 
+pub mod configure;
 pub mod devimages;
 pub mod file;
 pub mod image;
