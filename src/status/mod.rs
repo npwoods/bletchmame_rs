@@ -9,8 +9,8 @@ use std::sync::Arc;
 use anyhow::Result;
 use serde::Deserialize;
 use serde::Serialize;
-use tracing::event;
 use tracing::Level;
+use tracing::event;
 
 use crate::debugstr::DebugString;
 use crate::info::InfoDb;
@@ -210,9 +210,9 @@ pub enum UpdateXmlProblem {
 mod test {
 	use std::io::BufReader;
 
-	use crate::status::parse::parse_update;
 	use crate::status::Status;
 	use crate::status::Update;
+	use crate::status::parse::parse_update;
 
 	#[test]
 	fn session() {

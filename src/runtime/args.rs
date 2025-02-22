@@ -2,8 +2,8 @@ use std::borrow::Cow;
 use std::ffi::OsStr;
 use std::ffi::OsString;
 
-use crate::prefs::pathtype::PathType;
 use crate::prefs::PrefsPaths;
+use crate::prefs::pathtype::PathType;
 use crate::runtime::MameWindowing;
 
 #[derive(Debug)]
@@ -46,7 +46,6 @@ impl MameArguments {
 				Cow::Borrowed(x) => Cow::Borrowed(OsStr::new(x)),
 				Cow::Owned(x) => Cow::Owned(OsString::from(x)),
 			})
-			.map(Cow::<'static, OsStr>::from)
 			.chain(path_args)
 			.collect::<Vec<_>>();
 		Self { program, args }
@@ -76,8 +75,8 @@ fn platform_specific_args() -> Vec<&'static str> {
 
 #[cfg(test)]
 mod test {
-	use std::path::Path;
 	use std::path::MAIN_SEPARATOR_STR;
+	use std::path::Path;
 
 	use crate::prefs::PrefsPaths;
 	use crate::runtime::MameWindowing;

@@ -5,8 +5,8 @@ use muda::dpi::PhysicalSize;
 use raw_window_handle::HasWindowHandle;
 use raw_window_handle::RawWindowHandle;
 use slint::Window;
-use tracing::event;
 use tracing::Level;
+use tracing::event;
 use winit::window::WindowAttributes;
 
 use crate::platform::WindowExt;

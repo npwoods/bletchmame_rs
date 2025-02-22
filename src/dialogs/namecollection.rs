@@ -65,7 +65,7 @@ pub async fn dialog_new_collection(
 	dialog_name_collection(parent, title, existing_names, default_name.as_ref()).await
 }
 
-fn create_new_name(existing_names: &[String]) -> impl AsRef<str> {
+fn create_new_name(existing_names: &[String]) -> impl AsRef<str> + use<> {
 	let mut count = 1u32;
 	loop {
 		let new_name: Cow<str> = if count > 1 {

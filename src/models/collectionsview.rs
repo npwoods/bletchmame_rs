@@ -6,11 +6,11 @@ use std::pin::Pin;
 use std::rc::Rc;
 
 use muda::Menu;
-use slint::spawn_local;
 use slint::Model;
 use slint::ModelNotify;
 use slint::ModelTracker;
 use slint::Weak;
+use slint::spawn_local;
 
 use crate::appcommand::AppCommand;
 use crate::guiutils::menuing::MenuDesc;

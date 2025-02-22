@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use anyhow::Error;
 use anyhow::Result;
-use tracing::event;
 use tracing::Level;
+use tracing::event;
 
 use crate::parse::normalize_tag;
 use crate::parse::parse_mame_bool;

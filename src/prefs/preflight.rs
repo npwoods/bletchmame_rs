@@ -3,8 +3,8 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use is_executable::IsExecutable;
-use tracing::event;
 use tracing::Level;
+use tracing::event;
 
 use crate::prefs::PreflightProblem;
 

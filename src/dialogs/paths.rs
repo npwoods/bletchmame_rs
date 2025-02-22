@@ -13,15 +13,15 @@ use slint::ModelTracker;
 use slint::SharedString;
 use slint::VecModel;
 use slint::Weak;
-use tracing::event;
 use tracing::Level;
+use tracing::event;
 
-use crate::dialogs::file::file_dialog;
 use crate::dialogs::SingleResult;
+use crate::dialogs::file::file_dialog;
 use crate::guiutils::modal::Modal;
 use crate::icon::Icon;
-use crate::prefs::pathtype::PathType;
 use crate::prefs::PrefsPaths;
+use crate::prefs::pathtype::PathType;
 use crate::ui::MagicListViewItem;
 use crate::ui::PathsDialog;
 

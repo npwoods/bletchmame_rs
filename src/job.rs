@@ -3,8 +3,8 @@ use anyhow::Result;
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::thread::spawn;
 use std::thread::JoinHandle;
+use std::thread::spawn;
 
 #[derive(Debug)]
 pub struct Job<T>(Rc<RefCell<Option<JoinHandle<T>>>>);

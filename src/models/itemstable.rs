@@ -18,8 +18,8 @@ use slint::ModelRc;
 use slint::ModelTracker;
 use slint::SharedString;
 use slint::StandardListViewItem;
-use tracing::event;
 use tracing::Level;
+use tracing::event;
 use unicase::UniCase;
 
 use crate::appcommand::AppCommand;

@@ -4,8 +4,8 @@ use serde::Serialize;
 use strum::EnumProperty;
 use strum_macros::EnumString;
 
-use crate::prefs::access_paths;
 use crate::prefs::PathsStore;
+use crate::prefs::access_paths;
 
 const EXE_EXTENSION: &str = if cfg!(target_os = "windows") { "exe" } else { "" };
 

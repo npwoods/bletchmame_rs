@@ -3,9 +3,6 @@ use std::convert::Infallible;
 use std::ops::ControlFlow;
 
 use i_slint_core::items::MenuEntry as SlintMenuEntry;
-use muda::accelerator::Accelerator;
-use muda::accelerator::Code;
-use muda::accelerator::Modifiers;
 use muda::IsMenuItem;
 use muda::Menu;
 use muda::MenuId;
@@ -13,6 +10,9 @@ use muda::MenuItem;
 use muda::MenuItemKind;
 use muda::PredefinedMenuItem;
 use muda::Submenu;
+use muda::accelerator::Accelerator;
+use muda::accelerator::Code;
+use muda::accelerator::Modifiers;
 use slint::ModelRc;
 use slint::VecModel;
 

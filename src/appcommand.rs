@@ -7,11 +7,11 @@ use serde::Deserialize;
 use serde::Serialize;
 use strum::EnumProperty;
 
-use crate::prefs::pathtype::PathType;
 use crate::prefs::BuiltinCollection;
 use crate::prefs::PrefsCollection;
 use crate::prefs::PrefsItem;
 use crate::prefs::SortOrder;
+use crate::prefs::pathtype::PathType;
 use crate::status::Update;
 use crate::version::MameVersion;
 
