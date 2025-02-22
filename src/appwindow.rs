@@ -134,7 +134,7 @@ impl AppModel {
 		let prefs = self.preferences.borrow();
 
 		// save (ignore errors)
-		let _ = self.preferences.borrow().save(self.state.borrow().prefs_path());
+		let _ = self.preferences.borrow().save();
 
 		// react to all of the possible changes
 		self.update_state(|state| state.update_paths(&prefs.paths));
@@ -288,7 +288,7 @@ pub fn create(args: AppArgs) -> AppWindow {
 	let preferences = Preferences::load(&prefs_path)
 		.ok()
 		.flatten()
-		.unwrap_or_else(|| Preferences::fresh(prefs_path.to_str().map(|x| x.to_string())));
+		.unwrap_or_else(|| Preferences::fresh(prefs_path));
 
 	// update window preferences
 	if let Some(window_size) = &preferences.window_size {
@@ -511,6 +511,7 @@ pub fn create(args: AppArgs) -> AppWindow {
 	});
 
 	// now create the "real initial" state, now that we have a model to work with
+	let prefs_path = model.preferences.borrow().prefs_path.clone();
 	let paths = model.preferences.borrow().paths.clone();
 	let mame_windowing = if let Some(text) = model.child_window.text() {
 		MameWindowing::Attached(text.into())
@@ -749,8 +750,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			});
 		}
 		AppCommand::SettingsReset => model.modify_prefs(|prefs| {
-			let prefs_path = model.state.borrow().prefs_path().to_str().map(|x| x.to_string());
-			*prefs = Preferences::fresh(prefs_path);
+			*prefs = Preferences::fresh(prefs.prefs_path.clone());
 		}),
 		AppCommand::HelpRefreshInfoDb => {
 			model.update_state(|state| state.infodb_rebuild());
