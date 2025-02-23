@@ -302,6 +302,7 @@ pub enum PrefsItem {
 		machine_name: String,
 	},
 	Software {
+		#[serde(rename = "softwareList")]
 		software_list: String,
 		software: String,
 	},
