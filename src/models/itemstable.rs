@@ -32,6 +32,7 @@ use crate::prefs::ColumnType;
 use crate::prefs::PrefsCollection;
 use crate::prefs::PrefsColumn;
 use crate::prefs::PrefsItem;
+use crate::prefs::PrefsMachineItem;
 use crate::prefs::SortOrder;
 use crate::selection::SelectionManager;
 use crate::software::Software;
@@ -164,9 +165,9 @@ impl ItemsTableModel {
 					PrefsCollection::Folder { name: _, items } => items
 						.iter()
 						.filter_map(|item| match item {
-							PrefsItem::Machine { machine_name } => info_db
+							PrefsItem::Machine(item) => info_db
 								.machines()
-								.find_index(machine_name)
+								.find_index(&item.machine_name)
 								.map(|machine_index| Item::Machine { machine_index }),
 							PrefsItem::Software {
 								software_list,
@@ -567,7 +568,9 @@ fn make_prefs_item(info_db: &InfoDb, item: &Item) -> PrefsItem {
 	match item {
 		Item::Machine { machine_index } => {
 			let machine_name = info_db.machines().get(*machine_index).unwrap().name().to_string();
-			PrefsItem::Machine { machine_name }
+			let slots = Vec::new();
+			let item = PrefsMachineItem { machine_name, slots };
+			PrefsItem::Machine(item)
 		}
 		Item::Software {
 			software_list,
