@@ -50,6 +50,8 @@ enum ThisError {
 	CannotFindSlotOption(String, String, String),
 	#[error("Machine {0:?}: Cannot set option on machine")]
 	CantSetOptionOnMachine(String),
+	#[error("Cannot find machine {0}")]
+	CannotFindMachine(String),
 }
 
 impl MachineConfig {
@@ -84,6 +86,27 @@ impl MachineConfig {
 			machine_index,
 			slots,
 		}
+	}
+
+	#[allow(dead_code)]
+	pub fn from_machine_name_and_slots(
+		info_db: Rc<InfoDb>,
+		machine_name: &str,
+		opts: &[(impl AsRef<str>, Option<impl AsRef<str>>)],
+	) -> Result<Self> {
+		let machine_index = info_db
+			.machines()
+			.find_index(machine_name)
+			.ok_or_else(|| ThisError::CannotFindMachine(machine_name.to_string()))?;
+		let mut result = Self::new(info_db, machine_index);
+
+		for (tag, new_option_name) in opts {
+			let tag = tag.as_ref();
+			let new_option_name = new_option_name.as_ref().map(|x| x.as_ref());
+			result = result.set_slot_option(tag, new_option_name)?.unwrap_or(result);
+		}
+
+		Ok(result)
 	}
 
 	pub fn machine(&self) -> Machine<'_> {
@@ -334,12 +357,27 @@ fn strip_tag_prefix<'a>(tag: &'a str, target: &str) -> Option<&'a str> {
 mod test {
 	use std::rc::Rc;
 
+	use assert_matches::assert_matches;
 	use test_case::test_case;
 
 	use crate::info::InfoDb;
 
 	use super::MachineConfig;
 	use super::ThisError;
+
+	#[test_case(0, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[])]
+	#[test_case(1, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))])]
+	#[test_case(2, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi")), ("ext:multi:slot4:fdc:wd17xx:1", None)])]
+	fn from_machine_name_and_slots(_index: usize, info_xml: &str, machine_name: &str, opts: &[(&str, Option<&str>)]) {
+		// build the InfoDB
+		let info_db = InfoDb::from_listxml_output(info_xml.as_bytes(), |_| false)
+			.unwrap()
+			.unwrap();
+		let info_db = Rc::new(info_db);
+
+		let actual = MachineConfig::from_machine_name_and_slots(info_db, machine_name, opts);
+		assert_matches!(actual, Ok(_));
+	}
 
 	#[test_case(0, include_str!("info/test_data/listxml_coco.xml"), "coco2b", "ext", Some("fdc"), Ok(false))]
 	#[test_case(1, include_str!("info/test_data/listxml_coco.xml"), "coco2b", "ext", Some("multi"), Ok(true))]
@@ -433,27 +471,14 @@ mod test {
 			.unwrap();
 		let info_db = Rc::new(info_db);
 
-		// create the original config
-		let machine_index = info_db.machines().find_index(machine_name).unwrap();
-		let original_config = MachineConfig::new(info_db, machine_index);
-
 		// create the config for `opts1` (if `Some`)
 		let config1 = opts1.map(|opts1| {
-			let mut config = original_config.clone();
-			for (slot, opt) in opts1 {
-				config = config.set_slot_option(slot, *opt).unwrap().unwrap();
-			}
-			config
+			let info_db = info_db.clone();
+			MachineConfig::from_machine_name_and_slots(info_db, machine_name, opts1).unwrap()
 		});
 
 		// create the config for `opts2`
-		let config2 = {
-			let mut config = original_config;
-			for (slot, opt) in opts2 {
-				config = config.set_slot_option(slot, *opt).unwrap().unwrap();
-			}
-			config
-		};
+		let config2 = MachineConfig::from_machine_name_and_slots(info_db, machine_name, opts2).unwrap();
 
 		// get the changed slots
 		let actual = config2.changed_slots(config1.as_ref());
