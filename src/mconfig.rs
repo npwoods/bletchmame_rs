@@ -318,6 +318,7 @@ impl MachineConfig {
 				} else {
 					None
 				};
+				let slot_tag = format!("{}:{}", slot_tag, slot.options().get(*option_index).unwrap().name());
 				child_config.internal_changed_slots(child_base_config, &slot_tag, emit)
 			}
 		}
@@ -417,6 +418,7 @@ mod test {
 	#[test_case(0, include_str!("info/test_data/listxml_coco.xml"), "coco2b", None, &[], &[])]
 	#[test_case(1, include_str!("info/test_data/listxml_coco.xml"), "coco2b", Some(&[]), &[], &[])]
 	#[test_case(2, include_str!("info/test_data/listxml_coco.xml"), "coco2b", None, &[("ext", Some("multi"))], &[("ext", Some("multi"))])]
+	#[test_case(3, include_str!("info/test_data/listxml_coco.xml"), "coco2b", None, &[("ext", Some("multi")), ("ext:multi:slot4:fdc:wd17xx:1", None)], &[("ext", Some("multi")), ("ext:multi:slot4:fdc:wd17xx:1", None)])]
 	fn changed_slots(
 		_index: usize,
 		info_xml: &str,
