@@ -50,7 +50,7 @@ pub async fn dialog_devices_and_images(
 	let model_clone = model.clone();
 	modal.dialog().on_apply_changes_clicked(move || {
 		let model = DevicesAndImagesModel::get_model(&model_clone);
-		let changed_slots = model.with_diconfig(DevicesImagesConfig::changed_slots);
+		let changed_slots = model.with_diconfig(|diconfig| diconfig.changed_slots(true));
 		let command = AppCommand::ChangeSlots(changed_slots);
 		invoke_command(command);
 	});

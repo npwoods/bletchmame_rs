@@ -16,7 +16,7 @@ const LOG: Level = Level::DEBUG;
 
 #[derive(Clone, Debug)]
 pub struct MachineConfig {
-	info_db: Rc<InfoDb>,
+	pub info_db: Rc<InfoDb>,
 	pub machine_index: usize,
 	slots: Rc<[SlotData]>,
 }
@@ -94,7 +94,6 @@ impl MachineConfig {
 		Self::new(info_db, machine_index)
 	}
 
-	#[allow(dead_code)]
 	pub fn from_machine_name_and_slots(
 		info_db: Rc<InfoDb>,
 		machine_name: &str,
