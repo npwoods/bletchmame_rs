@@ -663,8 +663,8 @@ function command_start(args)
 
 	-- prep initial load args
 	start_load_args = {}
-	for i = 3,#args-1,2 do
-		start_load_args[args[i+0]] = args[i+1]
+	for i = 3,#args do
+		start_load_args[i -2] = args[i]
 	end
 
 	print("@INFO ### Starting emulation...")
@@ -1237,16 +1237,36 @@ function startplugin()
 			-- we're active (this could be the result of starting an emulation, or a soft/hard
 			-- reset); first  do we need to load images on start?  if so load them
 			local will_reset = false
-			for k,v in pairs(start_load_args) do
-				local image = find_image_by_tag(k)
-				if image then
-					image:load(v)
-					if image.is_reset_on_load then
-						will_reset = true
+			if #start_load_args > 0 and start_load_args[1]:sub(1, 1) == "&" then
+				-- changing slots
+				while #start_load_args > 0 and start_load_args[1]:sub(1, 1) == "&" do
+					local slot_option_name = table.remove(start_load_args, 1):sub(2)
+					local slot_option_value = table.remove(start_load_args, 1)
+					local opt = get_slot_option(slot_option_name)
+					if not opt then
+						print("@ERROR ### Cannot find slot option '" .. slot_option_name .. "'")
+						return
+					end
+					opt:specify(slot_option_value)
+				end
+				machine():hard_reset()
+				state = "RESET_UNPAUSED"
+				will_reset = true
+			else
+				-- changing images (if any)
+				while #start_load_args > 0 do
+					local k = table.remove(start_load_args, 1)
+					local v = table.remove(start_load_args, 1)
+					local image = find_image_by_tag(k)
+					if image then
+						image:load(v)
+						if image.is_reset_on_load then
+							will_reset = true
+						end
 					end
 				end
+				start_load_args = {}
 			end
-			start_load_args = {}
 
 			-- it is possible that loading an image will force a reset; we need to only
 			-- enter this block if we don't expect a reset
