@@ -3,6 +3,7 @@ use std::ops::ControlFlow;
 use std::rc::Rc;
 
 use anyhow::Result;
+use more_asserts::assert_le;
 use tracing::Level;
 use tracing::event;
 
@@ -86,6 +87,11 @@ impl MachineConfig {
 			machine_index,
 			slots,
 		}
+	}
+
+	pub fn from_machine_index(info_db: Rc<InfoDb>, machine_index: usize) -> Self {
+		assert_le!(machine_index, info_db.machines().len());
+		Self::new(info_db, machine_index)
 	}
 
 	#[allow(dead_code)]

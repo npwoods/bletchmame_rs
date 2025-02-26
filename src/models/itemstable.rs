@@ -27,6 +27,7 @@ use crate::guiutils::menuing::MenuDesc;
 use crate::info;
 use crate::info::InfoDb;
 use crate::info::View;
+use crate::mconfig::MachineConfig;
 use crate::prefs::BuiltinCollection;
 use crate::prefs::ColumnType;
 use crate::prefs::PrefsCollection;
@@ -115,7 +116,10 @@ impl ItemsTableModel {
 					PrefsCollection::Builtin(BuiltinCollection::All) => {
 						let machine_count = info_db.machines().len();
 						(0..machine_count)
-							.map(|machine_index| Item::Machine { machine_index })
+							.map(|machine_index| {
+								let machine_config = MachineConfig::from_machine_index(info_db.clone(), machine_index);
+								Item::Machine { machine_config }
+							})
 							.collect::<Rc<[_]>>()
 					}
 					PrefsCollection::Builtin(BuiltinCollection::AllSoftware) => dispenser
@@ -165,10 +169,15 @@ impl ItemsTableModel {
 					PrefsCollection::Folder { name: _, items } => items
 						.iter()
 						.filter_map(|item| match item {
-							PrefsItem::Machine(item) => info_db
-								.machines()
-								.find_index(&item.machine_name)
-								.map(|machine_index| Item::Machine { machine_index }),
+							PrefsItem::Machine(item) => {
+								let machine_config = MachineConfig::from_machine_name_and_slots(
+									info_db.clone(),
+									&item.machine_name,
+									&item.slots,
+								)
+								.ok()?;
+								Some(Item::Machine { machine_config })
+							}
 							PrefsItem::Software {
 								software_list,
 								software,
@@ -236,11 +245,18 @@ impl ItemsTableModel {
 
 		// get the critical information - the description and where (if anyplace) "Browse" would go to
 		let (run_menu_item, browse_target, configure_menu_item) = match item {
-			Item::Machine { machine_index } => {
-				let machine = info_db.machines().get(*machine_index).unwrap();
+			Item::Machine { machine_config } => {
+				let machine = machine_config.machine();
+				let initial_loads = machine_config
+					.changed_slots(None)
+					.into_iter()
+					.map(|(slot_name, slot_value)| {
+						(format!("&{slot_name}").into(), slot_value.unwrap_or_default().into())
+					})
+					.collect::<Vec<_>>();
 				let command = has_mame_initialized.then(|| AppCommand::RunMame {
 					machine_name: machine.name().to_string(),
-					initial_loads: vec![],
+					initial_loads,
 				});
 				let text = run_item_text(machine.description());
 				let run_menu_item = MenuDesc::Item(text, command.map(|x| x.into()));
@@ -550,7 +566,8 @@ pub enum EmptyReason {
 #[derive(Clone)]
 enum Item {
 	Machine {
-		machine_index: usize,
+		// Commentary:  `MachineConfig` has its own `InfoDb`; maybe we need a lighter `MachineConfigPartial`?
+		machine_config: MachineConfig,
 	},
 	Software {
 		software_list: Arc<SoftwareList>,
@@ -564,11 +581,11 @@ enum Item {
 	},
 }
 
-fn make_prefs_item(info_db: &InfoDb, item: &Item) -> PrefsItem {
+fn make_prefs_item(_info_db: &InfoDb, item: &Item) -> PrefsItem {
 	match item {
-		Item::Machine { machine_index } => {
-			let machine_name = info_db.machines().get(*machine_index).unwrap().name().to_string();
-			let slots = Vec::new();
+		Item::Machine { machine_config } => {
+			let machine_name = machine_config.machine().name().to_string();
+			let slots = machine_config.changed_slots(None);
 			let item = PrefsMachineItem { machine_name, slots };
 			PrefsItem::Machine(item)
 		}
@@ -687,10 +704,10 @@ fn contains_and_distance(text: &str, target: &str) -> Option<usize> {
 		.then(|| levenshtein(text, target))
 }
 
-fn column_text<'a>(info_db: &'a InfoDb, item: &'a Item, column: ColumnType) -> Cow<'a, str> {
+fn column_text<'a>(_info_db: &'a InfoDb, item: &'a Item, column: ColumnType) -> Cow<'a, str> {
 	match item {
-		Item::Machine { machine_index } => {
-			let machine = info_db.machines().get(*machine_index).unwrap();
+		Item::Machine { machine_config } => {
+			let machine = machine_config.machine();
 			let text = match column {
 				ColumnType::Name => machine.name(),
 				ColumnType::SourceFile => machine.source_file(),
