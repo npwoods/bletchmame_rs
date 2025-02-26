@@ -1,5 +1,6 @@
 pub mod pathtype;
 mod preflight;
+mod serde_slots;
 mod var;
 
 use std::borrow::Cow;
@@ -297,15 +298,22 @@ pub struct HistoryEntry {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", tag = "type")]
 pub enum PrefsItem {
-	Machine {
-		#[serde(rename = "machine")]
-		machine_name: String,
-	},
+	Machine(PrefsMachineItem),
 	Software {
 		#[serde(rename = "softwareList")]
 		software_list: String,
 		software: String,
 	},
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PrefsMachineItem {
+	#[serde(rename = "machine")]
+	pub machine_name: String,
+
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default", with = "serde_slots")]
+	pub slots: Vec<(String, Option<String>)>,
 }
 
 const PREFS: Option<&str> = Some("BletchMAME.json");

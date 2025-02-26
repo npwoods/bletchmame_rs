@@ -74,11 +74,7 @@ impl DevicesImagesConfig {
 		let result = if let Some(machine_name) = machine_name {
 			let machine_index = info_db.machines().find_index(machine_name)?;
 			let machine_config = MachineConfig::new(info_db.clone(), machine_index);
-			let machine_configs = MachineConfigPair {
-				clean: machine_config,
-				dirty: None,
-			};
-			diconfig_from_machine_configs_and_images(info_db, machine_configs, [].into())
+			Self::from(machine_config)
 		} else {
 			Self { info_db, core: None }
 		};
@@ -190,14 +186,14 @@ impl DevicesImagesConfig {
 		diconfig_from_machine_configs_and_images(self.info_db.clone(), machine_configs, images)
 	}
 
-	pub fn changed_slots(&self) -> Vec<(String, Option<String>)> {
+	pub fn changed_slots(&self, from_original: bool) -> Vec<(String, Option<String>)> {
 		self.core
 			.as_ref()
 			.and_then(|core| {
 				core.machine_configs
 					.dirty
 					.as_ref()
-					.map(|dirty| dirty.changed_slots(Some(&core.machine_configs.clean)))
+					.map(|dirty| dirty.changed_slots(from_original.then_some(&core.machine_configs.clean)))
 			})
 			.unwrap_or_default()
 	}
@@ -207,6 +203,17 @@ impl DevicesImagesConfig {
 			self.core.as_ref().map(|x| x.entries.as_ref()).unwrap_or_default(),
 			other.core.as_ref().map(|x| x.entries.as_ref()).unwrap_or_default(),
 		)
+	}
+}
+
+impl From<MachineConfig> for DevicesImagesConfig {
+	fn from(value: MachineConfig) -> Self {
+		let info_db = value.info_db.clone();
+		let machine_configs = MachineConfigPair {
+			clean: value,
+			dirty: None,
+		};
+		diconfig_from_machine_configs_and_images(info_db, machine_configs, [].into())
 	}
 }
 

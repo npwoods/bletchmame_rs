@@ -1,4 +1,4 @@
-import { Button, HorizontalBox, VerticalBox, TabWidget, ComboBox  } from "std-widgets.slint";
+import { Button, HorizontalBox, VerticalBox, TabWidget, ComboBox, GridBox  } from "std-widgets.slint";
 import { DevicesAndImagesList, DevicesAndImagesState } from "devimageslist.slint";
 
 export component ConfigureDialog inherits Window {
@@ -9,6 +9,7 @@ export component ConfigureDialog inherits Window {
 
     // properties
     in property <DevicesAndImagesState> dev-images-state;
+    in property <string> dev-images-error;
     in property <[string]> ram-sizes-model;
 
     // callbacks
@@ -20,12 +21,20 @@ export component ConfigureDialog inherits Window {
         TabWidget {
             Tab {
                 title: "Devices";
-                DevicesAndImagesList {
+                GridBox {
                     preferred-width: 100%;
                     preferred-height: 100%;
-                    state: root.dev-images-state;
-                    entry-option-changed(index, option-name) => {
-                        root.entry-option-changed(index, option-name);
+                    DevicesAndImagesList {
+                        visible: root.dev-images-error == "";
+                        state: root.dev-images-state;
+                        entry-option-changed(index, option-name) => {
+                            root.entry-option-changed(index, option-name);
+                        }
+                    }
+
+                    Text {
+                        visible: root.dev-images-error != "";
+                        text: root.dev-images-error;
                     }
                 }
             }
@@ -44,6 +53,7 @@ export component ConfigureDialog inherits Window {
             Button {
                 max-height: 30px;
                 text: "Ok";
+                enabled: root.dev-images-error == "";
                 clicked => {
                     root.ok-clicked();
                 }

@@ -955,29 +955,38 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 		AppCommand::ConfigureMachine { folder_name, index } => {
 			let model_clone = model.clone();
 			let info_db = model.state.borrow().info_db().unwrap().clone();
-			let machine_name = model
+			let (folder_index, item) = model
 				.preferences
 				.borrow()
 				.collections
 				.iter()
-				.filter_map(|x| {
-					if let PrefsCollection::Folder { name, items } = x.as_ref() {
-						(name == &folder_name).then(|| {
-							let PrefsItem::Machine { machine_name } = &items[index] else {
-								unreachable!()
-							};
-							machine_name.clone()
-						})
+				.enumerate()
+				.filter_map(|(folder_index, collection)| {
+					if let PrefsCollection::Folder { name, items } = collection.as_ref() {
+						(name == &folder_name).then_some((folder_index, items[index].clone()))
 					} else {
 						None
 					}
 				})
 				.next()
 				.unwrap();
+			let PrefsItem::Machine(item) = item else { unreachable!() };
 
 			let fut = async move {
 				let parent = model_clone.app_window_weak.clone();
-				dialog_configure(parent, info_db, machine_name).await;
+				if let Some(item) = dialog_configure(parent, info_db, item).await {
+					let item = PrefsItem::Machine(item);
+					model_clone.modify_prefs(|prefs| {
+						let old_collection = prefs.collections[folder_index].clone();
+						let PrefsCollection::Folder { name, mut items } = old_collection.as_ref().clone() else {
+							unreachable!()
+						};
+						items[index] = item;
+						let new_collection = PrefsCollection::Folder { name, items };
+						let new_collection = Rc::new(new_collection);
+						prefs.collections[folder_index] = new_collection;
+					})
+				}
 			};
 			spawn_local(fut).unwrap();
 		}
