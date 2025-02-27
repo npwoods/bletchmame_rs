@@ -94,6 +94,11 @@ fn machine_item_from_model(model: &DevicesAndImagesModel) -> PrefsMachineItem {
 	model.with_diconfig(|diconfig| {
 		let machine_name = diconfig.machine().unwrap().name().to_string();
 		let slots = diconfig.changed_slots(false);
-		PrefsMachineItem { machine_name, slots }
+		let ram_size = None;
+		PrefsMachineItem {
+			machine_name,
+			slots,
+			ram_size,
+		}
 	})
 }

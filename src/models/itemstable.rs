@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use std::cell::Cell;
 use std::cell::RefCell;
 use std::cmp::Reverse;
+use std::iter::once;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -56,6 +57,7 @@ pub struct ItemsTableModel {
 
 	selection: SelectionManager,
 	empty_callback: Box<dyn Fn(Option<EmptyReason>) + 'static>,
+	ramsize_arg_string: Arc<str>,
 	notify: ModelNotify,
 }
 
@@ -79,6 +81,7 @@ impl ItemsTableModel {
 
 			selection,
 			empty_callback: Box::new(empty_callback),
+			ramsize_arg_string: "-ramsize".into(),
 			notify: ModelNotify::default(),
 		};
 		Rc::new(result)
@@ -118,7 +121,10 @@ impl ItemsTableModel {
 						(0..machine_count)
 							.map(|machine_index| {
 								let machine_config = MachineConfig::from_machine_index(info_db.clone(), machine_index);
-								Item::Machine { machine_config }
+								Item::Machine {
+									machine_config,
+									ram_size: None,
+								}
 							})
 							.collect::<Rc<[_]>>()
 					}
@@ -176,7 +182,12 @@ impl ItemsTableModel {
 									&item.slots,
 								)
 								.ok()?;
-								Some(Item::Machine { machine_config })
+								let ram_size = item.ram_size;
+								let item = Item::Machine {
+									machine_config,
+									ram_size,
+								};
+								Some(item)
 							}
 							PrefsItem::Software {
 								software_list,
@@ -245,14 +256,24 @@ impl ItemsTableModel {
 
 		// get the critical information - the description and where (if anyplace) "Browse" would go to
 		let (run_menu_item, browse_target, configure_menu_item) = match item {
-			Item::Machine { machine_config } => {
+			Item::Machine {
+				machine_config,
+				ram_size,
+			} => {
 				let machine = machine_config.machine();
-				let initial_loads = machine_config
-					.changed_slots(None)
-					.into_iter()
-					.map(|(slot_name, slot_value)| {
-						(format!("&{slot_name}").into(), slot_value.unwrap_or_default().into())
-					})
+				let ramsize_arg = (
+					self.ramsize_arg_string.clone(),
+					ram_size.as_ref().map(u64::to_string).unwrap_or_default().into(),
+				);
+				let initial_loads = once(ramsize_arg)
+					.chain(
+						machine_config
+							.changed_slots(None)
+							.into_iter()
+							.map(|(slot_name, slot_value)| {
+								(format!("&{slot_name}").into(), slot_value.unwrap_or_default().into())
+							}),
+					)
 					.collect::<Vec<_>>();
 				let command = has_mame_initialized.then(|| AppCommand::RunMame {
 					machine_name: machine.name().to_string(),
@@ -568,6 +589,7 @@ enum Item {
 	Machine {
 		// Commentary:  `MachineConfig` has its own `InfoDb`; maybe we need a lighter `MachineConfigPartial`?
 		machine_config: MachineConfig,
+		ram_size: Option<u64>,
 	},
 	Software {
 		software_list: Arc<SoftwareList>,
@@ -583,10 +605,18 @@ enum Item {
 
 fn make_prefs_item(_info_db: &InfoDb, item: &Item) -> PrefsItem {
 	match item {
-		Item::Machine { machine_config } => {
+		Item::Machine {
+			machine_config,
+			ram_size,
+		} => {
 			let machine_name = machine_config.machine().name().to_string();
 			let slots = machine_config.changed_slots(None);
-			let item = PrefsMachineItem { machine_name, slots };
+			let ram_size = *ram_size;
+			let item = PrefsMachineItem {
+				machine_name,
+				slots,
+				ram_size,
+			};
 			PrefsItem::Machine(item)
 		}
 		Item::Software {
@@ -706,7 +736,7 @@ fn contains_and_distance(text: &str, target: &str) -> Option<usize> {
 
 fn column_text<'a>(_info_db: &'a InfoDb, item: &'a Item, column: ColumnType) -> Cow<'a, str> {
 	match item {
-		Item::Machine { machine_config } => {
+		Item::Machine { machine_config, .. } => {
 			let machine = machine_config.machine();
 			let text = match column {
 				ColumnType::Name => machine.name(),
