@@ -7,6 +7,7 @@ use slint::ModelRc;
 use slint::SharedString;
 use slint::VecModel;
 use slint::Weak;
+use slint::spawn_local;
 
 use crate::devimageconfig::DevicesImagesConfig;
 use crate::dialogs::SingleResult;
@@ -98,7 +99,14 @@ pub async fn dialog_configure(
 			.and_then(|ram_size| ram_options.iter().position(|x| x.size() == ram_size))
 			.map(|idx| idx + 1)
 			.unwrap_or_default();
-		modal.dialog().set_ram_sizes_index(index.try_into().unwrap());
+
+		// workaround for https://github.com/slint-ui/slint/issues/7632; please remove hack when fixed
+		let dialog_weak = modal.dialog().as_weak();
+		let fut = async move {
+			tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+			dialog_weak.unwrap().set_ram_sizes_index(index.try_into().unwrap());
+		};
+		spawn_local(fut).unwrap();
 	}
 
 	// set up the close handler
