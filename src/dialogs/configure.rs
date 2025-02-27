@@ -130,5 +130,7 @@ fn machine_item_from_model(model: &DevicesAndImagesModel, dialog: &ConfigureDial
 }
 
 fn ram_size_display_text(ram_size: u64) -> String {
-	ram_size.to_string()
+	let ram_size = byte_unit::Byte::from_u64(ram_size);
+	let (n, unit) = ram_size.get_exact_unit(true);
+	format!("{n} {unit}")
 }
