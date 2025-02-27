@@ -667,6 +667,13 @@ function command_start(args)
 		start_load_args[i -2] = args[i]
 	end
 
+	-- evaluate options
+	while #start_load_args > 0 and start_load_args[1]:sub(1, 1) == "-" do
+		local arg_name = table.remove(start_load_args, 1):sub(2)
+		local arg_value = table.remove(start_load_args, 1)
+		machine_options().entries[arg_name]:value(arg_value)
+	end
+
 	print("@INFO ### Starting emulation...")
 end
 

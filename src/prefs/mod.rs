@@ -314,6 +314,9 @@ pub struct PrefsMachineItem {
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default", with = "serde_slots")]
 	pub slots: Vec<(String, Option<String>)>,
+
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub ram_size: Option<u64>,
 }
 
 const PREFS: Option<&str> = Some("BletchMAME.json");

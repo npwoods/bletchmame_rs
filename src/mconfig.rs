@@ -90,8 +90,8 @@ impl MachineConfig {
 	}
 
 	pub fn from_machine_index(info_db: Rc<InfoDb>, machine_index: usize) -> Self {
-		assert_le!(machine_index, info_db.machines().len());
-		Self::new(info_db, machine_index)
+		let opts: &[(&str, Option<&str>)] = Default::default();
+		Self::from_machine_index_and_slots(info_db, machine_index, opts).unwrap()
 	}
 
 	pub fn from_machine_name_and_slots(
@@ -103,6 +103,15 @@ impl MachineConfig {
 			.machines()
 			.find_index(machine_name)
 			.ok_or_else(|| ThisError::CannotFindMachine(machine_name.to_string()))?;
+		Self::from_machine_index_and_slots(info_db, machine_index, opts)
+	}
+
+	pub fn from_machine_index_and_slots(
+		info_db: Rc<InfoDb>,
+		machine_index: usize,
+		opts: &[(impl AsRef<str>, Option<impl AsRef<str>>)],
+	) -> Result<Self> {
+		assert_le!(machine_index, info_db.machines().len());
 		let mut result = Self::new(info_db, machine_index);
 
 		for (tag, new_option_name) in opts {

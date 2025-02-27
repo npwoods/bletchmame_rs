@@ -11,6 +11,7 @@ export component ConfigureDialog inherits Window {
     in property <DevicesAndImagesState> dev-images-state;
     in property <string> dev-images-error;
     in property <[string]> ram-sizes-model;
+    in-out property <int> ram-sizes-index;
 
     // callbacks
     callback ok-clicked();
@@ -41,9 +42,24 @@ export component ConfigureDialog inherits Window {
 
             Tab {
                 title: "RAM Sizes";
-                ComboBox {
-                    model: root.ram-sizes-model;
-                    enabled: false;
+                VerticalBox {
+                    alignment: start;
+                    GridLayout {
+                        Text {
+                            row: 0;
+                            col: 0;
+                            vertical-alignment: center;
+                            text: "RAM Size:";
+                        }
+
+                        ComboBox {
+                            row: 0;
+                            col: 1;
+                            model: root.ram-sizes-model;
+                            enabled: root.ram-sizes-model.length >= 2;
+                            current-index <=> ram-sizes-index;
+                        }
+                    }
                 }
             }
         }
