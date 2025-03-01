@@ -1188,7 +1188,7 @@ local commands =
 function protected_call(callback, callback_name)
 	local status, err = pcall(callback)
 	if (not status) then
-		print("@ERROR ## Lua runtime error on " .. callback_name .. " " .. tostring(err))
+		print("@ERROR ### Lua runtime error on " .. callback_name .. " " .. tostring(err))
 	end
 end
 
