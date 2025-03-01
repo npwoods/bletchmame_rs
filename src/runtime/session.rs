@@ -99,6 +99,11 @@ fn execute_mame(
 	// interact with MAME, do our thing
 	let mame_result = interact_with_mame(&mut child, receiver, &event_callback);
 
+	// if we either errored, try to kill the process
+	if mame_result.is_err() {
+		let _ = child.kill();
+	}
+
 	// await the exit status
 	let exit_status = child.wait();
 	event!(LOG, "execute_mame(): MAME exited exit_status={:?}", exit_status);
