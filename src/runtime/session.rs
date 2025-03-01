@@ -37,7 +37,7 @@ const LOG: Level = Level::DEBUG;
 enum ThisError {
 	#[error("MAME Error Response: {0:?}")]
 	MameErrorResponse(String),
-	#[error("Problems found during MAME preflight: {0:?}")]
+	#[error("Unexpected Response from MAME: {0:?}")]
 	MameResponseNotUnderstood(String),
 	#[error("Unexpected EOF from MAME: {0}")]
 	EofFromMame(String),
