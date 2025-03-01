@@ -37,7 +37,7 @@ const LOG: Level = Level::DEBUG;
 enum ThisError {
 	#[error("MAME Error Response: {0:?}")]
 	MameErrorResponse(String),
-	#[error("Problems found during MAME preflight: {0:?}")]
+	#[error("Unexpected Response from MAME: {0:?}")]
 	MameResponseNotUnderstood(String),
 	#[error("Unexpected EOF from MAME: {0}")]
 	EofFromMame(String),
@@ -98,6 +98,11 @@ fn execute_mame(
 
 	// interact with MAME, do our thing
 	let mame_result = interact_with_mame(&mut child, receiver, &event_callback);
+
+	// if we either errored, try to kill the process
+	if mame_result.is_err() {
+		let _ = child.kill();
+	}
 
 	// await the exit status
 	let exit_status = child.wait();

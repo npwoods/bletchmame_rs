@@ -55,7 +55,7 @@ fn pairs_command_text(base: &[&str], args: &[(&str, &str)]) -> Cow<'static, str>
 		.map(Cow::Borrowed)
 		.chain(args.iter().flat_map(|(name, value)| {
 			let name = Cow::Borrowed(*name);
-			let value = if value.contains(' ') {
+			let value = if value.is_empty() || value.contains(' ') {
 				Cow::Owned(format!("\"{}\"", value))
 			} else {
 				Cow::Borrowed(*value)
@@ -73,8 +73,10 @@ mod test {
 	use super::MameCommand;
 
 	#[test_case(0, MameCommand::Stop, "STOP")]
-	#[test_case(1, MameCommand::Start { machine_name: "coco2b", initial_loads: &[("ext:fdc:wd17xx:0", "foo.dsk")]}, "START coco2b ext:fdc:wd17xx:0 foo.dsk")]
-	#[test_case(2, MameCommand::LoadImage(&[("ext:fdc:wd17xx:0", "foo bar.dsk")]), "LOAD ext:fdc:wd17xx:0 \"foo bar.dsk\"")]
+	#[test_case(1, MameCommand::Start { machine_name: "coco2b", initial_loads: &[("-ramsize", "")]}, "START coco2b -ramsize \"\"")]
+	#[test_case(2, MameCommand::Start { machine_name: "coco2b", initial_loads: &[("-ramsize", "64k")]}, "START coco2b -ramsize 64k")]
+	#[test_case(3, MameCommand::Start { machine_name: "coco2b", initial_loads: &[("ext:fdc:wd17xx:0", "foo.dsk")]}, "START coco2b ext:fdc:wd17xx:0 foo.dsk")]
+	#[test_case(4, MameCommand::LoadImage(&[("ext:fdc:wd17xx:0", "foo bar.dsk")]), "LOAD ext:fdc:wd17xx:0 \"foo bar.dsk\"")]
 	fn command_test(_index: usize, command: MameCommand<'_>, expected: &str) {
 		let actual = command.text();
 		assert_eq!(expected, actual);
