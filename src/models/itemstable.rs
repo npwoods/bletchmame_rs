@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use std::cell::Cell;
 use std::cell::RefCell;
 use std::cmp::Reverse;
+use std::collections::HashMap;
 use std::iter::once;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -123,6 +124,7 @@ impl ItemsTableModel {
 								let machine_config = MachineConfig::from_machine_index(info_db.clone(), machine_index);
 								Item::Machine {
 									machine_config,
+									images: Default::default(),
 									ram_size: None,
 								}
 							})
@@ -182,9 +184,11 @@ impl ItemsTableModel {
 									&item.slots,
 								)
 								.ok()?;
+								let images = item.images.clone();
 								let ram_size = item.ram_size;
 								let item = Item::Machine {
 									machine_config,
+									images,
 									ram_size,
 								};
 								Some(item)
@@ -258,6 +262,7 @@ impl ItemsTableModel {
 		let (run_menu_item, browse_target, configure_menu_item) = match item {
 			Item::Machine {
 				machine_config,
+				images,
 				ram_size,
 			} => {
 				let machine = machine_config.machine();
@@ -273,6 +278,11 @@ impl ItemsTableModel {
 							.map(|(slot_name, slot_value)| {
 								(format!("&{slot_name}").into(), slot_value.unwrap_or_default().into())
 							}),
+					)
+					.chain(
+						images
+							.iter()
+							.map(|(tag, filename)| (tag.as_str().into(), filename.as_str().into())),
 					)
 					.collect::<Vec<_>>();
 				let command = has_mame_initialized.then(|| AppCommand::RunMame {
@@ -589,6 +599,7 @@ enum Item {
 	Machine {
 		// Commentary:  `MachineConfig` has its own `InfoDb`; maybe we need a lighter `MachineConfigPartial`?
 		machine_config: MachineConfig,
+		images: HashMap<String, String>,
 		ram_size: Option<u64>,
 	},
 	Software {
@@ -607,14 +618,17 @@ fn make_prefs_item(_info_db: &InfoDb, item: &Item) -> PrefsItem {
 	match item {
 		Item::Machine {
 			machine_config,
+			images,
 			ram_size,
 		} => {
 			let machine_name = machine_config.machine().name().to_string();
 			let slots = machine_config.changed_slots(None);
+			let images = images.clone();
 			let ram_size = *ram_size;
 			let item = PrefsMachineItem {
 				machine_name,
 				slots,
+				images,
 				ram_size,
 			};
 			PrefsItem::Machine(item)

@@ -4,6 +4,7 @@ mod serde_slots;
 mod var;
 
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fs::File;
 use std::fs::create_dir_all;
@@ -314,6 +315,9 @@ pub struct PrefsMachineItem {
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default", with = "serde_slots")]
 	pub slots: Vec<(String, Option<String>)>,
+
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub images: HashMap<String, String>,
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub ram_size: Option<u64>,

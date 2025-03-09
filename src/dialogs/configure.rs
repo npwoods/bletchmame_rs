@@ -125,6 +125,7 @@ fn machine_item_from_model(model: &DevicesAndImagesModel, dialog: &ConfigureDial
 		let machine = diconfig.machine().unwrap();
 		let machine_name = machine.name().to_string();
 		let slots = diconfig.changed_slots(false);
+		let images = Default::default();
 		let ram_sizes_index = dialog.get_ram_sizes_index();
 		let ram_size = usize::try_from(ram_sizes_index - 1)
 			.ok()
@@ -132,6 +133,7 @@ fn machine_item_from_model(model: &DevicesAndImagesModel, dialog: &ConfigureDial
 		PrefsMachineItem {
 			machine_name,
 			slots,
+			images,
 			ram_size,
 		}
 	})
