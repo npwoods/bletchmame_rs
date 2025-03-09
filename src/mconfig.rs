@@ -53,6 +53,30 @@ enum ThisError {
 	CantSetOptionOnMachine(String),
 	#[error("Cannot find machine {0}")]
 	CannotFindMachine(String),
+	#[error("Expected tag {0:?} on machine {1:?} to be {2:?} but was {3:?}")]
+	IncorrectTagType(String, String, TagType, TagType),
+}
+
+#[derive(Clone, Debug)]
+pub enum TagType {
+	Machine,
+	Slot,
+}
+
+#[derive(Clone, Debug)]
+pub enum TagLookup<'a> {
+	#[allow(dead_code)]
+	Machine(Machine<'a>),
+	Slot(Machine<'a>, Slot<'a>),
+}
+
+impl From<&TagLookup<'_>> for TagType {
+	fn from(value: &TagLookup<'_>) -> Self {
+		match value {
+			TagLookup::Machine(_) => TagType::Machine,
+			TagLookup::Slot(_, _) => TagType::Slot,
+		}
+	}
 }
 
 impl MachineConfig {
@@ -127,7 +151,7 @@ impl MachineConfig {
 		self.info_db.machines().get(self.machine_index).unwrap()
 	}
 
-	pub fn lookup_tag(&self, tag: &str) -> Result<(Machine<'_>, Option<Slot<'_>>)> {
+	pub fn lookup_tag(&self, tag: &str) -> Result<TagLookup<'_>> {
 		match self.traverse_tag(tag)? {
 			ControlFlow::Continue((slot_index, next_tag)) => {
 				let SlotData::Set { config, .. } = &self.slots[slot_index] else {
@@ -137,10 +161,25 @@ impl MachineConfig {
 			}
 			ControlFlow::Break(slot_index) => {
 				let machine = self.machine();
-				let slot = slot_index.map(|index| machine.slots().get(index).unwrap());
-				Ok((machine, slot))
+				let result = if let Some(slot_index) = slot_index {
+					TagLookup::Slot(machine, machine.slots().get(slot_index).unwrap())
+				} else {
+					TagLookup::Machine(machine)
+				};
+				Ok(result)
 			}
 		}
+	}
+
+	pub fn lookup_slot_tag(&self, tag: &str) -> Result<(Machine<'_>, Slot<'_>)> {
+		let result = self.lookup_tag(tag)?;
+		let TagLookup::Slot(machine, slot) = result else {
+			let tag = tag.to_string();
+			let machine_name = self.machine().name().to_string();
+			let error = ThisError::IncorrectTagType(tag, machine_name, TagType::Slot, (&result).into());
+			return Err(error.into());
+		};
+		Ok((machine, slot))
 	}
 
 	pub fn set_slot_option(&self, tag: &str, new_option_name: Option<&str>) -> Result<Option<Self>> {
@@ -377,6 +416,7 @@ mod test {
 	use crate::info::InfoDb;
 
 	use super::MachineConfig;
+	use super::TagLookup;
 	use super::ThisError;
 
 	#[test_case(0, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[])]
@@ -455,10 +495,11 @@ mod test {
 		}
 
 		// perform the tag lookup
-		let actual = config
-			.lookup_tag(tag)
-			.map(|(machine, slot)| (machine.name().to_string(), slot.map(|x| x.name().to_string())))
-			.map_err(|e| e.to_string());
+		let actual = match config.lookup_tag(tag) {
+			Ok(TagLookup::Machine(machine)) => Ok((machine.name().to_string(), None)),
+			Ok(TagLookup::Slot(machine, slot)) => Ok((machine.name().to_string(), Some(slot.name().to_string()))),
+			Err(e) => Err(e.to_string()),
+		};
 
 		// and validate
 		let expected = expected

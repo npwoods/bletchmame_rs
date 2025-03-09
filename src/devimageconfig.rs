@@ -105,9 +105,8 @@ impl DevicesImagesConfig {
 				let (_, slot) = core
 					.machine_configs
 					.current_config()
-					.lookup_tag(&internal_entry.tag)
+					.lookup_slot_tag(&internal_entry.tag)
 					.unwrap();
-				let slot = slot.unwrap();
 
 				let none_option = EntryOption {
 					name: None,
