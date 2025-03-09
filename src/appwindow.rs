@@ -40,6 +40,7 @@ use crate::collections::toggle_builtin_collection;
 use crate::devimageconfig::DevicesImagesConfig;
 use crate::dialogs::configure::dialog_configure;
 use crate::dialogs::devimages::dialog_devices_and_images;
+use crate::dialogs::image::Format;
 use crate::dialogs::image::dialog_load_image;
 use crate::dialogs::messagebox::OkCancel;
 use crate::dialogs::messagebox::OkOnly;
@@ -918,7 +919,11 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				.iter()
 				.find(|x| x.tag == tag)
 				.unwrap();
-			if let Some(filename) = dialog_load_image(parent, image) {
+			let format_iter = image.details.formats.iter().map(|f| Format {
+				description: &f.description,
+				extensions: &f.extensions,
+			});
+			if let Some(filename) = dialog_load_image(parent, format_iter) {
 				let command = AppCommand::LoadImage { tag, filename };
 				handle_command(model, command);
 			}

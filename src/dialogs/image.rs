@@ -2,21 +2,21 @@ use rfd::FileDialog;
 use slint::ComponentHandle;
 use slint::Weak;
 
-use crate::status::Image;
+#[derive(Clone, Debug)]
+pub struct Format<'a> {
+	pub description: &'a str,
+	pub extensions: &'a [String],
+}
 
-pub fn dialog_load_image(_parent: Weak<impl ComponentHandle + 'static>, image: &Image) -> Option<String> {
+pub fn dialog_load_image<'a>(
+	_parent: Weak<impl ComponentHandle + 'static>,
+	format_iter: impl Iterator<Item = Format<'a>> + Clone,
+) -> Option<String> {
+	let all_extensions = format_iter.clone().flat_map(|f| f.extensions).collect::<Vec<_>>();
+
 	let dialog = FileDialog::new();
-	let all_extensions = image
-		.details
-		.formats
-		.iter()
-		.flat_map(|f| &f.extensions)
-		.collect::<Vec<_>>();
 	let dialog = dialog.add_filter("All Formats", &all_extensions);
-
-	let dialog = image.details.formats.iter().fold(dialog, |dialog, fmt| {
-		dialog.add_filter(fmt.description.clone(), &fmt.extensions)
-	});
+	let dialog = format_iter.fold(dialog, |dialog, fmt| dialog.add_filter(fmt.description, fmt.extensions));
 
 	let filename = dialog.pick_file()?;
 	let filename = filename.into_os_string().into_string().unwrap();
