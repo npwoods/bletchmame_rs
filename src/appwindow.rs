@@ -54,6 +54,7 @@ use crate::guiutils::menuing::MenuExt;
 use crate::guiutils::menuing::MenuItemUpdate;
 use crate::guiutils::menuing::accel;
 use crate::guiutils::modal::Modal;
+use crate::guiutils::modal::filter_command;
 use crate::history::History;
 use crate::models::collectionsview::CollectionsViewModel;
 use crate::models::itemstable::EmptyReason;
@@ -451,7 +452,9 @@ pub fn create(args: AppArgs) -> AppWindow {
 			let packet = packet.clone();
 			invoke_from_event_loop(move || {
 				let model = packet.unwrap();
-				handle_command(&model, command);
+				if let Some(command) = filter_command(command) {
+					handle_command(&model, command);
+				}
 			})
 			.unwrap();
 		}
