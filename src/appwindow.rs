@@ -982,7 +982,8 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 
 			let fut = async move {
 				let parent = model_clone.app_window_weak.clone();
-				if let Some(item) = dialog_configure(parent, info_db, item).await {
+				let menuing_type = model_clone.menuing_type;
+				if let Some(item) = dialog_configure(parent, info_db, item, menuing_type).await {
 					let item = PrefsItem::Machine(item);
 					model_clone.modify_prefs(|prefs| {
 						let old_collection = prefs.collections[folder_index].clone();

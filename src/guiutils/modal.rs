@@ -67,7 +67,6 @@ where
 		self.dialog.window()
 	}
 
-	#[allow(dead_code)]
 	pub fn set_command_filter(&self, callback: impl Fn(AppCommand) -> Option<AppCommand> + 'static) {
 		let callback = Box::new(callback) as Box<dyn Fn(AppCommand) -> Option<AppCommand> + 'static>;
 		CURRENT_FILTERS.with_borrow_mut(|filters| {

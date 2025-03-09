@@ -2,11 +2,13 @@ use std::borrow::Cow;
 use std::ops::ControlFlow;
 use std::rc::Rc;
 
+use anyhow::Error;
 use anyhow::Result;
 use more_asserts::assert_le;
 use tracing::Level;
 use tracing::event;
 
+use crate::info::Device;
 use crate::info::InfoDb;
 use crate::info::Machine;
 use crate::info::Slot;
@@ -53,6 +55,8 @@ enum ThisError {
 	CantSetOptionOnMachine(String),
 	#[error("Cannot find machine {0}")]
 	CannotFindMachine(String),
+	#[error("Cannot find device {0}")]
+	CannotFindDevice(String),
 	#[error("Expected tag {0:?} on machine {1:?} to be {2:?} but was {3:?}")]
 	IncorrectTagType(String, String, TagType, TagType),
 }
@@ -65,7 +69,6 @@ pub enum TagType {
 
 #[derive(Clone, Debug)]
 pub enum TagLookup<'a> {
-	#[allow(dead_code)]
 	Machine(Machine<'a>),
 	Slot(Machine<'a>, Slot<'a>),
 }
@@ -180,6 +183,24 @@ impl MachineConfig {
 			return Err(error.into());
 		};
 		Ok((machine, slot))
+	}
+
+	pub fn lookup_device_tag(&self, tag: &str) -> Result<(Machine<'_>, Device<'_>)> {
+		let (machine_tag, device_tag) = tag.rsplit_once(':').unwrap_or(("", tag));
+		let result = self.lookup_tag(machine_tag)?;
+		let TagLookup::Machine(machine) = result else {
+			let tag = tag.to_string();
+			let machine_name = self.machine().name().to_string();
+			let error = ThisError::IncorrectTagType(tag, machine_name, TagType::Machine, (&result).into());
+			return Err(error.into());
+		};
+
+		let device = machine
+			.devices()
+			.iter()
+			.find(|x| x.tag() == device_tag)
+			.ok_or_else(|| Error::from(ThisError::CannotFindDevice(device_tag.to_string())))?;
+		Ok((machine, device))
 	}
 
 	pub fn set_slot_option(&self, tag: &str, new_option_name: Option<&str>) -> Result<Option<Self>> {

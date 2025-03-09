@@ -88,8 +88,17 @@ impl DevicesImagesConfig {
 			.unwrap_or_default()
 	}
 
+	pub fn machine_config(&self) -> Option<&'_ MachineConfig> {
+		self.core.as_ref().map(|core| {
+			core.machine_configs
+				.dirty
+				.as_ref()
+				.unwrap_or(&core.machine_configs.clean)
+		})
+	}
+
 	pub fn machine(&self) -> Option<Machine<'_>> {
-		self.core.as_ref().map(|core| core.machine_configs.clean.machine())
+		self.machine_config().map(|x| x.machine())
 	}
 
 	pub fn entry_count(&self) -> usize {
@@ -202,6 +211,63 @@ impl DevicesImagesConfig {
 			self.core.as_ref().map(|x| x.entries.as_ref()).unwrap_or_default(),
 			other.core.as_ref().map(|x| x.entries.as_ref()).unwrap_or_default(),
 		)
+	}
+
+	pub fn images(&self) -> impl Iterator<Item = (&'_ str, Option<&'_ str>)> {
+		self.core.as_ref().unwrap().entries.iter().filter_map(|entry| {
+			let InternalEntryDetails::Image { filename } = &entry.details else {
+				return None;
+			};
+			Some((entry.tag.as_str(), filename.as_deref()))
+		})
+	}
+
+	pub fn set_images_from_slots(&self, mut image_func: impl FnMut(&str) -> Option<String>) -> Self {
+		let info_db = self.info_db.clone();
+		let Some(core) = self.core.as_ref() else {
+			return Self::new(info_db);
+		};
+
+		let machine_config = core
+			.machine_configs
+			.dirty
+			.as_ref()
+			.unwrap_or(&core.machine_configs.clean);
+
+		let images = {
+			let machines_iter = core.entries.iter().filter_map(|entry| {
+				let InternalEntryDetails::Slot { current_option_index } = entry.details else {
+					return None;
+				};
+				let current_option_index = current_option_index?;
+				let (_, slot) = machine_config.lookup_slot_tag(&entry.tag).unwrap();
+				let slot_option = slot.options().get(current_option_index).unwrap();
+				let machine = info_db.machines().find(slot_option.devname()).unwrap();
+				let tag = format!("{}:{}:{}:", entry.tag, slot.name(), slot_option.name());
+				Some((machine, tag))
+			});
+			let machines_iter = once((self.machine().unwrap(), "".to_string())).chain(machines_iter);
+			let device_tag_iter = machines_iter.flat_map(|(machine, tag)| {
+				machine
+					.devices()
+					.iter()
+					.map(|device| format!("{}{}", tag, device.tag()))
+					.collect::<Vec<_>>()
+			});
+			device_tag_iter
+				.map(|tag| {
+					let filename = image_func(&tag);
+					(tag, filename)
+				})
+				.collect::<Vec<_>>()
+		};
+		let images = images
+			.iter()
+			.map(|(tag, filename)| (tag.as_str(), filename.as_deref()))
+			.collect::<Vec<_>>();
+
+		let machine_configs = core.machine_configs.clone();
+		diconfig_from_machine_configs_and_images(info_db, machine_configs, images)
 	}
 }
 
