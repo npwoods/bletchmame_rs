@@ -1,8 +1,10 @@
+use i_slint_core::items::MenuEntry;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
 use slint::LogicalPosition;
 use slint::ModelRc;
 use slint::Weak;
+use slint::Window;
 
 use crate::appcommand::AppCommand;
 use crate::channel::Channel;
@@ -78,7 +80,14 @@ pub async fn dialog_devices_and_images(
 		let dialog = dialog_weak.unwrap();
 		let model = DevicesAndImagesModel::get_model(&model_clone);
 		let entry_index = entry_index.try_into().unwrap();
-		entry_popup_menu(&dialog, model, menuing_type, entry_index, point);
+		entry_popup_menu(
+			dialog.window(),
+			model,
+			menuing_type,
+			entry_index,
+			point,
+			|entries, point| dialog.invoke_show_context_menu(entries, point),
+		)
 	});
 
 	// subscribe to status changes
@@ -98,12 +107,14 @@ pub async fn dialog_devices_and_images(
 	modal.run(async { single_result.wait().await }).await;
 }
 
-fn entry_popup_menu(
-	dialog: &DevicesAndImagesDialog,
+/// Hackishly exposing as `pub` so that this can be shared with the configure machine dialog
+pub fn entry_popup_menu(
+	window: &Window,
 	model: &DevicesAndImagesModel,
 	menuing_type: MenuingType,
 	entry_index: usize,
 	point: LogicalPosition,
+	invoke_show_context_menu: impl Fn(ModelRc<MenuEntry>, LogicalPosition),
 ) {
 	let menu_items = model.with_diconfig(|diconfig| {
 		let entry = diconfig.entry(entry_index).unwrap();
@@ -138,11 +149,11 @@ fn entry_popup_menu(
 
 	match menuing_type {
 		MenuingType::Native => {
-			dialog.window().show_popup_menu(&popup_menu, point);
+			window.show_popup_menu(&popup_menu, point);
 		}
 		MenuingType::Slint => {
 			let entries = popup_menu.slint_menu_entries(None);
-			dialog.invoke_show_context_menu(entries, point);
+			invoke_show_context_menu(entries, point);
 		}
 	}
 }

@@ -40,6 +40,7 @@ use crate::collections::toggle_builtin_collection;
 use crate::devimageconfig::DevicesImagesConfig;
 use crate::dialogs::configure::dialog_configure;
 use crate::dialogs::devimages::dialog_devices_and_images;
+use crate::dialogs::image::Format;
 use crate::dialogs::image::dialog_load_image;
 use crate::dialogs::messagebox::OkCancel;
 use crate::dialogs::messagebox::OkOnly;
@@ -54,6 +55,7 @@ use crate::guiutils::menuing::MenuExt;
 use crate::guiutils::menuing::MenuItemUpdate;
 use crate::guiutils::menuing::accel;
 use crate::guiutils::modal::Modal;
+use crate::guiutils::modal::filter_command;
 use crate::history::History;
 use crate::models::collectionsview::CollectionsViewModel;
 use crate::models::itemstable::EmptyReason;
@@ -451,7 +453,9 @@ pub fn create(args: AppArgs) -> AppWindow {
 			let packet = packet.clone();
 			invoke_from_event_loop(move || {
 				let model = packet.unwrap();
-				handle_command(&model, command);
+				if let Some(command) = filter_command(command) {
+					handle_command(&model, command);
+				}
 			})
 			.unwrap();
 		}
@@ -915,7 +919,11 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				.iter()
 				.find(|x| x.tag == tag)
 				.unwrap();
-			if let Some(filename) = dialog_load_image(parent, image) {
+			let format_iter = image.details.formats.iter().map(|f| Format {
+				description: &f.description,
+				extensions: &f.extensions,
+			});
+			if let Some(filename) = dialog_load_image(parent, format_iter) {
 				let command = AppCommand::LoadImage { tag, filename };
 				handle_command(model, command);
 			}
@@ -974,7 +982,8 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 
 			let fut = async move {
 				let parent = model_clone.app_window_weak.clone();
-				if let Some(item) = dialog_configure(parent, info_db, item).await {
+				let menuing_type = model_clone.menuing_type;
+				if let Some(item) = dialog_configure(parent, info_db, item, menuing_type).await {
 					let item = PrefsItem::Machine(item);
 					model_clone.modify_prefs(|prefs| {
 						let old_collection = prefs.collections[folder_index].clone();

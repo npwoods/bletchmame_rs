@@ -16,6 +16,13 @@ export component ConfigureDialog inherits Window {
     // callbacks
     callback ok-clicked();
     callback entry-option-changed(int, string);
+    callback entry-button-clicked(int, Point);
+    callback menu-entry-activated(MenuEntry);
+
+    // functions
+    public function show-context-menu(entries: [MenuEntry], point: Point) {
+        dev-images-list.show-context-menu(entries, point);
+    }
 
     // control hierarchy
     VerticalBox {
@@ -25,11 +32,18 @@ export component ConfigureDialog inherits Window {
                 GridBox {
                     preferred-width: 100%;
                     preferred-height: 100%;
-                    DevicesAndImagesList {
+                    dev-images-list := DevicesAndImagesList {
                         visible: root.dev-images-error == "";
                         state: root.dev-images-state;
+                        images-button-enabled: true;
                         entry-option-changed(index, option-name) => {
                             root.entry-option-changed(index, option-name);
+                        }
+                        entry-button-clicked(index, point) => {
+                            root.entry-button-clicked(index, point);
+                        }
+                        menu-entry-activated(entry) => {
+                            root.menu-entry-activated(entry);
                         }
                     }
 
