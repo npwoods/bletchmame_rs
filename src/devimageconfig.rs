@@ -72,7 +72,7 @@ impl DevicesImagesConfig {
 
 	pub fn with_machine_name(info_db: Rc<InfoDb>, machine_name: Option<&str>) -> Option<Self> {
 		let result = if let Some(machine_name) = machine_name {
-			let machine_index = info_db.machines().find_index(machine_name)?;
+			let machine_index = info_db.machines().find_index(machine_name).ok()?;
 			let machine_config = MachineConfig::new(info_db.clone(), machine_index);
 			Self::from(machine_config)
 		} else {
@@ -228,11 +228,7 @@ impl DevicesImagesConfig {
 			return Self::new(info_db);
 		};
 
-		let machine_config = core
-			.machine_configs
-			.dirty
-			.as_ref()
-			.unwrap_or(&core.machine_configs.clean);
+		let machine_config = self.machine_config().unwrap();
 
 		let images = {
 			let machines_iter = core.entries.iter().filter_map(|entry| {
@@ -243,7 +239,7 @@ impl DevicesImagesConfig {
 				let (_, slot) = machine_config.lookup_slot_tag(&entry.tag).unwrap();
 				let slot_option = slot.options().get(current_option_index).unwrap();
 				let machine = info_db.machines().find(slot_option.devname()).unwrap();
-				let tag = format!("{}:{}:{}:", entry.tag, slot.name(), slot_option.name());
+				let tag = format!("{}:{}:", entry.tag, slot_option.name());
 				Some((machine, tag))
 			});
 			let machines_iter = once((self.machine().unwrap(), "".to_string())).chain(machines_iter);
@@ -251,6 +247,7 @@ impl DevicesImagesConfig {
 				machine
 					.devices()
 					.iter()
+					.filter(|device| !device.tag().contains(':'))
 					.map(|device| format!("{}{}", tag, device.tag()))
 					.collect::<Vec<_>>()
 			});
@@ -299,10 +296,7 @@ fn internal_update_status(
 	};
 
 	// find the machine index identified in the status
-	let machine_index = info_db
-		.machines()
-		.find_index(&running.machine_name)
-		.unwrap_or_else(|| panic!("Unknown machine {:?}", running.machine_name));
+	let machine_index = info_db.machines().find_index(&running.machine_name).unwrap();
 
 	// the machine_configs passed in is only relevant if the machine_index matches; if we don't
 	// have one we need to create it

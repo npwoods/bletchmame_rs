@@ -606,7 +606,8 @@ mod test {
 		let actual = db
 			.machines()
 			.find(target)
-			.map(|x| (String::from(x.manufacturer()), String::from(x.year())));
+			.map(|x| (String::from(x.manufacturer()), String::from(x.year())))
+			.ok();
 
 		let expected = expected.map(|(manufacturer, year)| (manufacturer.to_string(), year.to_string()));
 		assert_eq!(expected, actual);
@@ -616,8 +617,8 @@ mod test {
 	pub fn machines_find_everything(_index: usize, xml: &str) {
 		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
 		for machine in db.machines().iter() {
-			let other_machine = db.machines().find(machine.name());
-			assert_eq!(other_machine.map(|m| m.name()), Some(machine.name()));
+			let other_machine = db.machines().find(machine.name()).unwrap();
+			assert_eq!(other_machine.name(), machine.name());
 		}
 	}
 

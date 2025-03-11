@@ -1,3 +1,5 @@
+use anyhow::Error;
+use anyhow::Result;
 use binary_search::Direction;
 use binary_search::binary_search;
 
@@ -82,23 +84,27 @@ impl<'a> Machine<'a> {
 }
 
 impl<'a> MachinesView<'a> {
-	pub fn find_index(&self, target: &str) -> Option<usize> {
-		if self.is_empty() {
-			return None;
-		}
-
-		let ((largest_low, _), _) = binary_search((0, ()), (self.len(), ()), |i| {
-			if self.get(i).unwrap().name() <= target {
-				Direction::Low(())
-			} else {
-				Direction::High(())
-			}
-		});
-		let machine = self.get(largest_low).unwrap();
-		(machine.name() == target).then_some(largest_low)
+	pub fn find_index(&self, target: &str) -> Result<usize> {
+		let result = if !self.is_empty() {
+			let ((largest_low, _), _) = binary_search((0, ()), (self.len(), ()), |i| {
+				if self.get(i).unwrap().name() <= target {
+					Direction::Low(())
+				} else {
+					Direction::High(())
+				}
+			});
+			let machine = self.get(largest_low).unwrap();
+			(machine.name() == target).then_some(largest_low)
+		} else {
+			None
+		};
+		result.ok_or_else(|| {
+			let message = format!("cannot find machine {target:?}");
+			Error::msg(message)
+		})
 	}
 
-	pub fn find(&self, target: &str) -> Option<Machine<'a>> {
+	pub fn find(&self, target: &str) -> Result<Machine<'a>> {
 		self.find_index(target).map(|index| self.get(index).unwrap())
 	}
 }
@@ -225,6 +231,8 @@ impl RamOption<'_> {
 mod test {
 	use std::marker::PhantomData;
 
+	use assert_matches::assert_matches;
+
 	use crate::info::InfoDb;
 
 	use super::MachinesView;
@@ -243,6 +251,6 @@ mod test {
 		};
 
 		let actual = machines_view.find("cant_find_this");
-		assert!(actual.is_none());
+		assert_matches!(actual, Err(_));
 	}
 }

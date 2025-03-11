@@ -53,8 +53,6 @@ enum ThisError {
 	CannotFindSlotOption(String, String, String),
 	#[error("Machine {0:?}: Cannot set option on machine")]
 	CantSetOptionOnMachine(String),
-	#[error("Cannot find machine {0}")]
-	CannotFindMachine(String),
 	#[error("Cannot find device {0}")]
 	CannotFindDevice(String),
 	#[error("Expected tag {0:?} on machine {1:?} to be {2:?} but was {3:?}")]
@@ -126,10 +124,7 @@ impl MachineConfig {
 		machine_name: &str,
 		opts: &[(impl AsRef<str>, Option<impl AsRef<str>>)],
 	) -> Result<Self> {
-		let machine_index = info_db
-			.machines()
-			.find_index(machine_name)
-			.ok_or_else(|| ThisError::CannotFindMachine(machine_name.to_string()))?;
+		let machine_index = info_db.machines().find_index(machine_name)?;
 		Self::from_machine_index_and_slots(info_db, machine_index, opts)
 	}
 
