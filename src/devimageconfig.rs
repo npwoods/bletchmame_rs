@@ -228,11 +228,7 @@ impl DevicesImagesConfig {
 			return Self::new(info_db);
 		};
 
-		let machine_config = core
-			.machine_configs
-			.dirty
-			.as_ref()
-			.unwrap_or(&core.machine_configs.clean);
+		let machine_config = self.machine_config().unwrap();
 
 		let images = {
 			let machines_iter = core.entries.iter().filter_map(|entry| {
