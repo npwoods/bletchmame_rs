@@ -72,7 +72,7 @@ impl DevicesImagesConfig {
 
 	pub fn with_machine_name(info_db: Rc<InfoDb>, machine_name: Option<&str>) -> Option<Self> {
 		let result = if let Some(machine_name) = machine_name {
-			let machine_index = info_db.machines().find_index(machine_name)?;
+			let machine_index = info_db.machines().find_index(machine_name).ok()?;
 			let machine_config = MachineConfig::new(info_db.clone(), machine_index);
 			Self::from(machine_config)
 		} else {
@@ -299,10 +299,7 @@ fn internal_update_status(
 	};
 
 	// find the machine index identified in the status
-	let machine_index = info_db
-		.machines()
-		.find_index(&running.machine_name)
-		.unwrap_or_else(|| panic!("Unknown machine {:?}", running.machine_name));
+	let machine_index = info_db.machines().find_index(&running.machine_name).unwrap();
 
 	// the machine_configs passed in is only relevant if the machine_index matches; if we don't
 	// have one we need to create it

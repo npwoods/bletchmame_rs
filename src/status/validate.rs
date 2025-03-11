@@ -27,7 +27,7 @@ pub fn validate_status(status: &Status, info_db: &InfoDb) -> Result<(), Validati
 }
 
 fn validate_running(running: &Running, info_db: &InfoDb, mut emit: impl FnMut(UpdateXmlProblem)) {
-	if info_db.machines().find(&running.machine_name).is_none() {
+	if info_db.machines().find(&running.machine_name).is_err() {
 		emit(UpdateXmlProblem::UnknownMachine(running.machine_name.clone()));
 	}
 }
