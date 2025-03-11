@@ -239,7 +239,7 @@ impl DevicesImagesConfig {
 				let (_, slot) = machine_config.lookup_slot_tag(&entry.tag).unwrap();
 				let slot_option = slot.options().get(current_option_index).unwrap();
 				let machine = info_db.machines().find(slot_option.devname()).unwrap();
-				let tag = format!("{}:{}:{}:", entry.tag, slot.name(), slot_option.name());
+				let tag = format!("{}:{}:", entry.tag, slot_option.name());
 				Some((machine, tag))
 			});
 			let machines_iter = once((self.machine().unwrap(), "".to_string())).chain(machines_iter);
@@ -247,6 +247,7 @@ impl DevicesImagesConfig {
 				machine
 					.devices()
 					.iter()
+					.filter(|device| !device.tag().contains(':'))
 					.map(|device| format!("{}{}", tag, device.tag()))
 					.collect::<Vec<_>>()
 			});
