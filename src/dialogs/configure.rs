@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::iter::once;
 use std::rc::Rc;
@@ -25,7 +26,14 @@ use crate::mconfig::MachineConfig;
 use crate::models::devimages::DevicesAndImagesModel;
 use crate::prefs::PrefsMachineItem;
 use crate::ui::ConfigureDialog;
+use crate::ui::DeviceAndImageEntry;
 use crate::ui::DevicesAndImagesState;
+
+struct State {
+	dialog_weak: Weak<ConfigureDialog>,
+	dimodel: ModelRc<DeviceAndImageEntry>,
+	images: RefCell<HashMap<String, String>>,
+}
 
 pub async fn dialog_configure(
 	parent: Weak<impl ComponentHandle + 'static>,
@@ -44,46 +52,53 @@ pub async fn dialog_configure(
 	match MachineConfig::from_machine_index_and_slots(info_db.clone(), machine_index, &item.slots) {
 		Ok(machine_config) => {
 			let diconfig = DevicesImagesConfig::from(machine_config);
-			let diconfig: DevicesImagesConfig = diconfig.set_images_from_slots(|tag| item.images.get(tag).cloned());
 
 			// set up the devices and images model
-			let model = DevicesAndImagesModel::new(diconfig);
-			let none_string = model.none_string.clone();
-			let model = ModelRc::new(model);
-			let state = DevicesAndImagesState {
-				entries: model.clone(),
+			let dimodel = DevicesAndImagesModel::new(diconfig);
+			let none_string = dimodel.none_string.clone();
+			let dimodel: ModelRc<DeviceAndImageEntry> = ModelRc::new(dimodel);
+			let distate = DevicesAndImagesState {
+				entries: dimodel.clone(),
 				none_string,
 			};
-			modal.dialog().set_dev_images_state(state);
+			modal.dialog().set_dev_images_state(distate);
+
+			// assemble what we have into dialog state
+			let dialog_weak = modal.dialog().as_weak();
+			let images = RefCell::new(item.images);
+			let state = State {
+				dialog_weak,
+				dimodel,
+				images,
+			};
+			let state = Rc::new(state);
+
+			// initial images setup
+			state.update_images();
 
 			// set up the "ok" button
 			let signaller = single_result.signaller();
-			let model_clone = model.clone();
-			let dialog_weak = modal.dialog().as_weak();
+			let state_clone = state.clone();
 			modal.dialog().on_ok_clicked(move || {
-				let model = DevicesAndImagesModel::get_model(&model_clone);
-				let dialog = dialog_weak.unwrap();
-				let result = machine_item_from_model(model, &dialog);
+				let result = state_clone.get_machine_item();
 				signaller.signal(Some(result));
 			});
 
 			// set up callback for when an entry option changed
-			let model_clone = model.clone();
+			let state_clone = state.clone();
 			modal
 				.dialog()
 				.on_entry_option_changed(move |entry_index, new_option_name| {
 					let entry_index = entry_index.try_into().unwrap();
 					let new_option_name = (!new_option_name.is_empty()).then_some(new_option_name.as_str());
-					let model = DevicesAndImagesModel::get_model(&model_clone);
-					model.set_slot_entry_option(entry_index, new_option_name);
+					state_clone.set_slot_entry_option(entry_index, new_option_name);
 				});
 
 			// set up callback for when an image button is pressed
-			let model_clone = model.clone();
-			let dialog_weak = modal.dialog().as_weak();
+			let state_clone = state.clone();
 			modal.dialog().on_entry_button_clicked(move |entry_index, point| {
-				let dialog = dialog_weak.unwrap();
-				let model = DevicesAndImagesModel::get_model(&model_clone);
+				let dialog = state_clone.dialog_weak.unwrap();
+				let model = DevicesAndImagesModel::get_model(&state_clone.dimodel);
 				let entry_index = entry_index.try_into().unwrap();
 				entry_popup_menu(
 					dialog.window(),
@@ -96,12 +111,8 @@ pub async fn dialog_configure(
 			});
 
 			// set up a command filter
-			let model_clone = model.clone();
-			let dialog_weak = modal.dialog().as_weak();
-			modal.set_command_filter(move |command| {
-				let model = DevicesAndImagesModel::get_model(&model_clone);
-				command_filter(&dialog_weak, model, command)
-			});
+			let state_clone = state.clone();
+			modal.set_command_filter(move |command| command_filter(&state_clone, command));
 		}
 		Err(e) => {
 			let text = format!("{e}").into();
@@ -154,45 +165,17 @@ pub async fn dialog_configure(
 	modal.run(async { single_result.wait().await }).await
 }
 
-fn machine_item_from_model(model: &DevicesAndImagesModel, dialog: &ConfigureDialog) -> PrefsMachineItem {
-	model.with_diconfig(|diconfig| {
-		let machine = diconfig.machine().unwrap();
-		let machine_name = machine.name().to_string();
-		let slots = diconfig.changed_slots(false);
-		let images = model.with_diconfig(|diconfig| {
-			diconfig
-				.images()
-				.filter_map(|(tag, filename)| filename.map(|filename| (tag.to_string(), filename.to_string())))
-				.collect::<HashMap<_, _>>()
-		});
-		let ram_sizes_index = dialog.get_ram_sizes_index();
-		let ram_size = usize::try_from(ram_sizes_index - 1)
-			.ok()
-			.map(|index| machine.ram_options().get(index).unwrap().size());
-		PrefsMachineItem {
-			machine_name,
-			slots,
-			images,
-			ram_size,
-		}
-	})
-}
-
 fn ram_size_display_text(ram_size: u64) -> String {
 	let ram_size = byte_unit::Byte::from_u64(ram_size);
 	let (n, unit) = ram_size.get_exact_unit(true);
 	format!("{n} {unit}")
 }
 
-fn command_filter(
-	parent: &Weak<impl ComponentHandle + 'static>,
-	model: &DevicesAndImagesModel,
-	command: AppCommand,
-) -> Option<AppCommand> {
+fn command_filter(state: &Rc<State>, command: AppCommand) -> Option<AppCommand> {
 	// first pass
 	match command {
 		AppCommand::LoadImageDialog { tag } => {
-			let (_filename, extensions) = model.with_diconfig(|config| {
+			let (_filename, extensions) = state.with_diconfig(|config| {
 				let filename = (0..config.entry_count())
 					.filter_map(|index| {
 						let entry = config.entry(index).unwrap();
@@ -214,35 +197,71 @@ fn command_filter(
 				extensions: &extensions,
 			}];
 			let format_iter = formats.iter().cloned();
-			dialog_load_image(parent.clone(), format_iter)
-				.and_then(|filename| command_filter(parent, model, AppCommand::LoadImage { tag, filename }))
+			dialog_load_image(state.dialog_weak.clone(), format_iter)
+				.and_then(|filename| command_filter(state, AppCommand::LoadImage { tag, filename }))
 		}
 		AppCommand::LoadImage { tag, filename } => {
-			set_image_by_tag(model, &tag, Some(filename));
+			state.set_image_filename(tag, Some(filename));
 			None
 		}
 		AppCommand::UnloadImage { tag } => {
-			set_image_by_tag(model, &tag, None);
+			state.set_image_filename(tag, None);
 			None
 		}
 		_ => Some(command),
 	}
 }
 
-fn set_image_by_tag(model: &DevicesAndImagesModel, tag: &str, mut filename: Option<String>) {
-	let mut images = model.with_diconfig(|diconfig| {
-		diconfig
-			.images()
-			.map(|(this_tag, this_filename)| {
-				let this_filename = if this_tag == tag {
-					filename.take()
-				} else {
-					this_filename.map(str::to_string)
-				};
-				(this_tag.to_string(), this_filename)
-			})
-			.collect::<HashMap<_, _>>()
-	});
+impl State {
+	pub fn with_diconfig<R>(&self, callback: impl FnOnce(&DevicesImagesConfig) -> R) -> R {
+		let dimodel = DevicesAndImagesModel::get_model(&self.dimodel);
+		dimodel.with_diconfig(callback)
+	}
 
-	model.change_diconfig(|diconfig| Some(diconfig.set_images_from_slots(|tag| images.remove(tag).flatten())));
+	pub fn update_images(&self) {
+		let dimodel = DevicesAndImagesModel::get_model(&self.dimodel);
+		let images = self.images.borrow();
+		dimodel.change_diconfig(|diconfig| {
+			let diconfig = diconfig.set_images_from_slots(|tag| images.get(tag).cloned());
+			Some(diconfig)
+		});
+	}
+
+	pub fn get_machine_item(&self) -> PrefsMachineItem {
+		let dialog = self.dialog_weak.unwrap();
+		self.with_diconfig(|diconfig| {
+			let machine = diconfig.machine().unwrap();
+			let machine_name = machine.name().to_string();
+			let slots = diconfig.changed_slots(false);
+			let images = diconfig
+				.images()
+				.filter_map(|(tag, filename)| filename.map(|filename| (tag.to_string(), filename.to_string())))
+				.collect::<HashMap<_, _>>();
+			let ram_sizes_index = dialog.get_ram_sizes_index();
+			let ram_size = usize::try_from(ram_sizes_index - 1)
+				.ok()
+				.map(|index| machine.ram_options().get(index).unwrap().size());
+			PrefsMachineItem {
+				machine_name,
+				slots,
+				images,
+				ram_size,
+			}
+		})
+	}
+
+	pub fn set_slot_entry_option(&self, entry_index: usize, new_option_name: Option<&str>) {
+		let dimodel = DevicesAndImagesModel::get_model(&self.dimodel);
+		dimodel.set_slot_entry_option(entry_index, new_option_name);
+		self.update_images();
+	}
+
+	pub fn set_image_filename(&self, tag: String, new_filename: Option<String>) {
+		if let Some(new_filename) = new_filename {
+			self.images.borrow_mut().insert(tag, new_filename);
+		} else {
+			self.images.borrow_mut().remove(&tag);
+		}
+		self.update_images();
+	}
 }
