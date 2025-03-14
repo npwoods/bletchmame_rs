@@ -3,9 +3,12 @@ use std::cell::RefCell;
 use std::future::Future;
 use std::rc::Rc;
 
+use i_slint_backend_winit::WinitWindowAccessor;
+use i_slint_backend_winit::WinitWindowEventResult;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
 use slint::Window;
+use winit::event::WindowEvent;
 use winit::window::WindowAttributes;
 
 use crate::appcommand::AppCommand;
@@ -40,6 +43,20 @@ where
 
 		// invoke the func
 		let dialog = with_attributes_hook(func, hook);
+
+		// keep the window on top
+		let dialog_weak = dialog.as_weak();
+		parent.window().on_winit_window_event(move |_, evt| {
+			let dialog = matches!(evt, WindowEvent::Focused(true))
+				.then(|| dialog_weak.upgrade())
+				.flatten();
+			if let Some(dialog) = dialog {
+				dialog.window().with_winit_window(|window| window.focus_window());
+				WinitWindowEventResult::PreventDefault
+			} else {
+				WinitWindowEventResult::Propagate
+			}
+		});
 
 		// set up a bogus callback because the default callback won't do the right thing
 		dialog
@@ -131,6 +148,9 @@ fn set_window_attributes_for_modal_parent(
 
 fn reenable_modal_parent(parent: &impl ComponentHandle) {
 	parent.window().set_enabled_for_modal(true);
+	parent
+		.window()
+		.on_winit_window_event(|_, _| WinitWindowEventResult::Propagate);
 }
 
 pub fn filter_command(command: AppCommand) -> Option<AppCommand> {
