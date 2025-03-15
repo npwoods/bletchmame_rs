@@ -11,7 +11,7 @@ tracing = { version = "0.1.41", features = [
     "max_level_trace",
     "release_max_level_info",
 ] }
-tracing-subscriber = "0.3.19"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 slint = { git = "https://github.com/npwoods/slint.git", rev = "69b43975246dbbf4cbba4372b98dde1ce64dca79", features = [
     "raw-window-handle-06",
 ] }
