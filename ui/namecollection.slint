@@ -1,4 +1,4 @@
-import { AboutSlint, Button, VerticalBox, HorizontalBox, LineEdit } from "std-widgets.slint";
+import { AboutSlint, Button, VerticalBox, HorizontalBox, LineEdit, StandardButton } from "std-widgets.slint";
 
 export component NameCollectionDialog inherits Window {
     title: title-text;
@@ -32,8 +32,8 @@ export component NameCollectionDialog inherits Window {
 
         HorizontalBox {
             alignment: end;
-            Button {
-                text: "Cancel";
+            StandardButton {
+                kind: cancel;
                 clicked => {
                     root.cancel-clicked();
                 }
@@ -41,8 +41,8 @@ export component NameCollectionDialog inherits Window {
                 height: 30px;
             }
 
-            Button {
-                text: "Ok";
+            StandardButton {
+                kind: ok;
                 clicked => {
                     root.ok-clicked();
                 }

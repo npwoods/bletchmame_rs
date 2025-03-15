@@ -1,4 +1,4 @@
-import { Button, VerticalBox, HorizontalBox, ComboBox, ListView, LineEdit } from "std-widgets.slint";
+import { Button, VerticalBox, HorizontalBox, ComboBox, ListView, LineEdit, StandardButton } from "std-widgets.slint";
 import { DevicesAndImagesList, DeviceAndImageEntry, DevicesAndImagesState } from "devimageslist.slint";
 
 
@@ -53,9 +53,9 @@ export component DevicesAndImagesDialog inherits Window {
                 enabled: root.config-dirty;
             }
 
-            Button {
+            StandardButton {
                 max-height: 30px;
-                text: "Ok";
+                kind: ok;
                 clicked => {
                     root.ok-clicked();
                 }

@@ -1,4 +1,4 @@
-import { Button, HorizontalBox, VerticalBox, TabWidget, ComboBox, GridBox  } from "std-widgets.slint";
+import { Button, HorizontalBox, VerticalBox, TabWidget, ComboBox, GridBox, StandardButton  } from "std-widgets.slint";
 import { DevicesAndImagesList, DevicesAndImagesState } from "devimageslist.slint";
 
 export component ConfigureDialog inherits Window {
@@ -80,9 +80,9 @@ export component ConfigureDialog inherits Window {
 
         HorizontalBox {
             alignment: end;
-            Button {
+            StandardButton {
                 max-height: 30px;
-                text: "Ok";
+                kind: ok;
                 enabled: root.dev-images-error == "";
                 clicked => {
                     root.ok-clicked();
