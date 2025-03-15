@@ -148,6 +148,10 @@ impl Update {
 	pub fn validate(&self, info_db: &InfoDb) -> std::result::Result<(), ValidationError> {
 		Status::new(None, self.clone()).validate(info_db)
 	}
+
+	pub fn is_running(&self) -> bool {
+		self.running.is_some()
+	}
 }
 
 impl Debug for Update {
