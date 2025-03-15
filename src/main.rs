@@ -34,7 +34,7 @@ use guiutils::MenuingType;
 use muda::Menu;
 use slint::ComponentHandle;
 use structopt::StructOpt;
-use tracing::Level;
+use tracing_subscriber::EnvFilter;
 
 use crate::appwindow::AppArgs;
 use crate::diagnostics::info_db_from_xml_file;
@@ -57,7 +57,7 @@ struct Opt {
 	process_xml: Option<PathBuf>,
 
 	#[cfg_attr(feature = "diagnostics", structopt(long))]
-	log_level: Option<Level>,
+	log: Option<String>,
 
 	#[cfg_attr(feature = "diagnostics", structopt(long))]
 	no_capture_mame_stderr: bool,
@@ -74,10 +74,10 @@ fn main() {
 	let opts = Opt::from_args();
 
 	// set up logging
-	tracing_subscriber::fmt()
-		.with_max_level(opts.log_level.unwrap_or(Level::INFO))
-		.with_target(false)
-		.init();
+	let log = opts.log.or_else(|| std::env::var("RUST_ENV").ok());
+	if let Some(log) = log {
+		tracing_subscriber::fmt().with_env_filter(EnvFilter::new(log)).init();
+	}
 
 	// are we doing diagnostics
 	if let Some(path) = opts.process_xml {

@@ -27,7 +27,7 @@ use crate::xml::XmlElement;
 use crate::xml::XmlEvent;
 use crate::xml::XmlReader;
 
-const LOG: Level = Level::TRACE;
+const LOG: Level = Level::DEBUG;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Phase {

@@ -8,7 +8,7 @@ use tracing::event;
 
 use crate::prefs::PreflightProblem;
 
-const LOG: Level = Level::DEBUG;
+const LOG: Level = Level::INFO;
 
 pub fn preflight_checks<T>(
 	mame_executable_path: Option<&Path>,

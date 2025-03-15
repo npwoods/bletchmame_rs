@@ -14,7 +14,7 @@ use crate::info::Machine;
 use crate::info::Slot;
 use crate::info::View;
 
-const LOG: Level = Level::DEBUG;
+const LOG: Level = Level::INFO;
 
 #[derive(Clone, Debug)]
 pub struct MachineConfig {

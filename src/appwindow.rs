@@ -77,8 +77,8 @@ use crate::ui::AboutDialog;
 use crate::ui::AppWindow;
 use crate::ui::ReportIssue;
 
-const LOG_COMMANDS: Level = Level::DEBUG;
-const LOG_PREFS: Level = Level::DEBUG;
+const LOG_COMMANDS: Level = Level::INFO;
+const LOG_PREFS: Level = Level::INFO;
 
 const SOUND_ATTENUATION_OFF: i32 = -32;
 const SOUND_ATTENUATION_ON: i32 = 0;
