@@ -21,38 +21,36 @@ i-slint-backend-winit = { git = "https://github.com/npwoods/slint.git", rev = "6
 muda = "0.16.0"
 raw-window-handle = "0.6.2"
 rfd = "0.15.1"
-serde = { version = "1.0.216", features = ["rc"] }
-quick-xml = "0.37.1"
+serde = { version = "1.0.219", features = ["rc"] }
+quick-xml = "0.37.2"
 binary_serde = "1.0.24"
-arrayvec = "0.7.4"
-lentrait = "0.2.3"
 itertools = "0.14.0"
 winit = "0.30.3"
-tokio = { version = "1.42.0", features = [
+tokio = { version = "1.44.1", features = [
     "rt",
     "rt-multi-thread",
     "time",
     "sync",
 ] }
 dpi = "0.1.1"
-serde_json = "1.0.133"
-thiserror = "2.0.7"
+serde_json = "1.0.140"
+thiserror = "2.0.12"
 dirs = "6.0.0"
 open = "5.3.1"
 levenshtein = "1.0.5"
-unicase = "2.8.0"
+unicase = "2.8.1"
 binary-search = "0.1.2"
-smallvec = "1.13.2"
-derive-enum-all-values = "=0.1.0"
+smallvec = "1.14.0"
+derive-enum-all-values = "0.1.0"
 default-ext = "0.1.0"
-num = "=0.4.3"
+num = "0.4.3"
 strum = "0.27.1"
 strum_macros = "0.27.1"
 structopt = "0.3.26"
 winapi = "0.3.9"
 win32job = "2.0.2"
 is_executable = "1.0.4"
-anyhow = "1.0.94"
+anyhow = "1.0.97"
 hostname-validator = "1.1.1"
 internment = { version = "0.8.6", features = ["arena"] }
 throttle = "0.1.0"
@@ -68,7 +66,7 @@ tempdir = "0.3.7"
 ico = "0.4.0"
 slint-build = { git = "https://github.com/npwoods/slint.git", rev = "69b43975246dbbf4cbba4372b98dde1ce64dca79" }
 vivi_ui = { git = "https://seed.radicle.garden/z3oxAZSLcyXgpa7fcvgtueF49jHpH.git", rev = "92a0987cf92647290353826bf05113a65fca25a9" }
-winresource = "0.1.17"
+winresource = "0.1.20"
 
 [profile.dev]
 opt-level = 0
