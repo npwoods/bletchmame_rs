@@ -460,6 +460,16 @@ pub struct Object<'a, B> {
 	phantom: PhantomData<B>,
 }
 
+impl<B> Object<'_, B> {
+	pub fn index(&self) -> usize {
+		self.index
+	}
+
+	fn proxy(&self) -> impl PartialEq {
+		(self.db as *const _, self.byte_offset, self.index)
+	}
+}
+
 impl<'a, B> Object<'a, B>
 where
 	B: BinarySerde,
@@ -475,9 +485,11 @@ where
 		let offset = func(self.obj());
 		self.db.string(offset)
 	}
+}
 
-	pub fn index(&self) -> usize {
-		self.index
+impl<B> PartialEq for Object<'_, B> {
+	fn eq(&self, other: &Self) -> bool {
+		self.proxy() == other.proxy()
 	}
 }
 
