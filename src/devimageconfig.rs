@@ -433,9 +433,11 @@ fn identify_changed_rows(a: &[InternalEntry], b: &[InternalEntry]) -> Option<Vec
 mod test {
 	use std::rc::Rc;
 
+	use assert_matches::assert_matches;
 	use test_case::test_case;
 
 	use crate::info::InfoDb;
+	use crate::info::View;
 	use crate::status::Status;
 	use crate::status::Update;
 
@@ -482,5 +484,32 @@ mod test {
 
 		// smoke test!
 		smoke_test_config(new_config);
+	}
+
+	#[test_case(0, include_str!("info/test_data/listxml_alienar.xml"))]
+	#[test_case(1, include_str!("info/test_data/listxml_c64.xml"))]
+	#[test_case(2, include_str!("info/test_data/listxml_coco.xml"))]
+	fn access_all_images(_index: usize, info_xml: &str) {
+		// build the InfoDB
+		let info_db = InfoDb::from_listxml_output(info_xml.as_bytes(), |_| false)
+			.unwrap()
+			.unwrap();
+		let info_db = Rc::new(info_db);
+
+		for machine in info_db.machines().iter() {
+			let diconfig = DevicesImagesConfig::with_machine_name(info_db.clone(), Some(machine.name())).unwrap();
+			let diconfig = diconfig.set_images_from_slots(|_| None);
+			let machine_config = diconfig.machine_config().unwrap();
+			for (tag, _) in diconfig.images() {
+				let result = machine_config.lookup_device_tag(tag);
+				assert_matches!(
+					result,
+					Ok(_),
+					"failure to lookup device {:?} on machine {:?}",
+					tag,
+					machine.name()
+				);
+			}
+		}
 	}
 }

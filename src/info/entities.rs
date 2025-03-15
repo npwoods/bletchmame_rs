@@ -1,4 +1,3 @@
-use anyhow::Error;
 use anyhow::Result;
 use binary_search::Direction;
 use binary_search::binary_search;
@@ -98,10 +97,7 @@ impl<'a> MachinesView<'a> {
 		} else {
 			None
 		};
-		result.ok_or_else(|| {
-			let message = format!("cannot find machine {target:?}");
-			Error::msg(message)
-		})
+		result.ok_or_else(|| ThisError::CannotFindMachine(target.to_string()).into())
 	}
 
 	pub fn find(&self, target: &str) -> Result<Machine<'a>> {
@@ -227,15 +223,20 @@ impl RamOption<'_> {
 	}
 }
 
+#[derive(thiserror::Error, Debug, PartialEq, Eq)]
+enum ThisError {
+	#[error("cannot find machine {0:?}")]
+	CannotFindMachine(String),
+}
+
 #[cfg(test)]
 mod test {
 	use std::marker::PhantomData;
 
-	use assert_matches::assert_matches;
-
 	use crate::info::InfoDb;
 
 	use super::MachinesView;
+	use super::ThisError;
 
 	#[test]
 	pub fn empty_machine_find() {
@@ -250,7 +251,7 @@ mod test {
 			phantom: PhantomData,
 		};
 
-		let actual = machines_view.find("cant_find_this");
-		assert_matches!(actual, Err(_));
+		let actual = machines_view.find("cant_find_this").map_err(|e| e.downcast().unwrap());
+		assert_eq!(Err(ThisError::CannotFindMachine("cant_find_this".to_string())), actual);
 	}
 }

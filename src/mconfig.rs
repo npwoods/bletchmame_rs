@@ -95,14 +95,24 @@ impl MachineConfig {
 					.any(|x| strip_tag_prefix(slot.name(), x.name()).is_some_and(|x| !x.is_empty()));
 				if ignore {
 					SlotData::Ignore
-				} else if let Some(option_index) = slot.default_option_index() {
-					let machine_name = slot.options().get(option_index).unwrap().devname();
-					let machine_index = info_db.machines().find_index(machine_name).unwrap();
-					let config = Self::new(info_db.clone(), machine_index);
-					let config = Rc::new(config);
-					SlotData::Set { option_index, config }
 				} else {
-					SlotData::Unset
+					// when we get the default index, we need to ensure that it references an actual machine
+					let option_and_machine_index = slot.default_option_index().and_then(|option_index| {
+						let machine_name = slot.options().get(option_index).unwrap().devname();
+						info_db
+							.machines()
+							.find_index(machine_name)
+							.ok()
+							.map(|machine_index| (option_index, machine_index))
+					});
+
+					if let Some((option_index, machine_index)) = option_and_machine_index {
+						let config = Self::new(info_db.clone(), machine_index);
+						let config = Rc::new(config);
+						SlotData::Set { option_index, config }
+					} else {
+						SlotData::Unset
+					}
 				}
 			})
 			.collect();
