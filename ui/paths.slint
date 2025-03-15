@@ -1,4 +1,4 @@
-import { AboutSlint, Button, VerticalBox, HorizontalBox, ComboBox, StandardListView } from "std-widgets.slint";
+import { AboutSlint, Button, VerticalBox, HorizontalBox, ComboBox, StandardListView, StandardButton } from "std-widgets.slint";
 import { MagicListView, MagicListViewItem, Icons, FilledButton } from "@vivi/magic.slint";
 
 export component PathsDialog inherits Window {
@@ -50,16 +50,16 @@ export component PathsDialog inherits Window {
             min-width: 100px;
             max-width: 100px;
             alignment: start;
-            Button {
-                text: "Ok";
+            StandardButton {
+                kind: ok;
                 enabled: ok-enabled;
                 clicked => {
                     root.ok-clicked();
                 }
             }
 
-            Button {
-                text: "Cancel";
+            StandardButton {
+                kind: cancel;
                 clicked => {
                     root.cancel-clicked();
                 }

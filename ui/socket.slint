@@ -1,4 +1,4 @@
-import { Button, VerticalBox, HorizontalBox, LineEdit } from "std-widgets.slint";
+import { Button, VerticalBox, HorizontalBox, LineEdit, StandardButton } from "std-widgets.slint";
 
 export component ConnectToSocketDialog inherits Window {
     title: "Connect To Socket";
@@ -43,15 +43,15 @@ export component ConnectToSocketDialog inherits Window {
 
         HorizontalBox {
             alignment: end;
-            Button {
-                text: "Cancel";
+            StandardButton {
+                kind: cancel;
                 clicked => {
                     root.cancelled();
                 }
             }
 
-            Button {
-                text: "OK";
+            StandardButton {
+                kind: ok;
                 enabled: root.can-accept;
                 clicked => {
                     root.accepted();
