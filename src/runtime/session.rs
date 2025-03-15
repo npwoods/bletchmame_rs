@@ -20,6 +20,7 @@ use anyhow::Result;
 use slint::invoke_from_event_loop;
 use tracing::Level;
 use tracing::event;
+use tracing::span;
 
 use crate::appcommand::AppCommand;
 use crate::job::Job;
@@ -80,8 +81,11 @@ fn execute_mame(
 	event_callback: &impl Fn(MameEvent),
 	mame_stderr: MameStderr,
 ) -> Result<()> {
+	let span = span!(LOG, "execute_mame");
+	let _guard = span.enter();
+
 	// launch MAME, launch!
-	event!(LOG, "execute_mame(): Launching MAME: mame_args={mame_args:?}");
+	event!(LOG, ?mame_args, "Launching MAME");
 	let args = mame_args.args.iter().map(OsStr::new);
 	let (mame_stderr, create_no_window_flag) = match mame_stderr {
 		MameStderr::Capture => (Stdio::piped(), true),
@@ -106,7 +110,7 @@ fn execute_mame(
 
 	// await the exit status
 	let exit_status = child.wait();
-	event!(LOG, "execute_mame(): MAME exited exit_status={:?}", exit_status);
+	event!(LOG, ?exit_status, "MAME exited");
 
 	// notify the host that the session has ended
 	event_callback(MameEvent::SessionEnded);
@@ -128,7 +132,7 @@ fn interact_with_mame(
 	let mut is_exiting = false;
 
 	loop {
-		event!(LOG, "interact_with_mame(): calling read_line_from_mame()");
+		event!(LOG, "Calling read_response_from_mame()");
 		let (update, is_signal) = read_response_from_mame(&mut mame_stdout, &mut mame_stderr, &mut line)?;
 
 		if let Some(update) = update {
@@ -185,23 +189,18 @@ fn read_response_from_mame(
 		Err(e) => (Err(e), None),
 	};
 
-	event!(LOG, "read_response_from_mame(): resp={:?} comment={:?}", resp, comment);
+	event!(LOG, resp=?resp, comment=?comment);
 	let resp = resp?;
 
 	let update = if resp == ResponseLine::OkStatus {
 		// read the status XML from MAME
-		event!(LOG, "thread_proc(): starting to parse update");
+		event!(LOG, "Starting to parse update");
 		let update = Update::parse(&mut *mame_stdout);
-		event!(LOG, "thread_proc(): parsed update: {:?}", update.as_ref().map(|_| ()));
+		event!(LOG, "update" = ?update.as_ref().map(|_| ()), "Parsed update");
 
 		// read until end of line
 		let result = read_line_from_mame(mame_stdout, mame_stderr, line);
-		event!(
-			LOG,
-			"thread_proc(): poststatus eoln: line={:?} result={:?}",
-			line,
-			result
-		);
+		event!(LOG, ?line, ?result, "Poststatus eoln");
 		result?;
 		if !line.trim().is_empty() {
 			return Err(ThisError::MameResponseNotUnderstood(line.to_string()).into());
@@ -257,7 +256,7 @@ fn process_event_from_front_end(
 		Err(RecvTimeoutError::Disconnected) => (Cow::Borrowed("EXIT"), true),
 	};
 
-	event!(LOG, "process_event_from_front_end(): command_text={command_text:?}");
+	event!(LOG, ?command_text);
 
 	fn mame_write_err(e: impl Into<Error>) -> Error {
 		e.into().context("Error writing to MAME")
