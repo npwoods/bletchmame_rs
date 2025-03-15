@@ -32,7 +32,7 @@ use crate::runtime::args::MameArguments;
 use crate::status::Update;
 use crate::threadlocalbubble::ThreadLocalBubble;
 
-const LOG: Level = Level::DEBUG;
+const LOG: Level = Level::INFO;
 
 #[derive(thiserror::Error, Debug)]
 enum ThisError {

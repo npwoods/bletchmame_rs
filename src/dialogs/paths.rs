@@ -26,7 +26,7 @@ use crate::prefs::pathtype::PathType;
 use crate::ui::MagicListViewItem;
 use crate::ui::PathsDialog;
 
-const LOG: Level = Level::DEBUG;
+const LOG: Level = Level::INFO;
 
 struct State {
 	dialog_weak: Weak<PathsDialog>,

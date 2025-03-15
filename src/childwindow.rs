@@ -11,7 +11,7 @@ use winit::window::WindowAttributes;
 
 use crate::platform::WindowExt;
 
-const LOG: Level = Level::TRACE;
+const LOG: Level = Level::DEBUG;
 
 pub struct ChildWindow(Option<winit::window::Window>);
 

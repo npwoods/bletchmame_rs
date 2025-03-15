@@ -41,7 +41,7 @@ use crate::prefs::preflight::preflight_checks;
 use crate::prefs::var::resolve_path;
 use crate::prefs::var::resolve_paths_string;
 
-const LOG: Level = Level::DEBUG;
+const LOG: Level = Level::INFO;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]

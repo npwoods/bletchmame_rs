@@ -14,7 +14,7 @@ use quick_xml::name::QName;
 use tracing::Level;
 use tracing::event;
 
-const LOG: Level = Level::TRACE;
+const LOG: Level = Level::DEBUG;
 
 /// quick-xml events are at a slightly different granularity than what we would prefer
 #[derive(Debug)]

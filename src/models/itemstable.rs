@@ -42,7 +42,7 @@ use crate::software::Software;
 use crate::software::SoftwareList;
 use crate::software::SoftwareListDispenser;
 
-const LOG: Level = Level::TRACE;
+const LOG: Level = Level::DEBUG;
 
 pub struct ItemsTableModel {
 	info_db: RefCell<Option<Rc<InfoDb>>>,

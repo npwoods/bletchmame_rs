@@ -18,7 +18,7 @@ use crate::status::parse::parse_update;
 use crate::status::validate::validate_status;
 use crate::version::MameVersion;
 
-const LOG: Level = Level::TRACE;
+const LOG: Level = Level::DEBUG;
 
 #[derive(Clone)]
 pub struct Status {
