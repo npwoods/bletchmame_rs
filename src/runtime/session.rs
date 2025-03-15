@@ -130,12 +130,14 @@ fn interact_with_mame(
 	let mut mame_stdout = BufReader::new(child.stdout.take().unwrap());
 	let mut line = String::new();
 	let mut is_exiting = false;
+	let mut is_running = false;
 
 	loop {
 		event!(LOG, "Calling read_response_from_mame()");
 		let (update, is_signal) = read_response_from_mame(&mut mame_stdout, &mut mame_stderr, &mut line)?;
 
 		if let Some(update) = update {
+			is_running = update.is_running();
 			event_callback(MameEvent::StatusUpdate(update))
 		}
 
@@ -143,7 +145,7 @@ fn interact_with_mame(
 			if is_exiting {
 				break Ok(());
 			}
-			is_exiting = match process_event_from_front_end(receiver, &mut mame_stdin) {
+			is_exiting = match process_event_from_front_end(receiver, &mut mame_stdin, is_running) {
 				Ok(x) => x,
 				Err(e) => break Err(e),
 			};
@@ -248,8 +250,13 @@ fn read_text_from_reader(read: &mut impl Read) -> String {
 fn process_event_from_front_end(
 	receiver: &Receiver<Cow<'static, str>>,
 	mame_stdin: &mut BufWriter<impl Write>,
+	is_running: bool,
 ) -> Result<bool> {
-	let timeout = Duration::from_secs(1);
+	let timeout = if is_running {
+		Duration::from_secs(1)
+	} else {
+		Duration::from_secs(10)
+	};
 	let (command_text, is_exit) = match receiver.recv_timeout(timeout) {
 		Ok(command_text) => (command_text, false),
 		Err(RecvTimeoutError::Timeout) => (Cow::Borrowed("PING"), false),
