@@ -53,6 +53,9 @@ pub struct Preferences {
 	pub window_size: Option<PrefsSize>,
 
 	#[serde(default)]
+	pub is_fullscreen: bool,
+
+	#[serde(default)]
 	pub items_columns: Vec<PrefsColumn>,
 
 	#[serde(default)]

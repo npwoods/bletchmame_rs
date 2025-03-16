@@ -300,6 +300,7 @@ pub fn create(args: AppArgs) -> AppWindow {
 		let physical_size = LogicalSize::from(*window_size).to_physical(app_window.window().scale_factor());
 		app_window.window().set_size(physical_size);
 	}
+	app_window.window().set_fullscreen(preferences.is_fullscreen);
 
 	// create the model
 	let model = AppModel {
@@ -730,6 +731,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			let app_window = model.app_window();
 			let window = app_window.window();
 			let is_fullscreen = window.is_fullscreen();
+			model.preferences.borrow_mut().is_fullscreen = !is_fullscreen;
 			window.set_fullscreen(!is_fullscreen);
 		}
 		AppCommand::OptionsToggleSound => {
