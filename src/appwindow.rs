@@ -628,7 +628,7 @@ fn create_menu_bar() -> Menu {
 					],
 				)
 				.unwrap(),
-				&MenuItem::new("Full Screen", false, accel("F11")),
+				&CheckMenuItem::with_id(AppCommand::OptionsToggleFullScreen,"Full Screen", true, false, accel("F11")),
 				&CheckMenuItem::with_id(AppCommand::OptionsToggleSound, "Sound", false, false,None),
 				&MenuItem::new("Cheats...", false, None),
 				&MenuItem::with_id(AppCommand::OptionsClassic,"Classic MAME Menu", false, None),
@@ -725,6 +725,12 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				.map(|r| r.is_throttled)
 				.unwrap_or_default();
 			model.issue_command(MameCommand::Throttled(!is_throttled));
+		}
+		AppCommand::OptionsToggleFullScreen => {
+			let app_window = model.app_window();
+			let window = app_window.window();
+			let is_fullscreen = window.is_fullscreen();
+			window.set_fullscreen(!is_fullscreen);
 		}
 		AppCommand::OptionsToggleSound => {
 			if let Some(sound_attenuation) = model
@@ -1025,6 +1031,7 @@ fn update_menus(model: &AppModel) {
 		.map(|r| r.sound_attenuation > SOUND_ATTENUATION_OFF)
 		.unwrap_or_default();
 	let can_refresh_info_db = has_mame_executable && !state.is_building_infodb();
+	let is_fullscreen = model.app_window().window().is_fullscreen();
 
 	// update the menu bar
 	model.menu_bar.update(|id| {
@@ -1037,6 +1044,7 @@ fn update_menus(model: &AppModel) {
 			Ok(AppCommand::FileResetHard) => (Some(is_running), None),
 			Ok(AppCommand::OptionsThrottleRate(x)) => (Some(is_running), Some(Some(x) == throttle_rate)),
 			Ok(AppCommand::OptionsToggleWarp) => (Some(is_running), Some(!is_throttled)),
+			Ok(AppCommand::OptionsToggleFullScreen) => (None, Some(is_fullscreen)),
 			Ok(AppCommand::OptionsToggleSound) => (Some(is_running), Some(is_sound_enabled)),
 			Ok(AppCommand::OptionsClassic) => (Some(is_running), None),
 			Ok(AppCommand::HelpRefreshInfoDb) => (Some(can_refresh_info_db), None),
