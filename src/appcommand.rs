@@ -29,6 +29,7 @@ pub enum AppCommand {
 	// Options menu
 	OptionsThrottleRate(f32),
 	OptionsToggleWarp,
+	OptionsToggleFullScreen,
 	OptionsToggleSound,
 	#[strum(props(MinimumMame = "0.274"))]
 	OptionsClassic,

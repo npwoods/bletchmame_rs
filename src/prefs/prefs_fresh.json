@@ -5,6 +5,7 @@
       "$(MAMEPATH)\\plugins"
     ]
   },
+  "isFullscreen": false,
   "itemsColumns": [
     {
       "type": "name",
