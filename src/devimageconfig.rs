@@ -316,7 +316,10 @@ fn internal_update_status(
 			.filter(|slot| slot.has_selectable_options)
 			.fold(None, |config, slot| {
 				let tag = &slot.name;
-				let new_option_name = slot.current_option.map(|x| slot.options[x].name.as_str());
+				let new_option_name = slot.current_option.and_then(|idx| {
+					let slot_option = &slot.options[idx];
+					slot_option.selectable.then_some(slot_option.name.as_str())
+				});
 				config
 					.as_ref()
 					.unwrap_or(&machine_configs.clean)
@@ -449,8 +452,9 @@ mod test {
 	}
 
 	#[test_case(0, include_str!("info/test_data/listxml_c64.xml"), include_str!("status/test_data/status_mame0273_c64_1.xml"))]
-	#[test_case(1, include_str!("info/test_data/listxml_coco.xml"), include_str!("status/test_data/status_mame0270_coco2b_1.xml"))]
-	#[test_case(2, include_str!("info/test_data/listxml_coco.xml"), include_str!("status/test_data/status_mame0270_coco2b_5.xml"))]
+	#[test_case(1, include_str!("info/test_data/listxml_c64.xml"), include_str!("status/test_data/status_mame0273_c64_epyxfast_1.xml"))]
+	#[test_case(2, include_str!("info/test_data/listxml_coco.xml"), include_str!("status/test_data/status_mame0270_coco2b_1.xml"))]
+	#[test_case(3, include_str!("info/test_data/listxml_coco.xml"), include_str!("status/test_data/status_mame0270_coco2b_5.xml"))]
 	fn update_status(_index: usize, info_xml: &str, status_xml: &str) {
 		// build the InfoDB
 		let info_db = InfoDb::from_listxml_output(info_xml.as_bytes(), |_| false)
