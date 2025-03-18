@@ -7,6 +7,7 @@ use i_slint_backend_winit::WinitWindowAccessor;
 use i_slint_backend_winit::WinitWindowEventResult;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
+use slint::PhysicalPosition;
 use slint::Window;
 use winit::event::WindowEvent;
 use winit::window::WindowAttributes;
@@ -43,6 +44,18 @@ where
 
 		// invoke the func
 		let dialog = with_attributes_hook(func, hook);
+
+		let new_dialog_position = {
+			let parent_size = parent.window().size();
+			let parent_position = parent.window().position();
+			let dialog_size = dialog.window().size();
+			let x = parent_position.x
+				+ (i32::try_from(parent_size.width).unwrap() - i32::try_from(dialog_size.width).unwrap()) / 2;
+			let y = parent_position.y
+				+ (i32::try_from(parent_size.height).unwrap() - i32::try_from(dialog_size.height).unwrap()) / 2;
+			PhysicalPosition { x, y }
+		};
+		dialog.window().set_position(new_dialog_position);
 
 		// keep the window on top
 		let dialog_weak = dialog.as_weak();
@@ -136,13 +149,7 @@ fn set_window_attributes_for_modal_parent(
 	mut window_attributes: WindowAttributes,
 	parent: &Window,
 ) -> WindowAttributes {
-	let parent_position = parent.position();
-	let position = winit::dpi::PhysicalPosition {
-		x: parent_position.x + 64,
-		y: parent_position.y + 64,
-	};
 	window_attributes = window_attributes.with_owner_window(parent);
-	window_attributes.position = Some(position.into());
 	window_attributes
 }
 
