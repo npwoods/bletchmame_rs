@@ -654,15 +654,17 @@ mod test {
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", "ext:fdc:wd17xx:0:525dd", "floppydisk", "floppy_5_25",
+	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", "ext:fdc:wd17xx:0:525dd", "floppydisk", &["floppy_5_25"],
 		&["1dd", "86f", "cqi", "cqm", "d77", "d88", "dfi", "dmk", "dsk", "imd", "jvc", "mfi", "mfm", "os9", "sdf", "td0", "vdk"])]
+	#[test_case(1, include_str!("test_data/listxml_c64.xml"), "c64", "exp", "cartridge", &["c64_cart" ,"vic10_cart"],
+		&["80", "a0", "crt", "e0"])]
 	pub fn devices(
 		_index: usize,
 		xml: &str,
 		machine: &str,
 		device_tag: &str,
 		expected_type: &str,
-		expected_interface: &str,
+		expected_interfaces: &[&str],
 		expected_extensions: &[&str],
 	) {
 		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
@@ -678,13 +680,13 @@ mod test {
 			.unwrap();
 		let actual = (
 			device.device_type().to_string(),
-			device.interface().to_string(),
+			device.interfaces().map(|x| x.to_string()).collect::<Vec<_>>(),
 			device.extensions().map(|x| x.to_string()).collect::<Vec<_>>(),
 		);
 
 		let expected = (
 			expected_type.to_string(),
-			expected_interface.to_string(),
+			expected_interfaces.iter().map(|x| x.to_string()).collect::<Vec<_>>(),
 			expected_extensions.iter().map(|x| x.to_string()).collect::<Vec<_>>(),
 		);
 		assert_eq!(expected, actual);
