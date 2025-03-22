@@ -190,12 +190,13 @@ impl State {
 				let type_strindex = self.strings.lookup(&device_type.unwrap_or_default());
 				let tag_strindex = self.strings.lookup(&tag);
 				let mandatory = mandatory.map(parse_mame_bool).transpose()?.unwrap_or(false);
-				let interface_strindex = self.strings.lookup(&interface.unwrap_or_default());
+				let interfaces = interface.unwrap_or_default().split(',').sorted().join("\0");
+				let interfaces_strindex = self.strings.lookup(&interfaces);
 				let device = binary::Device {
 					type_strindex,
 					tag_strindex,
 					mandatory,
-					interface_strindex,
+					interfaces_strindex,
 					extensions_strindex: 0,
 				};
 				self.devices.push(device);
@@ -691,7 +692,7 @@ where
 }
 
 pub fn calculate_sizes_hash() -> u64 {
-	let multiplicand = 4729; // arbitrary prime number
+	let multiplicand = 4733; // arbitrary prime number
 	[
 		binary::Header::SERIALIZED_SIZE,
 		binary::Machine::SERIALIZED_SIZE,

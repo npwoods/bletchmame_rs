@@ -79,7 +79,7 @@ pub struct Device {
 	pub type_strindex: u32,
 	pub tag_strindex: u32,
 	pub mandatory: bool,
-	pub interface_strindex: u32,
+	pub interfaces_strindex: u32,
 	pub extensions_strindex: u32,
 }
 

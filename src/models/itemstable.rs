@@ -324,7 +324,7 @@ impl ItemsTableModel {
 								machine
 									.devices()
 									.iter()
-									.find(|dev| part.interface.as_ref() == dev.interface())
+									.find(|dev| dev.interfaces().any(|x| x == part.interface.as_ref()))
 									.map(|dev| (Arc::<str>::from(dev.tag()), software.name.clone()))
 									.ok_or(())
 							})

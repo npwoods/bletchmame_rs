@@ -132,8 +132,8 @@ impl<'a> Device<'a> {
 		self.obj().mandatory
 	}
 
-	pub fn interface(&self) -> &'a str {
-		self.string(|x| x.interface_strindex)
+	pub fn interfaces(&self) -> impl Iterator<Item = &'a str> + use<'a> {
+		self.string(|x| x.interfaces_strindex).split('\0')
 	}
 
 	pub fn extensions(&self) -> impl Iterator<Item = &'a str> + use<'a> {
