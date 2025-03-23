@@ -266,6 +266,17 @@ impl DevicesImagesConfig {
 		let machine_configs = core.machine_configs.clone();
 		diconfig_from_machine_configs_and_images(info_db, machine_configs, images)
 	}
+
+	pub fn reset_to_defaults(&self) -> Self {
+		let info_db = self.info_db.clone();
+		if let Some(machine_config) = self.machine_config() {
+			let machine_index = machine_config.machine().index();
+			let machine_config = MachineConfig::from_machine_index(info_db, machine_index);
+			Self::from(machine_config)
+		} else {
+			Self::new(info_db)
+		}
+	}
 }
 
 impl From<MachineConfig> for DevicesImagesConfig {

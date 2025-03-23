@@ -210,6 +210,12 @@ pub async fn dialog_configure(
 		signaller.signal(None);
 	});
 
+	// set up the "reset" button
+	let state_clone = state.clone();
+	modal.dialog().on_reset_clicked(move || {
+		state_clone.reset_to_defaults();
+	});
+
 	// present the modal dialog
 	modal.run(async { single_result.wait().await }).await
 }
@@ -484,5 +490,19 @@ impl State {
 		}
 
 		self.update_software_machines_bulk_enabled();
+	}
+
+	pub fn reset_to_defaults(&self) {
+		let dialog = self.dialog_weak.unwrap();
+		dialog.set_ram_sizes_index(0);
+
+		match &self.core {
+			CoreState::Machine { dimodel, .. } => {
+				let dimodel = DevicesAndImagesModel::get_model(dimodel);
+				dimodel.change_diconfig(|diconfig| Some(diconfig.reset_to_defaults()));
+			}
+			CoreState::MachineError { .. } => {}
+			CoreState::Software { .. } => todo!(),
+		}
 	}
 }
