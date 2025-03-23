@@ -26,7 +26,6 @@ use unicase::UniCase;
 
 use crate::appcommand::AppCommand;
 use crate::guiutils::menuing::MenuDesc;
-use crate::info;
 use crate::info::InfoDb;
 use crate::info::View;
 use crate::mconfig::MachineConfig;
@@ -158,6 +157,7 @@ impl ItemsTableModel {
 								software_list,
 								software,
 								machine_indexes,
+								preferred_machines: None,
 							}
 						})
 						.collect::<Rc<[_]>>(),
@@ -178,6 +178,7 @@ impl ItemsTableModel {
 							software_list,
 							software,
 							machine_indexes: Vec::default(),
+							preferred_machines: None,
 						})
 						.collect::<Rc<[_]>>(),
 
@@ -264,7 +265,7 @@ impl ItemsTableModel {
 		let items = vec![make_prefs_item(info_db, item)];
 
 		// get the critical information - the description and where (if anyplace) "Browse" would go to
-		let (run_menu_item, browse_target, configure_menu_item) = match item {
+		let (run_menu_item, browse_target, can_configure) = match item {
 			Item::Machine {
 				machine_config,
 				images,
@@ -301,14 +302,7 @@ impl ItemsTableModel {
 						machine_name: machine.name().to_string(),
 					});
 
-				// items in folders can be configured
-				let configure_menu_item = folder_name.clone().map(|folder_name| {
-					let text = "Configure...".to_string();
-					let command = AppCommand::Configure { folder_name, index };
-					MenuDesc::Item(text, Some(command.into()))
-				});
-
-				(run_menu_item, browse_target, configure_menu_item)
+				(run_menu_item, browse_target, true)
 			}
 			Item::Software {
 				software,
@@ -347,20 +341,22 @@ impl ItemsTableModel {
 					.collect::<Vec<_>>();
 				let text = run_item_text(&software.description);
 				let run_menu_item = MenuDesc::SubMenu(text, true, sub_items);
-				(run_menu_item, None, None)
+				(run_menu_item, None, true)
 			}
 			Item::Unrecognized { error, .. } => {
 				let message = format!("{}", error);
 				let run_menu_item = MenuDesc::Item(message, None);
-				(run_menu_item, None, None)
+				(run_menu_item, None, false)
 			}
 		};
 
 		// now actually build the context menu
 		let mut menu_items = Vec::new();
 		menu_items.push(run_menu_item);
-		if let Some(configure_menu_item) = configure_menu_item {
-			menu_items.push(configure_menu_item);
+		if let Some(folder_name) = can_configure.then_some(folder_name.as_ref()).flatten().cloned() {
+			let text = "Configure...".to_string();
+			let command = AppCommand::Configure { folder_name, index };
+			menu_items.push(MenuDesc::Item(text, Some(command.into())));
 		}
 		menu_items.push(MenuDesc::Separator);
 
@@ -561,22 +557,30 @@ fn software_folder_item(dispenser: &mut SoftwareListDispenser, item: &PrefsSoftw
 		.ok_or_else(|| ThisError::UnknownSoftware(item.software.clone()))?
 		.clone();
 
-	Ok(software_item(info, software_list, software))
-}
+	let machine_indexes = if let Some(preferred_machines) = item.preferred_machines.as_deref() {
+		preferred_machines
+			.iter()
+			.flat_map(|machine_name| dispenser.info_db.machines().find(machine_name).ok())
+			.map(|machine| machine.index())
+			.collect::<Vec<_>>()
+	} else {
+		Iterator::chain(
+			info.original_for_machines().iter(),
+			info.compatible_for_machines().iter(),
+		)
+		.map(|x| x.index())
+		.collect::<Vec<_>>()
+	};
 
-fn software_item(info: info::SoftwareList<'_>, software_list: Arc<SoftwareList>, software: Arc<Software>) -> Item {
-	let machine_indexes = Iterator::chain(
-		info.original_for_machines().iter(),
-		info.compatible_for_machines().iter(),
-	)
-	.map(|x| x.index())
-	.collect::<Vec<_>>();
+	let preferred_machines = item.preferred_machines.as_ref().map(|x| x.iter().join("\0").into());
 
-	Item::Software {
+	let result = Item::Software {
 		software_list,
 		software,
 		machine_indexes,
-	}
+		preferred_machines,
+	};
+	Ok(result)
 }
 
 /// Sometimes, the items view is empty - we can (try to) report why
@@ -604,6 +608,7 @@ enum Item {
 		software_list: Arc<SoftwareList>,
 		software: Arc<Software>,
 		machine_indexes: Vec<usize>,
+		preferred_machines: Option<Box<str>>, // NUL delimited
 	},
 	Unrecognized {
 		item: PrefsItem,
@@ -633,12 +638,16 @@ fn make_prefs_item(_info_db: &InfoDb, item: &Item) -> PrefsItem {
 		Item::Software {
 			software_list,
 			software,
+			preferred_machines,
 			..
 		} => {
+			let preferred_machines = preferred_machines
+				.as_ref()
+				.map(|x| x.split('\0').map(str::to_string).collect::<Vec<_>>());
 			let item = PrefsSoftwareItem {
 				software_list: software_list.name.to_string(),
 				software: software.name.to_string(),
-				preferred_machines: None,
+				preferred_machines,
 			};
 			PrefsItem::Software(item)
 		}

@@ -65,7 +65,7 @@ impl Debug for SoftwareList {
 }
 
 pub struct SoftwareListDispenser<'a> {
-	info_db: &'a InfoDb,
+	pub info_db: &'a InfoDb,
 	software_list_paths: &'a [String],
 	map: HashMap<String, (info::SoftwareList<'a>, Arc<SoftwareList>)>,
 }
