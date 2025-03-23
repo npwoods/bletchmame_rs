@@ -329,6 +329,9 @@ pub struct PrefsSoftwareItem {
 	pub software_list: String,
 
 	pub software: String,
+
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub preferred_machines: Option<Vec<String>>,
 }
 
 const PREFS: Option<&str> = Some("BletchMAME.json");

@@ -638,6 +638,7 @@ fn make_prefs_item(_info_db: &InfoDb, item: &Item) -> PrefsItem {
 			let item = PrefsSoftwareItem {
 				software_list: software_list.name.to_string(),
 				software: software.name.to_string(),
+				preferred_machines: None,
 			};
 			PrefsItem::Software(item)
 		}

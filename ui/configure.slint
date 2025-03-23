@@ -1,5 +1,10 @@
-import { Button, HorizontalBox, VerticalBox, TabWidget, ComboBox, GridBox, StandardButton  } from "std-widgets.slint";
+import { Button, HorizontalBox, VerticalBox, TabWidget, ComboBox, GridBox, StandardButton, ListView, CheckBox  } from "std-widgets.slint";
 import { DevicesAndImagesList, DevicesAndImagesState } from "devimageslist.slint";
+
+struct SoftwareMachine {
+    machine-index: int,
+    description: string,
+    checked: bool}
 
 export component ConfigureDialog inherits Window {
     title: "Configure";
@@ -12,21 +17,27 @@ export component ConfigureDialog inherits Window {
     in property <string> dev-images-error;
     in property <[string]> ram-sizes-model;
     in-out property <int> ram-sizes-index;
+    in property <[SoftwareMachine]> software-machines;
+    in property <bool> software-machines-bulk-all-enabled;
+    in property <bool> software-machines-bulk-none-enabled;
 
     // callbacks
     callback ok-clicked();
     callback entry-option-changed(int, string);
     callback entry-button-clicked(int, Point);
     callback menu-entry-activated(MenuEntry);
+    callback software-machines-toggle-checked(int);
+    callback software-machines-bulk-all-clicked();
+    callback software-machines-bulk-none-clicked();
 
     // functions
     public function show-context-menu(entries: [MenuEntry], point: Point) {
-        dev-images-list.show-context-menu(entries, point);
+        //dev-images-list.show-context-menu(entries, point);
     }
 
     // control hierarchy
     VerticalBox {
-        TabWidget {
+        if root.software-machines.length == 0: TabWidget {
             Tab {
                 title: "Devices";
                 GridBox {
@@ -77,7 +88,49 @@ export component ConfigureDialog inherits Window {
                 }
             }
         }
+        if root.software-machines.length > 0: TabWidget {
+            Tab {
+                title: "Preferred Machines";
+                VerticalBox {
+                    ListView {
+                        preferred-height: 100%;
+                        vertical-stretch: 1;
+                        for data[row] in root.software-machines: HorizontalBox {
+                            CheckBox {
+                                width: 24px;
+                                checked: data.checked;
+                                toggled => {
+                                    root.software-machines-toggle-checked(row);
+                                }
+                            }
 
+                            Text {
+                                text: data.description;
+                            }
+                        }
+                    }
+
+                    HorizontalBox {
+                        vertical-stretch: 0;
+                        Button {
+                            text: "Select All";
+                            enabled: root.software-machines-bulk-all-enabled;
+                            clicked => {
+                                root.software-machines-bulk-all-clicked();
+                            }
+                        }
+
+                        Button {
+                            text: "Select None";
+                            enabled: root.software-machines-bulk-none-enabled;
+                            clicked => {
+                                root.software-machines-bulk-none-clicked();
+                            }
+                        }
+                    }
+                }
+            }
+        }
         HorizontalBox {
             alignment: end;
             StandardButton {

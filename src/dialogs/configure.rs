@@ -4,8 +4,10 @@ use std::iter::once;
 use std::rc::Rc;
 
 use anyhow::Error;
+use itertools::Itertools;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
+use slint::Model;
 use slint::ModelRc;
 use slint::SharedString;
 use slint::VecModel;
@@ -27,9 +29,11 @@ use crate::mconfig::MachineConfig;
 use crate::models::devimages::DevicesAndImagesModel;
 use crate::prefs::PrefsItem;
 use crate::prefs::PrefsMachineItem;
+use crate::prefs::PrefsSoftwareItem;
 use crate::ui::ConfigureDialog;
 use crate::ui::DeviceAndImageEntry;
 use crate::ui::DevicesAndImagesState;
+use crate::ui::SoftwareMachine;
 
 struct State {
 	dialog_weak: Weak<ConfigureDialog>,
@@ -46,6 +50,12 @@ enum CoreState {
 		machine_index: usize,
 		ram_size: Option<u64>,
 		error: Error,
+	},
+	Software {
+		info_db: Rc<InfoDb>,
+		software_list: String,
+		software: String,
+		software_machines: ModelRc<SoftwareMachine>,
 	},
 }
 
@@ -123,6 +133,26 @@ pub async fn dialog_configure(
 
 			// RAM info
 			Some((*machine_index, *ram_size))
+		}
+
+		CoreState::Software { software_machines, .. } => {
+			modal.dialog().set_software_machines(software_machines.clone());
+			state.update_software_machines_bulk_enabled();
+
+			let state_clone = state.clone();
+			modal.dialog().on_software_machines_toggle_checked(move |index| {
+				state_clone.toggle_software_machines_checked(index.try_into().unwrap())
+			});
+			let state_clone = state.clone();
+			modal
+				.dialog()
+				.on_software_machines_bulk_none_clicked(move || state_clone.set_software_machines_bulk_checked(false));
+			let state_clone = state.clone();
+			modal
+				.dialog()
+				.on_software_machines_bulk_all_clicked(move || state_clone.set_software_machines_bulk_checked(true));
+
+			None
 		}
 	};
 
@@ -253,7 +283,37 @@ impl State {
 					},
 				}
 			}
-			PrefsItem::Software { .. } => todo!(),
+			PrefsItem::Software(item) => {
+				let software_list = info_db.software_lists().find(&item.software_list).unwrap();
+				let software_machines = software_list
+					.original_for_machines()
+					.iter()
+					.chain(software_list.compatible_for_machines().iter())
+					.sorted_by_key(|machine| machine.description())
+					.map(|machine| {
+						let machine_index = machine.index().try_into().unwrap();
+						let checked = item
+							.preferred_machines
+							.as_ref()
+							.is_none_or(|x| x.iter().any(|x| x == machine.name()));
+						let description = machine.description().into();
+						SoftwareMachine {
+							machine_index,
+							description,
+							checked,
+						}
+					})
+					.collect::<Vec<_>>();
+				let software_machines = VecModel::from(software_machines);
+				let software_machines = ModelRc::new(software_machines);
+
+				CoreState::Software {
+					info_db: info_db.clone(),
+					software_list: item.software_list,
+					software: item.software,
+					software_machines,
+				}
+			}
 		};
 		let state = Self { dialog_weak, core };
 		if matches!(&state.core, CoreState::Machine { .. }) {
@@ -308,6 +368,39 @@ impl State {
 			}),
 
 			CoreState::MachineError { .. } => todo!(),
+
+			CoreState::Software {
+				info_db,
+				software_list,
+				software,
+				software_machines,
+			} => {
+				let software_machines = software_machines
+					.as_any()
+					.downcast_ref::<VecModel<SoftwareMachine>>()
+					.unwrap();
+				let software_machines_len = software_machines.row_count();
+				let preferred_machine_indexes = software_machines
+					.iter()
+					.filter_map(|x| x.checked.then_some(x.machine_index))
+					.collect::<Vec<_>>();
+				let preferred_machines = (preferred_machine_indexes.len() != software_machines_len).then(|| {
+					preferred_machine_indexes
+						.into_iter()
+						.map(|machine_index| {
+							let machine_index = machine_index.try_into().unwrap();
+							info_db.machines().get(machine_index).unwrap().name().to_string()
+						})
+						.collect::<Vec<_>>()
+				});
+
+				let item = PrefsSoftwareItem {
+					software_list: software_list.clone(),
+					software: software.clone(),
+					preferred_machines,
+				};
+				PrefsItem::Software(item)
+			}
 		}
 	}
 
@@ -330,5 +423,60 @@ impl State {
 			images.borrow_mut().remove(&tag);
 		}
 		self.update_images();
+	}
+
+	pub fn update_software_machines_bulk_enabled(&self) {
+		let CoreState::Software { software_machines, .. } = &self.core else {
+			unreachable!()
+		};
+		let all_equal_value = software_machines
+			.as_any()
+			.downcast_ref::<VecModel<SoftwareMachine>>()
+			.unwrap()
+			.iter()
+			.map(|x| x.checked)
+			.all_equal_value();
+		let (bulk_all_enabled, bulk_none_enabled) = match all_equal_value {
+			Ok(false) => (true, false),
+			Ok(true) => (false, true),
+			Err(None) => (false, false),
+			Err(Some(_)) => (true, true),
+		};
+		let dialog = self.dialog_weak.unwrap();
+		dialog.set_software_machines_bulk_all_enabled(bulk_all_enabled);
+		dialog.set_software_machines_bulk_none_enabled(bulk_none_enabled);
+	}
+
+	pub fn toggle_software_machines_checked(&self, row: usize) {
+		let CoreState::Software { software_machines, .. } = &self.core else {
+			unreachable!()
+		};
+		let model = software_machines
+			.as_any()
+			.downcast_ref::<VecModel<SoftwareMachine>>()
+			.unwrap();
+		let mut data = model.row_data(row).unwrap();
+		data.checked = !data.checked;
+		model.set_row_data(row, data);
+		self.update_software_machines_bulk_enabled();
+	}
+
+	pub fn set_software_machines_bulk_checked(&self, checked: bool) {
+		let CoreState::Software { software_machines, .. } = &self.core else {
+			unreachable!()
+		};
+		let model = software_machines
+			.as_any()
+			.downcast_ref::<VecModel<SoftwareMachine>>()
+			.unwrap();
+
+		for (row, data) in model.iter().enumerate() {
+			if data.checked != checked {
+				let data = SoftwareMachine { checked, ..data };
+				model.set_row_data(row, data);
+			}
+		}
+
+		self.update_software_machines_bulk_enabled();
 	}
 }
