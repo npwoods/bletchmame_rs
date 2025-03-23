@@ -84,12 +84,7 @@ impl<'a> SoftwareListDispenser<'a> {
 		let (info_db_software_list, software_list) = match entry {
 			Entry::Occupied(entry) => entry.get().clone(),
 			Entry::Vacant(entry) => {
-				let info_db_software_list =
-					self.info_db.software_lists().find(software_list_name).ok_or_else(|| {
-						let message = format!("Unknown software list '{}'", software_list_name);
-						Error::msg(message)
-					})?;
-
+				let info_db_software_list = self.info_db.software_lists().find(software_list_name)?;
 				let software_list = load_software_list(self.software_list_paths, software_list_name)?;
 				entry.insert((info_db_software_list, software_list.clone()));
 				(info_db_software_list, software_list)
