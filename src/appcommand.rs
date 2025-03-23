@@ -98,7 +98,7 @@ pub enum AppCommand {
 	InfoDbBuildComplete,
 	InfoDbBuildCancel,
 	ReactivateMame,
-	ConfigureMachine {
+	Configure {
 		folder_name: String,
 		index: usize,
 	},

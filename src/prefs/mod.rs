@@ -303,11 +303,7 @@ pub struct HistoryEntry {
 #[serde(rename_all = "camelCase", tag = "type")]
 pub enum PrefsItem {
 	Machine(PrefsMachineItem),
-	Software {
-		#[serde(rename = "softwareList")]
-		software_list: String,
-		software: String,
-	},
+	Software(PrefsSoftwareItem),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -324,6 +320,18 @@ pub struct PrefsMachineItem {
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub ram_size: Option<u64>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PrefsSoftwareItem {
+	#[serde(rename = "softwareList")]
+	pub software_list: String,
+
+	pub software: String,
+
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub preferred_machines: Option<Vec<String>>,
 }
 
 const PREFS: Option<&str> = Some("BletchMAME.json");

@@ -26,7 +26,6 @@ use unicase::UniCase;
 
 use crate::appcommand::AppCommand;
 use crate::guiutils::menuing::MenuDesc;
-use crate::info;
 use crate::info::InfoDb;
 use crate::info::View;
 use crate::mconfig::MachineConfig;
@@ -36,6 +35,7 @@ use crate::prefs::PrefsCollection;
 use crate::prefs::PrefsColumn;
 use crate::prefs::PrefsItem;
 use crate::prefs::PrefsMachineItem;
+use crate::prefs::PrefsSoftwareItem;
 use crate::prefs::SortOrder;
 use crate::selection::SelectionManager;
 use crate::software::Software;
@@ -60,6 +60,12 @@ pub struct ItemsTableModel {
 	empty_callback: Box<dyn Fn(Option<EmptyReason>) + 'static>,
 	ramsize_arg_string: Arc<str>,
 	notify: ModelNotify,
+}
+
+#[derive(thiserror::Error, Debug)]
+enum ThisError {
+	#[error("unknown software {0}")]
+	UnknownSoftware(String),
 }
 
 impl ItemsTableModel {
@@ -151,6 +157,7 @@ impl ItemsTableModel {
 								software_list,
 								software,
 								machine_indexes,
+								preferred_machines: None,
 							}
 						})
 						.collect::<Rc<[_]>>(),
@@ -171,6 +178,7 @@ impl ItemsTableModel {
 							software_list,
 							software,
 							machine_indexes: Vec::default(),
+							preferred_machines: None,
 						})
 						.collect::<Rc<[_]>>(),
 
@@ -193,15 +201,13 @@ impl ItemsTableModel {
 								};
 								Some(item)
 							}
-							PrefsItem::Software {
-								software_list,
-								software,
-							} => {
-								let item = software_folder_item(&mut dispenser, software_list, software)
-									.unwrap_or_else(|error| Item::UnrecognizedSoftware {
-										software_list_name: software_list.clone(),
-										software_name: software.clone(),
-										error: Rc::new(error),
+							PrefsItem::Software(software_item) => {
+								let item =
+									software_folder_item(&mut dispenser, software_item).unwrap_or_else(|error| {
+										Item::Unrecognized {
+											item: item.clone(),
+											error: Rc::new(error),
+										}
 									});
 								Some(item)
 							}
@@ -259,7 +265,7 @@ impl ItemsTableModel {
 		let items = vec![make_prefs_item(info_db, item)];
 
 		// get the critical information - the description and where (if anyplace) "Browse" would go to
-		let (run_menu_item, browse_target, configure_menu_item) = match item {
+		let (run_menu_item, browse_target, can_configure) = match item {
 			Item::Machine {
 				machine_config,
 				images,
@@ -296,14 +302,7 @@ impl ItemsTableModel {
 						machine_name: machine.name().to_string(),
 					});
 
-				// items in folders can be configured
-				let configure_menu_item = folder_name.clone().map(|folder_name| {
-					let text = "Configure...".to_string();
-					let command = AppCommand::ConfigureMachine { folder_name, index };
-					MenuDesc::Item(text, Some(command.into()))
-				});
-
-				(run_menu_item, browse_target, configure_menu_item)
+				(run_menu_item, browse_target, true)
 			}
 			Item::Software {
 				software,
@@ -342,20 +341,22 @@ impl ItemsTableModel {
 					.collect::<Vec<_>>();
 				let text = run_item_text(&software.description);
 				let run_menu_item = MenuDesc::SubMenu(text, true, sub_items);
-				(run_menu_item, None, None)
+				(run_menu_item, None, true)
 			}
-			Item::UnrecognizedSoftware { error, .. } => {
+			Item::Unrecognized { error, .. } => {
 				let message = format!("{}", error);
 				let run_menu_item = MenuDesc::Item(message, None);
-				(run_menu_item, None, None)
+				(run_menu_item, None, false)
 			}
 		};
 
 		// now actually build the context menu
 		let mut menu_items = Vec::new();
 		menu_items.push(run_menu_item);
-		if let Some(configure_menu_item) = configure_menu_item {
-			menu_items.push(configure_menu_item);
+		if let Some(folder_name) = can_configure.then_some(folder_name.as_ref()).flatten().cloned() {
+			let text = "Configure...".to_string();
+			let command = AppCommand::Configure { folder_name, index };
+			menu_items.push(MenuDesc::Item(text, Some(command.into())));
 		}
 		menu_items.push(MenuDesc::Separator);
 
@@ -547,38 +548,39 @@ impl Model for ItemsTableModel {
 	}
 }
 
-fn software_folder_item(
-	dispenser: &mut SoftwareListDispenser,
-	software_list_name: &str,
-	software_name: &str,
-) -> Result<Item> {
-	let (info, software_list) = dispenser.get(software_list_name)?;
+fn software_folder_item(dispenser: &mut SoftwareListDispenser, item: &PrefsSoftwareItem) -> Result<Item> {
+	let (info, software_list) = dispenser.get(&item.software_list)?;
 	let software = software_list
 		.software
 		.iter()
-		.find(|x| x.name.as_ref() == software_name)
-		.ok_or_else(|| {
-			let message = format!("Unknown software '{}'", software_name);
-			Error::msg(message)
-		})?
+		.find(|x| x.name.as_ref() == item.software)
+		.ok_or_else(|| ThisError::UnknownSoftware(item.software.clone()))?
 		.clone();
 
-	Ok(software_item(info, software_list, software))
-}
+	let machine_indexes = if let Some(preferred_machines) = item.preferred_machines.as_deref() {
+		preferred_machines
+			.iter()
+			.flat_map(|machine_name| dispenser.info_db.machines().find(machine_name).ok())
+			.map(|machine| machine.index())
+			.collect::<Vec<_>>()
+	} else {
+		Iterator::chain(
+			info.original_for_machines().iter(),
+			info.compatible_for_machines().iter(),
+		)
+		.map(|x| x.index())
+		.collect::<Vec<_>>()
+	};
 
-fn software_item(info: info::SoftwareList<'_>, software_list: Arc<SoftwareList>, software: Arc<Software>) -> Item {
-	let machine_indexes = Iterator::chain(
-		info.original_for_machines().iter(),
-		info.compatible_for_machines().iter(),
-	)
-	.map(|x| x.index())
-	.collect::<Vec<_>>();
+	let preferred_machines = item.preferred_machines.as_ref().map(|x| x.iter().join("\0").into());
 
-	Item::Software {
+	let result = Item::Software {
 		software_list,
 		software,
 		machine_indexes,
-	}
+		preferred_machines,
+	};
+	Ok(result)
 }
 
 /// Sometimes, the items view is empty - we can (try to) report why
@@ -606,10 +608,10 @@ enum Item {
 		software_list: Arc<SoftwareList>,
 		software: Arc<Software>,
 		machine_indexes: Vec<usize>,
+		preferred_machines: Option<Box<str>>, // NUL delimited
 	},
-	UnrecognizedSoftware {
-		software_list_name: String,
-		software_name: String,
+	Unrecognized {
+		item: PrefsItem,
 		error: Rc<Error>,
 	},
 }
@@ -636,19 +638,20 @@ fn make_prefs_item(_info_db: &InfoDb, item: &Item) -> PrefsItem {
 		Item::Software {
 			software_list,
 			software,
+			preferred_machines,
 			..
-		} => PrefsItem::Software {
-			software_list: software_list.name.to_string(),
-			software: software.name.to_string(),
-		},
-		Item::UnrecognizedSoftware {
-			software_list_name,
-			software_name,
-			..
-		} => PrefsItem::Software {
-			software_list: software_list_name.clone(),
-			software: software_name.clone(),
-		},
+		} => {
+			let preferred_machines = preferred_machines
+				.as_ref()
+				.map(|x| x.split('\0').map(str::to_string).collect::<Vec<_>>());
+			let item = PrefsSoftwareItem {
+				software_list: software_list.name.to_string(),
+				software: software.name.to_string(),
+				preferred_machines,
+			};
+			PrefsItem::Software(item)
+		}
+		Item::Unrecognized { item, .. } => item.clone(),
 	}
 }
 
@@ -772,15 +775,14 @@ fn column_text<'a>(_info_db: &'a InfoDb, item: &'a Item, column: ColumnType) -> 
 			ColumnType::Year => software.year.as_ref().into(),
 			ColumnType::Provider => software.publisher.as_ref().into(),
 		},
-		Item::UnrecognizedSoftware {
-			software_list_name,
-			software_name,
-			..
-		} => match column {
-			ColumnType::Name => software_name.into(),
-			ColumnType::SourceFile => format!("{}.xml", software_list_name).into(),
-			_ => "".into(),
-		},
+		Item::Unrecognized { item, .. } => {
+			let PrefsItem::Software(item) = item else { todo!() };
+			match column {
+				ColumnType::Name => item.software.clone().into(),
+				ColumnType::SourceFile => format!("{}.xml", item.software_list).into(),
+				_ => "".into(),
+			}
+		}
 	}
 }
 

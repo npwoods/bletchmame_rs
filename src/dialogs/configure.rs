@@ -3,8 +3,11 @@ use std::collections::HashMap;
 use std::iter::once;
 use std::rc::Rc;
 
+use anyhow::Error;
+use itertools::Itertools;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
+use slint::Model;
 use slint::ModelRc;
 use slint::SharedString;
 use slint::VecModel;
@@ -24,65 +27,63 @@ use crate::info::InfoDb;
 use crate::info::View;
 use crate::mconfig::MachineConfig;
 use crate::models::devimages::DevicesAndImagesModel;
+use crate::prefs::PrefsItem;
 use crate::prefs::PrefsMachineItem;
+use crate::prefs::PrefsSoftwareItem;
 use crate::ui::ConfigureDialog;
 use crate::ui::DeviceAndImageEntry;
 use crate::ui::DevicesAndImagesState;
+use crate::ui::SoftwareMachine;
 
 struct State {
 	dialog_weak: Weak<ConfigureDialog>,
-	dimodel: ModelRc<DeviceAndImageEntry>,
-	images: RefCell<HashMap<String, String>>,
+	core: CoreState,
+}
+
+enum CoreState {
+	Machine {
+		dimodel: ModelRc<DeviceAndImageEntry>,
+		images: RefCell<HashMap<String, String>>,
+		ram_size: Option<u64>,
+	},
+	MachineError {
+		machine_index: usize,
+		ram_size: Option<u64>,
+		error: Error,
+	},
+	Software {
+		info_db: Rc<InfoDb>,
+		software_list: String,
+		software: String,
+		software_machines: ModelRc<SoftwareMachine>,
+	},
 }
 
 pub async fn dialog_configure(
 	parent: Weak<impl ComponentHandle + 'static>,
 	info_db: Rc<InfoDb>,
-	item: PrefsMachineItem,
+	item: PrefsItem,
 	menuing_type: MenuingType,
-) -> Option<PrefsMachineItem> {
+) -> Option<PrefsItem> {
 	// prepare the dialog
 	let modal = Modal::new(&parent.unwrap(), || ConfigureDialog::new().unwrap());
 	let single_result = SingleResult::default();
 
-	// find the machine
-	let machine_index = info_db.machines().find_index(&item.machine_name).unwrap();
+	// get the state
+	let dialog_weak = modal.dialog().as_weak();
+	let state = State::new(dialog_weak, &info_db, item);
+	let state = Rc::new(state);
 
-	// look up the machine and create the devimages config
-	match MachineConfig::from_machine_index_and_slots(info_db.clone(), machine_index, &item.slots) {
-		Ok(machine_config) => {
-			let diconfig = DevicesImagesConfig::from(machine_config);
-
+	// do different things based on the state
+	let ram_info = match &state.core {
+		CoreState::Machine { dimodel, ram_size, .. } => {
 			// set up the devices and images model
-			let dimodel = DevicesAndImagesModel::new(diconfig);
-			let none_string = dimodel.none_string.clone();
-			let dimodel: ModelRc<DeviceAndImageEntry> = ModelRc::new(dimodel);
+			let none_string = DevicesAndImagesModel::get_model(dimodel).none_string.clone();
 			let distate = DevicesAndImagesState {
 				entries: dimodel.clone(),
 				none_string,
 			};
 			modal.dialog().set_dev_images_state(distate);
-
-			// assemble what we have into dialog state
-			let dialog_weak = modal.dialog().as_weak();
-			let images = RefCell::new(item.images);
-			let state = State {
-				dialog_weak,
-				dimodel,
-				images,
-			};
-			let state = Rc::new(state);
-
-			// initial images setup
-			state.update_images();
-
-			// set up the "ok" button
-			let signaller = single_result.signaller();
-			let state_clone = state.clone();
-			modal.dialog().on_ok_clicked(move || {
-				let result = state_clone.get_machine_item();
-				signaller.signal(Some(result));
-			});
 
 			// set up callback for when an entry option changed
 			let state_clone = state.clone();
@@ -98,7 +99,10 @@ pub async fn dialog_configure(
 			let state_clone = state.clone();
 			modal.dialog().on_entry_button_clicked(move |entry_index, point| {
 				let dialog = state_clone.dialog_weak.unwrap();
-				let model = DevicesAndImagesModel::get_model(&state_clone.dimodel);
+				let CoreState::Machine { dimodel, .. } = &state_clone.core else {
+					unreachable!()
+				};
+				let model = DevicesAndImagesModel::get_model(dimodel);
 				let entry_index = entry_index.try_into().unwrap();
 				entry_popup_menu(
 					dialog.window(),
@@ -113,16 +117,48 @@ pub async fn dialog_configure(
 			// set up a command filter
 			let state_clone = state.clone();
 			modal.set_command_filter(move |command| command_filter(&state_clone, command));
+
+			// RAM info
+			let machine_index = state.with_diconfig(|diconfig| diconfig.machine().unwrap().index());
+			Some((machine_index, *ram_size))
 		}
-		Err(e) => {
-			let text = format!("{e}").into();
+
+		CoreState::MachineError {
+			error,
+			machine_index,
+			ram_size,
+		} => {
+			let text = error.to_string().into();
 			modal.dialog().set_dev_images_error(text);
+
+			// RAM info
+			Some((*machine_index, *ram_size))
 		}
-	}
+
+		CoreState::Software { software_machines, .. } => {
+			modal.dialog().set_software_machines(software_machines.clone());
+			state.update_software_machines_bulk_enabled();
+
+			let state_clone = state.clone();
+			modal.dialog().on_software_machines_toggle_checked(move |index| {
+				state_clone.toggle_software_machines_checked(index.try_into().unwrap())
+			});
+			let state_clone = state.clone();
+			modal
+				.dialog()
+				.on_software_machines_bulk_none_clicked(move || state_clone.set_software_machines_bulk_checked(false));
+			let state_clone = state.clone();
+			modal
+				.dialog()
+				.on_software_machines_bulk_all_clicked(move || state_clone.set_software_machines_bulk_checked(true));
+
+			None
+		}
+	};
 
 	// set up RAM size options
-	let ram_options = info_db.machines().get(machine_index).unwrap().ram_options();
-	if !ram_options.is_empty() {
+	if let Some((machine_index, ram_size)) = ram_info {
+		let ram_options = info_db.machines().get(machine_index).unwrap().ram_options();
 		let default_index = ram_options
 			.iter()
 			.position(|x| x.is_default())
@@ -139,8 +175,7 @@ pub async fn dialog_configure(
 		modal.dialog().set_ram_sizes_model(ram_option_texts);
 
 		// current RAM size option
-		let index = item
-			.ram_size
+		let index = ram_size
 			.and_then(|ram_size| ram_options.iter().position(|x| x.size() == ram_size))
 			.map(|idx| idx + 1)
 			.unwrap_or_default();
@@ -159,6 +194,14 @@ pub async fn dialog_configure(
 	modal.window().on_close_requested(move || {
 		signaller.signal(None);
 		CloseRequestResponse::KeepWindowShown
+	});
+
+	// set up the "ok" button
+	let signaller = single_result.signaller();
+	let state_clone = state.clone();
+	modal.dialog().on_ok_clicked(move || {
+		let result = state_clone.get_prefs_item();
+		signaller.signal(Some(result));
 	});
 
 	// present the modal dialog
@@ -213,55 +256,227 @@ fn command_filter(state: &Rc<State>, command: AppCommand) -> Option<AppCommand> 
 }
 
 impl State {
+	pub fn new(dialog_weak: Weak<ConfigureDialog>, info_db: &Rc<InfoDb>, item: PrefsItem) -> Self {
+		let core = match item {
+			PrefsItem::Machine(item) => {
+				// figure out the diconfig
+				let machine_index = info_db.machines().find_index(&item.machine_name).unwrap();
+				let machine_config =
+					MachineConfig::from_machine_index_and_slots(info_db.clone(), machine_index, &item.slots);
+				let ram_size = item.ram_size;
+				match machine_config {
+					Ok(machine_config) => {
+						let diconfig = DevicesImagesConfig::from(machine_config);
+						let dimodel = DevicesAndImagesModel::new(diconfig);
+						let dimodel: ModelRc<DeviceAndImageEntry> = ModelRc::new(dimodel);
+						let images = RefCell::new(item.images);
+						CoreState::Machine {
+							dimodel,
+							images,
+							ram_size,
+						}
+					}
+					Err(error) => CoreState::MachineError {
+						machine_index,
+						ram_size,
+						error,
+					},
+				}
+			}
+			PrefsItem::Software(item) => {
+				let software_list = info_db.software_lists().find(&item.software_list).unwrap();
+				let software_machines = software_list
+					.original_for_machines()
+					.iter()
+					.chain(software_list.compatible_for_machines().iter())
+					.sorted_by_key(|machine| machine.description())
+					.map(|machine| {
+						let machine_index = machine.index().try_into().unwrap();
+						let checked = item
+							.preferred_machines
+							.as_ref()
+							.is_none_or(|x| x.iter().any(|x| x == machine.name()));
+						let description = machine.description().into();
+						SoftwareMachine {
+							machine_index,
+							description,
+							checked,
+						}
+					})
+					.collect::<Vec<_>>();
+				let software_machines = VecModel::from(software_machines);
+				let software_machines = ModelRc::new(software_machines);
+
+				CoreState::Software {
+					info_db: info_db.clone(),
+					software_list: item.software_list,
+					software: item.software,
+					software_machines,
+				}
+			}
+		};
+		let state = Self { dialog_weak, core };
+		if matches!(&state.core, CoreState::Machine { .. }) {
+			state.update_images();
+		}
+		state
+	}
+
 	pub fn with_diconfig<R>(&self, callback: impl FnOnce(&DevicesImagesConfig) -> R) -> R {
-		let dimodel = DevicesAndImagesModel::get_model(&self.dimodel);
+		let CoreState::Machine { dimodel, .. } = &self.core else {
+			unreachable!()
+		};
+		let dimodel = DevicesAndImagesModel::get_model(dimodel);
 		dimodel.with_diconfig(callback)
 	}
 
 	pub fn update_images(&self) {
-		let dimodel = DevicesAndImagesModel::get_model(&self.dimodel);
-		let images = self.images.borrow();
+		let CoreState::Machine { dimodel, images, .. } = &self.core else {
+			unreachable!()
+		};
+		let dimodel = DevicesAndImagesModel::get_model(dimodel);
+		let images = images.borrow();
 		dimodel.change_diconfig(|diconfig| {
 			let diconfig = diconfig.set_images_from_slots(|tag| images.get(tag).cloned());
 			Some(diconfig)
 		});
 	}
 
-	pub fn get_machine_item(&self) -> PrefsMachineItem {
+	pub fn get_prefs_item(&self) -> PrefsItem {
 		let dialog = self.dialog_weak.unwrap();
-		self.with_diconfig(|diconfig| {
-			let machine = diconfig.machine().unwrap();
-			let machine_name = machine.name().to_string();
-			let slots = diconfig.changed_slots(false);
-			let images = diconfig
-				.images()
-				.filter_map(|(tag, filename)| filename.map(|filename| (tag.to_string(), filename.to_string())))
-				.collect::<HashMap<_, _>>();
-			let ram_sizes_index = dialog.get_ram_sizes_index();
-			let ram_size = usize::try_from(ram_sizes_index - 1)
-				.ok()
-				.map(|index| machine.ram_options().get(index).unwrap().size());
-			PrefsMachineItem {
-				machine_name,
-				slots,
-				images,
-				ram_size,
+
+		match &self.core {
+			CoreState::Machine { .. } => self.with_diconfig(|diconfig| {
+				let machine = diconfig.machine().unwrap();
+				let machine_name = machine.name().to_string();
+				let slots = diconfig.changed_slots(false);
+				let images = diconfig
+					.images()
+					.filter_map(|(tag, filename)| filename.map(|filename| (tag.to_string(), filename.to_string())))
+					.collect::<HashMap<_, _>>();
+				let ram_sizes_index = dialog.get_ram_sizes_index();
+				let ram_size = usize::try_from(ram_sizes_index - 1)
+					.ok()
+					.map(|index| machine.ram_options().get(index).unwrap().size());
+				let item = PrefsMachineItem {
+					machine_name,
+					slots,
+					images,
+					ram_size,
+				};
+				PrefsItem::Machine(item)
+			}),
+
+			CoreState::MachineError { .. } => todo!(),
+
+			CoreState::Software {
+				info_db,
+				software_list,
+				software,
+				software_machines,
+			} => {
+				let software_machines = software_machines
+					.as_any()
+					.downcast_ref::<VecModel<SoftwareMachine>>()
+					.unwrap();
+				let software_machines_len = software_machines.row_count();
+				let preferred_machine_indexes = software_machines
+					.iter()
+					.filter_map(|x| x.checked.then_some(x.machine_index))
+					.collect::<Vec<_>>();
+				let preferred_machines = (preferred_machine_indexes.len() != software_machines_len).then(|| {
+					preferred_machine_indexes
+						.into_iter()
+						.map(|machine_index| {
+							let machine_index = machine_index.try_into().unwrap();
+							info_db.machines().get(machine_index).unwrap().name().to_string()
+						})
+						.collect::<Vec<_>>()
+				});
+
+				let item = PrefsSoftwareItem {
+					software_list: software_list.clone(),
+					software: software.clone(),
+					preferred_machines,
+				};
+				PrefsItem::Software(item)
 			}
-		})
+		}
 	}
 
 	pub fn set_slot_entry_option(&self, entry_index: usize, new_option_name: Option<&str>) {
-		let dimodel = DevicesAndImagesModel::get_model(&self.dimodel);
+		let CoreState::Machine { dimodel, .. } = &self.core else {
+			unreachable!()
+		};
+		let dimodel = DevicesAndImagesModel::get_model(dimodel);
 		dimodel.set_slot_entry_option(entry_index, new_option_name);
 		self.update_images();
 	}
 
 	pub fn set_image_filename(&self, tag: String, new_filename: Option<String>) {
+		let CoreState::Machine { images, .. } = &self.core else {
+			unreachable!()
+		};
 		if let Some(new_filename) = new_filename {
-			self.images.borrow_mut().insert(tag, new_filename);
+			images.borrow_mut().insert(tag, new_filename);
 		} else {
-			self.images.borrow_mut().remove(&tag);
+			images.borrow_mut().remove(&tag);
 		}
 		self.update_images();
+	}
+
+	pub fn update_software_machines_bulk_enabled(&self) {
+		let CoreState::Software { software_machines, .. } = &self.core else {
+			unreachable!()
+		};
+		let all_equal_value = software_machines
+			.as_any()
+			.downcast_ref::<VecModel<SoftwareMachine>>()
+			.unwrap()
+			.iter()
+			.map(|x| x.checked)
+			.all_equal_value();
+		let (bulk_all_enabled, bulk_none_enabled) = match all_equal_value {
+			Ok(false) => (true, false),
+			Ok(true) => (false, true),
+			Err(None) => (false, false),
+			Err(Some(_)) => (true, true),
+		};
+		let dialog = self.dialog_weak.unwrap();
+		dialog.set_software_machines_bulk_all_enabled(bulk_all_enabled);
+		dialog.set_software_machines_bulk_none_enabled(bulk_none_enabled);
+	}
+
+	pub fn toggle_software_machines_checked(&self, row: usize) {
+		let CoreState::Software { software_machines, .. } = &self.core else {
+			unreachable!()
+		};
+		let model = software_machines
+			.as_any()
+			.downcast_ref::<VecModel<SoftwareMachine>>()
+			.unwrap();
+		let mut data = model.row_data(row).unwrap();
+		data.checked = !data.checked;
+		model.set_row_data(row, data);
+		self.update_software_machines_bulk_enabled();
+	}
+
+	pub fn set_software_machines_bulk_checked(&self, checked: bool) {
+		let CoreState::Software { software_machines, .. } = &self.core else {
+			unreachable!()
+		};
+		let model = software_machines
+			.as_any()
+			.downcast_ref::<VecModel<SoftwareMachine>>()
+			.unwrap();
+
+		for (row, data) in model.iter().enumerate() {
+			if data.checked != checked {
+				let data = SoftwareMachine { checked, ..data };
+				model.set_row_data(row, data);
+			}
+		}
+
+		self.update_software_machines_bulk_enabled();
 	}
 }

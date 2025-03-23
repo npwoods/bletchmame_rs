@@ -167,6 +167,7 @@ fn slint_menu_entry(menu_item: &MenuItemKind) -> Option<SlintMenuEntry> {
 	Some(entry)
 }
 
+#[derive(Debug)]
 pub enum MenuDesc {
 	Item(String, Option<MenuId>),
 	SubMenu(String, bool, Vec<MenuDesc>),

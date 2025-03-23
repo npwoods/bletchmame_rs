@@ -197,8 +197,10 @@ impl<'a> SoftwareList<'a> {
 }
 
 impl<'a> SoftwareListsView<'a> {
-	pub fn find(&self, target: &str) -> Option<SoftwareList<'a>> {
-		self.iter().find(|x| x.name() == target)
+	pub fn find(&self, target: &str) -> Result<SoftwareList<'a>> {
+		self.iter()
+			.find(|x| x.name() == target)
+			.ok_or_else(|| ThisError::CannotFindSoftwareList(target.to_string()).into())
 	}
 }
 
@@ -227,6 +229,8 @@ impl RamOption<'_> {
 enum ThisError {
 	#[error("cannot find machine {0:?}")]
 	CannotFindMachine(String),
+	#[error("cannot find software list {0:?}")]
+	CannotFindSoftwareList(String),
 }
 
 #[cfg(test)]
