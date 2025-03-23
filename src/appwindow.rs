@@ -968,7 +968,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 		AppCommand::InfoDbBuildComplete => model.update_state(|state| Some(state.infodb_build_complete())),
 		AppCommand::InfoDbBuildCancel => model.update_state(|state| Some(state.infodb_build_cancel())),
 		AppCommand::ReactivateMame => model.update_state(AppState::activate),
-		AppCommand::ConfigureMachine { folder_name, index } => {
+		AppCommand::Configure { folder_name, index } => {
 			let model_clone = model.clone();
 			let info_db = model.state.borrow().info_db().unwrap().clone();
 			let (folder_index, item) = model

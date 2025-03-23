@@ -299,7 +299,7 @@ impl ItemsTableModel {
 				// items in folders can be configured
 				let configure_menu_item = folder_name.clone().map(|folder_name| {
 					let text = "Configure...".to_string();
-					let command = AppCommand::ConfigureMachine { folder_name, index };
+					let command = AppCommand::Configure { folder_name, index };
 					MenuDesc::Item(text, Some(command.into()))
 				});
 
