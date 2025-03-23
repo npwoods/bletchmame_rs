@@ -204,6 +204,12 @@ pub async fn dialog_configure(
 		signaller.signal(Some(result));
 	});
 
+	// set up the "cancel" button
+	let signaller = single_result.signaller();
+	modal.dialog().on_cancel_clicked(move || {
+		signaller.signal(None);
+	});
+
 	// present the modal dialog
 	modal.run(async { single_result.wait().await }).await
 }

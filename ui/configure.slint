@@ -23,6 +23,7 @@ export component ConfigureDialog inherits Window {
 
     // callbacks
     callback ok-clicked();
+    callback cancel-clicked();
     callback entry-option-changed(int, string);
     callback entry-button-clicked(int, Point);
     callback menu-entry-activated(MenuEntry);
@@ -133,6 +134,14 @@ export component ConfigureDialog inherits Window {
         }
         HorizontalBox {
             alignment: end;
+            StandardButton {
+                max-height: 30px;
+                kind: cancel;
+                clicked => {
+                    root.cancel-clicked();
+                }
+            }
+
             StandardButton {
                 max-height: 30px;
                 kind: ok;
