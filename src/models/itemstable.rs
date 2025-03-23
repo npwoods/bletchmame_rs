@@ -36,6 +36,7 @@ use crate::prefs::PrefsCollection;
 use crate::prefs::PrefsColumn;
 use crate::prefs::PrefsItem;
 use crate::prefs::PrefsMachineItem;
+use crate::prefs::PrefsSoftwareItem;
 use crate::prefs::SortOrder;
 use crate::selection::SelectionManager;
 use crate::software::Software;
@@ -199,14 +200,13 @@ impl ItemsTableModel {
 								};
 								Some(item)
 							}
-							PrefsItem::Software {
-								software_list,
-								software,
-							} => {
-								let item = software_folder_item(&mut dispenser, software_list, software)
-									.unwrap_or_else(|error| Item::Unrecognized {
-										item: item.clone(),
-										error: Rc::new(error),
+							PrefsItem::Software(software_item) => {
+								let item =
+									software_folder_item(&mut dispenser, software_item).unwrap_or_else(|error| {
+										Item::Unrecognized {
+											item: item.clone(),
+											error: Rc::new(error),
+										}
 									});
 								Some(item)
 							}
@@ -552,17 +552,13 @@ impl Model for ItemsTableModel {
 	}
 }
 
-fn software_folder_item(
-	dispenser: &mut SoftwareListDispenser,
-	software_list_name: &str,
-	software_name: &str,
-) -> Result<Item> {
-	let (info, software_list) = dispenser.get(software_list_name)?;
+fn software_folder_item(dispenser: &mut SoftwareListDispenser, item: &PrefsSoftwareItem) -> Result<Item> {
+	let (info, software_list) = dispenser.get(&item.software_list)?;
 	let software = software_list
 		.software
 		.iter()
-		.find(|x| x.name.as_ref() == software_name)
-		.ok_or_else(|| ThisError::UnknownSoftware(software_name.to_string()))?
+		.find(|x| x.name.as_ref() == item.software)
+		.ok_or_else(|| ThisError::UnknownSoftware(item.software.clone()))?
 		.clone();
 
 	Ok(software_item(info, software_list, software))
@@ -638,10 +634,13 @@ fn make_prefs_item(_info_db: &InfoDb, item: &Item) -> PrefsItem {
 			software_list,
 			software,
 			..
-		} => PrefsItem::Software {
-			software_list: software_list.name.to_string(),
-			software: software.name.to_string(),
-		},
+		} => {
+			let item = PrefsSoftwareItem {
+				software_list: software_list.name.to_string(),
+				software: software.name.to_string(),
+			};
+			PrefsItem::Software(item)
+		}
 		Item::Unrecognized { item, .. } => item.clone(),
 	}
 }
@@ -767,17 +766,10 @@ fn column_text<'a>(_info_db: &'a InfoDb, item: &'a Item, column: ColumnType) -> 
 			ColumnType::Provider => software.publisher.as_ref().into(),
 		},
 		Item::Unrecognized { item, .. } => {
-			let PrefsItem::Software {
-				software_list,
-				software,
-				..
-			} = item
-			else {
-				todo!()
-			};
+			let PrefsItem::Software(item) = item else { todo!() };
 			match column {
-				ColumnType::Name => software.clone().into(),
-				ColumnType::SourceFile => format!("{}.xml", software_list).into(),
+				ColumnType::Name => item.software.clone().into(),
+				ColumnType::SourceFile => format!("{}.xml", item.software_list).into(),
 				_ => "".into(),
 			}
 		}
