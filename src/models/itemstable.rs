@@ -198,9 +198,8 @@ impl ItemsTableModel {
 								software,
 							} => {
 								let item = software_folder_item(&mut dispenser, software_list, software)
-									.unwrap_or_else(|error| Item::UnrecognizedSoftware {
-										software_list_name: software_list.clone(),
-										software_name: software.clone(),
+									.unwrap_or_else(|error| Item::Unrecognized {
+										item: item.clone(),
 										error: Rc::new(error),
 									});
 								Some(item)
@@ -344,7 +343,7 @@ impl ItemsTableModel {
 				let run_menu_item = MenuDesc::SubMenu(text, true, sub_items);
 				(run_menu_item, None, None)
 			}
-			Item::UnrecognizedSoftware { error, .. } => {
+			Item::Unrecognized { error, .. } => {
 				let message = format!("{}", error);
 				let run_menu_item = MenuDesc::Item(message, None);
 				(run_menu_item, None, None)
@@ -607,9 +606,8 @@ enum Item {
 		software: Arc<Software>,
 		machine_indexes: Vec<usize>,
 	},
-	UnrecognizedSoftware {
-		software_list_name: String,
-		software_name: String,
+	Unrecognized {
+		item: PrefsItem,
 		error: Rc<Error>,
 	},
 }
@@ -641,14 +639,7 @@ fn make_prefs_item(_info_db: &InfoDb, item: &Item) -> PrefsItem {
 			software_list: software_list.name.to_string(),
 			software: software.name.to_string(),
 		},
-		Item::UnrecognizedSoftware {
-			software_list_name,
-			software_name,
-			..
-		} => PrefsItem::Software {
-			software_list: software_list_name.clone(),
-			software: software_name.clone(),
-		},
+		Item::Unrecognized { item, .. } => item.clone(),
 	}
 }
 
@@ -772,15 +763,21 @@ fn column_text<'a>(_info_db: &'a InfoDb, item: &'a Item, column: ColumnType) -> 
 			ColumnType::Year => software.year.as_ref().into(),
 			ColumnType::Provider => software.publisher.as_ref().into(),
 		},
-		Item::UnrecognizedSoftware {
-			software_list_name,
-			software_name,
-			..
-		} => match column {
-			ColumnType::Name => software_name.into(),
-			ColumnType::SourceFile => format!("{}.xml", software_list_name).into(),
-			_ => "".into(),
-		},
+		Item::Unrecognized { item, .. } => {
+			let PrefsItem::Software {
+				software_list,
+				software,
+				..
+			} = item
+			else {
+				todo!()
+			};
+			match column {
+				ColumnType::Name => software.clone().into(),
+				ColumnType::SourceFile => format!("{}.xml", software_list).into(),
+				_ => "".into(),
+			}
+		}
 	}
 }
 
