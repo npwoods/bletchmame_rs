@@ -64,7 +64,6 @@ use crate::platform::WindowExt;
 use crate::prefs::BuiltinCollection;
 use crate::prefs::Preferences;
 use crate::prefs::PrefsCollection;
-use crate::prefs::PrefsItem;
 use crate::prefs::SortOrder;
 use crate::prefs::pathtype::PathType;
 use crate::runtime::MameStderr;
@@ -986,13 +985,11 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				})
 				.next()
 				.unwrap();
-			let PrefsItem::Machine(item) = item else { unreachable!() };
 
 			let fut = async move {
 				let parent = model_clone.app_window_weak.clone();
 				let menuing_type = model_clone.menuing_type;
 				if let Some(item) = dialog_configure(parent, info_db, item, menuing_type).await {
-					let item = PrefsItem::Machine(item);
 					model_clone.modify_prefs(|prefs| {
 						let old_collection = prefs.collections[folder_index].clone();
 						let PrefsCollection::Folder { name, mut items } = old_collection.as_ref().clone() else {

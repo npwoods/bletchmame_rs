@@ -24,6 +24,7 @@ use crate::info::InfoDb;
 use crate::info::View;
 use crate::mconfig::MachineConfig;
 use crate::models::devimages::DevicesAndImagesModel;
+use crate::prefs::PrefsItem;
 use crate::prefs::PrefsMachineItem;
 use crate::ui::ConfigureDialog;
 use crate::ui::DeviceAndImageEntry;
@@ -38,14 +39,15 @@ struct State {
 pub async fn dialog_configure(
 	parent: Weak<impl ComponentHandle + 'static>,
 	info_db: Rc<InfoDb>,
-	item: PrefsMachineItem,
+	item: PrefsItem,
 	menuing_type: MenuingType,
-) -> Option<PrefsMachineItem> {
+) -> Option<PrefsItem> {
 	// prepare the dialog
 	let modal = Modal::new(&parent.unwrap(), || ConfigureDialog::new().unwrap());
 	let single_result = SingleResult::default();
 
 	// find the machine
+	let PrefsItem::Machine(item) = item else { unreachable!() };
 	let machine_index = info_db.machines().find_index(&item.machine_name).unwrap();
 
 	// look up the machine and create the devimages config
@@ -80,7 +82,7 @@ pub async fn dialog_configure(
 			let signaller = single_result.signaller();
 			let state_clone = state.clone();
 			modal.dialog().on_ok_clicked(move || {
-				let result = state_clone.get_machine_item();
+				let result = state_clone.get_prefs_item();
 				signaller.signal(Some(result));
 			});
 
@@ -227,7 +229,7 @@ impl State {
 		});
 	}
 
-	pub fn get_machine_item(&self) -> PrefsMachineItem {
+	pub fn get_prefs_item(&self) -> PrefsItem {
 		let dialog = self.dialog_weak.unwrap();
 		self.with_diconfig(|diconfig| {
 			let machine = diconfig.machine().unwrap();
@@ -241,12 +243,13 @@ impl State {
 			let ram_size = usize::try_from(ram_sizes_index - 1)
 				.ok()
 				.map(|index| machine.ram_options().get(index).unwrap().size());
-			PrefsMachineItem {
+			let result = PrefsMachineItem {
 				machine_name,
 				slots,
 				images,
 				ram_size,
-			}
+			};
+			PrefsItem::Machine(result)
 		})
 	}
 
