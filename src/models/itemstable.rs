@@ -62,6 +62,12 @@ pub struct ItemsTableModel {
 	notify: ModelNotify,
 }
 
+#[derive(thiserror::Error, Debug)]
+enum ThisError {
+	#[error("unknown software {0}")]
+	UnknownSoftware(String),
+}
+
 impl ItemsTableModel {
 	pub fn new(
 		current_collection: Rc<PrefsCollection>,
@@ -556,10 +562,7 @@ fn software_folder_item(
 		.software
 		.iter()
 		.find(|x| x.name.as_ref() == software_name)
-		.ok_or_else(|| {
-			let message = format!("Unknown software '{}'", software_name);
-			Error::msg(message)
-		})?
+		.ok_or_else(|| ThisError::UnknownSoftware(software_name.to_string()))?
 		.clone();
 
 	Ok(software_item(info, software_list, software))
