@@ -159,34 +159,36 @@ pub async fn dialog_configure(
 	// set up RAM size options
 	if let Some((machine_index, ram_size)) = ram_info {
 		let ram_options = info_db.machines().get(machine_index).unwrap().ram_options();
-		let default_index = ram_options
-			.iter()
-			.position(|x| x.is_default())
-			.expect("expected a default RAM option");
-		let default_text = format!(
-			"Default ({})",
-			ram_size_display_text(ram_options.get(default_index).unwrap().size())
-		);
-		let ram_option_texts = once(SharedString::from(default_text))
-			.chain(ram_options.iter().map(|opt| ram_size_display_text(opt.size()).into()))
-			.collect::<Vec<_>>();
-		let ram_option_texts = VecModel::from(ram_option_texts);
-		let ram_option_texts = ModelRc::new(ram_option_texts);
-		modal.dialog().set_ram_sizes_model(ram_option_texts);
+		if !ram_options.is_empty() {
+			let default_index = ram_options
+				.iter()
+				.position(|x| x.is_default())
+				.expect("expected a default RAM option");
+			let default_text = format!(
+				"Default ({})",
+				ram_size_display_text(ram_options.get(default_index).unwrap().size())
+			);
+			let ram_option_texts = once(SharedString::from(default_text))
+				.chain(ram_options.iter().map(|opt| ram_size_display_text(opt.size()).into()))
+				.collect::<Vec<_>>();
+			let ram_option_texts = VecModel::from(ram_option_texts);
+			let ram_option_texts = ModelRc::new(ram_option_texts);
+			modal.dialog().set_ram_sizes_model(ram_option_texts);
 
-		// current RAM size option
-		let index = ram_size
-			.and_then(|ram_size| ram_options.iter().position(|x| x.size() == ram_size))
-			.map(|idx| idx + 1)
-			.unwrap_or_default();
+			// current RAM size option
+			let index = ram_size
+				.and_then(|ram_size| ram_options.iter().position(|x| x.size() == ram_size))
+				.map(|idx| idx + 1)
+				.unwrap_or_default();
 
-		// workaround for https://github.com/slint-ui/slint/issues/7632; please remove hack when fixed
-		let dialog_weak = modal.dialog().as_weak();
-		let fut = async move {
-			tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-			dialog_weak.unwrap().set_ram_sizes_index(index.try_into().unwrap());
-		};
-		spawn_local(fut).unwrap();
+			// workaround for https://github.com/slint-ui/slint/issues/7632; please remove hack when fixed
+			let dialog_weak = modal.dialog().as_weak();
+			let fut = async move {
+				tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+				dialog_weak.unwrap().set_ram_sizes_index(index.try_into().unwrap());
+			};
+			spawn_local(fut).unwrap();
+		}
 	}
 
 	// set up the close handler
