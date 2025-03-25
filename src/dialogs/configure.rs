@@ -29,7 +29,9 @@ use crate::mconfig::MachineConfig;
 use crate::models::devimages::DevicesAndImagesModel;
 use crate::prefs::PrefsItem;
 use crate::prefs::PrefsMachineItem;
+use crate::prefs::PrefsPaths;
 use crate::prefs::PrefsSoftwareItem;
+use crate::software::SoftwareListDispenser;
 use crate::ui::ConfigureDialog;
 use crate::ui::DeviceAndImageEntry;
 use crate::ui::DevicesAndImagesState;
@@ -47,6 +49,7 @@ enum CoreState {
 		ram_size: Option<u64>,
 	},
 	MachineError {
+		info_db: Rc<InfoDb>,
 		machine_index: usize,
 		ram_size: Option<u64>,
 		error: Error,
@@ -63,6 +66,7 @@ pub async fn dialog_configure(
 	parent: Weak<impl ComponentHandle + 'static>,
 	info_db: Rc<InfoDb>,
 	item: PrefsItem,
+	paths: &PrefsPaths,
 	menuing_type: MenuingType,
 ) -> Option<PrefsItem> {
 	// prepare the dialog
@@ -73,6 +77,9 @@ pub async fn dialog_configure(
 	let dialog_weak = modal.dialog().as_weak();
 	let state = State::new(dialog_weak, &info_db, item);
 	let state = Rc::new(state);
+
+	// set the title
+	modal.dialog().set_dialog_title(state.title(paths).into());
 
 	// do different things based on the state
 	let ram_info = match &state.core {
@@ -127,6 +134,7 @@ pub async fn dialog_configure(
 			error,
 			machine_index,
 			ram_size,
+			..
 		} => {
 			let text = error.to_string().into();
 			modal.dialog().set_dev_images_error(text);
@@ -291,6 +299,7 @@ impl State {
 						}
 					}
 					Err(error) => CoreState::MachineError {
+						info_db: info_db.clone(),
 						machine_index,
 						ram_size,
 						error,
@@ -506,5 +515,54 @@ impl State {
 			CoreState::MachineError { .. } => {}
 			CoreState::Software { .. } => todo!(),
 		}
+	}
+
+	pub fn title(&self, paths: &PrefsPaths) -> String {
+		if let CoreState::Software {
+			info_db,
+			software_list,
+			software,
+			..
+		} = &self.core
+		{
+			let mut dispenser = SoftwareListDispenser::new(info_db, &paths.software_lists);
+
+			let software_entry = dispenser.get(software_list).ok().and_then(|(_, x)| {
+				x.software
+					.iter()
+					.flat_map(|x| (x.name.as_ref() == software).then(|| x.clone()))
+					.next()
+			});
+			if let Some(software_entry) = software_entry.as_deref() {
+				configure_dialog_title(software_entry.description.as_ref(), Some(software_entry.name.as_ref()))
+			} else {
+				configure_dialog_title(software.as_str(), None)
+			}
+		} else {
+			let (info_db, machine_index) = match &self.core {
+				CoreState::Machine { dimodel, .. } => {
+					DevicesAndImagesModel::get_model(dimodel).with_diconfig(|diconfig| {
+						(
+							diconfig.machine_config().unwrap().info_db.clone(),
+							diconfig.machine().unwrap().index(),
+						)
+					})
+				}
+				CoreState::MachineError {
+					info_db, machine_index, ..
+				} => (info_db.clone(), *machine_index),
+				CoreState::Software { .. } => unreachable!(),
+			};
+			let machine = info_db.machines().get(machine_index).unwrap();
+			configure_dialog_title(machine.description(), Some(machine.name()))
+		}
+	}
+}
+
+fn configure_dialog_title(description: &str, name: Option<&str>) -> String {
+	if let Some(name) = name {
+		format!("Configure {} ({})", description, name)
+	} else {
+		format!("Configure {}", description)
 	}
 }
