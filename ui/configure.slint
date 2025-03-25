@@ -7,12 +7,13 @@ struct SoftwareMachine {
     checked: bool}
 
 export component ConfigureDialog inherits Window {
-    title: "Configure";
+    title: dialog-title;
     icon: @image-url("bletchmame.png");
     preferred-width: 600px;
     preferred-height: 500px;
 
     // properties
+    in property <string> dialog-title;
     in property <DevicesAndImagesState> dev-images-state;
     in property <string> dev-images-error;
     in property <[string]> ram-sizes-model;
