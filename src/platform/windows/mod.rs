@@ -15,12 +15,12 @@ use raw_window_handle::Win32WindowHandle;
 use slint::LogicalPosition;
 use slint::Window;
 use win32job::Job;
-use winapi::shared::windef::HWND;
-use winapi::um::winbase::CREATE_NO_WINDOW;
-use winapi::um::wincon::ATTACH_PARENT_PROCESS;
-use winapi::um::wincon::AttachConsole;
-use winapi::um::winuser::GetFocus;
-use winapi::um::winuser::SetFocus;
+use windows::Win32::System::Console::ATTACH_PARENT_PROCESS;
+use windows::Win32::System::Console::AttachConsole;
+use windows::Win32::System::Threading::CREATE_NO_WINDOW;
+use windows_sys::Win32::Foundation::HWND;
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::GetFocus;
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::SetFocus;
 use winit::platform::windows::WindowAttributesExtWindows;
 use winit::platform::windows::WindowExtWindows;
 use winit::window::WindowAttributes;
@@ -28,7 +28,7 @@ use winit::window::WindowAttributes;
 pub fn win_platform_init() -> Result<impl Any, Error> {
 	// attach to the parent's console - debugging is hell if we don't do this
 	unsafe {
-		AttachConsole(ATTACH_PARENT_PROCESS);
+		let _ = AttachConsole(ATTACH_PARENT_PROCESS);
 	}
 
 	// we spawn MAME a lot - we want to create a Win32 job so that stray
@@ -50,7 +50,7 @@ pub trait WinCommandExt {
 impl WinCommandExt for Command {
 	fn create_no_window(&mut self, flag: bool) -> &mut Self {
 		if flag {
-			self.creation_flags(CREATE_NO_WINDOW);
+			self.creation_flags(CREATE_NO_WINDOW.0);
 		};
 		self
 	}

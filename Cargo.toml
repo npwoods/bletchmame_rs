@@ -47,7 +47,6 @@ num = "0.4.3"
 strum = "0.27.1"
 strum_macros = "0.27.1"
 structopt = "0.3.26"
-winapi = "0.3.9"
 win32job = "2.0.2"
 is_executable = "1.0.4"
 anyhow = "1.0.97"
@@ -56,6 +55,19 @@ internment = { version = "0.8.6", features = ["arena"] }
 throttle = "0.1.0"
 more-asserts = "0.3.1"
 byte-unit = "5.1.6"
+
+[target.'cfg(target_os = "windows")'.dependencies.windows]
+version = "0.61.1"
+features = [
+    "Win32",
+    "Win32_System",
+    "Win32_System_Console",
+    "Win32_System_Threading",
+]
+
+[target.'cfg(target_os = "windows")'.dependencies.windows-sys]
+version = "0.59"
+features = ["Win32_UI_Input_KeyboardAndMouse"]
 
 [dev-dependencies]
 assert_matches = "1.5.0"
