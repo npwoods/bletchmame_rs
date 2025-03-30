@@ -573,6 +573,9 @@ fn create_menu_bar() -> Menu {
 				&MenuItem::new("Load State...", false, accel("Ctrl+F7")),
 				&MenuItem::new("Save State...", false, accel("Ctrl+Shift+F7")),
 				&PredefinedMenuItem::separator(),
+				&MenuItem::new("Save Screenshot...", false, accel("F12")),
+				&MenuItem::new("Record Movie...", false, accel("Shift+F12")),
+				&PredefinedMenuItem::separator(),
 				&MenuItem::with_id(AppCommand::FileDebugger, "Debugger...", false, None),
 				&Submenu::with_items(
 					"Reset",
