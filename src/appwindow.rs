@@ -573,7 +573,7 @@ fn create_menu_bar() -> Menu {
 				&MenuItem::new("Load State...", false, accel("Ctrl+F7")),
 				&MenuItem::new("Save State...", false, accel("Ctrl+Shift+F7")),
 				&PredefinedMenuItem::separator(),
-				&MenuItem::new("Debugger...", false, None),
+				&MenuItem::with_id(AppCommand::FileDebugger, "Debugger...", false, None),
 				&Submenu::with_items(
 					"Reset",
 					true,
@@ -703,6 +703,9 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				model.menuing_type,
 			);
 			spawn_local(fut).unwrap();
+		}
+		AppCommand::FileDebugger => {
+			model.issue_command(MameCommand::Debugger);
 		}
 		AppCommand::FileResetSoft => {
 			model.issue_command(MameCommand::SoftReset);
@@ -1040,6 +1043,7 @@ fn update_menus(model: &AppModel) {
 			Ok(AppCommand::FileStop) => (Some(is_running), None),
 			Ok(AppCommand::FilePause) => (Some(is_running), Some(is_paused)),
 			Ok(AppCommand::FileDevicesAndImages) => (Some(is_running), None),
+			Ok(AppCommand::FileDebugger) => (Some(is_running), None),
 			Ok(AppCommand::FileResetSoft) => (Some(is_running), None),
 			Ok(AppCommand::FileResetHard) => (Some(is_running), None),
 			Ok(AppCommand::OptionsThrottleRate(x)) => (Some(is_running), Some(Some(x) == throttle_rate)),
