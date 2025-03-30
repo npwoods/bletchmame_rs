@@ -20,6 +20,7 @@ pub enum MameCommand<'a> {
 	LoadImage(&'a [(&'a str, &'a str)]),
 	UnloadImage(&'a str),
 	ChangeSlots(&'a [(&'a str, &'a str)]),
+	Debugger,
 }
 
 impl MameCommand<'_> {
@@ -41,6 +42,7 @@ impl MameCommand<'_> {
 			MameCommand::LoadImage(loads) => pairs_command_text(&["LOAD"], loads),
 			MameCommand::UnloadImage(tag) => format!("UNLOAD {}", tag).into(),
 			MameCommand::ChangeSlots(changes) => pairs_command_text(&["CHANGE_SLOTS"], changes),
+			MameCommand::Debugger => "DEBUGGER".into(),
 		}
 	}
 }
