@@ -41,6 +41,7 @@ pub fn accel(text: &str) -> Option<Accelerator> {
 		"F9" => Code::F9,
 		"F10" => Code::F10,
 		"F11" => Code::F11,
+		"F12" => Code::F12,
 		"Pause" => Code::Pause,
 		x => panic!("Unknown accelerator {x}"),
 	};
