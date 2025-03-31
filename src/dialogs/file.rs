@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::path::Path;
@@ -46,6 +47,33 @@ pub fn choose_path_by_type_dialog(
 	}?;
 
 	Some(string_from_osstring_lossy(path))
+}
+
+pub fn save_file_dialog(
+	parent: &impl ComponentHandle,
+	title: &str,
+	file_types: &[(Option<&str>, &str)],
+	initial_file: Option<String>,
+) -> Option<String> {
+	let mut dialog = create_file_dialog(parent);
+	dialog = dialog.set_title(title);
+	for (desc, ext) in file_types {
+		let desc = if let Some(desc) = desc.as_ref() {
+			Cow::Borrowed(*desc)
+		} else {
+			Cow::Owned(format!("{} files", ext.to_uppercase()))
+		};
+		let name = format!("{desc} (*.{ext})");
+		let extensions = [*ext];
+		dialog = dialog.add_filter(name, &extensions);
+	}
+	dialog = dialog.add_filter("All Files (*.*)", &["*"]);
+
+	if let Some(initial_file) = initial_file {
+		dialog = dialog.set_file_name(initial_file);
+	}
+
+	dialog.save_file().map(string_from_osstring_lossy)
 }
 
 fn create_file_dialog(parent: &impl ComponentHandle) -> FileDialog {

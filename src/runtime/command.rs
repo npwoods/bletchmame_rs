@@ -20,6 +20,7 @@ pub enum MameCommand<'a> {
 	LoadImage(&'a [(&'a str, &'a str)]),
 	UnloadImage(&'a str),
 	ChangeSlots(&'a [(&'a str, &'a str)]),
+	SaveSnapshot(u32, &'a str),
 	Debugger,
 }
 
@@ -42,6 +43,10 @@ impl MameCommand<'_> {
 			MameCommand::LoadImage(loads) => pairs_command_text(&["LOAD"], loads),
 			MameCommand::UnloadImage(tag) => format!("UNLOAD {}", tag).into(),
 			MameCommand::ChangeSlots(changes) => pairs_command_text(&["CHANGE_SLOTS"], changes),
+			MameCommand::SaveSnapshot(screen_number, filename) => {
+				let filename = quote_if_needed(filename);
+				format!("SAVE_SNAPSHOT {screen_number} {filename}").into()
+			}
 			MameCommand::Debugger => "DEBUGGER".into(),
 		}
 	}
