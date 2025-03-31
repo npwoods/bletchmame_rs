@@ -1,4 +1,5 @@
 use std::ffi::OsStr;
+use std::ffi::OsString;
 use std::path::Path;
 
 use rfd::FileDialog;
@@ -7,7 +8,11 @@ use slint::ComponentHandle;
 use crate::prefs::pathtype::PathType;
 use crate::prefs::pathtype::PickType;
 
-pub fn file_dialog(_parent: &impl ComponentHandle, path_type: PathType, initial: Option<&Path>) -> Option<String> {
+pub fn choose_path_by_type_dialog(
+	parent: &impl ComponentHandle,
+	path_type: PathType,
+	initial: Option<&Path>,
+) -> Option<String> {
 	// determine the initial directory and/or file
 	let (initial_directory, initial_file) = if let Some(initial) = initial {
 		let metadata = initial.metadata().ok();
@@ -23,7 +28,7 @@ pub fn file_dialog(_parent: &impl ComponentHandle, path_type: PathType, initial:
 	};
 
 	// create the dialog and specify the initials
-	let dialog = FileDialog::new();
+	let dialog = create_file_dialog(parent);
 	let dialog = if let Some(initial_directory) = initial_directory {
 		dialog.set_directory(initial_directory)
 	} else {
@@ -40,6 +45,15 @@ pub fn file_dialog(_parent: &impl ComponentHandle, path_type: PathType, initial:
 		PickType::Dir => dialog.pick_folder(),
 	}?;
 
-	// we have a `PathBuf`; we want a `String`; something is very messed up if this conversion fails
-	path.into_os_string().into_string().ok()
+	Some(string_from_osstring_lossy(path))
+}
+
+fn create_file_dialog(parent: &impl ComponentHandle) -> FileDialog {
+	FileDialog::new().set_parent(&parent.window().window_handle())
+}
+
+fn string_from_osstring_lossy(s: impl Into<OsString>) -> String {
+	s.into()
+		.into_string()
+		.unwrap_or_else(|e| e.to_string_lossy().into_owned())
 }
