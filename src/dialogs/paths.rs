@@ -18,7 +18,7 @@ use tracing::Level;
 use tracing::event;
 
 use crate::dialogs::SingleResult;
-use crate::dialogs::file::file_dialog;
+use crate::dialogs::file::choose_path_by_type_dialog;
 use crate::guiutils::modal::Modal;
 use crate::icon::Icon;
 use crate::prefs::PrefsPaths;
@@ -197,7 +197,7 @@ fn browse_clicked(dialog: &PathsDialog, paths: &RefCell<PrefsPaths>) {
 	);
 
 	// show the file dialog
-	let Some(path) = file_dialog(dialog, path_type, resolved_existing_path) else {
+	let Some(path) = choose_path_by_type_dialog(dialog, path_type, resolved_existing_path) else {
 		return;
 	};
 	let Ok(row) = usize::try_from(dialog.get_path_entry_index()) else {

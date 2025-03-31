@@ -20,6 +20,7 @@ pub enum MameCommand<'a> {
 	LoadImage(&'a [(&'a str, &'a str)]),
 	UnloadImage(&'a str),
 	ChangeSlots(&'a [(&'a str, &'a str)]),
+	SaveSnapshot(u32, &'a str),
 	Debugger,
 }
 
@@ -42,6 +43,10 @@ impl MameCommand<'_> {
 			MameCommand::LoadImage(loads) => pairs_command_text(&["LOAD"], loads),
 			MameCommand::UnloadImage(tag) => format!("UNLOAD {}", tag).into(),
 			MameCommand::ChangeSlots(changes) => pairs_command_text(&["CHANGE_SLOTS"], changes),
+			MameCommand::SaveSnapshot(screen_number, filename) => {
+				let filename = quote_if_needed(filename);
+				format!("SAVE_SNAPSHOT {screen_number} {filename}").into()
+			}
 			MameCommand::Debugger => "DEBUGGER".into(),
 		}
 	}
@@ -57,15 +62,19 @@ fn pairs_command_text(base: &[&str], args: &[(&str, &str)]) -> Cow<'static, str>
 		.map(Cow::Borrowed)
 		.chain(args.iter().flat_map(|(name, value)| {
 			let name = Cow::Borrowed(*name);
-			let value = if value.is_empty() || value.contains(' ') {
-				Cow::Owned(format!("\"{}\"", value))
-			} else {
-				Cow::Borrowed(*value)
-			};
+			let value = quote_if_needed(value);
 			[name, value]
 		}))
 		.join(" ")
 		.into()
+}
+
+fn quote_if_needed(s: &str) -> Cow<'_, str> {
+	if s.is_empty() || s.contains(' ') {
+		Cow::Owned(format!("\"{s}\""))
+	} else {
+		Cow::Borrowed(s)
+	}
 }
 
 #[cfg(test)]
@@ -82,5 +91,13 @@ mod test {
 	fn command_test(_index: usize, command: MameCommand<'_>, expected: &str) {
 		let actual = command.text();
 		assert_eq!(expected, actual);
+	}
+
+	#[test_case(0, "", "\"\"")]
+	#[test_case(1, "Foo", "Foo")]
+	#[test_case(2, "Foo Bar", "\"Foo Bar\"")]
+	fn quote_if_needed(_index: usize, s: &str, expected: &str) {
+		let actual = super::quote_if_needed(s);
+		assert_eq!(expected, &actual);
 	}
 }

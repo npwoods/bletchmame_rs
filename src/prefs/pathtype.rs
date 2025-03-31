@@ -41,6 +41,8 @@ pub enum PathType {
 	Cfg,
 	#[strum(to_string = "NVRAM", props(MameArgument = "-nvram_directory"))]
 	Nvram,
+	#[strum(to_string = "Snapshots")]
+	Snapshots,
 }
 
 impl PathType {
@@ -57,7 +59,13 @@ impl PathType {
 				name: "MAME Executable",
 				extension: EXE_EXTENSION,
 			},
-			Self::Roms | Self::Samples | Self::SoftwareLists | Self::Plugins | Self::Cfg | Self::Nvram => PickType::Dir,
+			Self::Roms
+			| Self::Samples
+			| Self::SoftwareLists
+			| Self::Plugins
+			| Self::Cfg
+			| Self::Nvram
+			| Self::Snapshots => PickType::Dir,
 		}
 	}
 

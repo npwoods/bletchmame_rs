@@ -22,6 +22,7 @@ pub enum AppCommand {
 	FileStop,
 	FilePause,
 	FileDevicesAndImages,
+	FileSaveScreenshot,
 	FileDebugger,
 	FileResetSoft,
 	FileResetHard,

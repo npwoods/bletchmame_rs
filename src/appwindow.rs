@@ -40,6 +40,7 @@ use crate::collections::toggle_builtin_collection;
 use crate::devimageconfig::DevicesImagesConfig;
 use crate::dialogs::configure::dialog_configure;
 use crate::dialogs::devimages::dialog_devices_and_images;
+use crate::dialogs::file::save_file_dialog;
 use crate::dialogs::image::Format;
 use crate::dialogs::image::dialog_load_image;
 use crate::dialogs::messagebox::OkCancel;
@@ -274,6 +275,15 @@ impl AppModel {
 
 	pub fn issue_command(&self, command: MameCommand<'_>) {
 		self.state.borrow().issue_command(command);
+	}
+
+	pub fn suggested_initial_save_filename(&self, extension: &str) -> Option<String> {
+		self.state
+			.borrow()
+			.status()
+			.as_ref()
+			.and_then(|s| s.running.as_ref())
+			.map(|r| format!("{}.{}", r.machine_name, extension))
 	}
 }
 
@@ -573,7 +583,7 @@ fn create_menu_bar() -> Menu {
 				&MenuItem::new("Load State...", false, accel("Ctrl+F7")),
 				&MenuItem::new("Save State...", false, accel("Ctrl+Shift+F7")),
 				&PredefinedMenuItem::separator(),
-				&MenuItem::new("Save Screenshot...", false, accel("F12")),
+				&MenuItem::with_id(AppCommand::FileSaveScreenshot,"Save Screenshot...", false, accel("F12")),
 				&MenuItem::new("Record Movie...", false, accel("Shift+F12")),
 				&PredefinedMenuItem::separator(),
 				&MenuItem::with_id(AppCommand::FileDebugger, "Debugger...", false, None),
@@ -706,6 +716,14 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				model.menuing_type,
 			);
 			spawn_local(fut).unwrap();
+		}
+		AppCommand::FileSaveScreenshot => {
+			let title = "Save Screenshot";
+			let file_types = [(None, "png")];
+			let initial_file = model.suggested_initial_save_filename("png");
+			if let Some(filename) = save_file_dialog(&model.app_window(), title, &file_types, initial_file) {
+				model.issue_command(MameCommand::SaveSnapshot(0, &filename));
+			}
 		}
 		AppCommand::FileDebugger => {
 			model.issue_command(MameCommand::Debugger);
@@ -1046,6 +1064,7 @@ fn update_menus(model: &AppModel) {
 			Ok(AppCommand::FileStop) => (Some(is_running), None),
 			Ok(AppCommand::FilePause) => (Some(is_running), Some(is_paused)),
 			Ok(AppCommand::FileDevicesAndImages) => (Some(is_running), None),
+			Ok(AppCommand::FileSaveScreenshot) => (Some(is_running), None),
 			Ok(AppCommand::FileDebugger) => (Some(is_running), None),
 			Ok(AppCommand::FileResetSoft) => (Some(is_running), None),
 			Ok(AppCommand::FileResetHard) => (Some(is_running), None),
