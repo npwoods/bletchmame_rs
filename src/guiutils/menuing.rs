@@ -1,4 +1,5 @@
 //! Helpers for Menu handling; which Slint does not handle yet
+use std::borrow::Cow;
 use std::convert::Infallible;
 use std::ops::ControlFlow;
 
@@ -52,6 +53,7 @@ pub fn accel(text: &str) -> Option<Accelerator> {
 pub struct MenuItemUpdate {
 	pub enabled: Option<bool>,
 	pub checked: Option<bool>,
+	pub text: Option<Cow<'static, str>>,
 }
 
 /// Extension for muda menus
@@ -71,6 +73,9 @@ impl MenuExt for Menu {
 					if let Some(enabled) = update.enabled {
 						menu_item.set_enabled(enabled);
 					}
+					if let Some(text) = update.text {
+						menu_item.set_text(&text);
+					}
 					assert!(
 						update.checked.is_none(),
 						"Menu item \"{}\" needs to be using CheckMenuItem",
@@ -84,6 +89,9 @@ impl MenuExt for Menu {
 					}
 					if let Some(checked) = update.checked {
 						menu_item.set_checked(checked);
+					}
+					if let Some(text) = update.text {
+						menu_item.set_text(&text);
 					}
 				}
 				_ => {

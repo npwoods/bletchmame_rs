@@ -1082,26 +1082,32 @@ fn update_menus(model: &AppModel) {
 		.unwrap_or_default();
 	let can_refresh_info_db = has_mame_executable && !state.is_building_infodb();
 	let is_fullscreen = model.app_window().window().is_fullscreen();
+	let is_recording = running.as_ref().map(|r| r.is_recording).unwrap_or_default();
+	let recording_message = if is_recording {
+		"Stop Recording"
+	} else {
+		"Record Movie..."
+	};
 
 	// update the menu bar
 	model.menu_bar.update(|id| {
 		let command = AppCommand::try_from(id);
-		let (enabled, checked) = match command {
-			Ok(AppCommand::FileStop) => (Some(is_running), None),
-			Ok(AppCommand::FilePause) => (Some(is_running), Some(is_paused)),
-			Ok(AppCommand::FileDevicesAndImages) => (Some(is_running), None),
-			Ok(AppCommand::FileSaveScreenshot) => (Some(is_running), None),
-			Ok(AppCommand::FileRecordMovie) => (Some(is_running), None),
-			Ok(AppCommand::FileDebugger) => (Some(is_running), None),
-			Ok(AppCommand::FileResetSoft) => (Some(is_running), None),
-			Ok(AppCommand::FileResetHard) => (Some(is_running), None),
-			Ok(AppCommand::OptionsThrottleRate(x)) => (Some(is_running), Some(Some(x) == throttle_rate)),
-			Ok(AppCommand::OptionsToggleWarp) => (Some(is_running), Some(!is_throttled)),
-			Ok(AppCommand::OptionsToggleFullScreen) => (None, Some(is_fullscreen)),
-			Ok(AppCommand::OptionsToggleSound) => (Some(is_running), Some(is_sound_enabled)),
-			Ok(AppCommand::OptionsClassic) => (Some(is_running), None),
-			Ok(AppCommand::HelpRefreshInfoDb) => (Some(can_refresh_info_db), None),
-			_ => (None, None),
+		let (enabled, checked, text) = match command {
+			Ok(AppCommand::FileStop) => (Some(is_running), None, None),
+			Ok(AppCommand::FilePause) => (Some(is_running), Some(is_paused), None),
+			Ok(AppCommand::FileDevicesAndImages) => (Some(is_running), None, None),
+			Ok(AppCommand::FileSaveScreenshot) => (Some(is_running), None, None),
+			Ok(AppCommand::FileRecordMovie) => (Some(is_running), None, Some(recording_message.into())),
+			Ok(AppCommand::FileDebugger) => (Some(is_running), None, None),
+			Ok(AppCommand::FileResetSoft) => (Some(is_running), None, None),
+			Ok(AppCommand::FileResetHard) => (Some(is_running), None, None),
+			Ok(AppCommand::OptionsThrottleRate(x)) => (Some(is_running), Some(Some(x) == throttle_rate), None),
+			Ok(AppCommand::OptionsToggleWarp) => (Some(is_running), Some(!is_throttled), None),
+			Ok(AppCommand::OptionsToggleFullScreen) => (None, Some(is_fullscreen), None),
+			Ok(AppCommand::OptionsToggleSound) => (Some(is_running), Some(is_sound_enabled), None),
+			Ok(AppCommand::OptionsClassic) => (Some(is_running), None, None),
+			Ok(AppCommand::HelpRefreshInfoDb) => (Some(can_refresh_info_db), None, None),
+			_ => (None, None, None),
 		};
 
 		// factor in the minimum MAME version when deteriming enabled, if available
@@ -1112,7 +1118,7 @@ fn update_menus(model: &AppModel) {
 				.and_then(AppCommand::minimum_mame_version)
 				.is_none_or(|a| build.is_some_and(|b| b >= &a))
 		});
-		MenuItemUpdate { enabled, checked }
+		MenuItemUpdate { enabled, checked, text }
 	});
 }
 
