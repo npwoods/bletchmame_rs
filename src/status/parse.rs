@@ -84,9 +84,11 @@ impl State {
 				Some(Phase::Status)
 			}
 			(Phase::Status, b"video") => {
-				let [throttled, throttle_rate] = evt.find_attributes([b"throttled", b"throttle_rate"])?;
+				let [throttled, throttle_rate, is_recording] =
+					evt.find_attributes([b"throttled", b"throttle_rate", b"is_recording"])?;
 				let throttled = throttled.map(parse_mame_bool).transpose()?;
 				let throttle_rate = throttle_rate.map(|x| x.parse::<f32>()).transpose()?;
+				let is_recording = is_recording.map(parse_mame_bool).transpose()?;
 
 				event!(
 					LOG,
@@ -97,6 +99,7 @@ impl State {
 
 				self.running.is_throttled = throttled.or(self.running.is_throttled);
 				self.running.throttle_rate = throttle_rate.or(self.running.throttle_rate);
+				self.running.is_recording = is_recording.or(self.running.is_recording);
 				None
 			}
 			(Phase::Status, b"sound") => {

@@ -1,4 +1,6 @@
 use std::borrow::Cow;
+use std::ffi::OsStr;
+use std::path::Path;
 
 use itertools::Itertools;
 
@@ -21,6 +23,8 @@ pub enum MameCommand<'a> {
 	UnloadImage(&'a str),
 	ChangeSlots(&'a [(&'a str, &'a str)]),
 	SaveSnapshot(u32, &'a str),
+	BeginRecording(&'a str, MovieFormat),
+	EndRecording,
 	Debugger,
 }
 
@@ -47,7 +51,30 @@ impl MameCommand<'_> {
 				let filename = quote_if_needed(filename);
 				format!("SAVE_SNAPSHOT {screen_number} {filename}").into()
 			}
+			MameCommand::BeginRecording(filename, format) => format!("BEGIN_RECORDING {filename} {format}").into(),
+			MameCommand::EndRecording => "END_RECORDING".into(),
 			MameCommand::Debugger => "DEBUGGER".into(),
+		}
+	}
+}
+
+#[derive(Copy, Clone, Debug, Default, PartialEq, strum_macros::Display)]
+pub enum MovieFormat {
+	#[default]
+	#[strum(to_string = "avi")]
+	Avi,
+	#[strum(to_string = "mng")]
+	Mng,
+}
+
+impl TryFrom<&Path> for MovieFormat {
+	type Error = ();
+
+	fn try_from(value: &Path) -> Result<Self, Self::Error> {
+		match value.extension().and_then(OsStr::to_str) {
+			Some("avi") => Ok(Self::Avi),
+			Some("mng") => Ok(Self::Mng),
+			_ => Err(()),
 		}
 	}
 }

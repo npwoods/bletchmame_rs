@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
 
@@ -70,6 +71,7 @@ use crate::prefs::pathtype::PathType;
 use crate::runtime::MameStderr;
 use crate::runtime::MameWindowing;
 use crate::runtime::command::MameCommand;
+use crate::runtime::command::MovieFormat;
 use crate::selection::SelectionManager;
 use crate::status::Status;
 use crate::threadlocalbubble::ThreadLocalBubble;
@@ -584,7 +586,7 @@ fn create_menu_bar() -> Menu {
 				&MenuItem::new("Save State...", false, accel("Ctrl+Shift+F7")),
 				&PredefinedMenuItem::separator(),
 				&MenuItem::with_id(AppCommand::FileSaveScreenshot,"Save Screenshot...", false, accel("F12")),
-				&MenuItem::new("Record Movie...", false, accel("Shift+F12")),
+				&MenuItem::with_id(AppCommand::FileRecordMovie,"Record Movie...", false, accel("Shift+F12")),
 				&PredefinedMenuItem::separator(),
 				&MenuItem::with_id(AppCommand::FileDebugger, "Debugger...", false, None),
 				&Submenu::with_items(
@@ -723,6 +725,30 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			let initial_file = model.suggested_initial_save_filename("png");
 			if let Some(filename) = save_file_dialog(&model.app_window(), title, &file_types, initial_file) {
 				model.issue_command(MameCommand::SaveSnapshot(0, &filename));
+			}
+		}
+		AppCommand::FileRecordMovie => {
+			let is_recording = model
+				.state
+				.borrow()
+				.status()
+				.as_ref()
+				.unwrap()
+				.running
+				.as_ref()
+				.unwrap()
+				.is_recording;
+
+			if is_recording {
+				model.issue_command(MameCommand::EndRecording);
+			} else {
+				let title = "Record Movie";
+				let file_types = [(None, "avi"), (None, "mng")];
+				let initial_file = model.suggested_initial_save_filename("avi");
+				if let Some(filename) = save_file_dialog(&model.app_window(), title, &file_types, initial_file) {
+					let movie_format = MovieFormat::try_from(Path::new(&filename)).unwrap_or_default();
+					model.issue_command(MameCommand::BeginRecording(&filename, movie_format));
+				}
 			}
 		}
 		AppCommand::FileDebugger => {
@@ -1056,25 +1082,32 @@ fn update_menus(model: &AppModel) {
 		.unwrap_or_default();
 	let can_refresh_info_db = has_mame_executable && !state.is_building_infodb();
 	let is_fullscreen = model.app_window().window().is_fullscreen();
+	let is_recording = running.as_ref().map(|r| r.is_recording).unwrap_or_default();
+	let recording_message = if is_recording {
+		"Stop Recording"
+	} else {
+		"Record Movie..."
+	};
 
 	// update the menu bar
 	model.menu_bar.update(|id| {
 		let command = AppCommand::try_from(id);
-		let (enabled, checked) = match command {
-			Ok(AppCommand::FileStop) => (Some(is_running), None),
-			Ok(AppCommand::FilePause) => (Some(is_running), Some(is_paused)),
-			Ok(AppCommand::FileDevicesAndImages) => (Some(is_running), None),
-			Ok(AppCommand::FileSaveScreenshot) => (Some(is_running), None),
-			Ok(AppCommand::FileDebugger) => (Some(is_running), None),
-			Ok(AppCommand::FileResetSoft) => (Some(is_running), None),
-			Ok(AppCommand::FileResetHard) => (Some(is_running), None),
-			Ok(AppCommand::OptionsThrottleRate(x)) => (Some(is_running), Some(Some(x) == throttle_rate)),
-			Ok(AppCommand::OptionsToggleWarp) => (Some(is_running), Some(!is_throttled)),
-			Ok(AppCommand::OptionsToggleFullScreen) => (None, Some(is_fullscreen)),
-			Ok(AppCommand::OptionsToggleSound) => (Some(is_running), Some(is_sound_enabled)),
-			Ok(AppCommand::OptionsClassic) => (Some(is_running), None),
-			Ok(AppCommand::HelpRefreshInfoDb) => (Some(can_refresh_info_db), None),
-			_ => (None, None),
+		let (enabled, checked, text) = match command {
+			Ok(AppCommand::FileStop) => (Some(is_running), None, None),
+			Ok(AppCommand::FilePause) => (Some(is_running), Some(is_paused), None),
+			Ok(AppCommand::FileDevicesAndImages) => (Some(is_running), None, None),
+			Ok(AppCommand::FileSaveScreenshot) => (Some(is_running), None, None),
+			Ok(AppCommand::FileRecordMovie) => (Some(is_running), None, Some(recording_message.into())),
+			Ok(AppCommand::FileDebugger) => (Some(is_running), None, None),
+			Ok(AppCommand::FileResetSoft) => (Some(is_running), None, None),
+			Ok(AppCommand::FileResetHard) => (Some(is_running), None, None),
+			Ok(AppCommand::OptionsThrottleRate(x)) => (Some(is_running), Some(Some(x) == throttle_rate), None),
+			Ok(AppCommand::OptionsToggleWarp) => (Some(is_running), Some(!is_throttled), None),
+			Ok(AppCommand::OptionsToggleFullScreen) => (None, Some(is_fullscreen), None),
+			Ok(AppCommand::OptionsToggleSound) => (Some(is_running), Some(is_sound_enabled), None),
+			Ok(AppCommand::OptionsClassic) => (Some(is_running), None, None),
+			Ok(AppCommand::HelpRefreshInfoDb) => (Some(can_refresh_info_db), None, None),
+			_ => (None, None, None),
 		};
 
 		// factor in the minimum MAME version when deteriming enabled, if available
@@ -1085,7 +1118,7 @@ fn update_menus(model: &AppModel) {
 				.and_then(AppCommand::minimum_mame_version)
 				.is_none_or(|a| build.is_some_and(|b| b >= &a))
 		});
-		MenuItemUpdate { enabled, checked }
+		MenuItemUpdate { enabled, checked, text }
 	});
 }
 
