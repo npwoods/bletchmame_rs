@@ -40,6 +40,7 @@ impl Status {
 			let is_throttled = running.is_throttled.unwrap_or(status_running.is_throttled);
 			let throttle_rate = running.throttle_rate.unwrap_or(status_running.throttle_rate);
 			let sound_attenuation = running.sound_attenuation.unwrap_or(status_running.sound_attenuation);
+			let is_recording = running.is_recording.unwrap_or(status_running.is_recording);
 			let images = if let Some(images) = running.images {
 				images
 					.into_iter()
@@ -74,6 +75,7 @@ impl Status {
 				is_throttled,
 				throttle_rate,
 				sound_attenuation,
+				is_recording,
 				images,
 				slots,
 			}
@@ -106,6 +108,7 @@ pub struct Running {
 	pub is_throttled: bool,
 	pub throttle_rate: f32,
 	pub sound_attenuation: i32,
+	pub is_recording: bool,
 	pub images: Arc<[Image]>,
 	pub slots: Arc<[Slot]>,
 }
@@ -170,6 +173,7 @@ struct RunningUpdate {
 	pub is_throttled: Option<bool>,
 	pub throttle_rate: Option<f32>,
 	pub sound_attenuation: Option<i32>,
+	pub is_recording: Option<bool>,
 	pub images: Option<Vec<ImageUpdate>>,
 	pub slots: Option<Vec<Slot>>,
 }
