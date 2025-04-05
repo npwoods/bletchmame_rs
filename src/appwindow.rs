@@ -586,8 +586,8 @@ fn create_menu_bar() -> Menu {
 				&PredefinedMenuItem::separator(),
 				&MenuItem::with_id(AppCommand::FileDevicesAndImages,"Devices and Images...", false, None),
 				&PredefinedMenuItem::separator(),
-				&MenuItem::new("Quick Load State", false, accel("F7")),
-				&MenuItem::new("Quick Save State", false, accel("Shift+F7")),
+				&MenuItem::with_id(AppCommand::FileQuickLoadState,"Quick Load State", false, accel("F7")),
+				&MenuItem::with_id(AppCommand::FileQuickSaveState,"Quick Save State", false, accel("Shift+F7")),
 				&MenuItem::with_id(AppCommand::FileLoadState,"Load State...", false, accel("Ctrl+F7")),
 				&MenuItem::with_id(AppCommand::FileSaveState, "Save State...", false, accel("Ctrl+Shift+F7")),
 				&PredefinedMenuItem::separator(),
@@ -724,6 +724,14 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				model.menuing_type,
 			);
 			spawn_local(fut).unwrap();
+		}
+		AppCommand::FileQuickLoadState => {
+			let last_save_state = model.state.borrow().last_save_state().unwrap();
+			model.issue_command(MameCommand::StateLoad(last_save_state.as_ref()));
+		}
+		AppCommand::FileQuickSaveState => {
+			let last_save_state = model.state.borrow().last_save_state().unwrap();
+			model.issue_command(MameCommand::StateSave(last_save_state.as_ref()));
 		}
 		AppCommand::FileLoadState => {
 			let model_clone = model.clone();
@@ -1158,6 +1166,7 @@ fn update_menus(model: &AppModel) {
 	} else {
 		"Record Movie..."
 	};
+	let has_last_save_state = is_running && state.last_save_state().is_some();
 
 	// update the menu bar
 	model.menu_bar.update(|id| {
@@ -1166,6 +1175,8 @@ fn update_menus(model: &AppModel) {
 			Ok(AppCommand::FileStop) => (Some(is_running), None, None),
 			Ok(AppCommand::FilePause) => (Some(is_running), Some(is_paused), None),
 			Ok(AppCommand::FileDevicesAndImages) => (Some(is_running), None, None),
+			Ok(AppCommand::FileQuickLoadState) => (Some(has_last_save_state), None, None),
+			Ok(AppCommand::FileQuickSaveState) => (Some(has_last_save_state), None, None),
 			Ok(AppCommand::FileLoadState) => (Some(is_running), None, None),
 			Ok(AppCommand::FileSaveState) => (Some(is_running), None, None),
 			Ok(AppCommand::FileSaveScreenshot) => (Some(is_running), None, None),

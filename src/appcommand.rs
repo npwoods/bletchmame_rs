@@ -22,6 +22,8 @@ pub enum AppCommand {
 	FileStop,
 	FilePause,
 	FileDevicesAndImages,
+	FileQuickLoadState,
+	FileQuickSaveState,
 	FileLoadState,
 	FileSaveState,
 	FileSaveScreenshot,
