@@ -1,15 +1,15 @@
 use std::borrow::Cow;
 use std::ffi::OsStr;
-use std::ffi::OsString;
 use std::path::Path;
 
-use rfd::FileDialog;
+use rfd::AsyncFileDialog;
+use rfd::FileHandle;
 use slint::ComponentHandle;
 
 use crate::prefs::pathtype::PathType;
 use crate::prefs::pathtype::PickType;
 
-pub fn choose_path_by_type_dialog(
+pub async fn choose_path_by_type_dialog(
 	parent: &impl ComponentHandle,
 	path_type: PathType,
 	initial: Option<&Path>,
@@ -41,15 +41,15 @@ pub fn choose_path_by_type_dialog(
 		dialog
 	};
 
-	let path = match path_type.pick_type() {
-		PickType::File { name, extension } => dialog.add_filter(name, &[extension]).pick_file(),
-		PickType::Dir => dialog.pick_folder(),
+	let fh = match path_type.pick_type() {
+		PickType::File { name, extension } => dialog.add_filter(name, &[extension]).pick_file().await,
+		PickType::Dir => dialog.pick_folder().await,
 	}?;
 
-	Some(string_from_osstring_lossy(path))
+	Some(string_from_filehandle_lossy(fh))
 }
 
-pub fn save_file_dialog(
+pub async fn save_file_dialog(
 	parent: &impl ComponentHandle,
 	title: &str,
 	file_types: &[(Option<&str>, &str)],
@@ -73,15 +73,13 @@ pub fn save_file_dialog(
 		dialog = dialog.set_file_name(initial_file);
 	}
 
-	dialog.save_file().map(string_from_osstring_lossy)
+	dialog.save_file().await.map(string_from_filehandle_lossy)
 }
 
-fn create_file_dialog(parent: &impl ComponentHandle) -> FileDialog {
-	FileDialog::new().set_parent(&parent.window().window_handle())
+fn create_file_dialog(parent: &impl ComponentHandle) -> AsyncFileDialog {
+	AsyncFileDialog::new().set_parent(&parent.window().window_handle())
 }
 
-fn string_from_osstring_lossy(s: impl Into<OsString>) -> String {
-	s.into()
-		.into_string()
-		.unwrap_or_else(|e| e.to_string_lossy().into_owned())
+fn string_from_filehandle_lossy(fh: FileHandle) -> String {
+	fh.path().to_string_lossy().into_owned()
 }
