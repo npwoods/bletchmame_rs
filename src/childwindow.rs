@@ -52,7 +52,7 @@ impl ChildWindow {
 		let position = PhysicalPosition::new(0, (top * container.scale_factor()) as u32);
 		let size = container.size();
 		let size = PhysicalSize::new(size.width, size.height - position.y);
-		event!(LOG, "ChildWindow::update(): position={:?} size={:?}", position, size);
+		event!(LOG, position=?position, size=?size, "ChildWindow::update()");
 
 		// and set them
 		window.set_outer_position(position);

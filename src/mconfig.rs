@@ -209,7 +209,7 @@ impl MachineConfig {
 	}
 
 	pub fn set_slot_option(&self, tag: &str, new_option_name: Option<&str>) -> Result<Option<Self>> {
-		event!(LOG, "MachineConfig::set_option(): {tag:?} {new_option_name:?}");
+		event!(LOG, tag=?tag, new_option_name=?new_option_name, "MachineConfig::set_option()");
 
 		let machine = self.machine();
 		let changes = match self.traverse_tag(tag)? {

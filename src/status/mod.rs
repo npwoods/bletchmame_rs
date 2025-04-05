@@ -80,7 +80,7 @@ impl Status {
 				slots,
 			}
 		});
-		event!(LOG, "Status::merge(): running={:?}", running);
+		event!(LOG, running=?running, "Status::merge()");
 		Self {
 			running,
 			build: update.build,

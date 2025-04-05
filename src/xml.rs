@@ -61,7 +61,7 @@ where
 			self.set_done();
 		}
 
-		event!(LOG, "XmlReader::next(): result={:?}", result);
+		event!(LOG, result=?result, "XmlReader::next()");
 		result
 	}
 

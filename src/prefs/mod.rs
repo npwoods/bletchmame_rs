@@ -346,14 +346,14 @@ impl Preferences {
 		// try to load the preferences
 		let path = prefs_filename(prefs_path, PREFS)?;
 		let result = load_prefs(&path);
-		event!(LOG, "Preferences::load(): result={:?}", result.as_ref().map(|_| ()));
+		event!(LOG, "result" = ?result.as_ref().map(|_| ()), "Preferences::load()");
 
 		// did we error?
 		if result.is_err() {
 			// we did; back up this file
 			if let Ok(renamed) = prefs_filename(prefs_path, PREFS_BACKUP) {
 				let rc = rename(&path, &renamed);
-				event!(LOG, "Preferences::load(): {:?} ==> {:?}; rc={:?}", path, renamed, rc,);
+				event!(LOG, path=?path, renamed=?renamed, rc=?rc, "Preferences::load()");
 			}
 		}
 

@@ -70,9 +70,9 @@ impl State {
 				let is_paused = is_paused.map(|x| parse_mame_bool(x.as_ref())).transpose()?;
 				event!(
 					LOG,
-					"status State::handle_start(): machine_name={} is_paused={:?}",
-					machine_name,
-					is_paused
+					machine_name=?machine_name,
+					is_paused=?is_paused,
+					"status State::handle_start()"
 				);
 
 				let app_build = app_build.map(MameVersion::from);
@@ -92,9 +92,9 @@ impl State {
 
 				event!(
 					LOG,
-					"status State::handle_start(): throttled={:?} throttle_rate={:?}",
-					throttled,
-					throttle_rate
+					throttled=?throttled,
+					throttle_rate=?throttle_rate,
+					"status State::handle_start()"
 				);
 
 				self.running.is_throttled = throttled.or(self.running.is_throttled);
