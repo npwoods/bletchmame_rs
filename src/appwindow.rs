@@ -726,8 +726,9 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				let title = "Save Screenshot";
 				let file_types = [(None, "png")];
 				let initial_file = model.suggested_initial_save_filename("png");
-
-				if let Some(filename) = save_file_dialog(&model.app_window(), title, &file_types, initial_file).await {
+				if let Some(filename) =
+					save_file_dialog(&model.app_window(), title, &file_types, None, initial_file.as_deref()).await
+				{
 					model.issue_command(MameCommand::SaveSnapshot(0, &filename));
 				}
 			};
@@ -759,7 +760,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 					let file_types = file_types.iter().map(|ext| (None, ext.as_str())).collect::<Vec<_>>();
 					let initial_file = model.suggested_initial_save_filename(&MovieFormat::default().to_string());
 					if let Some(filename) =
-						save_file_dialog(&model.app_window(), title, &file_types, initial_file).await
+						save_file_dialog(&model.app_window(), title, &file_types, None, initial_file.as_deref()).await
 					{
 						let movie_format = MovieFormat::try_from(Path::new(&filename)).unwrap_or_default();
 						model.issue_command(MameCommand::BeginRecording(&filename, movie_format));
