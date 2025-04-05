@@ -193,7 +193,9 @@ fn browse_clicked(dialog: &PathsDialog, paths: &RefCell<PrefsPaths>) {
 	let resolved_existing_path = resolved_existing_path.as_deref();
 	event!(
 		LOG,
-		"browse_clicked(): existing_path={existing_path:?} resolved_existing_path={resolved_existing_path:?}"
+		existing_path=?existing_path,
+		resolved_existing_path=?resolved_existing_path,
+		"browse_clicked()"
 	);
 
 	// show the file dialog

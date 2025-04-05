@@ -430,11 +430,11 @@ impl ItemsTableModel {
 
 		event!(
 			LOG,
-			"set_columns_and_search(): search={:?} sorting={:?} search_changed={} sorting_changed={:?}",
-			search,
-			sorting,
-			search_changed,
-			sorting_changed
+			search=?search,
+			sorting=?sorting,
+			search_changed=?search_changed,
+			sorting_changed=?sorting_changed,
+			"set_columns_and_search()"
 		);
 
 		// if anything changed, update our map

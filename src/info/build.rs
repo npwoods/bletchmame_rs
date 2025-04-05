@@ -107,8 +107,7 @@ impl State {
 	}
 
 	pub fn handle_start(&mut self, evt: XmlElement<'_>) -> Result<Option<Phase>> {
-		event!(LOG, "handle_start(): self={:?}", self);
-		event!(LOG, "handle_start(): {:?}", evt);
+		event!(LOG, self=?self, evt=?evt, "handle_start()");
 
 		let phase = self.phase_stack.last().unwrap_or(&Phase::Root);
 		let new_phase = match (phase, evt.name().as_ref()) {
@@ -292,7 +291,7 @@ impl State {
 	}
 
 	pub fn handle_end(&mut self, callback: &mut impl FnMut(&str) -> bool, text: Option<String>) -> Result<Option<()>> {
-		event!(LOG, "handle_end(): self={:?}", self);
+		event!(LOG, self=?self, "handle_end()");
 
 		match self.phase_stack.last().unwrap_or(&Phase::Root) {
 			Phase::MachineDescription => {

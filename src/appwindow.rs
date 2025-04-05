@@ -684,7 +684,7 @@ fn create_menu_bar() -> Menu {
 }
 
 fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
-	event!(LOG_COMMANDS, "handle_command(): command={:?}", &command);
+	event!(LOG_COMMANDS, command=?&command, "handle_command()");
 	match command {
 		AppCommand::FileStop => {
 			model.issue_command(MameCommand::Stop);
