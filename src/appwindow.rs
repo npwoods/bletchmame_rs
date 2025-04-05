@@ -752,8 +752,12 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				let fut = async move {
 					let model = model_clone.as_ref();
 					let title = "Record Movie";
-					let file_types = [(None, "avi"), (None, "mng")];
-					let initial_file = model.suggested_initial_save_filename("avi");
+					let file_types = MovieFormat::all_values()
+						.iter()
+						.map(MovieFormat::to_string)
+						.collect::<Vec<_>>();
+					let file_types = file_types.iter().map(|ext| (None, ext.as_str())).collect::<Vec<_>>();
+					let initial_file = model.suggested_initial_save_filename(&MovieFormat::default().to_string());
 					if let Some(filename) =
 						save_file_dialog(&model.app_window(), title, &file_types, initial_file).await
 					{
