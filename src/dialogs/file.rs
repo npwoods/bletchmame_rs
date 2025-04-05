@@ -27,6 +27,20 @@ pub async fn choose_path_by_type_dialog(
 	Some(string_from_filehandle_lossy(fh))
 }
 
+pub async fn load_file_dialog(
+	parent: &impl ComponentHandle,
+	title: &str,
+	file_types: &[(Option<&str>, &str)],
+	initial_dir: Option<&Path>,
+	initial_file: Option<&str>,
+) -> Option<String> {
+	let dialog = create_file_dialog(parent);
+	let dialog = dialog.set_title(title);
+	let dialog = set_file_dialog_file_types(dialog, file_types);
+	let dialog = set_file_dialog_initial_target(dialog, initial_dir, initial_file);
+	dialog.pick_file().await.map(string_from_filehandle_lossy)
+}
+
 pub async fn save_file_dialog(
 	parent: &impl ComponentHandle,
 	title: &str,
