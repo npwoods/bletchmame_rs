@@ -720,12 +720,18 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			spawn_local(fut).unwrap();
 		}
 		AppCommand::FileSaveScreenshot => {
-			let title = "Save Screenshot";
-			let file_types = [(None, "png")];
-			let initial_file = model.suggested_initial_save_filename("png");
-			if let Some(filename) = save_file_dialog(&model.app_window(), title, &file_types, initial_file) {
-				model.issue_command(MameCommand::SaveSnapshot(0, &filename));
-			}
+			let model_clone = model.clone();
+			let fut = async move {
+				let model = model_clone.as_ref();
+				let title = "Save Screenshot";
+				let file_types = [(None, "png")];
+				let initial_file = model.suggested_initial_save_filename("png");
+
+				if let Some(filename) = save_file_dialog(&model.app_window(), title, &file_types, initial_file).await {
+					model.issue_command(MameCommand::SaveSnapshot(0, &filename));
+				}
+			};
+			spawn_local(fut).unwrap();
 		}
 		AppCommand::FileRecordMovie => {
 			let is_recording = model
@@ -742,13 +748,20 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			if is_recording {
 				model.issue_command(MameCommand::EndRecording);
 			} else {
-				let title = "Record Movie";
-				let file_types = [(None, "avi"), (None, "mng")];
-				let initial_file = model.suggested_initial_save_filename("avi");
-				if let Some(filename) = save_file_dialog(&model.app_window(), title, &file_types, initial_file) {
-					let movie_format = MovieFormat::try_from(Path::new(&filename)).unwrap_or_default();
-					model.issue_command(MameCommand::BeginRecording(&filename, movie_format));
-				}
+				let model_clone = model.clone();
+				let fut = async move {
+					let model = model_clone.as_ref();
+					let title = "Record Movie";
+					let file_types = [(None, "avi"), (None, "mng")];
+					let initial_file = model.suggested_initial_save_filename("avi");
+					if let Some(filename) =
+						save_file_dialog(&model.app_window(), title, &file_types, initial_file).await
+					{
+						let movie_format = MovieFormat::try_from(Path::new(&filename)).unwrap_or_default();
+						model.issue_command(MameCommand::BeginRecording(&filename, movie_format));
+					}
+				};
+				spawn_local(fut).unwrap();
 			}
 		}
 		AppCommand::FileDebugger => {

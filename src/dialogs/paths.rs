@@ -82,9 +82,8 @@ pub async fn dialog_paths(
 	// set up the "browse" button
 	let state_clone = state.clone();
 	modal.dialog().on_browse_clicked(move || {
-		let dialog = state_clone.dialog_weak.unwrap();
-		browse_clicked(&dialog, &state_clone.paths);
-		model_contents_changed(&state_clone);
+		let fut = browse_clicked(state_clone.clone());
+		spawn_local(fut).unwrap();
 	});
 
 	// set up the "delete" button
@@ -180,8 +179,9 @@ fn update_paths_entries(dialog: &PathsDialog, paths: &PrefsPaths) {
 	model.update(paths_entries, path_type.is_multi());
 }
 
-fn browse_clicked(dialog: &PathsDialog, paths: &RefCell<PrefsPaths>) {
-	let path_type = path_type(dialog);
+async fn browse_clicked(state: Rc<State>) {
+	let dialog = state.dialog_weak.unwrap();
+	let path_type = path_type(&dialog);
 	let model = dialog.get_path_entries();
 	let model = PathEntriesModel::get_model(&model);
 
@@ -189,7 +189,9 @@ fn browse_clicked(dialog: &PathsDialog, paths: &RefCell<PrefsPaths>) {
 	let existing_path = usize::try_from(dialog.get_path_entry_index())
 		.ok()
 		.and_then(|index| model.entry(index));
-	let resolved_existing_path = existing_path.as_ref().and_then(|path| paths.borrow().resolve(path));
+	let resolved_existing_path = existing_path
+		.as_ref()
+		.and_then(|path| state.paths.borrow().resolve(path));
 	let resolved_existing_path = resolved_existing_path.as_deref();
 	event!(
 		LOG,
@@ -199,13 +201,14 @@ fn browse_clicked(dialog: &PathsDialog, paths: &RefCell<PrefsPaths>) {
 	);
 
 	// show the file dialog
-	let Some(path) = choose_path_by_type_dialog(dialog, path_type, resolved_existing_path) else {
+	let Some(path) = choose_path_by_type_dialog(&dialog, path_type, resolved_existing_path).await else {
 		return;
 	};
 	let Ok(row) = usize::try_from(dialog.get_path_entry_index()) else {
 		return;
 	};
 	model.set_entry(row, &path, Icon::Blank);
+	model_contents_changed(&state);
 }
 
 fn delete_clicked(dialog: &PathsDialog) {
