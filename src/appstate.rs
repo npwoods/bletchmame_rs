@@ -36,6 +36,7 @@ pub struct AppState {
 	info_db_build: Option<InfoDbBuild>,
 	live: Option<Live>,
 	failure: Option<Rc<Failure>>,
+	last_save_state: Option<Rc<str>>,
 	pending_shutdown: bool,
 	fixed: Rc<Fixed>,
 }
@@ -127,6 +128,7 @@ impl AppState {
 			info_db_build: None,
 			live: None,
 			failure: None,
+			last_save_state: None,
 			pending_shutdown: false,
 			fixed,
 		}
@@ -695,6 +697,18 @@ impl AppState {
 
 	pub fn prefs_path(&self) -> &'_ Path {
 		&self.fixed.prefs_path
+	}
+
+	pub fn last_save_state(&self) -> Option<Rc<str>> {
+		self.last_save_state.clone()
+	}
+
+	pub fn set_last_save_state(&self, last_save_state: impl Into<Option<Rc<str>>>) -> Self {
+		let last_save_state = last_save_state.into();
+		Self {
+			last_save_state,
+			..self.clone()
+		}
 	}
 }
 

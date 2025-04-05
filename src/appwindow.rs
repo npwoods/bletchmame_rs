@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::path::Path;
 use std::path::PathBuf;
@@ -41,6 +42,8 @@ use crate::collections::toggle_builtin_collection;
 use crate::devimageconfig::DevicesImagesConfig;
 use crate::dialogs::configure::dialog_configure;
 use crate::dialogs::devimages::dialog_devices_and_images;
+use crate::dialogs::file::initial_dir_and_file_from_path;
+use crate::dialogs::file::load_file_dialog;
 use crate::dialogs::file::save_file_dialog;
 use crate::dialogs::image::Format;
 use crate::dialogs::image::dialog_load_image;
@@ -84,6 +87,9 @@ const LOG_PREFS: Level = Level::INFO;
 
 const SOUND_ATTENUATION_OFF: i32 = -32;
 const SOUND_ATTENUATION_ON: i32 = 0;
+
+const SAVE_STATE_EXTENSION: &str = "sta";
+const SAVE_STATE_FILE_TYPES: &[(Option<&str>, &str)] = &[(Some("MAME Saved State Files"), SAVE_STATE_EXTENSION)];
 
 /// Arguments to the application (derivative from the command line); almost all of this
 /// are power user features or diagnostics
@@ -580,10 +586,10 @@ fn create_menu_bar() -> Menu {
 				&PredefinedMenuItem::separator(),
 				&MenuItem::with_id(AppCommand::FileDevicesAndImages,"Devices and Images...", false, None),
 				&PredefinedMenuItem::separator(),
-				&MenuItem::new("Quick Load State", false, accel("F7")),
-				&MenuItem::new("Quick Save State", false, accel("Shift+F7")),
-				&MenuItem::new("Load State...", false, accel("Ctrl+F7")),
-				&MenuItem::new("Save State...", false, accel("Ctrl+Shift+F7")),
+				&MenuItem::with_id(AppCommand::FileQuickLoadState,"Quick Load State", false, accel("F7")),
+				&MenuItem::with_id(AppCommand::FileQuickSaveState,"Quick Save State", false, accel("Shift+F7")),
+				&MenuItem::with_id(AppCommand::FileLoadState,"Load State...", false, accel("Ctrl+F7")),
+				&MenuItem::with_id(AppCommand::FileSaveState, "Save State...", false, accel("Ctrl+Shift+F7")),
 				&PredefinedMenuItem::separator(),
 				&MenuItem::with_id(AppCommand::FileSaveScreenshot,"Save Screenshot...", false, accel("F12")),
 				&MenuItem::with_id(AppCommand::FileRecordMovie,"Record Movie...", false, accel("Shift+F12")),
@@ -719,6 +725,60 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			);
 			spawn_local(fut).unwrap();
 		}
+		AppCommand::FileQuickLoadState => {
+			let last_save_state = model.state.borrow().last_save_state().unwrap();
+			model.issue_command(MameCommand::StateLoad(last_save_state.as_ref()));
+		}
+		AppCommand::FileQuickSaveState => {
+			let last_save_state = model.state.borrow().last_save_state().unwrap();
+			model.issue_command(MameCommand::StateSave(last_save_state.as_ref()));
+		}
+		AppCommand::FileLoadState => {
+			let model_clone = model.clone();
+			let fut = async move {
+				let last_save_state = model_clone.state.borrow().last_save_state();
+				let (initial_dir, initial_file) =
+					initial_dir_and_file_from_path(last_save_state.as_deref().map(Path::new));
+
+				let title = "Load State";
+				let file_types = SAVE_STATE_FILE_TYPES;
+				if let Some(filename) =
+					load_file_dialog(&model_clone.app_window(), title, file_types, initial_dir, initial_file).await
+				{
+					model_clone.issue_command(MameCommand::StateLoad(&filename));
+					model_clone.update_state(|state| Some(state.set_last_save_state(Some(filename.into()))));
+				}
+			};
+			spawn_local(fut).unwrap();
+		}
+		AppCommand::FileSaveState => {
+			let model_clone = model.clone();
+			let fut = async move {
+				let last_save_state = model_clone.state.borrow().last_save_state();
+				let (initial_dir, initial_file) =
+					initial_dir_and_file_from_path(last_save_state.as_deref().map(Path::new));
+				let (initial_dir, initial_file) = if initial_dir.is_some() && initial_file.is_some() {
+					let initial_file = initial_file.map(Cow::Borrowed);
+					(initial_dir, initial_file)
+				} else {
+					let initial_file = model_clone
+						.suggested_initial_save_filename(SAVE_STATE_EXTENSION)
+						.map(Cow::Owned);
+					(None, initial_file)
+				};
+				let initial_file = initial_file.as_deref();
+
+				let title = "Save State";
+				let file_types = SAVE_STATE_FILE_TYPES;
+				if let Some(filename) =
+					save_file_dialog(&model_clone.app_window(), title, file_types, initial_dir, initial_file).await
+				{
+					model_clone.issue_command(MameCommand::StateSave(&filename));
+					model_clone.update_state(|state| Some(state.set_last_save_state(Some(filename.into()))));
+				}
+			};
+			spawn_local(fut).unwrap();
+		}
 		AppCommand::FileSaveScreenshot => {
 			let model_clone = model.clone();
 			let fut = async move {
@@ -726,8 +786,9 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				let title = "Save Screenshot";
 				let file_types = [(None, "png")];
 				let initial_file = model.suggested_initial_save_filename("png");
-
-				if let Some(filename) = save_file_dialog(&model.app_window(), title, &file_types, initial_file).await {
+				if let Some(filename) =
+					save_file_dialog(&model.app_window(), title, &file_types, None, initial_file.as_deref()).await
+				{
 					model.issue_command(MameCommand::SaveSnapshot(0, &filename));
 				}
 			};
@@ -759,7 +820,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 					let file_types = file_types.iter().map(|ext| (None, ext.as_str())).collect::<Vec<_>>();
 					let initial_file = model.suggested_initial_save_filename(&MovieFormat::default().to_string());
 					if let Some(filename) =
-						save_file_dialog(&model.app_window(), title, &file_types, initial_file).await
+						save_file_dialog(&model.app_window(), title, &file_types, None, initial_file.as_deref()).await
 					{
 						let movie_format = MovieFormat::try_from(Path::new(&filename)).unwrap_or_default();
 						model.issue_command(MameCommand::BeginRecording(&filename, movie_format));
@@ -1105,6 +1166,7 @@ fn update_menus(model: &AppModel) {
 	} else {
 		"Record Movie..."
 	};
+	let has_last_save_state = is_running && state.last_save_state().is_some();
 
 	// update the menu bar
 	model.menu_bar.update(|id| {
@@ -1113,6 +1175,10 @@ fn update_menus(model: &AppModel) {
 			Ok(AppCommand::FileStop) => (Some(is_running), None, None),
 			Ok(AppCommand::FilePause) => (Some(is_running), Some(is_paused), None),
 			Ok(AppCommand::FileDevicesAndImages) => (Some(is_running), None, None),
+			Ok(AppCommand::FileQuickLoadState) => (Some(has_last_save_state), None, None),
+			Ok(AppCommand::FileQuickSaveState) => (Some(has_last_save_state), None, None),
+			Ok(AppCommand::FileLoadState) => (Some(is_running), None, None),
+			Ok(AppCommand::FileSaveState) => (Some(is_running), None, None),
 			Ok(AppCommand::FileSaveScreenshot) => (Some(is_running), None, None),
 			Ok(AppCommand::FileRecordMovie) => (Some(is_running), None, Some(recording_message.into())),
 			Ok(AppCommand::FileDebugger) => (Some(is_running), None, None),

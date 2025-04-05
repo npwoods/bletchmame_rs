@@ -22,6 +22,10 @@ pub enum AppCommand {
 	FileStop,
 	FilePause,
 	FileDevicesAndImages,
+	FileQuickLoadState,
+	FileQuickSaveState,
+	FileLoadState,
+	FileSaveState,
 	FileSaveScreenshot,
 	#[strum(props(MinimumMame = "0.221"))]
 	FileRecordMovie, // recording movies by specifying absolute paths was introduced in MAME 0.221
