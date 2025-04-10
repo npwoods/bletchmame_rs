@@ -7,6 +7,7 @@ use std::process::Command;
 
 use anyhow::Error;
 use anyhow::Result;
+use easy_ext::ext;
 use i_slint_backend_winit::WinitWindowAccessor;
 use muda::Menu;
 use raw_window_handle::HasWindowHandle;
@@ -67,14 +68,8 @@ impl WinWindowAttributesExt for WindowAttributes {
 	}
 }
 
-pub trait WinWindowExt {
-	fn attach_menu_bar(&self, menu_bar: &Menu) -> Result<()>;
-	fn show_popup_menu(&self, popup_menu: &Menu, position: LogicalPosition);
-	fn set_enabled_for_modal(&self, enabled: bool);
-	fn ensure_child_focus(&self, child: &winit::window::Window);
-}
-
-impl WinWindowExt for Window {
+#[ext(WinWindowExt)]
+pub impl Window {
 	fn attach_menu_bar(&self, menu_bar: &Menu) -> Result<()> {
 		menuing::attach_menu_bar(self, menu_bar)
 	}
