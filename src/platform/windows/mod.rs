@@ -7,6 +7,7 @@ use std::process::Command;
 
 use anyhow::Error;
 use anyhow::Result;
+use easy_ext::ext;
 use i_slint_backend_winit::WinitWindowAccessor;
 use muda::Menu;
 use raw_window_handle::HasWindowHandle;
@@ -43,11 +44,8 @@ pub fn win_platform_init() -> Result<impl Any, Error> {
 	Ok(job)
 }
 
-pub trait WinCommandExt {
-	fn create_no_window(&mut self, flag: bool) -> &mut Self;
-}
-
-impl WinCommandExt for Command {
+#[ext(WinCommandExt)]
+pub impl Command {
 	fn create_no_window(&mut self, flag: bool) -> &mut Self {
 		if flag {
 			self.creation_flags(CREATE_NO_WINDOW.0);
@@ -56,25 +54,16 @@ impl WinCommandExt for Command {
 	}
 }
 
-pub trait WinWindowAttributesExt {
-	fn with_owner_window(self, owner: &Window) -> Self;
-}
-
-impl WinWindowAttributesExt for WindowAttributes {
+#[ext(WinWindowAttributesExt)]
+pub impl WindowAttributes {
 	fn with_owner_window(self, owner: &Window) -> Self {
 		let win32_window = get_win32_window_handle(owner).unwrap();
 		WindowAttributesExtWindows::with_owner_window(self, win32_window.hwnd.into())
 	}
 }
 
-pub trait WinWindowExt {
-	fn attach_menu_bar(&self, menu_bar: &Menu) -> Result<()>;
-	fn show_popup_menu(&self, popup_menu: &Menu, position: LogicalPosition);
-	fn set_enabled_for_modal(&self, enabled: bool);
-	fn ensure_child_focus(&self, child: &winit::window::Window);
-}
-
-impl WinWindowExt for Window {
+#[ext(WinWindowExt)]
+pub impl Window {
 	fn attach_menu_bar(&self, menu_bar: &Menu) -> Result<()> {
 		menuing::attach_menu_bar(self, menu_bar)
 	}

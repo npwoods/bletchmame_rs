@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use std::convert::Infallible;
 use std::ops::ControlFlow;
 
+use easy_ext::ext;
 use i_slint_core::items::MenuEntry as SlintMenuEntry;
 use muda::IsMenuItem;
 use muda::Menu;
@@ -57,14 +58,8 @@ pub struct MenuItemUpdate {
 }
 
 /// Extension for muda menus
-pub trait MenuExt {
-	fn update(&self, callback: impl Fn(&MenuId) -> MenuItemUpdate);
-	fn slint_menu_entries(&self, sub_menu: Option<&SlintMenuEntry>) -> ModelRc<SlintMenuEntry>;
-	fn is_natively_supported() -> bool;
-	fn visit<B, C>(&self, init: C, func: impl Fn(C, &MenuItemKind) -> ControlFlow<B, C>) -> ControlFlow<B, C>;
-}
-
-impl MenuExt for Menu {
+#[ext(MenuExt)]
+pub impl Menu {
 	fn update(&self, callback: impl Fn(&MenuId) -> MenuItemUpdate) {
 		self.visit((), |_, item| {
 			match item {
