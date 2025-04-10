@@ -44,11 +44,8 @@ pub fn win_platform_init() -> Result<impl Any, Error> {
 	Ok(job)
 }
 
-pub trait WinCommandExt {
-	fn create_no_window(&mut self, flag: bool) -> &mut Self;
-}
-
-impl WinCommandExt for Command {
+#[ext(WinCommandExt)]
+pub impl Command {
 	fn create_no_window(&mut self, flag: bool) -> &mut Self {
 		if flag {
 			self.creation_flags(CREATE_NO_WINDOW.0);
