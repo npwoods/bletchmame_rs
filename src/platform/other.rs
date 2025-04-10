@@ -14,11 +14,8 @@ pub fn other_platform_init() -> Result<impl Any> {
 	Ok(())
 }
 
-pub trait OtherCommandExt {
-	fn create_no_window(&mut self, flag: bool) -> &mut Self;
-}
-
-impl OtherCommandExt for Command {
+#[ext(OtherCommandExt)]
+pub impl Command {
 	fn create_no_window(&mut self, _flag: bool) -> &mut Self {
 		self
 	}
