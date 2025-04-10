@@ -24,11 +24,8 @@ impl OtherCommandExt for Command {
 	}
 }
 
-pub trait OtherWindowAttributesExt {
-	fn with_owner_window(self, owner: &Window) -> Self;
-}
-
-impl OtherWindowAttributesExt for WindowAttributes {
+#[ext(OtherWindowAttributesExt)]
+pub impl WindowAttributes {
 	fn with_owner_window(self, _owner: &Window) -> Self {
 		self
 	}
