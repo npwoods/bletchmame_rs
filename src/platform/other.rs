@@ -4,6 +4,7 @@ use std::any::Any;
 use std::process::Command;
 
 use anyhow::Result;
+use easy_ext::ext;
 use muda::Menu;
 use slint::LogicalPosition;
 use slint::Window;
@@ -33,14 +34,8 @@ impl OtherWindowAttributesExt for WindowAttributes {
 	}
 }
 
-pub trait OtherWindowExt {
-	fn attach_menu_bar(&self, menu_bar: &Menu) -> Result<()>;
-	fn show_popup_menu(&self, popup_menu: &Menu, point: LogicalPosition);
-	fn set_enabled_for_modal(&self, enabled: bool);
-	fn ensure_child_focus(&self, child: &winit::window::Window);
-}
-
-impl OtherWindowExt for Window {
+#[ext(OtherWindowExt)]
+pub impl Window {
 	fn attach_menu_bar(&self, _menu_bar: &Menu) -> Result<()> {
 		todo!()
 	}
