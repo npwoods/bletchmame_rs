@@ -62,37 +62,16 @@ pub struct MenuItemUpdate {
 pub impl Menu {
 	fn update(&self, callback: impl Fn(&MenuId) -> MenuItemUpdate) {
 		self.visit((), |_, item| {
-			match item {
-				MenuItemKind::MenuItem(menu_item) => {
-					let update = callback(menu_item.id());
-					if let Some(enabled) = update.enabled {
-						menu_item.set_enabled(enabled);
-					}
-					if let Some(text) = update.text {
-						menu_item.set_text(&text);
-					}
-					assert!(
-						update.checked.is_none(),
-						"Menu item \"{}\" needs to be using CheckMenuItem",
-						menu_item.text()
-					);
-				}
-				MenuItemKind::Check(menu_item) => {
-					let update = callback(menu_item.id());
-					if let Some(enabled) = update.enabled {
-						menu_item.set_enabled(enabled);
-					}
-					if let Some(checked) = update.checked {
-						menu_item.set_checked(checked);
-					}
-					if let Some(text) = update.text {
-						menu_item.set_text(&text);
-					}
-				}
-				_ => {
-					// do nothing
-				}
-			};
+			let update = callback(item.id());
+			if let Some(enabled) = update.enabled {
+				item.set_enabled(enabled);
+			}
+			if let Some(checked) = update.checked {
+				item.set_checked(checked);
+			}
+			if let Some(text) = update.text {
+				item.set_text(&text);
+			}
 			ControlFlow::<Infallible>::Continue(())
 		});
 	}
@@ -133,6 +112,29 @@ pub impl Menu {
 
 	fn visit<B, C>(&self, init: C, func: impl Fn(C, &MenuItemKind) -> ControlFlow<B, C>) -> ControlFlow<B, C> {
 		visit_menu_items(&self.items(), init, &func)
+	}
+}
+
+#[ext]
+impl MenuItemKind {
+	fn set_text(&self, text: impl AsRef<str>) {
+		match self {
+			MenuItemKind::MenuItem(menu_item) => menu_item.set_text(text),
+			MenuItemKind::Check(check_menu_item) => check_menu_item.set_text(text),
+			_ => todo!(),
+		}
+	}
+
+	fn set_enabled(&self, enabled: bool) {
+		match self {
+			MenuItemKind::MenuItem(menu_item) => menu_item.set_enabled(enabled),
+			MenuItemKind::Check(check_menu_item) => check_menu_item.set_enabled(enabled),
+			_ => todo!(),
+		}
+	}
+
+	fn set_checked(&self, checked: bool) {
+		self.as_check_menuitem_unchecked().set_checked(checked);
 	}
 }
 
