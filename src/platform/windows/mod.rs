@@ -57,11 +57,8 @@ impl WinCommandExt for Command {
 	}
 }
 
-pub trait WinWindowAttributesExt {
-	fn with_owner_window(self, owner: &Window) -> Self;
-}
-
-impl WinWindowAttributesExt for WindowAttributes {
+#[ext(WinWindowAttributesExt)]
+pub impl WindowAttributes {
 	fn with_owner_window(self, owner: &Window) -> Self {
 		let win32_window = get_win32_window_handle(owner).unwrap();
 		WindowAttributesExtWindows::with_owner_window(self, win32_window.hwnd.into())
