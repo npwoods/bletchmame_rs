@@ -5,8 +5,6 @@ use std::process::Command;
 
 use anyhow::Result;
 use easy_ext::ext;
-use muda::Menu;
-use slint::LogicalPosition;
 use slint::Window;
 use winit::window::WindowAttributes;
 
@@ -30,19 +28,15 @@ pub impl WindowAttributes {
 
 #[ext(OtherWindowExt)]
 pub impl Window {
-	fn attach_menu_bar(&self, _menu_bar: &Menu) -> Result<()> {
-		todo!()
-	}
-
-	fn show_popup_menu(&self, _popup_menu: &Menu, _position: LogicalPosition) {
-		todo!()
-	}
-
 	fn set_enabled_for_modal(&self, _enabled: bool) {
 		// do nothing for now
 	}
 
 	fn ensure_child_focus(&self, _child: &winit::window::Window) {
 		// do nothing for now
+	}
+
+	fn with_muda_menu<T>(&self, _callback: impl FnOnce(&::muda::Menu) -> T) -> Option<T> {
+		None
 	}
 }

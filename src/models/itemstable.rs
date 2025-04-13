@@ -13,19 +13,18 @@ use anyhow::Result;
 use itertools::Either;
 use itertools::Itertools;
 use levenshtein::levenshtein;
-use muda::Menu;
 use slint::Model;
 use slint::ModelNotify;
 use slint::ModelRc;
 use slint::ModelTracker;
 use slint::SharedString;
 use slint::StandardListViewItem;
+use slint::VecModel;
 use tracing::Level;
 use tracing::event;
 use unicase::UniCase;
 
 use crate::appcommand::AppCommand;
-use crate::guiutils::menuing::MenuDesc;
 use crate::info::InfoDb;
 use crate::info::View;
 use crate::mconfig::MachineConfig;
@@ -41,6 +40,7 @@ use crate::selection::SelectionManager;
 use crate::software::Software;
 use crate::software::SoftwareList;
 use crate::software::SoftwareListDispenser;
+use crate::ui::ItemContextMenuInfo;
 
 const LOG: Level = Level::DEBUG;
 
@@ -245,7 +245,7 @@ impl ItemsTableModel {
 		index: usize,
 		folder_info: &[(usize, Rc<PrefsCollection>)],
 		has_mame_initialized: bool,
-	) -> Option<Menu> {
+	) -> Option<ItemContextMenuInfo> {
 		// access the InfoDB
 		let info_db = self.info_db.borrow();
 		let info_db = info_db.as_ref()?;
@@ -265,7 +265,7 @@ impl ItemsTableModel {
 		let items = vec![make_prefs_item(info_db, item)];
 
 		// get the critical information - the description and where (if anyplace) "Browse" would go to
-		let (run_menu_item, browse_target, can_configure) = match item {
+		let (run, browse_target, can_configure) = match item {
 			Item::Machine {
 				machine_config,
 				images,
@@ -295,14 +295,14 @@ impl ItemsTableModel {
 					machine_name: machine.name().to_string(),
 					initial_loads,
 				});
-				let text = run_item_text(machine.description());
-				let run_menu_item = MenuDesc::Item(text, command.map(|x| x.into()));
+				let title = run_item_text(machine.description()).into();
 				let browse_target =
 					(!machine.machine_software_lists().is_empty()).then(|| PrefsCollection::MachineSoftware {
 						machine_name: machine.name().to_string(),
 					});
 
-				(run_menu_item, browse_target, true)
+				let run_info = RunInfo::Single(MenuDesc { command, title });
+				(run_info, browse_target, true)
 			}
 			Item::Software {
 				software,
@@ -335,38 +335,33 @@ impl ItemsTableModel {
 								machine_name: machine.name().to_string(),
 								initial_loads,
 							};
-							MenuDesc::Item(machine.description().to_string(), Some(command.into()))
+							let command = Some(command);
+							let title = machine.description().into();
+							MenuDesc { command, title }
 						})
 					})
 					.collect::<Vec<_>>();
-				let text = run_item_text(&software.description);
-				let run_menu_item = MenuDesc::SubMenu(text, true, sub_items);
-				(run_menu_item, None, true)
+				let title = run_item_text(&software.description).into();
+				let run_info = RunInfo::Multi(title, sub_items);
+				(run_info, None, true)
 			}
 			Item::Unrecognized { error, .. } => {
-				let message = format!("{}", error);
-				let run_menu_item = MenuDesc::Item(message, None);
-				(run_menu_item, None, false)
+				let title = format!("{}", error).into();
+				let run_info = RunInfo::Single(MenuDesc { command: None, title });
+				(run_info, None, false)
 			}
 		};
 
 		// now actually build the context menu
-		let mut menu_items = Vec::new();
-		menu_items.push(run_menu_item);
-		if let Some(folder_name) = can_configure.then_some(folder_name.as_ref()).flatten().cloned() {
-			let text = "Configure...".to_string();
-			let command = AppCommand::Configure { folder_name, index };
-			menu_items.push(MenuDesc::Item(text, Some(command.into())));
-		}
-		menu_items.push(MenuDesc::Separator);
-
-		if let Some(browse_target) = browse_target {
-			let id = AppCommand::Browse(browse_target).into();
-			menu_items.push(MenuDesc::Item("Browse Software".to_string(), Some(id)));
-		}
+		let configure_command = can_configure
+			.then_some(folder_name.as_ref())
+			.flatten()
+			.cloned()
+			.map(|folder_name| AppCommand::Configure { folder_name, index });
+		let browse_command = browse_target.map(AppCommand::Browse);
 
 		// add to folder
-		let mut folder_menu_items = folder_info
+		let add_to_existing_folder_descs = folder_info
 			.iter()
 			.map(|(index, col)| {
 				let PrefsCollection::Folder {
@@ -379,29 +374,31 @@ impl ItemsTableModel {
 
 				let folder_contains_all_items = items.iter().all(|x| folder_items.contains(x));
 				let command =
-					(!folder_contains_all_items).then(|| AppCommand::AddToExistingFolder(*index, items.clone()).into());
+					(!folder_contains_all_items).then(|| AppCommand::AddToExistingFolder(*index, items.clone()));
 
-				MenuDesc::Item(name.clone(), command)
+				let title = name.into();
+				MenuDesc { command, title }
 			})
 			.collect::<Vec<_>>();
-		if !folder_menu_items.is_empty() {
-			folder_menu_items.push(MenuDesc::Separator);
-		}
-		folder_menu_items.push(MenuDesc::Item(
-			"New Folder...".into(),
-			Some(AppCommand::AddToNewFolderDialog(items.clone()).into()),
-		));
-		menu_items.push(MenuDesc::SubMenu("Add To Folder".into(), true, folder_menu_items));
+		let new_folder_command = AppCommand::AddToNewFolderDialog(items.clone());
 
 		// remove from this folder
-		if let Some(folder_name) = folder_name {
-			let text = format!("Remove From \"{}\"", folder_name);
-			let command = AppCommand::RemoveFromFolder(folder_name, items.clone());
-			menu_items.push(MenuDesc::Item(text, Some(command.into())));
-		};
+		let remove_from_folder_desc = folder_name.map(|folder_name| {
+			let title = format!("Remove From \"{}\"", folder_name).into();
+			let command = Some(AppCommand::RemoveFromFolder(folder_name, items.clone()));
+			MenuDesc { command, title }
+		});
 
 		// and return!
-		Some(MenuDesc::make_popup_menu(menu_items))
+		let result = LocalItemContextMenuInfo {
+			run,
+			configure_command,
+			browse_command,
+			add_to_existing_folder_descs,
+			new_folder_command,
+			remove_from_folder_desc,
+		};
+		Some(result.into())
 	}
 
 	pub fn set_columns_and_search(&self, columns: &[PrefsColumn], search: &str, sort_suppressed: bool) {
@@ -792,4 +789,93 @@ fn is_item_match(info_db: &InfoDb, prefs_item: &PrefsItem, item: &Item) -> bool 
 
 fn run_item_text(text: &str) -> String {
 	format!("Run {}", text)
+}
+
+/// Rust friendly equivalent of ItemContextMenuInfo
+struct LocalItemContextMenuInfo {
+	run: RunInfo,
+	configure_command: Option<AppCommand>,
+	browse_command: Option<AppCommand>,
+	add_to_existing_folder_descs: Vec<MenuDesc>,
+	new_folder_command: AppCommand,
+	remove_from_folder_desc: Option<MenuDesc>,
+}
+
+enum RunInfo {
+	Single(MenuDesc),
+	Multi(SharedString, Vec<MenuDesc>),
+}
+
+struct MenuDesc {
+	command: Option<AppCommand>,
+	title: SharedString,
+}
+
+impl From<LocalItemContextMenuInfo> for ItemContextMenuInfo {
+	fn from(value: LocalItemContextMenuInfo) -> Self {
+		let (run_command, run_title, run_subdescs) = match value.run {
+			RunInfo::Single(menu_desc) => (
+				menu_desc
+					.command
+					.as_ref()
+					.map(AppCommand::encode_for_slint)
+					.unwrap_or_default(),
+				menu_desc.title,
+				Default::default(),
+			),
+			RunInfo::Multi(title, menu_descs) => {
+				let menu_descs = menu_descs
+					.into_iter()
+					.map(MenuDesc::encode_for_slint)
+					.collect::<Vec<_>>();
+				let menu_descs = VecModel::from(menu_descs);
+				let menu_descs = ModelRc::new(menu_descs);
+				(Default::default(), title, menu_descs)
+			}
+		};
+		let run_desc = (run_command, run_title);
+		let configure_command = value
+			.configure_command
+			.as_ref()
+			.map(AppCommand::encode_for_slint)
+			.unwrap_or_default();
+		let browse_command = value
+			.browse_command
+			.as_ref()
+			.map(AppCommand::encode_for_slint)
+			.unwrap_or_default();
+		let add_to_existing_folder_descs = value
+			.add_to_existing_folder_descs
+			.into_iter()
+			.map(MenuDesc::encode_for_slint)
+			.collect::<Vec<_>>();
+		let add_to_existing_folder_descs = VecModel::from(add_to_existing_folder_descs);
+		let add_to_existing_folder_descs = ModelRc::new(add_to_existing_folder_descs);
+		let new_folder_command = value.new_folder_command.encode_for_slint();
+		let remove_from_folder_desc = value
+			.remove_from_folder_desc
+			.map(MenuDesc::encode_for_slint)
+			.unwrap_or_default();
+		Self {
+			run_desc,
+			run_subdescs,
+			configure_command,
+			browse_command,
+			add_to_existing_folder_descs,
+			new_folder_command,
+			remove_from_folder_desc,
+		}
+	}
+}
+
+impl MenuDesc {
+	pub fn encode_for_slint(self) -> (SharedString, SharedString) {
+		(
+			self.command
+				.as_ref()
+				.map(AppCommand::encode_for_slint)
+				.unwrap_or_default(),
+			self.title,
+		)
+	}
 }

@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-pub mod menuing;
-
 use std::any::Any;
 use std::os::windows::process::CommandExt;
 use std::process::Command;
@@ -9,11 +6,9 @@ use anyhow::Error;
 use anyhow::Result;
 use easy_ext::ext;
 use i_slint_backend_winit::WinitWindowAccessor;
-use muda::Menu;
 use raw_window_handle::HasWindowHandle;
 use raw_window_handle::RawWindowHandle;
 use raw_window_handle::Win32WindowHandle;
-use slint::LogicalPosition;
 use slint::Window;
 use win32job::Job;
 use windows::Win32::System::Console::ATTACH_PARENT_PROCESS;
@@ -64,12 +59,8 @@ pub impl WindowAttributes {
 
 #[ext(WinWindowExt)]
 pub impl Window {
-	fn attach_menu_bar(&self, menu_bar: &Menu) -> Result<()> {
-		menuing::attach_menu_bar(self, menu_bar)
-	}
-
-	fn show_popup_menu(&self, popup_menu: &Menu, position: LogicalPosition) {
-		menuing::show_popup_menu(self, popup_menu, position)
+	fn with_muda_menu<T>(&self, callback: impl FnOnce(&::muda::Menu) -> T) -> Option<T> {
+		i_slint_backend_winit::WinitWindowAccessor::with_muda_menu(self, callback)
 	}
 
 	fn set_enabled_for_modal(&self, enabled: bool) {

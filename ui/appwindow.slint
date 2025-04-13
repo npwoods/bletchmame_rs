@@ -1,6 +1,23 @@
 import { HorizontalBox, VerticalBox, Button, StandardListView, StandardTableView, LineEdit, ListView, ScrollView, GridBox, Spinner } from "std-widgets.slint";
 import { MagicListView, MagicListViewItem, Icons, FilledButton } from "@vivi/magic.slint";
 
+struct CollectionContextMenuInfo {
+    move-up-command: string,
+    move-down-command: string,
+    delete-command: string,
+    rename-command: string,
+    new-collection-command: string}
+
+struct ItemContextMenuInfo {
+    run-desc: {command: string, title: string},
+    run-subdescs: [{command: string, title: string}],
+    configure-command: string,
+    browse-command: string,
+    add-to-existing-folder-descs: [{command: string, title: string}],
+    new-folder-command: string,
+    remove-from-folder-desc: {command: string, title: string},
+}
+
 struct ReportIssue {
     text: string,
     button-text: string}
@@ -26,16 +43,20 @@ export component AppWindow inherits Window {
     // the currently running machine (empty if no emulation is running)
     in property <string> running-machine-desc;
 
-    // interface to Slint's crude menu bar
-    in property <[MenuEntry]> menubar-entries;
-    public function menubar-height() -> length {
-        return hbox.absolute-position.y - self.absolute-position.y;
+    // the menu bar
+    callback menu-item-activated(string, string);
+    callback menu-item-command(string);
+    in property <[string]> menu-items-builtin-collections;
+    in-out property <CollectionContextMenuInfo> collection-context-menu-info;
+    public function show-collection-context-menu(info: CollectionContextMenuInfo, point: Point) {
+        self.collection-context-menu-info = info;
+        collection-context-menu.show(point);
     }
-    public function show-context-menu(entries: [MenuEntry], point: Point) {
-        context-menu.show(entries, point);
+    in-out property <ItemContextMenuInfo> item-context-menu-info;
+    public function show-item-context-menu(info: ItemContextMenuInfo, point: Point) {
+        self.item-context-menu-info = info;
+        item-context-menu.show(point);
     }
-    callback menubar-sub-menu-selected(MenuEntry) -> [MenuEntry];
-    callback menu-entry-activated(MenuEntry);
 
     // the collections view on the left
     in property <[MagicListViewItem]> collections-model;
@@ -91,21 +112,377 @@ export component AppWindow inherits Window {
 
     // Slint's crude menu bar
     MenuBar {
-        entries: menubar-entries;
-        sub-menu(entry) => {
-            return menubar-sub-menu-selected(entry);
+        Menu {
+            title: @tr("MenuBar" => "File");
+            MenuItem {
+                title: @tr("MenuBar" => "Stop");
+                activated => {
+                    menu-item-activated(parent.title, self.title);
+                }
+            }
+
+            MenuItem {
+                title: @tr("MenuBar" => "Pause");
+                activated => {
+                    menu-item-activated(parent.title, self.title);
+                }
+            }
+
+            MenuSeparator { }
+
+            MenuItem {
+                title: @tr("MenuBar" => "Devices and Images...");
+                activated => {
+                    menu-item-activated(parent.title, self.title);
+                }
+            }
+
+            MenuItem {
+                title: @tr("MenuBar" => "Quick Load State");
+                activated => {
+                    menu-item-activated(parent.title, self.title);
+                }
+            }
+
+            MenuItem {
+                title: @tr("MenuBar" => "Quick Save State");
+                activated => {
+                    menu-item-activated(parent.title, self.title);
+                }
+            }
+
+            MenuItem {
+                title: @tr("MenuBar" => "Load State...");
+                activated => {
+                    menu-item-activated(parent.title, self.title);
+                }
+            }
+
+            MenuItem {
+                title: @tr("MenuBar" => "Save State...");
+                activated => {
+                    menu-item-activated(parent.title, self.title);
+                }
+            }
+
+            MenuSeparator { }
+
+            MenuItem {
+                title: @tr("MenuBar" => "Save Screenshot...");
+                activated => {
+                    menu-item-activated(parent.title, self.title);
+                }
+            }
+
+            MenuItem {
+                title: @tr("MenuBar" => "Record Movie...");
+                activated => {
+                    menu-item-activated(parent.title, self.title);
+                }
+            }
+
+            MenuSeparator { }
+
+            MenuItem {
+                title: @tr("MenuBar" => "Debugger...");
+                activated => {
+                    menu-item-activated(parent.title, self.title);
+                }
+            }
+
+            Menu {
+                title: @tr("MenuBar" => "Reset");
+                MenuItem {
+                    title: @tr("MenuBar" => "Soft Reset");
+                    activated => {
+                        menu-item-activated(parent.title, self.title);
+                    }
+                }
+
+                MenuItem {
+                    title: @tr("MenuBar" => "Hard Reset");
+                    activated => {
+                        menu-item-activated(parent.title, self.title);
+                    }
+                }
+            }
+
+            MenuItem {
+                title: @tr("MenuBar" => "Exit");
+                activated => {
+                    menu-item-activated(parent.title, self.title);
+                }
+            }
         }
-        activated(entry) => {
-            menu-entry-activated(entry)
+
+        Menu {
+            title: @tr("MenuBar" => "Options");
+            Menu {
+                title: @tr("MenuBar" => "Throttle");
+                for rate in [1000, 500, 200, 100, 50, 20, 10]: MenuItem {
+                    title: rate + "%";
+                    activated => {
+                        menu-item-activated(parent.title, self.title);
+                    }
+                }
+                MenuSeparator { }
+
+                MenuItem {
+                    title: @tr("MenuBar" => "Increase Speed");
+                    activated => {
+                        menu-item-activated(parent.title, self.title);
+                    }
+                }
+
+                MenuItem {
+                    title: @tr("MenuBar" => "Decrease Speed");
+                    activated => {
+                        menu-item-activated(parent.title, self.title);
+                    }
+                }
+
+                MenuItem {
+                    title: @tr("MenuBar" => "Warp mode");
+                    activated => {
+                        menu-item-activated(parent.title, self.title);
+                    }
+                }
+            }
+
+            Menu {
+                title: @tr("MenuBar" => "Frame Skip");
+                MenuItem {
+                    title: "Auto";
+                    activated => {
+                        menu-item-activated(parent.title, self.title);
+                    }
+                }
+
+                for rate in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]: MenuItem {
+                    title: rate;
+                    activated => {
+                        menu-item-activated(parent.title, self.title);
+                    }
+                }
+            }
+
+            MenuItem {
+                title: @tr("MenuBar" => "Full Screen");
+                activated => {
+                    menu-item-activated(parent.title, self.title);
+                }
+            }
+
+            MenuItem {
+                title: @tr("MenuBar" => "Sound");
+                activated => {
+                    menu-item-activated(parent.title, self.title);
+                }
+            }
+
+            MenuItem {
+                title: @tr("MenuBar" => "Cheats...");
+                activated => {
+                    menu-item-activated(parent.title, self.title);
+                }
+            }
+
+            MenuItem {
+                title: @tr("MenuBar" => "Classic MAME Menu");
+                activated => {
+                    menu-item-activated(parent.title, self.title);
+                }
+            }
+        }
+
+        Menu {
+            title: @tr("MenuBar" => "Settings");
+            MenuItem {
+                title: @tr("MenuBar" => "Joysticks and Controllers...");
+                activated => {
+                    menu-item-activated(parent.title, self.title);
+                }
+            }
+
+            MenuItem {
+                title: @tr("MenuBar" => "Keyboard...");
+                activated => {
+                    menu-item-activated(parent.title, self.title);
+                }
+            }
+
+            MenuItem {
+                title: @tr("MenuBar" => "Miscellaneous Input...");
+                activated => {
+                    menu-item-activated(parent.title, self.title);
+                }
+            }
+
+            MenuItem {
+                title: @tr("MenuBar" => "Configuration...");
+                activated => {
+                    menu-item-activated(parent.title, self.title);
+                }
+            }
+
+            MenuItem {
+                title: @tr("MenuBar" => "DIP Switches...");
+                activated => {
+                    menu-item-activated(parent.title, self.title);
+                }
+            }
+
+            MenuSeparator { }
+
+            MenuItem {
+                title: @tr("MenuBar" => "Paths...");
+                activated => {
+                    menu-item-activated(parent.title, self.title);
+                }
+            }
+
+            Menu {
+                title: @tr("MenuBar" => "Builtin Collections");
+                for title in menu-items-builtin-collections: MenuItem {
+                    title: title;
+                    activated => {
+                        menu-item-activated(parent.title, self.title);
+                    }
+                }
+            }
+
+            MenuItem {
+                title: @tr("MenuBar" => "Reset Settings To Default");
+                activated => {
+                    menu-item-activated(parent.title, self.title);
+                }
+            }
+
+            MenuItem {
+                title: @tr("MenuBar" => "Import MAME INI...");
+                activated => {
+                    menu-item-activated(parent.title, self.title);
+                }
+            }
+        }
+
+        Menu {
+            title: @tr("MenuBar" => "Help");
+            MenuItem {
+                title: @tr("MenuBar" => "Refresh MAME machine info...");
+                activated => {
+                    menu-item-activated(parent.title, self.title);
+                }
+            }
+
+            MenuItem {
+                title: @tr("MenuBar" => "BletchMAME web site...");
+                activated => {
+                    menu-item-activated(parent.title, self.title);
+                }
+            }
+
+            MenuItem {
+                title: @tr("MenuBar" => "About...");
+                activated => {
+                    menu-item-activated(parent.title, self.title);
+                }
+            }
         }
     }
 
-    context-menu := ContextMenu {
-        sub-menu(entry) => {
-            return menubar-sub-menu-selected(entry);
+    collection-context-menu := ContextMenuArea {
+        Menu {
+            if collection-context-menu-info.move-up-command != "": MenuItem {
+                title: @tr("CollectionContextMenu" => "Move Up");
+                activated => {
+                    menu-item-command(collection-context-menu-info.move-up-command);
+                }
+            }
+            if collection-context-menu-info.move-down-command != "": MenuItem {
+                title: @tr("CollectionContextMenu" => "Move Down");
+                activated => {
+                    menu-item-command(collection-context-menu-info.move-down-command);
+                }
+            }
+            if collection-context-menu-info.delete-command != "": MenuItem {
+                title: @tr("CollectionContextMenu" => "Delete");
+                activated => {
+                    menu-item-command(collection-context-menu-info.delete-command);
+                }
+            }
+            if collection-context-menu-info.rename-command != "": MenuItem {
+                title: @tr("CollectionContextMenu" => "Rename");
+                activated => {
+                    menu-item-command(collection-context-menu-info.rename-command);
+                }
+            }
+            MenuSeparator { }
+
+            if collection-context-menu-info.new-collection-command != "": MenuItem {
+                title: @tr("CollectionContextMenu" => "New Collection");
+                activated => {
+                    menu-item-command(collection-context-menu-info.new-collection-command);
+                }
+            }
         }
-        activated(entry) => {
-            menu-entry-activated(entry)
+    }
+
+    item-context-menu := ContextMenuArea {
+        Menu {
+            if item-context-menu-info.run-desc.command != "": MenuItem {
+                title: item-context-menu-info.run-desc.title;
+                activated => {
+                    menu-item-command(item-context-menu-info.run-desc.command);
+                }
+            }
+            if item-context-menu-info.run-desc.command == "": Menu {
+                title: item-context-menu-info.run-desc.title;
+                for subdesc in item-context-menu-info.run-subdescs: MenuItem {
+                    title: subdesc.title;
+                    activated => {
+                        menu-item-command(subdesc.command);
+                    }
+                }
+            }
+            if item-context-menu-info.configure-command != "": MenuItem {
+                title: @tr("ItemContextMenu" => "Configure...");
+                activated => {
+                    menu-item-command(item-context-menu-info.configure-command);
+                }
+            }
+            MenuSeparator { }
+
+            if item-context-menu-info.browse-command != "": MenuItem {
+                title: @tr("ItemContextMenu" => "Browse Software");
+                activated => {
+                    menu-item-command(item-context-menu-info.browse-command);
+                }
+            }
+            Menu {
+                title: @tr("ItemContextMenu" => "Add To Folder");
+                for desc in item-context-menu-info.add-to-existing-folder-descs: MenuItem {
+                    title: desc.title;
+                    activated => {
+                        menu-item-command(desc.command);
+                    }
+                }
+                MenuSeparator { }
+
+                MenuItem {
+                    title: @tr("ItemContextMenu" => "New Folder...");
+                    activated => {
+                        menu-item-command(item-context-menu-info.new-folder-command);
+                    }
+                }
+            }
+
+            MenuItem {
+                title: item-context-menu-info.remove-from-folder-desc.title;
+                activated => {
+                    menu-item-command(item-context-menu-info.remove-from-folder-desc.command);
+                }
+            }
         }
     }
 

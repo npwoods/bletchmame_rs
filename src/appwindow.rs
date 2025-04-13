@@ -1,20 +1,15 @@
 use std::borrow::Cow;
 use std::cell::RefCell;
+use std::convert::Infallible;
+use std::ops::ControlFlow;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::str::FromStr;
 
-use muda::CheckMenuItem;
-use muda::IsMenuItem;
-use muda::Menu;
-use muda::MenuEvent;
-use muda::MenuId;
-use muda::MenuItem;
-use muda::PredefinedMenuItem;
-use muda::Submenu;
+use muda::accelerator::Accelerator;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
-use slint::LogicalPosition;
 use slint::LogicalSize;
 use slint::Model;
 use slint::ModelRc;
@@ -54,13 +49,12 @@ use crate::dialogs::namecollection::dialog_new_collection;
 use crate::dialogs::namecollection::dialog_rename_collection;
 use crate::dialogs::paths::dialog_paths;
 use crate::dialogs::socket::dialog_connect_to_socket;
-use crate::guiutils::MenuingType;
 use crate::guiutils::is_context_menu_event;
 use crate::guiutils::menuing::MenuExt;
+use crate::guiutils::menuing::MenuItemKindExt;
 use crate::guiutils::menuing::MenuItemUpdate;
 use crate::guiutils::menuing::accel;
 use crate::guiutils::modal::Modal;
-use crate::guiutils::modal::filter_command;
 use crate::history::History;
 use crate::models::collectionsview::CollectionsViewModel;
 use crate::models::itemstable::EmptyReason;
@@ -77,13 +71,13 @@ use crate::runtime::command::MameCommand;
 use crate::runtime::command::MovieFormat;
 use crate::selection::SelectionManager;
 use crate::status::Status;
-use crate::threadlocalbubble::ThreadLocalBubble;
 use crate::ui::AboutDialog;
 use crate::ui::AppWindow;
 use crate::ui::ReportIssue;
 
 const LOG_COMMANDS: Level = Level::INFO;
 const LOG_PREFS: Level = Level::INFO;
+const LOG_MENUING: Level = Level::DEBUG;
 
 const SOUND_ATTENUATION_OFF: i32 = -32;
 const SOUND_ATTENUATION_ON: i32 = 0;
@@ -97,12 +91,9 @@ const SAVE_STATE_FILE_TYPES: &[(Option<&str>, &str)] = &[(Some("MAME Saved State
 pub struct AppArgs {
 	pub prefs_path: PathBuf,
 	pub mame_stderr: MameStderr,
-	pub menuing_type: MenuingType,
 }
 
 struct AppModel {
-	menu_bar: Menu,
-	menuing_type: MenuingType,
 	app_window_weak: Weak<AppWindow>,
 	preferences: RefCell<Preferences>,
 	state: RefCell<AppState>,
@@ -268,19 +259,6 @@ impl AppModel {
 		update_menus(self);
 	}
 
-	pub fn show_popup_menu(&self, popup_menu: Menu, position: LogicalPosition) {
-		let app_window = self.app_window();
-		match self.menuing_type {
-			MenuingType::Native => {
-				app_window.window().show_popup_menu(&popup_menu, position);
-			}
-			MenuingType::Slint => {
-				let entries = popup_menu.slint_menu_entries(None);
-				app_window.invoke_show_context_menu(entries, position);
-			}
-		}
-	}
-
 	pub fn issue_command(&self, command: MameCommand<'_>) {
 		self.state.borrow().issue_command(command);
 	}
@@ -296,14 +274,41 @@ impl AppModel {
 }
 
 pub fn create(args: AppArgs) -> AppWindow {
-	let app_window = AppWindow::new().unwrap();
+	// create the main "App" window
+	let app_window = AppWindow::new().expect("Failed to create main window");
 
 	// child window for MAME to attach to
-	let child_window =
-		ChildWindow::new(app_window.window()).unwrap_or_else(|e| panic!("Failed to create child window: {e:?}"));
+	let child_window = ChildWindow::new(app_window.window()).expect("Failed to create child window");
 
-	// create the menu bar
-	let menu_bar = create_menu_bar();
+	// prepare the menu bar
+	app_window.set_menu_items_builtin_collections(ModelRc::new(VecModel::from(
+		BuiltinCollection::all_values()
+			.iter()
+			.map(BuiltinCollection::to_string)
+			.map(SharedString::from)
+			.collect::<Vec<_>>(),
+	)));
+	let app_window_weak = app_window.as_weak();
+	invoke_from_event_loop(move || {
+		// need to invoke from event loop so this can happen after menu rebuild
+		app_window_weak.unwrap().window().with_muda_menu(|menu_bar| {
+			menu_bar.visit((), |_, sub_menu, item| {
+				if let Some(title) = item.text() {
+					let parent_title = sub_menu.map(|x| x.text());
+					let (command, accelerator) = menu_item_info(parent_title.as_deref(), &title);
+
+					if command.is_none() {
+						item.set_enabled(false);
+					}
+					if let Some(accelerator) = accelerator {
+						item.set_accelerator(Some(accelerator)).unwrap();
+					}
+				}
+				ControlFlow::<Infallible>::Continue(())
+			});
+		});
+	})
+	.unwrap();
 
 	// get preferences
 	let prefs_path = args.prefs_path;
@@ -321,8 +326,6 @@ pub fn create(args: AppArgs) -> AppWindow {
 
 	// create the model
 	let model = AppModel {
-		menu_bar,
-		menuing_type: args.menuing_type,
 		app_window_weak: app_window.as_weak(),
 		preferences: RefCell::new(preferences),
 		state: RefCell::new(AppState::bogus()),
@@ -332,36 +335,42 @@ pub fn create(args: AppArgs) -> AppWindow {
 	let model = Rc::new(model);
 
 	// attach the menu bar (either natively or with an approximation using Slint); looking forward to Slint having first class menuing support
-	match args.menuing_type {
-		MenuingType::Native => {
-			// attach a native menu bar
-			app_window
-				.window()
-				.attach_menu_bar(&model.menu_bar)
-				.unwrap_or_else(|e| panic!("Failed to attach menu bar: {e:?}"));
-		}
-		MenuingType::Slint => {
-			// set up Slint menu bar by proxying muda menu bar
-			app_window.set_menubar_entries(model.menu_bar.slint_menu_entries(None));
-			let model_clone = model.clone();
-			app_window.on_menubar_sub_menu_selected(move |entry| model_clone.menu_bar.slint_menu_entries(Some(&entry)));
-			let model_clone = model.clone();
-			app_window.on_menu_entry_activated(move |entry| {
-				let id = MenuId::from(&entry.id);
-				if let Ok(command) = AppCommand::try_from(&id) {
-					handle_command(&model_clone, command);
+	let model_clone = model.clone();
+	app_window.on_menu_item_activated(move |parent_title, title| {
+		// hack to work around Muda automatically changing the check mark value
+		model_clone.app_window().window().with_muda_menu(|menu_bar| {
+			menu_bar.visit((), |_, sub_menu, item| {
+				if sub_menu.is_some_and(|x| x.text().as_str() == parent_title.as_str())
+					&& item.text().is_some_and(|x| x.as_str() == title.as_str())
+				{
+					if let Some(item) = item.as_check_menuitem() {
+						item.set_checked(!item.is_checked());
+					}
+					ControlFlow::Break(())
+				} else {
+					ControlFlow::Continue(())
 				}
 			});
+		});
+
+		// dispatch the command
+		if let (Some(command), _) = menu_item_info(Some(&parent_title), &title) {
+			handle_command(&model_clone, command);
 		}
-	}
+	});
+	let model_clone = model.clone();
+	app_window.on_menu_item_command(move |command_string| {
+		if let Some(command) = AppCommand::decode_from_slint(command_string) {
+			handle_command(&model_clone, command);
+		}
+	});
 
 	// create a repeating future that will update the child window forever
 	let model_weak = Rc::downgrade(&model);
 	app_window.on_size_changed(move || {
 		if let Some(model) = model_weak.upgrade() {
 			// set the child window size
-			let menubar_height = model.app_window().invoke_menubar_height();
-			model.child_window.update(model.app_window().window(), menubar_height);
+			model.child_window.update(model.app_window().window(), 0.0);
 		}
 	});
 
@@ -464,21 +473,6 @@ pub fn create(args: AppArgs) -> AppWindow {
 		handle_command(&model_clone, command);
 	});
 
-	// set up menu handler
-	let packet = ThreadLocalBubble::new(model.clone());
-	MenuEvent::set_event_handler(Some(move |menu_event: MenuEvent| {
-		if let Ok(command) = AppCommand::try_from(&menu_event.id) {
-			let packet = packet.clone();
-			invoke_from_event_loop(move || {
-				let model = packet.unwrap();
-				if let Some(command) = filter_command(command) {
-					handle_command(&model, command);
-				}
-			})
-			.unwrap();
-		}
-	}));
-
 	// for when we shut down
 	let model_clone = model.clone();
 	app_window.window().on_close_requested(move || {
@@ -492,8 +486,10 @@ pub fn create(args: AppArgs) -> AppWindow {
 	app_window.on_collections_row_pointer_event(move |index, evt, position| {
 		if is_context_menu_event(&evt) {
 			let index = usize::try_from(index).ok();
-			if let Some(popup_menu) = model_clone.with_collections_view_model(|x| x.context_commands(index)) {
-				model_clone.show_popup_menu(popup_menu, position);
+			if let Some(context_commands) = model_clone.with_collections_view_model(|x| x.context_commands(index)) {
+				model_clone
+					.app_window()
+					.invoke_show_collection_context_menu(context_commands, position);
 			}
 		}
 	});
@@ -505,10 +501,12 @@ pub fn create(args: AppArgs) -> AppWindow {
 			let index = usize::try_from(index).unwrap();
 			let folder_info = get_folder_collections(&model_clone.preferences.borrow().collections);
 			let has_mame_initialized = model_clone.state.borrow().status().is_some();
-			if let Some(popup_menu) =
+			if let Some(context_commands) =
 				model_clone.with_items_table_model(|x| x.context_commands(index, &folder_info, has_mame_initialized))
 			{
-				model_clone.show_popup_menu(popup_menu, position);
+				model_clone
+					.app_window()
+					.invoke_show_item_context_menu(context_commands, position);
 			}
 		}
 	});
@@ -561,132 +559,53 @@ pub fn create(args: AppArgs) -> AppWindow {
 	app_window
 }
 
-fn create_menu_bar() -> Menu {
-	fn to_menu_item_ref_vec(items: &[impl IsMenuItem]) -> Vec<&dyn IsMenuItem> {
-		items.iter().map(|x| x as &dyn IsMenuItem).collect::<Vec<_>>()
-	}
+fn menu_item_info(parent_title: Option<&str>, title: &str) -> (Option<AppCommand>, Option<Accelerator>) {
+	let (command, accelerator) = match (parent_title, title) {
+		// File menu
+		(_, "Stop") => (Some(AppCommand::FileStop), None),
+		(_, "Pause") => (Some(AppCommand::FilePause), Some("Pause")),
+		(_, "Devices and Images...") => (Some(AppCommand::FileDevicesAndImages), None),
+		(_, "Quick Load State") => (Some(AppCommand::FileQuickLoadState), Some("F7")),
+		(_, "Quick Save State") => (Some(AppCommand::FileQuickLoadState), Some("Shift+F7")),
+		(_, "Load State...") => (Some(AppCommand::FileLoadState), Some("Ctrl+F7")),
+		(_, "Save State...") => (Some(AppCommand::FileLoadState), Some("Ctrl+Shift+F7")),
+		(_, "Save Screenshot...") => (Some(AppCommand::FileSaveScreenshot), Some("F12")),
+		(_, "Record Movie...") => (Some(AppCommand::FileRecordMovie), Some("Shift+F12")),
+		(_, "Debugger...") => (Some(AppCommand::FileDebugger), None),
+		(_, "Soft Reset") => (Some(AppCommand::FileResetSoft), None),
+		(_, "Hard Reset") => (Some(AppCommand::FileResetHard), None),
+		(_, "Exit") => (Some(AppCommand::FileExit), Some("Ctrl+Alt+X")),
 
-	let toggle_builtin_menu_items = BuiltinCollection::all_values()
-		.iter()
-		.map(|x| {
-			let id = AppCommand::SettingsToggleBuiltinCollection(*x);
-			MenuItem::with_id(id, format!("{}", x), true, None)
-		})
-		.collect::<Vec<_>>();
-	let toggle_builtin_menu_items = to_menu_item_ref_vec(&toggle_builtin_menu_items);
+		// Options menu
+		(Some("Throttle"), "Increase Speed") => (None, Some("F9")),
+		(Some("Throttle"), "Decrease Speed") => (None, Some("F8")),
+		(Some("Throttle"), "Warp mode") => (Some(AppCommand::OptionsToggleWarp), Some("F10")),
+		(Some("Throttle"), rate) => {
+			let rate = rate.strip_suffix('%').unwrap().parse().unwrap();
+			(Some(AppCommand::OptionsThrottleRate(rate)), None)
+		}
+		(_, "Full Screen") => (Some(AppCommand::OptionsToggleFullScreen), Some("F11")),
+		(_, "Sound") => (Some(AppCommand::OptionsToggleSound), None),
+		(_, "Classic MAME Menu") => (Some(AppCommand::OptionsClassic), None),
 
-	#[rustfmt::skip]
-	let menu_bar = Menu::with_items(&[
-		&Submenu::with_items(
-			"File",
-			true,
-			&[
-				&MenuItem::with_id(AppCommand::FileStop, "Stop", false, None),
-				&CheckMenuItem::with_id(AppCommand::FilePause, "Pause", false, false, accel("Pause")),
-				&PredefinedMenuItem::separator(),
-				&MenuItem::with_id(AppCommand::FileDevicesAndImages,"Devices and Images...", false, None),
-				&PredefinedMenuItem::separator(),
-				&MenuItem::with_id(AppCommand::FileQuickLoadState,"Quick Load State", false, accel("F7")),
-				&MenuItem::with_id(AppCommand::FileQuickSaveState,"Quick Save State", false, accel("Shift+F7")),
-				&MenuItem::with_id(AppCommand::FileLoadState,"Load State...", false, accel("Ctrl+F7")),
-				&MenuItem::with_id(AppCommand::FileSaveState, "Save State...", false, accel("Ctrl+Shift+F7")),
-				&PredefinedMenuItem::separator(),
-				&MenuItem::with_id(AppCommand::FileSaveScreenshot,"Save Screenshot...", false, accel("F12")),
-				&MenuItem::with_id(AppCommand::FileRecordMovie,"Record Movie...", false, accel("Shift+F12")),
-				&PredefinedMenuItem::separator(),
-				&MenuItem::with_id(AppCommand::FileDebugger, "Debugger...", false, None),
-				&Submenu::with_items(
-					"Reset",
-					true,
-					&[
-						&MenuItem::with_id(AppCommand::FileResetSoft, "Soft Reset", false, None),
-						&MenuItem::with_id(AppCommand::FileResetHard,"Hard Reset", false, None),
-					],
-				)
-				.unwrap(),
-				&MenuItem::with_id(AppCommand::FileExit, "Exit", true, accel("Ctrl+Alt+X")),
-			],
-		)
-		.unwrap(),
-		&Submenu::with_items(
-			"Options",
-			true,
-			&[
-				&Submenu::with_items(
-					"Throttle",
-					true,
-					&[
-						&CheckMenuItem::with_id(AppCommand::OptionsThrottleRate(10.0), "1000%", false, false, None),
-						&CheckMenuItem::with_id(AppCommand::OptionsThrottleRate(5.0), "500%", false, false, None),
-						&CheckMenuItem::with_id(AppCommand::OptionsThrottleRate(2.0), "200%", false, false, None),
-						&CheckMenuItem::with_id(AppCommand::OptionsThrottleRate(1.0), "100%", false, false, None),
-						&CheckMenuItem::with_id(AppCommand::OptionsThrottleRate(0.5), "50%", false, false, None),
-						&CheckMenuItem::with_id(AppCommand::OptionsThrottleRate(0.2), "20%", false, false, None),
-						&CheckMenuItem::with_id(AppCommand::OptionsThrottleRate(0.1), "10%", false, false, None),
-						&PredefinedMenuItem::separator(),
-						&MenuItem::new("Increase Speed", false, accel("F9")),
-						&MenuItem::new("Decrease Speed", false, accel("F8")),
-						&CheckMenuItem::with_id(AppCommand::OptionsToggleWarp, "Warp mode", false, false, accel("F10")),
-					],
-				)
-				.unwrap(),
-				&Submenu::with_items(
-					"Frame Skip",
-					false,
-					&[
-						&MenuItem::new("Auto", false, None),
-						&MenuItem::new("0", false, None),
-						&MenuItem::new("1", false, None),
-						&MenuItem::new("2", false, None),
-						&MenuItem::new("3", false, None),
-						&MenuItem::new("4", false, None),
-						&MenuItem::new("5", false, None),
-						&MenuItem::new("6", false, None),
-						&MenuItem::new("7", false, None),
-						&MenuItem::new("8", false, None),
-						&MenuItem::new("9", false, None),
-						&MenuItem::new("10", false, None),
-					],
-				)
-				.unwrap(),
-				&CheckMenuItem::with_id(AppCommand::OptionsToggleFullScreen,"Full Screen", true, false, accel("F11")),
-				&CheckMenuItem::with_id(AppCommand::OptionsToggleSound, "Sound", false, false,None),
-				&MenuItem::new("Cheats...", false, None),
-				&MenuItem::with_id(AppCommand::OptionsClassic,"Classic MAME Menu", false, None),
-			],
-		)
-		.unwrap(),
-		&Submenu::with_items(
-			"Settings",
-			true,
-			&[
-				&MenuItem::new("Joysticks and Controllers...", false, None),
-				&MenuItem::new("Keyboard...", false, None),
-				&MenuItem::new("Miscellaneous Input...", false, None),
-				&MenuItem::new("Configuration...", false, None),
-				&MenuItem::new("DIP Switches...", false, None),
-				&PredefinedMenuItem::separator(),
-				&MenuItem::with_id(AppCommand::SettingsPaths(None), "Paths...", true, None),
-				&Submenu::with_items("Builtin Collections", true, &toggle_builtin_menu_items).unwrap(),
-				&MenuItem::with_id(AppCommand::SettingsReset, "Reset Settings To Default", true, None),
-				&MenuItem::new("Import MAME INI...", false, None),
-			],
-		)
-		.unwrap(),
-		&Submenu::with_items(
-			"Help",
-			true,
-			&[
-				&MenuItem::with_id(AppCommand::HelpRefreshInfoDb, "Refresh MAME machine info...", false, None),
-				&MenuItem::with_id(AppCommand::HelpWebSite, "BletchMAME web site...", true, None),
-				&MenuItem::with_id(AppCommand::HelpAbout, "About...", true, None),
-			],
-		)
-		.unwrap(),
-	])
-	.unwrap();
+		// Settings menu
+		(_, "Paths...") => (Some(AppCommand::SettingsPaths(None)), None),
+		(Some("Builtin Collections"), col) => {
+			let col = BuiltinCollection::from_str(col).unwrap();
+			(Some(AppCommand::SettingsToggleBuiltinCollection(col)), None)
+		}
+		(_, "Reset Settings To Default") => (Some(AppCommand::SettingsReset), None),
 
-	menu_bar
+		// Help menu
+		(_, "Refresh MAME machine info...") => (Some(AppCommand::HelpRefreshInfoDb), None),
+		(_, "BletchMAME web site...") => (Some(AppCommand::HelpWebSite), None),
+		(_, "About...") => (Some(AppCommand::HelpAbout), None),
+
+		// Anything else
+		(_, _) => (None, None),
+	};
+	event!(LOG_MENUING, parent_title=?parent_title, title=?title, command=?command, accelerator=?accelerator, "menu_item_info");
+	(command, accelerator.and_then(accel))
 }
 
 fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
@@ -721,7 +640,6 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				diconfig,
 				status_update_channel,
 				invoke_command,
-				model.menuing_type,
 			);
 			spawn_local(fut).unwrap();
 		}
@@ -1116,9 +1034,8 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 
 			let fut = async move {
 				let parent = model_clone.app_window_weak.clone();
-				let menuing_type = model_clone.menuing_type;
 				let paths = model_clone.preferences.borrow().paths.clone();
-				if let Some(item) = dialog_configure(parent, info_db, item, &paths, menuing_type).await {
+				if let Some(item) = dialog_configure(parent, info_db, item, &paths).await {
 					model_clone.modify_prefs(|prefs| {
 						let old_collection = prefs.collections[folder_index].clone();
 						let PrefsCollection::Folder { name, mut items } = old_collection.as_ref().clone() else {
@@ -1169,39 +1086,40 @@ fn update_menus(model: &AppModel) {
 	let has_last_save_state = is_running && state.last_save_state().is_some();
 
 	// update the menu bar
-	model.menu_bar.update(|id| {
-		let command = AppCommand::try_from(id);
-		let (enabled, checked, text) = match command {
-			Ok(AppCommand::FileStop) => (Some(is_running), None, None),
-			Ok(AppCommand::FilePause) => (Some(is_running), Some(is_paused), None),
-			Ok(AppCommand::FileDevicesAndImages) => (Some(is_running), None, None),
-			Ok(AppCommand::FileQuickLoadState) => (Some(has_last_save_state), None, None),
-			Ok(AppCommand::FileQuickSaveState) => (Some(has_last_save_state), None, None),
-			Ok(AppCommand::FileLoadState) => (Some(is_running), None, None),
-			Ok(AppCommand::FileSaveState) => (Some(is_running), None, None),
-			Ok(AppCommand::FileSaveScreenshot) => (Some(is_running), None, None),
-			Ok(AppCommand::FileRecordMovie) => (Some(is_running), None, Some(recording_message.into())),
-			Ok(AppCommand::FileDebugger) => (Some(is_running), None, None),
-			Ok(AppCommand::FileResetSoft) => (Some(is_running), None, None),
-			Ok(AppCommand::FileResetHard) => (Some(is_running), None, None),
-			Ok(AppCommand::OptionsThrottleRate(x)) => (Some(is_running), Some(Some(x) == throttle_rate), None),
-			Ok(AppCommand::OptionsToggleWarp) => (Some(is_running), Some(!is_throttled), None),
-			Ok(AppCommand::OptionsToggleFullScreen) => (None, Some(is_fullscreen), None),
-			Ok(AppCommand::OptionsToggleSound) => (Some(is_running), Some(is_sound_enabled), None),
-			Ok(AppCommand::OptionsClassic) => (Some(is_running), None, None),
-			Ok(AppCommand::HelpRefreshInfoDb) => (Some(can_refresh_info_db), None, None),
-			_ => (None, None, None),
-		};
+	model.app_window().window().with_muda_menu(|menu_bar| {
+		menu_bar.update(|parent_title, title| {
+			let (command, _) = menu_item_info(parent_title, title);
+			let (enabled, checked, text) = match command {
+				Some(AppCommand::FileStop) => (Some(is_running), None, None),
+				Some(AppCommand::FilePause) => (Some(is_running), Some(is_paused), None),
+				Some(AppCommand::FileDevicesAndImages) => (Some(is_running), None, None),
+				Some(AppCommand::FileQuickLoadState) => (Some(has_last_save_state), None, None),
+				Some(AppCommand::FileQuickSaveState) => (Some(has_last_save_state), None, None),
+				Some(AppCommand::FileLoadState) => (Some(is_running), None, None),
+				Some(AppCommand::FileSaveState) => (Some(is_running), None, None),
+				Some(AppCommand::FileSaveScreenshot) => (Some(is_running), None, None),
+				Some(AppCommand::FileRecordMovie) => (Some(is_running), None, Some(recording_message.into())),
+				Some(AppCommand::FileDebugger) => (Some(is_running), None, None),
+				Some(AppCommand::FileResetSoft) => (Some(is_running), None, None),
+				Some(AppCommand::FileResetHard) => (Some(is_running), None, None),
+				Some(AppCommand::OptionsThrottleRate(x)) => (Some(is_running), Some(Some(x) == throttle_rate), None),
+				Some(AppCommand::OptionsToggleWarp) => (Some(is_running), Some(!is_throttled), None),
+				Some(AppCommand::OptionsToggleFullScreen) => (None, Some(is_fullscreen), None),
+				Some(AppCommand::OptionsToggleSound) => (Some(is_running), Some(is_sound_enabled), None),
+				Some(AppCommand::OptionsClassic) => (Some(is_running), None, None),
+				Some(AppCommand::HelpRefreshInfoDb) => (Some(can_refresh_info_db), None, None),
+				_ => (None, None, None),
+			};
 
-		// factor in the minimum MAME version when deteriming enabled, if available
-		let enabled = enabled.map(|e| {
-			e && command
-				.as_ref()
-				.ok()
-				.and_then(AppCommand::minimum_mame_version)
-				.is_none_or(|a| build.is_some_and(|b| b >= &a))
-		});
-		MenuItemUpdate { enabled, checked, text }
+			// factor in the minimum MAME version when deteriming enabled, if available
+			let enabled = enabled.map(|e| {
+				e && command
+					.as_ref()
+					.and_then(AppCommand::minimum_mame_version)
+					.is_none_or(|a| build.is_some_and(|b| b >= &a))
+			});
+			MenuItemUpdate { enabled, checked, text }
+		})
 	});
 }
 
@@ -1317,24 +1235,4 @@ fn items_set_sorting(model: &Rc<AppModel>, column: i32, order: SortOrder) {
 	let column = usize::try_from(column).unwrap();
 	let command = AppCommand::ItemsSort(column, order);
 	handle_command(model, command);
-}
-
-#[cfg(test)]
-mod test {
-	use std::convert::Infallible;
-	use std::ops::ControlFlow;
-
-	use crate::appcommand::AppCommand;
-	use crate::guiutils::menuing::MenuExt;
-
-	#[test]
-	fn create_menu_bar() {
-		let menu_bar = super::create_menu_bar();
-		menu_bar.visit((), |_, _, item| {
-			if let Ok(command) = AppCommand::try_from(item.id()) {
-				let _ = command.minimum_mame_version();
-			}
-			ControlFlow::<Infallible>::Continue(())
-		});
-	}
 }

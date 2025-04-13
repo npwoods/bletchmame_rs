@@ -12,6 +12,11 @@ export struct DevicesAndImagesState {
     entries: [DeviceAndImageEntry],
     none-string: string}
 
+export struct DevicesAndImagesContextMenuInfo {
+    load-image-command: string,
+    connect-to-socket-command: string,
+    unload-command: string}
+
 export component DevicesAndImagesList {
     // properties
     in property <length> splitter: 240px;
@@ -23,9 +28,32 @@ export component DevicesAndImagesList {
     callback entry-button-clicked(int, Point);
     callback menu-entry-activated(MenuEntry);
 
-    // functions
-    public function show-context-menu(entries: [MenuEntry], point: Point) {
-        context-menu.show(entries, point);
+    // context menu
+    in-out property <DevicesAndImagesContextMenuInfo> context-menu-info;
+    public function show-context-menu(info: DevicesAndImagesContextMenuInfo, point: Point) {
+        self.context-menu-info = info;
+        context-menu.show(point);
+    }
+
+    // context menu control
+    context-menu := ContextMenuArea {
+        Menu {
+            if false: MenuItem {
+                title: @tr("DevicesAndImages" => "Create Image...");
+            }
+            if false: MenuItem {
+                title: @tr("DevicesAndImages" => "Load Image...");
+            }
+            if false: MenuItem {
+                title: @tr("DevicesAndImages" => "Load Software List Part...");
+            }
+            if false: MenuItem {
+                title: @tr("DevicesAndImages" => "Connect To Socket...");
+            }
+            if false: MenuItem {
+                title: @tr("DevicesAndImages" => "Unload");
+            }
+        }
     }
 
     // controls
@@ -68,12 +96,6 @@ export component DevicesAndImagesList {
                     root.entry-button-clicked(index, { x: self.absolute-position.x, y: self.absolute-position.y + self.height });
                 }
             }
-        }
-    }
-
-    context-menu := ContextMenu {
-        activated(entry) => {
-            menu-entry-activated(entry)
         }
     }
 }

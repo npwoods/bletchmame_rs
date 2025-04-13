@@ -9,17 +9,9 @@ use i_slint_backend_winit::Backend;
 use i_slint_core::items::PointerEvent;
 use i_slint_core::items::PointerEventKind;
 use slint::platform::PointerEventButton;
-use strum_macros::EnumString;
 use winit::window::WindowAttributes;
 
 use crate::guiutils::hook::create_window_attributes_hook;
-
-#[derive(Copy, Clone, Debug, EnumString)]
-#[strum(ascii_case_insensitive)]
-pub enum MenuingType {
-	Native,
-	Slint,
-}
 
 fn global_hook(attrs: WindowAttributes) -> WindowAttributes {
 	attrs

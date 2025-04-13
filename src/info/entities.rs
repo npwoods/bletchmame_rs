@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use anyhow::Result;
 use binary_search::Direction;
 use binary_search::binary_search;
