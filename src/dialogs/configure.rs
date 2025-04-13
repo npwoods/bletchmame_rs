@@ -21,7 +21,6 @@ use crate::dialogs::SingleResult;
 use crate::dialogs::devimages::entry_popup_menu;
 use crate::dialogs::image::Format;
 use crate::dialogs::image::dialog_load_image;
-use crate::guiutils::MenuingType;
 use crate::guiutils::modal::Modal;
 use crate::info::InfoDb;
 use crate::info::View;
@@ -67,7 +66,6 @@ pub async fn dialog_configure(
 	info_db: Rc<InfoDb>,
 	item: PrefsItem,
 	paths: &PrefsPaths,
-	menuing_type: MenuingType,
 ) -> Option<PrefsItem> {
 	// prepare the dialog
 	let modal = Modal::new(&parent.unwrap(), || ConfigureDialog::new().unwrap());
@@ -111,14 +109,9 @@ pub async fn dialog_configure(
 				};
 				let model = DevicesAndImagesModel::get_model(dimodel);
 				let entry_index = entry_index.try_into().unwrap();
-				entry_popup_menu(
-					dialog.window(),
-					model,
-					menuing_type,
-					entry_index,
-					point,
-					|entries, point| dialog.invoke_show_context_menu(entries, point),
-				)
+				entry_popup_menu(model, entry_index, point, |entries, point| {
+					dialog.invoke_show_context_menu(entries, point)
+				})
 			});
 
 			// set up a command filter

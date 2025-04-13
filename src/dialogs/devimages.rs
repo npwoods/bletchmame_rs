@@ -1,23 +1,18 @@
-use i_slint_core::items::MenuEntry;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
 use slint::LogicalPosition;
 use slint::ModelRc;
 use slint::Weak;
-use slint::Window;
 
 use crate::appcommand::AppCommand;
 use crate::channel::Channel;
 use crate::devimageconfig::DevicesImagesConfig;
 use crate::devimageconfig::EntryDetails;
 use crate::dialogs::SingleResult;
-use crate::guiutils::MenuingType;
-use crate::guiutils::menuing::MenuDesc;
-use crate::guiutils::menuing::MenuExt;
 use crate::guiutils::modal::Modal;
 use crate::models::devimages::DevicesAndImagesModel;
-use crate::platform::WindowExt;
 use crate::status::Status;
+use crate::ui::DevicesAndImagesContextMenuInfo;
 use crate::ui::DevicesAndImagesDialog;
 use crate::ui::DevicesAndImagesState;
 
@@ -26,7 +21,6 @@ pub async fn dialog_devices_and_images(
 	diconfig: DevicesImagesConfig,
 	status_update_channel: Channel<Status>,
 	invoke_command: impl Fn(AppCommand) + 'static,
-	menuing_type: MenuingType,
 ) {
 	// prepare the dialog
 	let modal = Modal::new(&parent.unwrap(), || DevicesAndImagesDialog::new().unwrap());
@@ -80,14 +74,9 @@ pub async fn dialog_devices_and_images(
 		let dialog = dialog_weak.unwrap();
 		let model = DevicesAndImagesModel::get_model(&model_clone);
 		let entry_index = entry_index.try_into().unwrap();
-		entry_popup_menu(
-			dialog.window(),
-			model,
-			menuing_type,
-			entry_index,
-			point,
-			|entries, point| dialog.invoke_show_context_menu(entries, point),
-		)
+		entry_popup_menu(model, entry_index, point, |info, point| {
+			dialog.invoke_show_context_menu(info, point)
+		})
 	});
 
 	// subscribe to status changes
@@ -109,51 +98,47 @@ pub async fn dialog_devices_and_images(
 
 /// Hackishly exposing as `pub` so that this can be shared with the configure machine dialog
 pub fn entry_popup_menu(
-	window: &Window,
 	model: &DevicesAndImagesModel,
-	menuing_type: MenuingType,
 	entry_index: usize,
 	point: LogicalPosition,
-	invoke_show_context_menu: impl Fn(ModelRc<MenuEntry>, LogicalPosition),
+	invoke_show_context_menu: impl Fn(DevicesAndImagesContextMenuInfo, LogicalPosition),
 ) {
-	let menu_items = model.with_diconfig(|diconfig| {
+	let info = model.with_diconfig(|diconfig| {
 		let entry = diconfig.entry(entry_index).unwrap();
-		let EntryDetails::Image { filename } = &entry.details else {
+		let EntryDetails::Image { .. } = &entry.details else {
 			unreachable!();
 		};
 
-		let load_command = {
+		let load_image_command = {
 			let tag = entry.tag.to_string();
-			let command = AppCommand::LoadImageDialog { tag };
-			Some(command.into())
+			Some(AppCommand::LoadImageDialog { tag })
 		};
-		let connect_socket_command = {
-			let tag = entry.tag.to_string();
-			let command = AppCommand::ConnectToSocketDialog { tag };
-			Some(command.into())
-		};
-		let unload_command = filename.is_some().then(|| {
-			let tag = entry.tag.to_string();
-			let command = AppCommand::UnloadImage { tag };
-			command.into()
-		});
-		[
-			MenuDesc::Item("Create Image...".into(), None),
-			MenuDesc::Item("Load Image...".into(), load_command),
-			MenuDesc::Item("Load Software List Part...".into(), None),
-			MenuDesc::Item("Connect To Socket...".into(), connect_socket_command),
-			MenuDesc::Item("Unload".into(), unload_command),
-		]
-	});
-	let popup_menu = MenuDesc::make_popup_menu(menu_items);
 
-	match menuing_type {
-		MenuingType::Native => {
-			window.show_popup_menu(&popup_menu, point);
+		let connect_to_socket_command = {
+			let tag = entry.tag.to_string();
+			Some(AppCommand::ConnectToSocketDialog { tag })
+		};
+
+		let unload_command = {
+			let tag = entry.tag.to_string();
+			Some(AppCommand::UnloadImage { tag })
+		};
+
+		DevicesAndImagesContextMenuInfo {
+			load_image_command: load_image_command
+				.as_ref()
+				.map(AppCommand::encode_for_slint)
+				.unwrap_or_default(),
+			connect_to_socket_command: connect_to_socket_command
+				.as_ref()
+				.map(AppCommand::encode_for_slint)
+				.unwrap_or_default(),
+			unload_command: unload_command
+				.as_ref()
+				.map(AppCommand::encode_for_slint)
+				.unwrap_or_default(),
 		}
-		MenuingType::Slint => {
-			let entries = popup_menu.slint_menu_entries(None);
-			invoke_show_context_menu(entries, point);
-		}
-	}
+	});
+
+	invoke_show_context_menu(info, point);
 }

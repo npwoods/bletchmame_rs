@@ -5,7 +5,6 @@ use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
 
-use muda::Menu;
 use slint::Model;
 use slint::ModelNotify;
 use slint::ModelTracker;
@@ -13,10 +12,10 @@ use slint::Weak;
 use slint::spawn_local;
 
 use crate::appcommand::AppCommand;
-use crate::guiutils::menuing::MenuDesc;
 use crate::info::InfoDb;
 use crate::prefs::PrefsCollection;
 use crate::ui::AppWindow;
+use crate::ui::CollectionContextMenuInfo;
 use crate::ui::MagicListViewItem;
 
 pub struct CollectionsViewModel {
@@ -59,8 +58,8 @@ impl CollectionsViewModel {
 		self.after_refresh_callback.set(Some(callback));
 	}
 
-	pub fn context_commands(&self, index: Option<usize>) -> Option<Menu> {
-		let mut menu_items = Vec::new();
+	pub fn context_commands(&self, index: Option<usize>) -> Option<CollectionContextMenuInfo> {
+		let mut result = CollectionContextMenuInfo::default();
 
 		// menu items pertaining to selected collections
 		if let Some(old_index) = index {
@@ -68,16 +67,16 @@ impl CollectionsViewModel {
 			if old_index > 0 {
 				let new_index = Some(old_index - 1);
 				let command = AppCommand::MoveCollection { old_index, new_index };
-				menu_items.push(MenuDesc::Item("Move Up".into(), Some(command.into())));
+				result.move_up_command = command.encode_for_slint();
 			}
 			if old_index < items.len() - 1 {
 				let new_index = Some(old_index + 1);
 				let command = AppCommand::MoveCollection { old_index, new_index };
-				menu_items.push(MenuDesc::Item("Move Down".into(), Some(command.into())));
+				result.move_down_command = command.encode_for_slint();
 			}
 			if items.len() > 1 {
 				let command = AppCommand::DeleteCollectionDialog { index: old_index };
-				menu_items.push(MenuDesc::Item("Delete".into(), Some(command.into())));
+				result.delete_command = command.encode_for_slint();
 			}
 			if items
 				.get(old_index)
@@ -85,17 +84,16 @@ impl CollectionsViewModel {
 				.unwrap_or_default()
 			{
 				let command = AppCommand::RenameCollectionDialog { index: old_index };
-				menu_items.push(MenuDesc::Item("Rename...".into(), Some(command.into())));
+				result.rename_command = command.encode_for_slint();
 			}
-			menu_items.push(MenuDesc::Separator);
 		}
 
 		// new collection
 		let command = AppCommand::AddToNewFolderDialog([].into());
-		menu_items.push(MenuDesc::Item("New Collection".into(), Some(command.into())));
+		result.new_collection_command = command.encode_for_slint();
 
 		// make the popup menu
-		Some(MenuDesc::make_popup_menu(menu_items))
+		Some(result)
 	}
 }
 

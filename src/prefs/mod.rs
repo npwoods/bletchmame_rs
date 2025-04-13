@@ -27,7 +27,6 @@ use serde::Deserialize;
 use serde::Serialize;
 use slint::LogicalSize;
 use strum::EnumProperty;
-use strum_macros::EnumProperty;
 use strum_macros::EnumString;
 use tracing::Level;
 use tracing::event;
@@ -279,7 +278,9 @@ impl PrefsCollection {
 	}
 }
 
-#[derive(AllValues, Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, strum_macros::Display)]
+#[derive(
+	AllValues, Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, strum_macros::Display, EnumString,
+)]
 #[serde(rename_all = "camelCase", tag = "subtype")]
 pub enum BuiltinCollection {
 	#[strum(to_string = "All Systems")]

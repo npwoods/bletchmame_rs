@@ -4,19 +4,12 @@ use std::convert::Infallible;
 use std::ops::ControlFlow;
 
 use easy_ext::ext;
-use i_slint_core::items::MenuEntry as SlintMenuEntry;
-use muda::IsMenuItem;
 use muda::Menu;
-use muda::MenuId;
-use muda::MenuItem;
 use muda::MenuItemKind;
-use muda::PredefinedMenuItem;
 use muda::Submenu;
 use muda::accelerator::Accelerator;
 use muda::accelerator::Code;
 use muda::accelerator::Modifiers;
-use slint::ModelRc;
-use slint::VecModel;
 
 /// Helper function to declare accelerators
 pub fn accel(text: &str) -> Option<Accelerator> {
@@ -60,54 +53,23 @@ pub struct MenuItemUpdate {
 /// Extension for muda menus
 #[ext(MenuExt)]
 pub impl Menu {
-	fn update(&self, callback: impl Fn(&MenuId) -> MenuItemUpdate) {
-		self.visit((), |_, _, item| {
-			let update = callback(item.id());
-			if let Some(enabled) = update.enabled {
-				item.set_enabled(enabled);
-			}
-			if let Some(checked) = update.checked {
-				item.set_checked(checked);
-			}
-			if let Some(text) = update.text {
-				item.set_text(&text);
+	fn update(&self, callback: impl Fn(Option<&str>, &str) -> MenuItemUpdate) {
+		self.visit((), |_, sub_menu, item| {
+			if let Some(title) = item.text() {
+				let parent_title = sub_menu.map(|x| x.text());
+				let update = callback(parent_title.as_deref(), &title);
+				if let Some(enabled) = update.enabled {
+					item.set_enabled(enabled);
+				}
+				if let Some(checked) = update.checked {
+					item.set_checked(checked);
+				}
+				if let Some(text) = update.text {
+					item.set_text(&text);
+				}
 			}
 			ControlFlow::<Infallible>::Continue(())
 		});
-	}
-
-	fn slint_menu_entries(&self, sub_menu: Option<&SlintMenuEntry>) -> ModelRc<SlintMenuEntry> {
-		// find the menu items we want to return
-		let items = if let Some(sub_menu) = sub_menu {
-			let title = &sub_menu.title;
-			let flow = self.visit((), |_, _, item: &MenuItemKind| {
-				if let Some(items) = item
-					.as_submenu()
-					.and_then(|sub_menu| (sub_menu.text().as_str() == title.as_str()).then(|| sub_menu.items()))
-				{
-					ControlFlow::Break(items)
-				} else {
-					ControlFlow::Continue(())
-				}
-			});
-			match flow {
-				ControlFlow::Break(items) => items,
-				ControlFlow::Continue(()) => Vec::new(),
-			}
-		} else {
-			self.items()
-		};
-
-		// convert them to Slint
-		let items = items.iter().filter_map(slint_menu_entry).collect::<Vec<_>>();
-
-		// and build the model
-		let model = VecModel::from(items);
-		ModelRc::new(model)
-	}
-
-	fn is_natively_supported() -> bool {
-		cfg!(windows)
 	}
 
 	fn visit<B, C>(
@@ -119,8 +81,16 @@ pub impl Menu {
 	}
 }
 
-#[ext]
-impl MenuItemKind {
+#[ext(MenuItemKindExt)]
+pub impl MenuItemKind {
+	fn text(&self) -> Option<String> {
+		match self {
+			MenuItemKind::MenuItem(menu_item) => Some(menu_item.text()),
+			MenuItemKind::Check(check_menu_item) => Some(check_menu_item.text()),
+			_ => None,
+		}
+	}
+
 	fn set_text(&self, text: impl AsRef<str>) {
 		match self {
 			MenuItemKind::MenuItem(menu_item) => menu_item.set_text(text),
@@ -133,6 +103,14 @@ impl MenuItemKind {
 		match self {
 			MenuItemKind::MenuItem(menu_item) => menu_item.set_enabled(enabled),
 			MenuItemKind::Check(check_menu_item) => check_menu_item.set_enabled(enabled),
+			_ => todo!(),
+		}
+	}
+
+	fn set_accelerator(&self, accelerator: Option<Accelerator>) -> muda::Result<()> {
+		match self {
+			MenuItemKind::MenuItem(menu_item) => menu_item.set_accelerator(accelerator),
+			MenuItemKind::Check(check_menu_item) => check_menu_item.set_accelerator(accelerator),
 			_ => todo!(),
 		}
 	}
@@ -160,62 +138,6 @@ fn visit_menu_items<B, C>(
 				}
 			}
 		})
-}
-
-fn slint_menu_entry(menu_item: &MenuItemKind) -> Option<SlintMenuEntry> {
-	let (title, id, has_sub_menu) = match menu_item {
-		MenuItemKind::MenuItem(menu_item) => Some((menu_item.text(), menu_item.id().as_ref(), false)),
-		MenuItemKind::Check(menu_item) => Some((menu_item.text(), menu_item.id().as_ref(), false)),
-		MenuItemKind::Submenu(menu_item) => Some((menu_item.text(), menu_item.id().as_ref(), true)),
-		_ => None,
-	}?;
-
-	let title = title.into();
-	let id = id.into();
-	let entry = SlintMenuEntry {
-		title,
-		id,
-		has_sub_menu,
-	};
-	Some(entry)
-}
-
-#[derive(Debug)]
-pub enum MenuDesc {
-	Item(String, Option<MenuId>),
-	SubMenu(String, bool, Vec<MenuDesc>),
-	Separator,
-}
-
-impl MenuDesc {
-	pub fn into_boxed_menu_item(self) -> Box<dyn IsMenuItem + 'static> {
-		match self {
-			MenuDesc::Item(text, id) => {
-				let menu_item = if let Some(id) = id {
-					MenuItem::with_id(id, text, true, None)
-				} else {
-					MenuItem::new(text, false, None)
-				};
-				Box::new(menu_item)
-			}
-			MenuDesc::SubMenu(text, enabled, items) => {
-				let items = items.into_iter().map(|x| x.into_boxed_menu_item()).collect::<Vec<_>>();
-				let items = items.iter().map(|x| &**x as &dyn IsMenuItem).collect::<Vec<_>>();
-				let submenu = Submenu::with_items(&text, enabled, &items).unwrap();
-				Box::new(submenu)
-			}
-			MenuDesc::Separator => {
-				let menu_item = PredefinedMenuItem::separator();
-				Box::new(menu_item)
-			}
-		}
-	}
-
-	pub fn make_popup_menu(items: impl IntoIterator<Item = Self>) -> Menu {
-		let items = items.into_iter().map(|x| x.into_boxed_menu_item()).collect::<Vec<_>>();
-		let items = items.iter().map(|x| &**x as &dyn IsMenuItem).collect::<Vec<_>>();
-		Menu::with_items(&items).unwrap()
-	}
 }
 
 #[cfg(test)]

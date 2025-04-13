@@ -1,5 +1,5 @@
 import { Button, HorizontalBox, VerticalBox, TabWidget, ComboBox, GridBox, StandardButton, ListView, CheckBox  } from "std-widgets.slint";
-import { DevicesAndImagesList, DevicesAndImagesState } from "devimageslist.slint";
+import { DevicesAndImagesList, DevicesAndImagesState, DevicesAndImagesContextMenuInfo } from "devimageslist.slint";
 
 struct SoftwareMachine {
     machine-index: int,
@@ -34,13 +34,14 @@ export component ConfigureDialog inherits Window {
     callback software-machines-bulk-none-clicked();
 
     // functions
-    public function show-context-menu(entries: [MenuEntry], point: Point) {
-        //dev-images-list.show-context-menu(entries, point);
+    public function show-context-menu(info: DevicesAndImagesContextMenuInfo, point: Point) {
+        dev-images-list.show-context-menu(info, point);
     }
 
     // control hierarchy
     VerticalBox {
-        if root.software-machines.length == 0: TabWidget {
+        TabWidget {
+            visible: root.software-machines.length == 0;
             Tab {
                 title: "Devices";
                 GridBox {
@@ -91,6 +92,7 @@ export component ConfigureDialog inherits Window {
                 }
             }
         }
+
         if root.software-machines.length > 0: TabWidget {
             Tab {
                 title: "Preferred Machines";

@@ -160,7 +160,9 @@ fn reenable_modal_parent(parent: &impl ComponentHandle) {
 		.on_winit_window_event(|_, _| WinitWindowEventResult::Propagate);
 }
 
+#[allow(dead_code)]
 pub fn filter_command(command: AppCommand) -> Option<AppCommand> {
+	// this code is likely not supposed to be dead
 	CURRENT_FILTERS.with_borrow(|filters| {
 		if let Some(filter) = filters.last() {
 			filter(command)
