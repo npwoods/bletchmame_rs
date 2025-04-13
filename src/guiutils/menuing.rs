@@ -61,7 +61,7 @@ pub struct MenuItemUpdate {
 #[ext(MenuExt)]
 pub impl Menu {
 	fn update(&self, callback: impl Fn(&MenuId) -> MenuItemUpdate) {
-		self.visit((), |_, item| {
+		self.visit((), |_, _, item| {
 			let update = callback(item.id());
 			if let Some(enabled) = update.enabled {
 				item.set_enabled(enabled);
@@ -80,7 +80,7 @@ pub impl Menu {
 		// find the menu items we want to return
 		let items = if let Some(sub_menu) = sub_menu {
 			let title = &sub_menu.title;
-			let flow = self.visit((), |_, item: &MenuItemKind| {
+			let flow = self.visit((), |_, _, item: &MenuItemKind| {
 				if let Some(items) = item
 					.as_submenu()
 					.and_then(|sub_menu| (sub_menu.text().as_str() == title.as_str()).then(|| sub_menu.items()))
@@ -110,8 +110,12 @@ pub impl Menu {
 		cfg!(windows)
 	}
 
-	fn visit<B, C>(&self, init: C, func: impl Fn(C, &MenuItemKind) -> ControlFlow<B, C>) -> ControlFlow<B, C> {
-		visit_menu_items(&self.items(), init, &func)
+	fn visit<B, C>(
+		&self,
+		init: C,
+		func: impl Fn(C, Option<&Submenu>, &MenuItemKind) -> ControlFlow<B, C>,
+	) -> ControlFlow<B, C> {
+		visit_menu_items(&self.items(), init, None, &func)
 	}
 }
 
@@ -141,18 +145,21 @@ impl MenuItemKind {
 fn visit_menu_items<B, C>(
 	items: &[MenuItemKind],
 	init: C,
-	func: &impl Fn(C, &MenuItemKind) -> ControlFlow<B, C>,
+	sub_menu: Option<&Submenu>,
+	func: &impl Fn(C, Option<&Submenu>, &MenuItemKind) -> ControlFlow<B, C>,
 ) -> ControlFlow<B, C> {
-	items.iter().try_fold(init, |state, item| match func(state, item) {
-		ControlFlow::Break(x) => ControlFlow::Break(x),
-		ControlFlow::Continue(x) => {
-			if let MenuItemKind::Submenu(sub_menu) = item {
-				visit_menu_items(&sub_menu.items(), x, func)
-			} else {
-				ControlFlow::Continue(x)
+	items
+		.iter()
+		.try_fold(init, |state, item| match func(state, sub_menu, item) {
+			ControlFlow::Break(x) => ControlFlow::Break(x),
+			ControlFlow::Continue(x) => {
+				if let MenuItemKind::Submenu(sub_menu) = item {
+					visit_menu_items(&sub_menu.items(), x, Some(sub_menu), func)
+				} else {
+					ControlFlow::Continue(x)
+				}
 			}
-		}
-	})
+		})
 }
 
 fn slint_menu_entry(menu_item: &MenuItemKind) -> Option<SlintMenuEntry> {

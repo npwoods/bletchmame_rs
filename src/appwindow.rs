@@ -1330,7 +1330,7 @@ mod test {
 	#[test]
 	fn create_menu_bar() {
 		let menu_bar = super::create_menu_bar();
-		menu_bar.visit((), |_, item| {
+		menu_bar.visit((), |_, _, item| {
 			if let Ok(command) = AppCommand::try_from(item.id()) {
 				let _ = command.minimum_mame_version();
 			}
