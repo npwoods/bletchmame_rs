@@ -22,11 +22,11 @@ muda = "0.16.0"
 raw-window-handle = "0.6.2"
 rfd = "0.15.1"
 serde = { version = "1.0.219", features = ["rc"] }
-quick-xml = "0.37.2"
+quick-xml = "0.37.4"
 binary_serde = "1.0.24"
 itertools = "0.14.0"
 winit = "0.30.3"
-tokio = { version = "1.44.1", features = [
+tokio = { version = "1.44.2", features = [
     "rt",
     "rt-multi-thread",
     "time",
@@ -40,7 +40,7 @@ open = "5.3.1"
 levenshtein = "1.0.5"
 unicase = "2.8.1"
 binary-search = "0.1.2"
-smallvec = "1.14.0"
+smallvec = "1.15.0"
 derive-enum-all-values = "0.1.0"
 default-ext = "0.1.0"
 num = "0.4.3"
