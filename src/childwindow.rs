@@ -1,6 +1,6 @@
 use anyhow::Result;
 use dpi::PhysicalPosition;
-use i_slint_backend_winit::create_winit_window;
+use i_slint_backend_winit::WinitWindowAccessor;
 use muda::dpi::PhysicalSize;
 use raw_window_handle::HasWindowHandle;
 use raw_window_handle::RawWindowHandle;
@@ -32,7 +32,7 @@ impl ChildWindow {
 				.with_parent_window(Some(raw_window_handle))
 		};
 
-		let window = create_winit_window(window_attributes)?;
+		let window = parent.create_winit_window(window_attributes)?;
 		Ok(Self(Some(window)))
 	}
 

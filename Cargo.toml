@@ -12,12 +12,12 @@ tracing = { version = "0.1.41", features = [
     "release_max_level_info",
 ] }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-slint = { git = "https://github.com/npwoods/slint.git", rev = "f971decb0e937dfd52cb000b62ccbf071a68c03b", features = [
+slint = { git = "https://github.com/npwoods/slint.git", rev = "396e9b58bb694de377931f2095753471fb3fbf00", features = [
     "raw-window-handle-06",
 ] }
-i-slint-core = { git = "https://github.com/npwoods/slint.git", rev = "f971decb0e937dfd52cb000b62ccbf071a68c03b" }
-i-slint-common = { git = "https://github.com/npwoods/slint.git", rev = "f971decb0e937dfd52cb000b62ccbf071a68c03b" }
-i-slint-backend-winit = { git = "https://github.com/npwoods/slint.git", rev = "f971decb0e937dfd52cb000b62ccbf071a68c03b" }
+i-slint-core = { git = "https://github.com/npwoods/slint.git", rev = "396e9b58bb694de377931f2095753471fb3fbf00" }
+i-slint-common = { git = "https://github.com/npwoods/slint.git", rev = "396e9b58bb694de377931f2095753471fb3fbf00" }
+i-slint-backend-winit = { git = "https://github.com/npwoods/slint.git", rev = "396e9b58bb694de377931f2095753471fb3fbf00" }
 muda = "0.16.0"
 raw-window-handle = "0.6.2"
 rfd = "0.15.1"
@@ -77,7 +77,7 @@ tempdir = "0.3.7"
 
 [build-dependencies]
 ico = "0.4.0"
-slint-build = { git = "https://github.com/npwoods/slint.git", rev = "f971decb0e937dfd52cb000b62ccbf071a68c03b" }
+slint-build = { git = "https://github.com/npwoods/slint.git", rev = "396e9b58bb694de377931f2095753471fb3fbf00" }
 vivi_ui = { git = "https://seed.radicle.garden/z3oxAZSLcyXgpa7fcvgtueF49jHpH.git", rev = "92a0987cf92647290353826bf05113a65fca25a9" }
 winresource = "0.1.20"
 
