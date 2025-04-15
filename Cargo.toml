@@ -18,6 +18,7 @@ slint = { git = "https://github.com/npwoods/slint.git", rev = "16aaa58929c62951c
 i-slint-core = { git = "https://github.com/npwoods/slint.git", rev = "16aaa58929c62951c201dc2d1b55d3ea6de96107" }
 i-slint-common = { git = "https://github.com/npwoods/slint.git", rev = "16aaa58929c62951c201dc2d1b55d3ea6de96107" }
 i-slint-backend-winit = { git = "https://github.com/npwoods/slint.git", rev = "16aaa58929c62951c201dc2d1b55d3ea6de96107" }
+i-slint-backend-qt = { git = "https://github.com/npwoods/slint.git", rev = "16aaa58929c62951c201dc2d1b55d3ea6de96107", optional = true }
 muda = "0.16.0"
 raw-window-handle = "0.6.2"
 rfd = "0.15.1"
@@ -93,3 +94,4 @@ panic = "abort"
 [features]
 default = ["diagnostics"]
 diagnostics = []
+slint-qt-backend = ["dep:i-slint-backend-qt"]
