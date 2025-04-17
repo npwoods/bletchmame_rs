@@ -47,11 +47,18 @@ export component AppWindow inherits Window {
     callback menu-item-activated(string, string);
     callback menu-item-command(string);
     in property <[string]> menu-items-builtin-collections;
+    public function menubar-height() -> length {
+        return hbox.absolute-position.y;
+    }
+
+    // collections context menu
     in-out property <CollectionContextMenuInfo> collection-context-menu-info;
     public function show-collection-context-menu(info: CollectionContextMenuInfo, point: Point) {
         self.collection-context-menu-info = info;
         collection-context-menu.show(point);
     }
+
+    // items context menu
     in-out property <ItemContextMenuInfo> item-context-menu-info;
     public function show-item-context-menu(info: ItemContextMenuInfo, point: Point) {
         self.item-context-menu-info = info;
