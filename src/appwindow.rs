@@ -370,7 +370,8 @@ pub fn create(args: AppArgs) -> AppWindow {
 	app_window.on_size_changed(move || {
 		if let Some(model) = model_weak.upgrade() {
 			// set the child window size
-			model.child_window.update(model.app_window().window(), 0.0);
+			let top = model.app_window().invoke_menubar_height();
+			model.child_window.update(model.app_window().window(), top);
 		}
 	});
 
