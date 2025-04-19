@@ -20,6 +20,7 @@ use slint::Weak;
 use slint::invoke_from_event_loop;
 use slint::quit_event_loop;
 use slint::spawn_local;
+use strum::EnumString;
 use tracing::Level;
 use tracing::event;
 
@@ -91,6 +92,20 @@ const SAVE_STATE_FILE_TYPES: &[(Option<&str>, &str)] = &[(Some("MAME Saved State
 pub struct AppArgs {
 	pub prefs_path: PathBuf,
 	pub mame_stderr: MameStderr,
+	pub mame_windowing: AppWindowing,
+}
+
+#[derive(Debug, Default, EnumString)]
+pub enum AppWindowing {
+	#[default]
+	#[strum(ascii_case_insensitive)]
+	Integrated,
+	#[strum(ascii_case_insensitive)]
+	Windowed,
+	#[strum(ascii_case_insensitive)]
+	WindowedMaximized,
+	#[strum(ascii_case_insensitive)]
+	Fullscreen,
 }
 
 struct AppModel {
@@ -98,7 +113,14 @@ struct AppModel {
 	preferences: RefCell<Preferences>,
 	state: RefCell<AppState>,
 	status_changed_channel: Channel<Status>,
-	child_window: Option<ChildWindow>,
+	windowing: RuntimeWindowing,
+}
+
+enum RuntimeWindowing {
+	Child(ChildWindow),
+	Windowed,
+	WindowedMaximized,
+	Fullscreen,
 }
 
 impl AppModel {
@@ -216,7 +238,7 @@ impl AppModel {
 			app_window.set_running_machine_desc(state.running_machine_description().into());
 
 			// child window visibility
-			if let Some(child_window) = &self.child_window {
+			if let RuntimeWindowing::Child(child_window) = &self.windowing {
 				child_window.set_visible(running.is_some());
 			}
 
@@ -279,8 +301,16 @@ pub fn create(args: AppArgs) -> AppWindow {
 	// create the main "App" window
 	let app_window = AppWindow::new().expect("Failed to create main window");
 
-	// child window for MAME to attach to
-	let child_window = Some(ChildWindow::new(app_window.window()).expect("Failed to create child window"));
+	// choose a MAME windowing mode
+	let windowing = match args.mame_windowing {
+		AppWindowing::Integrated => {
+			let child_window = ChildWindow::new(app_window.window()).expect("Failed to create child window");
+			RuntimeWindowing::Child(child_window)
+		}
+		AppWindowing::Windowed => RuntimeWindowing::Windowed,
+		AppWindowing::WindowedMaximized => RuntimeWindowing::WindowedMaximized,
+		AppWindowing::Fullscreen => RuntimeWindowing::Fullscreen,
+	};
 
 	// prepare the menu bar
 	app_window.set_menu_items_builtin_collections(ModelRc::new(VecModel::from(
@@ -332,7 +362,7 @@ pub fn create(args: AppArgs) -> AppWindow {
 		preferences: RefCell::new(preferences),
 		state: RefCell::new(AppState::bogus()),
 		status_changed_channel: Channel::default(),
-		child_window,
+		windowing,
 	};
 	let model = Rc::new(model);
 
@@ -371,7 +401,7 @@ pub fn create(args: AppArgs) -> AppWindow {
 	let model_weak = Rc::downgrade(&model);
 	app_window.on_size_changed(move || {
 		if let Some(model) = model_weak.upgrade() {
-			if let Some(child_window) = &model.child_window {
+			if let RuntimeWindowing::Child(child_window) = &model.windowing {
 				// set the child window size
 				let top = model.app_window().invoke_menubar_height();
 				child_window.update(model.app_window().window(), top);
@@ -540,11 +570,13 @@ pub fn create(args: AppArgs) -> AppWindow {
 
 	// now create the "real initial" state, now that we have a model to work with
 	let paths = model.preferences.borrow().paths.clone();
-	let mame_windowing = if let Some(child_window) = &model.child_window {
-		MameWindowing::Attached(child_window.text().into())
-	} else {
-		MameWindowing::Windowed
+	let mame_windowing = match &model.windowing {
+		RuntimeWindowing::Child(child_window) => MameWindowing::Attached(child_window.text().into()),
+		RuntimeWindowing::Windowed => MameWindowing::Windowed,
+		RuntimeWindowing::WindowedMaximized => MameWindowing::WindowedMaximized,
+		RuntimeWindowing::Fullscreen => MameWindowing::Fullscreen,
 	};
+
 	let model_weak = Rc::downgrade(&model);
 	let state = AppState::new(prefs_path, paths, mame_windowing, args.mame_stderr, move |command| {
 		let model = model_weak.upgrade().unwrap();

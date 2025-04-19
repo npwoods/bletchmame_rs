@@ -10,9 +10,7 @@ use strum_macros::EnumString;
 pub enum MameWindowing {
 	Attached(Rc<str>),
 	Windowed,
-	#[allow(dead_code)]
 	WindowedMaximized,
-	#[allow(dead_code)]
 	Fullscreen,
 }
 
