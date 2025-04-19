@@ -29,6 +29,7 @@ mod xml;
 
 use std::path::PathBuf;
 
+use appwindow::AppWindowing;
 use dirs::config_local_dir;
 use slint::ComponentHandle;
 use structopt::StructOpt;
@@ -49,6 +50,9 @@ mod ui {
 struct Opt {
 	#[structopt(long, parse(from_os_str))]
 	prefs_path: Option<PathBuf>,
+
+	#[structopt(long)]
+	mame_windowing: Option<AppWindowing>,
 
 	#[cfg_attr(feature = "diagnostics", structopt(long, parse(from_os_str)))]
 	process_xml: Option<PathBuf>,
@@ -93,6 +97,9 @@ fn main() {
 		MameStderr::Capture
 	};
 
+	// windowing?
+	let mame_windowing = opts.mame_windowing.unwrap_or_default();
+
 	// set up the tokio runtime
 	let tokio_runtime = tokio::runtime::Builder::new_multi_thread()
 		.enable_time()
@@ -107,6 +114,7 @@ fn main() {
 	let args = AppArgs {
 		prefs_path,
 		mame_stderr,
+		mame_windowing,
 	};
 	let app_window = appwindow::create(args);
 
