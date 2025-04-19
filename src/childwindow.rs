@@ -19,16 +19,14 @@ enum ThisError {
 	UnknownRawHandleType,
 }
 
-pub struct ChildWindow(Option<winit::window::Window>);
+pub struct ChildWindow(winit::window::Window);
 
 impl ChildWindow {
 	pub fn new(parent: &Window) -> Result<Self> {
 		// access the raw hande for the parent - if we can't access the so-called "handle text", we
-		// can't use the window and we return a bogus child window
+		// can't use the window and we return an error
 		let raw_window_handle = parent.window_handle().window_handle()?.as_raw();
-		if handle_text(&raw_window_handle).is_err() {
-			return Ok(Self(None));
-		}
+		handle_text(&raw_window_handle)?;
 
 		let window_attributes = unsafe {
 			WindowAttributes::default()
@@ -39,21 +37,14 @@ impl ChildWindow {
 		};
 
 		let window = parent.create_winit_window(window_attributes)?;
-		Ok(Self(Some(window)))
+		Ok(Self(window))
 	}
 
 	pub fn set_visible(&self, is_visible: bool) {
-		let Some(window) = &self.0 else {
-			return;
-		};
-		window.set_visible(is_visible);
+		self.0.set_visible(is_visible);
 	}
 
 	pub fn update(&self, container: &Window, top: f32) {
-		let Some(window) = &self.0 else {
-			return;
-		};
-
 		// determine position and size
 		let position = PhysicalPosition::new(0, (top * container.scale_factor()) as u32);
 		let size = container.size();
@@ -61,18 +52,16 @@ impl ChildWindow {
 		event!(LOG, position=?position, size=?size, "ChildWindow::update()");
 
 		// and set them
-		window.set_outer_position(position);
-		let _ = window.request_inner_size(size);
+		self.0.set_outer_position(position);
+		let _ = self.0.request_inner_size(size);
 
 		// hackish (and platform specific) method to "ensure" focus
-		container.ensure_child_focus(window);
+		container.ensure_child_focus(&self.0);
 	}
 
-	pub fn text(&self) -> Option<String> {
-		let window = self.0.as_ref()?;
-		let raw_window_handle = window.window_handle().unwrap().as_raw();
-		let text = handle_text(&raw_window_handle).unwrap();
-		Some(text)
+	pub fn text(&self) -> String {
+		let raw_window_handle = self.0.window_handle().unwrap().as_raw();
+		handle_text(&raw_window_handle).unwrap()
 	}
 }
 

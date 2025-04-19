@@ -98,7 +98,7 @@ struct AppModel {
 	preferences: RefCell<Preferences>,
 	state: RefCell<AppState>,
 	status_changed_channel: Channel<Status>,
-	child_window: ChildWindow,
+	child_window: Option<ChildWindow>,
 }
 
 impl AppModel {
@@ -216,7 +216,9 @@ impl AppModel {
 			app_window.set_running_machine_desc(state.running_machine_description().into());
 
 			// child window visibility
-			self.child_window.set_visible(running.is_some());
+			if let Some(child_window) = &self.child_window {
+				child_window.set_visible(running.is_some());
+			}
 
 			// report view
 			app_window.set_report_message(
@@ -278,7 +280,7 @@ pub fn create(args: AppArgs) -> AppWindow {
 	let app_window = AppWindow::new().expect("Failed to create main window");
 
 	// child window for MAME to attach to
-	let child_window = ChildWindow::new(app_window.window()).expect("Failed to create child window");
+	let child_window = Some(ChildWindow::new(app_window.window()).expect("Failed to create child window"));
 
 	// prepare the menu bar
 	app_window.set_menu_items_builtin_collections(ModelRc::new(VecModel::from(
@@ -369,9 +371,11 @@ pub fn create(args: AppArgs) -> AppWindow {
 	let model_weak = Rc::downgrade(&model);
 	app_window.on_size_changed(move || {
 		if let Some(model) = model_weak.upgrade() {
-			// set the child window size
-			let top = model.app_window().invoke_menubar_height();
-			model.child_window.update(model.app_window().window(), top);
+			if let Some(child_window) = &model.child_window {
+				// set the child window size
+				let top = model.app_window().invoke_menubar_height();
+				child_window.update(model.app_window().window(), top);
+			}
 		}
 	});
 
@@ -536,8 +540,8 @@ pub fn create(args: AppArgs) -> AppWindow {
 
 	// now create the "real initial" state, now that we have a model to work with
 	let paths = model.preferences.borrow().paths.clone();
-	let mame_windowing = if let Some(text) = model.child_window.text() {
-		MameWindowing::Attached(text.into())
+	let mame_windowing = if let Some(child_window) = &model.child_window {
+		MameWindowing::Attached(child_window.text().into())
 	} else {
 		MameWindowing::Windowed
 	};
