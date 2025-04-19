@@ -13,6 +13,12 @@ use crate::platform::WindowExt;
 
 const LOG: Level = Level::DEBUG;
 
+#[derive(thiserror::Error, Debug)]
+enum ThisError {
+	#[error("unknown raw handle type")]
+	UnknownRawHandleType,
+}
+
 pub struct ChildWindow(Option<winit::window::Window>);
 
 impl ChildWindow {
@@ -20,7 +26,7 @@ impl ChildWindow {
 		// access the raw hande for the parent - if we can't access the so-called "handle text", we
 		// can't use the window and we return a bogus child window
 		let raw_window_handle = parent.window_handle().window_handle()?.as_raw();
-		if handle_text(&raw_window_handle).is_none() {
+		if handle_text(&raw_window_handle).is_err() {
 			return Ok(Self(None));
 		}
 
@@ -65,19 +71,19 @@ impl ChildWindow {
 	pub fn text(&self) -> Option<String> {
 		let window = self.0.as_ref()?;
 		let raw_window_handle = window.window_handle().unwrap().as_raw();
-		let text = handle_text(&raw_window_handle).expect("Can't identify handle type");
+		let text = handle_text(&raw_window_handle).unwrap();
 		Some(text)
 	}
 }
 
-fn handle_text(raw_window_handle: &RawWindowHandle) -> Option<String> {
+fn handle_text(raw_window_handle: &RawWindowHandle) -> Result<String> {
 	match raw_window_handle {
 		#[cfg(target_family = "windows")]
-		RawWindowHandle::Win32(win32_window_handle) => Some(win32_window_handle.hwnd.to_string()),
+		RawWindowHandle::Win32(win32_window_handle) => Ok(win32_window_handle.hwnd.to_string()),
 
 		#[cfg(target_family = "unix")]
-		RawWindowHandle::Xlib(xlib_window_handle) => Some(xlib_window_handle.window.to_string()),
+		RawWindowHandle::Xlib(xlib_window_handle) => Ok(xlib_window_handle.window.to_string()),
 
-		_ => None,
+		_ => Err(ThisError::UnknownRawHandleType.into()),
 	}
 }
