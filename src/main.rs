@@ -37,7 +37,8 @@ use tracing_subscriber::EnvFilter;
 
 use crate::appwindow::AppArgs;
 use crate::diagnostics::info_db_from_xml_file;
-use crate::guiutils::init_gui_utils;
+use crate::guiutils::SlintBackend;
+use crate::guiutils::init_slint_backend;
 use crate::platform::platform_init;
 use crate::runtime::MameStderr;
 
@@ -53,6 +54,9 @@ struct Opt {
 
 	#[structopt(long)]
 	mame_windowing: Option<AppWindowing>,
+
+	#[cfg_attr(feature = "slint-qt-backend", structopt(long))]
+	slint_backend: Option<SlintBackend>,
 
 	#[cfg_attr(feature = "diagnostics", structopt(long, parse(from_os_str)))]
 	process_xml: Option<PathBuf>,
@@ -107,8 +111,9 @@ fn main() {
 		.unwrap();
 	let _guard = tokio_runtime.enter();
 
-	// initialize our GUI utility code that will hopefully go away as Slint improves
-	init_gui_utils();
+	// set up the Slint back end
+	let backend_type = opts.slint_backend.unwrap_or_default();
+	init_slint_backend(backend_type).expect("slint backend setup failed");
 
 	// create the application window...
 	let args = AppArgs {
