@@ -26,7 +26,7 @@ export component DevicesAndImagesList {
     // callbacks
     callback entry-option-changed(int, string);
     callback entry-button-clicked(int, Point);
-    callback menu-entry-activated(MenuEntry);
+    callback menu-item-command(string);
 
     // context menu
     in-out property <DevicesAndImagesContextMenuInfo> context-menu-info;
@@ -38,20 +38,38 @@ export component DevicesAndImagesList {
     // context menu control
     context-menu := ContextMenuArea {
         Menu {
-            if false: MenuItem {
+            MenuItem {
                 title: @tr("DevicesAndImages" => "Create Image...");
+                enabled: false;
             }
-            if false: MenuItem {
+
+            MenuItem {
                 title: @tr("DevicesAndImages" => "Load Image...");
+                enabled: root.context-menu-info.load-image-command != "";
+                activated => {
+                    menu-item-command(root.context-menu-info.load-image-command);
+                }
             }
-            if false: MenuItem {
+
+            MenuItem {
                 title: @tr("DevicesAndImages" => "Load Software List Part...");
+                enabled: false;
             }
-            if false: MenuItem {
+
+            MenuItem {
                 title: @tr("DevicesAndImages" => "Connect To Socket...");
+                enabled: root.context-menu-info.connect-to-socket-command != "";
+                activated => {
+                    menu-item-command(root.context-menu-info.connect-to-socket-command);
+                }
             }
-            if false: MenuItem {
+
+            MenuItem {
                 title: @tr("DevicesAndImages" => "Unload");
+                enabled: root.context-menu-info.unload-command != "";
+                activated => {
+                    menu-item-command(root.context-menu-info.unload-command);
+                }
             }
         }
     }
