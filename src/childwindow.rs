@@ -86,9 +86,6 @@ impl ChildWindow {
 				let size = dpi::PhysicalSize::new(size.width, size.height);
 				window.set_outer_position(position);
 				let _ = window.request_inner_size(size);
-
-				// hackish (and platform specific) method to "ensure" focus
-				container.ensure_child_focus(window);
 			}
 
 			#[cfg(feature = "slint-qt-backend")]
@@ -108,6 +105,14 @@ impl ChildWindow {
 
 			#[cfg(feature = "slint-qt-backend")]
 			ChildWindowInternal::Qt(window_adapter) => window_adapter.qt_win_id().unwrap().to_string(),
+		}
+	}
+
+	/// Hackish (and platform specific) method to "ensure" focus
+	pub fn ensure_child_focus(&self, container: &Window) {
+		#[allow(irrefutable_let_patterns)]
+		if let ChildWindowInternal::Winit(window) = &self.0 {
+			container.ensure_child_focus(window);
 		}
 	}
 }
