@@ -1,5 +1,3 @@
-use std::cell::Cell;
-use std::cell::RefCell;
 use std::future::Future;
 use std::rc::Rc;
 
@@ -12,20 +10,13 @@ use slint::Window;
 use winit::event::WindowEvent;
 use winit::window::WindowAttributes;
 
-use crate::appcommand::AppCommand;
 use crate::guiutils::hook::with_attributes_hook;
 use crate::platform::WindowAttributesExt;
 use crate::platform::WindowExt;
 
-thread_local! {
-	#[allow(clippy::type_complexity)]
-	static CURRENT_FILTERS: RefCell<Vec<Box<dyn Fn(AppCommand) -> Option<AppCommand> + 'static>>> = RefCell::new(Default::default());
-}
-
 pub struct Modal<D> {
 	reenable_parent: Rc<dyn Fn() + 'static>,
 	dialog: D,
-	must_drop_filter: Cell<bool>,
 }
 
 impl<D> Modal<D>
@@ -85,7 +76,6 @@ where
 		Self {
 			reenable_parent,
 			dialog,
-			must_drop_filter: Cell::new(false),
 		}
 	}
 
@@ -95,14 +85,6 @@ where
 
 	pub fn window(&self) -> &'_ Window {
 		self.dialog.window()
-	}
-
-	pub fn set_command_filter(&self, callback: impl Fn(AppCommand) -> Option<AppCommand> + 'static) {
-		let callback = Box::new(callback) as Box<dyn Fn(AppCommand) -> Option<AppCommand> + 'static>;
-		CURRENT_FILTERS.with_borrow_mut(|filters| {
-			filters.push(callback);
-		});
-		self.must_drop_filter.set(true);
 	}
 
 	pub fn launch(self) {
@@ -135,16 +117,6 @@ where
 	}
 }
 
-impl<D> Drop for Modal<D> {
-	fn drop(&mut self) {
-		if self.must_drop_filter.get() {
-			CURRENT_FILTERS.with_borrow_mut(|filters| {
-				let _ = filters.pop().unwrap();
-			});
-		}
-	}
-}
-
 fn set_window_attributes_for_modal_parent(
 	mut window_attributes: WindowAttributes,
 	parent: &Window,
@@ -158,16 +130,4 @@ fn reenable_modal_parent(parent: &impl ComponentHandle) {
 	parent
 		.window()
 		.on_winit_window_event(|_, _| WinitWindowEventResult::Propagate);
-}
-
-#[allow(dead_code)]
-pub fn filter_command(command: AppCommand) -> Option<AppCommand> {
-	// this code is likely not supposed to be dead
-	CURRENT_FILTERS.with_borrow(|filters| {
-		if let Some(filter) = filters.last() {
-			filter(command)
-		} else {
-			Some(command)
-		}
-	})
 }

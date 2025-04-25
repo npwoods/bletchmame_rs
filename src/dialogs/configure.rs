@@ -21,6 +21,7 @@ use crate::dialogs::SingleResult;
 use crate::dialogs::devimages::entry_popup_menu;
 use crate::dialogs::image::Format;
 use crate::dialogs::image::dialog_load_image;
+use crate::dialogs::socket::dialog_connect_to_socket;
 use crate::guiutils::modal::Modal;
 use crate::info::InfoDb;
 use crate::info::View;
@@ -114,9 +115,13 @@ pub async fn dialog_configure(
 				})
 			});
 
-			// set up a command filter
+			// set up the context menu command handler
 			let state_clone = state.clone();
-			modal.set_command_filter(move |command| command_filter(&state_clone, command));
+			modal.dialog().on_menu_item_command(move |command_string| {
+				if let Some(command) = AppCommand::decode_from_slint(command_string) {
+					context_menu_command(&state_clone, command);
+				}
+			});
 
 			// RAM info
 			let machine_index = state.with_diconfig(|diconfig| diconfig.machine().unwrap().index());
@@ -229,8 +234,8 @@ fn ram_size_display_text(ram_size: u64) -> String {
 	format!("{n} {unit}")
 }
 
-fn command_filter(state: &Rc<State>, command: AppCommand) -> Option<AppCommand> {
-	// first pass
+fn context_menu_command(state: &Rc<State>, command: AppCommand) {
+	// this dialog interprets commands differently than core BletchMAME
 	match command {
 		AppCommand::LoadImageDialog { tag } => {
 			let (_filename, extensions) = state.with_diconfig(|config| {
@@ -255,18 +260,25 @@ fn command_filter(state: &Rc<State>, command: AppCommand) -> Option<AppCommand> 
 				extensions: &extensions,
 			}];
 			let format_iter = formats.iter().cloned();
-			dialog_load_image(state.dialog_weak.clone(), format_iter)
-				.and_then(|filename| command_filter(state, AppCommand::LoadImage { tag, filename }))
+			if let Some(filename) = dialog_load_image(state.dialog_weak.clone(), format_iter) {
+				state.set_image_filename(tag, Some(filename));
+			}
 		}
-		AppCommand::LoadImage { tag, filename } => {
-			state.set_image_filename(tag, Some(filename));
-			None
+		AppCommand::ConnectToSocketDialog { tag } => {
+			let state = state.clone();
+			let fut = async move {
+				let parent: Weak<ConfigureDialog> = state.dialog_weak.clone();
+				if let Some((hostname, port)) = dialog_connect_to_socket(parent).await {
+					let filename = format!("socket.{hostname}:{port}");
+					state.set_image_filename(tag, Some(filename));
+				}
+			};
+			spawn_local(fut).unwrap();
 		}
 		AppCommand::UnloadImage { tag } => {
 			state.set_image_filename(tag, None);
-			None
 		}
-		_ => Some(command),
+		_ => unreachable!(),
 	}
 }
 
