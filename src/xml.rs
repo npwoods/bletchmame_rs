@@ -11,10 +11,7 @@ use quick_xml::escape::unescape;
 use quick_xml::events::BytesStart;
 use quick_xml::events::Event;
 use quick_xml::name::QName;
-use tracing::Level;
-use tracing::event;
-
-const LOG: Level = Level::DEBUG;
+use tracing::debug;
 
 /// quick-xml events are at a slightly different granularity than what we would prefer
 #[derive(Debug)]
@@ -61,7 +58,7 @@ where
 			self.set_done();
 		}
 
-		event!(LOG, result=?result, "XmlReader::next()");
+		debug!(result=?result, "XmlReader::next()");
 		result
 	}
 

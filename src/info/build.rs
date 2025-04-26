@@ -11,8 +11,7 @@ use anyhow::Result;
 use binary_serde::BinarySerde;
 use itertools::Itertools;
 use num::CheckedAdd;
-use tracing::Level;
-use tracing::event;
+use tracing::debug;
 
 use crate::info::ChipType;
 use crate::info::ENDIANNESS;
@@ -26,8 +25,6 @@ use crate::parse::parse_mame_bool;
 use crate::xml::XmlElement;
 use crate::xml::XmlEvent;
 use crate::xml::XmlReader;
-
-const LOG: Level = Level::DEBUG;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Phase {
@@ -107,7 +104,7 @@ impl State {
 	}
 
 	pub fn handle_start(&mut self, evt: XmlElement<'_>) -> Result<Option<Phase>> {
-		event!(LOG, self=?self, evt=?evt, "handle_start()");
+		debug!(self=?self, evt=?evt, "handle_start()");
 
 		let phase = self.phase_stack.last().unwrap_or(&Phase::Root);
 		let new_phase = match (phase, evt.name().as_ref()) {
@@ -120,12 +117,8 @@ impl State {
 				let [name, source_file, clone_of, rom_of, runnable] =
 					evt.find_attributes([b"name", b"sourcefile", b"cloneof", b"romof", b"runnable"])?;
 
-				event!(
-					LOG,
-					"handle_start(): name={:?} source_file={:?} runnable={:?}",
-					name,
-					source_file,
-					runnable
+				debug!(name =?name, source_file=?source_file, runnable=?runnable,
+					"handle_start()"
 				);
 
 				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?;
@@ -291,7 +284,7 @@ impl State {
 	}
 
 	pub fn handle_end(&mut self, callback: &mut impl FnMut(&str) -> bool, text: Option<String>) -> Result<Option<()>> {
-		event!(LOG, self=?self, "handle_end()");
+		debug!(self=?self, "handle_end()");
 
 		match self.phase_stack.last().unwrap_or(&Phase::Root) {
 			Phase::MachineDescription => {

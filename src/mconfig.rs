@@ -5,16 +5,13 @@ use std::rc::Rc;
 use anyhow::Error;
 use anyhow::Result;
 use more_asserts::assert_le;
-use tracing::Level;
-use tracing::event;
+use tracing::info;
 
 use crate::info::Device;
 use crate::info::InfoDb;
 use crate::info::Machine;
 use crate::info::Slot;
 use crate::info::View;
-
-const LOG: Level = Level::INFO;
 
 #[derive(Clone, Debug)]
 pub struct MachineConfig {
@@ -209,7 +206,7 @@ impl MachineConfig {
 	}
 
 	pub fn set_slot_option(&self, tag: &str, new_option_name: Option<&str>) -> Result<Option<Self>> {
-		event!(LOG, tag=?tag, new_option_name=?new_option_name, "MachineConfig::set_option()");
+		info!(tag=?tag, new_option_name=?new_option_name, "MachineConfig::set_option()");
 
 		let machine = self.machine();
 		let changes = match self.traverse_tag(tag)? {

@@ -4,8 +4,7 @@ use std::sync::Arc;
 
 use anyhow::Error;
 use anyhow::Result;
-use tracing::Level;
-use tracing::event;
+use tracing::debug;
 
 use crate::parse::normalize_tag;
 use crate::parse::parse_mame_bool;
@@ -20,8 +19,6 @@ use crate::version::MameVersion;
 use crate::xml::XmlElement;
 use crate::xml::XmlEvent;
 use crate::xml::XmlReader;
-
-const LOG: Level = Level::DEBUG;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Phase {
@@ -68,8 +65,7 @@ impl State {
 					evt.find_attributes([b"romname", b"paused", b"app_build", b"app_version"])?;
 				let machine_name = romname.unwrap_or_default().to_string();
 				let is_paused = is_paused.map(|x| parse_mame_bool(x.as_ref())).transpose()?;
-				event!(
-					LOG,
+				debug!(
 					machine_name=?machine_name,
 					is_paused=?is_paused,
 					"status State::handle_start()"
@@ -90,8 +86,7 @@ impl State {
 				let throttle_rate = throttle_rate.map(|x| x.parse::<f32>()).transpose()?;
 				let is_recording = is_recording.map(parse_mame_bool).transpose()?;
 
-				event!(
-					LOG,
+				debug!(
 					throttled=?throttled,
 					throttle_rate=?throttle_rate,
 					"status State::handle_start()"

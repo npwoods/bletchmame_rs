@@ -21,8 +21,8 @@ use slint::invoke_from_event_loop;
 use slint::quit_event_loop;
 use slint::spawn_local;
 use strum::EnumString;
-use tracing::Level;
-use tracing::event;
+use tracing::debug;
+use tracing::info;
 
 use crate::appcommand::AppCommand;
 use crate::appstate::AppState;
@@ -75,10 +75,6 @@ use crate::status::Status;
 use crate::ui::AboutDialog;
 use crate::ui::AppWindow;
 use crate::ui::ReportIssue;
-
-const LOG_COMMANDS: Level = Level::INFO;
-const LOG_PREFS: Level = Level::INFO;
-const LOG_MENUING: Level = Level::DEBUG;
 
 const SOUND_ATTENUATION_OFF: i32 = -32;
 const SOUND_ATTENUATION_ON: i32 = 0;
@@ -165,22 +161,22 @@ impl AppModel {
 		// react to all of the possible changes
 		self.update_state(|state| state.update_paths(&prefs.paths));
 		if prefs.collections != old_prefs.collections {
-			event!(LOG_PREFS, "modify_prefs(): prefs.collection changed");
+			info!("modify_prefs(): prefs.collection changed");
 			let info_db = self.state.borrow().info_db().cloned();
 			self.with_collections_view_model(|x| x.update(info_db, &prefs.collections));
 		}
 		if prefs.current_history_entry() != old_prefs.current_history_entry()
 			|| prefs.current_collection() != old_prefs.current_collection()
 		{
-			event!(LOG_PREFS, "modify_prefs(): current history_entry/collection] changed");
+			info!("modify_prefs(): current history_entry/collection] changed");
 			update_ui_for_current_history_item(self);
 		}
 		if prefs.items_columns != old_prefs.items_columns {
-			event!(LOG_PREFS, "modify_prefs(): items_columns changed");
+			info!("modify_prefs(): items_columns changed");
 			update_ui_for_sort_changes(self);
 		}
 		if prefs.paths.software_lists != old_prefs.paths.software_lists {
-			event!(LOG_PREFS, "modify_prefs(): paths.software_lists changed");
+			info!("modify_prefs(): paths.software_lists changed");
 			software_paths_updated(self);
 		}
 	}
@@ -646,12 +642,12 @@ fn menu_item_info(parent_title: Option<&str>, title: &str) -> (Option<AppCommand
 		// Anything else
 		(_, _) => (None, None),
 	};
-	event!(LOG_MENUING, parent_title=?parent_title, title=?title, command=?command, accelerator=?accelerator, "menu_item_info");
+	debug!(parent_title=?parent_title, title=?title, command=?command, accelerator=?accelerator, "menu_item_info");
 	(command, accelerator.and_then(accel))
 }
 
 fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
-	event!(LOG_COMMANDS, command=?&command, "handle_command()");
+	info!(command=?&command, "handle_command()");
 	match command {
 		AppCommand::FileStop => {
 			model.issue_command(MameCommand::Stop);
