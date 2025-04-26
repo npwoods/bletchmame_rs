@@ -3,12 +3,9 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use is_executable::IsExecutable;
-use tracing::Level;
-use tracing::event;
+use tracing::info;
 
 use crate::prefs::PreflightProblem;
-
-const LOG: Level = Level::INFO;
 
 pub fn preflight_checks<T>(
 	mame_executable_path: Option<&Path>,
@@ -60,7 +57,7 @@ where
 		problems.push(PreflightProblem::NoPluginsPaths);
 	}
 
-	event!(LOG, "preflight_checks(): problems={problems:?}");
+	info!(problems=?problems, "preflight_checks()");
 	problems
 }
 

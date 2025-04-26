@@ -20,8 +20,7 @@ use slint::ModelTracker;
 use slint::SharedString;
 use slint::StandardListViewItem;
 use slint::VecModel;
-use tracing::Level;
-use tracing::event;
+use tracing::debug;
 use unicase::UniCase;
 
 use crate::appcommand::AppCommand;
@@ -41,8 +40,6 @@ use crate::software::Software;
 use crate::software::SoftwareList;
 use crate::software::SoftwareListDispenser;
 use crate::ui::ItemContextMenuInfo;
-
-const LOG: Level = Level::DEBUG;
 
 pub struct ItemsTableModel {
 	info_db: RefCell<Option<Rc<InfoDb>>>,
@@ -425,8 +422,7 @@ impl ItemsTableModel {
 			self.sorting.set(sorting);
 		}
 
-		event!(
-			LOG,
+		debug!(
 			search=?search,
 			sorting=?sorting,
 			search_changed=?search_changed,

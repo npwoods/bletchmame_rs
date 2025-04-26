@@ -28,8 +28,7 @@ use serde::Serialize;
 use slint::LogicalSize;
 use strum::EnumProperty;
 use strum_macros::EnumString;
-use tracing::Level;
-use tracing::event;
+use tracing::info;
 
 use crate::history::History;
 use crate::icon::Icon;
@@ -39,8 +38,6 @@ use crate::prefs::pathtype::PickType;
 use crate::prefs::preflight::preflight_checks;
 use crate::prefs::var::resolve_path;
 use crate::prefs::var::resolve_paths_string;
-
-const LOG: Level = Level::INFO;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -347,14 +344,14 @@ impl Preferences {
 		// try to load the preferences
 		let path = prefs_filename(prefs_path, PREFS)?;
 		let result = load_prefs(&path);
-		event!(LOG, "result" = ?result.as_ref().map(|_| ()), "Preferences::load()");
+		info!("result" = ?result.as_ref().map(|_| ()), "Preferences::load()");
 
 		// did we error?
 		if result.is_err() {
 			// we did; back up this file
 			if let Ok(renamed) = prefs_filename(prefs_path, PREFS_BACKUP) {
 				let rc = rename(&path, &renamed);
-				event!(LOG, path=?path, renamed=?renamed, rc=?rc, "Preferences::load()");
+				info!(path=?path, renamed=?renamed, rc=?rc, "Preferences::load()");
 			}
 		}
 

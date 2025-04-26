@@ -5,13 +5,10 @@ use raw_window_handle::RawWindowHandle;
 use slint::PhysicalPosition;
 use slint::PhysicalSize;
 use slint::Window;
-use tracing::Level;
-use tracing::event;
+use tracing::debug;
 use winit::window::WindowAttributes;
 
 use crate::platform::WindowExt;
-
-const LOG: Level = Level::DEBUG;
 
 #[derive(thiserror::Error, Debug)]
 enum ThisError {
@@ -78,7 +75,7 @@ impl ChildWindow {
 		};
 		let size = container.size();
 		let size = PhysicalSize::new(size.width, size.height - (position.y as u32));
-		event!(LOG, position=?position, size=?size, "ChildWindow::update()");
+		debug!(position=?position, size=?size, "ChildWindow::update()");
 
 		match &self.0 {
 			ChildWindowInternal::Winit(window) => {

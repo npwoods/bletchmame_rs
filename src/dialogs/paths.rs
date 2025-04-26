@@ -14,8 +14,7 @@ use slint::SharedString;
 use slint::VecModel;
 use slint::Weak;
 use slint::spawn_local;
-use tracing::Level;
-use tracing::event;
+use tracing::info;
 
 use crate::dialogs::SingleResult;
 use crate::dialogs::file::choose_path_by_type_dialog;
@@ -25,8 +24,6 @@ use crate::prefs::PrefsPaths;
 use crate::prefs::pathtype::PathType;
 use crate::ui::MagicListViewItem;
 use crate::ui::PathsDialog;
-
-const LOG: Level = Level::INFO;
 
 struct State {
 	dialog_weak: Weak<PathsDialog>,
@@ -193,8 +190,7 @@ async fn browse_clicked(state: Rc<State>) {
 		.as_ref()
 		.and_then(|path| state.paths.borrow().resolve(path));
 	let resolved_existing_path = resolved_existing_path.as_deref();
-	event!(
-		LOG,
+	info!(
 		existing_path=?existing_path,
 		resolved_existing_path=?resolved_existing_path,
 		"browse_clicked()"

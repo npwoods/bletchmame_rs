@@ -9,16 +9,13 @@ use std::sync::Arc;
 use anyhow::Result;
 use serde::Deserialize;
 use serde::Serialize;
-use tracing::Level;
-use tracing::event;
+use tracing::debug;
 
 use crate::debugstr::DebugString;
 use crate::info::InfoDb;
 use crate::status::parse::parse_update;
 use crate::status::validate::validate_status;
 use crate::version::MameVersion;
-
-const LOG: Level = Level::DEBUG;
 
 #[derive(Clone)]
 pub struct Status {
@@ -80,7 +77,7 @@ impl Status {
 				slots,
 			}
 		});
-		event!(LOG, running=?running, "Status::merge()");
+		debug!(running=?running, "Status::merge()");
 		Self {
 			running,
 			build: update.build,
