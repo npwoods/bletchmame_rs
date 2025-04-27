@@ -96,7 +96,6 @@ mod qtwidget {
 		pub fn set_visible(&self, visible: bool) {
 			let qt_widget = &self.0;
 			cpp!(unsafe [qt_widget as "std::unique_ptr<QWidget> *", visible as "bool"] {
-				auto parent_widget = (*qt_widget)->parentWidget();
 				(*qt_widget)->setVisible(visible);
 			});
 		}
