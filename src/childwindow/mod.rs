@@ -1,71 +1,52 @@
+#[cfg(feature = "slint-qt-backend")]
+mod qt;
+mod winit;
+
 use anyhow::Result;
-use i_slint_backend_winit::WinitWindowAccessor;
-use raw_window_handle::HasWindowHandle;
-use raw_window_handle::RawWindowHandle;
 use slint::PhysicalPosition;
 use slint::PhysicalSize;
 use slint::Window;
 use tracing::debug;
-use winit::window::WindowAttributes;
 
-use crate::platform::WindowExt;
+use crate::childwindow::winit::WinitChildWindow;
 
-#[derive(thiserror::Error, Debug)]
-enum ThisError {
-	#[error("unknown raw handle type")]
-	UnknownRawHandleType,
-	#[error("cannot create child window")]
-	CannotCreateChildWindow,
+#[cfg(feature = "slint-qt-backend")]
+use crate::childwindow::qt::QtChildWindow;
+
+trait ChildWindowImpl {
+	fn set_visible(&self, is_visible: bool);
+	fn update(&self, position: dpi::PhysicalPosition<u32>, size: dpi::PhysicalSize<u32>);
+	fn text(&self) -> String;
+
+	/// Hackish (and platform specific) method to "ensure" focus
+	fn ensure_child_focus(&self, container: &Window);
 }
 
-pub struct ChildWindow(ChildWindowInternal);
-
-enum ChildWindowInternal {
-	Winit(winit::window::Window),
-
-	#[cfg(feature = "slint-qt-backend")]
-	Qt(std::rc::Rc<dyn slint::platform::WindowAdapter>),
-}
+#[cfg(not(feature = "slint-qt-backend"))]
+pub struct ChildWindow(WinitChildWindow);
+#[cfg(feature = "slint-qt-backend")]
+pub struct ChildWindow(Box<dyn ChildWindowImpl>);
 
 impl ChildWindow {
+	#[cfg(not(feature = "slint-qt-backend"))]
 	pub fn new(parent: &Window) -> Result<Self> {
+		let result = WinitChildWindow::new(parent)?;
+		Ok(Self(result))
+	}
+
+	#[cfg(feature = "slint-qt-backend")]
+	pub fn new(parent: &Window) -> Result<Self> {
+		use i_slint_backend_winit::WinitWindowAccessor;
 		let result = if parent.with_winit_window(|_| ()).is_some() {
-			// we're using the winit backend; access the raw hande for the parent - if
-			// we can't access the so-called "handle text", we can't use the window and we return an error
-			let raw_window_handle = parent.window_handle().window_handle()?.as_raw();
-			handle_text(&raw_window_handle)?;
-
-			let window_attributes = unsafe {
-				WindowAttributes::default()
-					.with_title("MAME Child Window")
-					.with_visible(false)
-					.with_decorations(false)
-					.with_parent_window(Some(raw_window_handle))
-			};
-
-			let window = parent.create_winit_window(window_attributes)?;
-			ChildWindowInternal::Winit(window)
+			Box::new(WinitChildWindow::new(parent)?) as Box<_>
 		} else {
-			#[cfg(feature = "slint-qt-backend")]
-			{
-				// we're using the Qt back end; create a WindowAdapter
-				let window_adapter = parent.create_child_window()?;
-				window_adapter.qt_win_id().ok_or(ThisError::CannotCreateChildWindow)?;
-				ChildWindowInternal::Qt(window_adapter)
-			}
-
-			#[cfg(not(feature = "slint-qt-backend"))]
-			return Err(ThisError::CannotCreateChildWindow.into());
+			Box::new(QtChildWindow::new(parent)?) as Box<_>
 		};
 		Ok(Self(result))
 	}
 
 	pub fn set_visible(&self, is_visible: bool) {
-		match &self.0 {
-			ChildWindowInternal::Winit(window) => window.set_visible(is_visible),
-			#[cfg(feature = "slint-qt-backend")]
-			ChildWindowInternal::Qt(window_adapter) => window_adapter.set_visible(is_visible).unwrap(),
-		}
+		self.0.set_visible(is_visible);
 	}
 
 	pub fn update(&self, container: &Window, top: f32) {
@@ -77,51 +58,17 @@ impl ChildWindow {
 		let size = PhysicalSize::new(size.width, size.height - (position.y as u32));
 		debug!(position=?position, size=?size, "ChildWindow::update()");
 
-		match &self.0 {
-			ChildWindowInternal::Winit(window) => {
-				let position = dpi::PhysicalPosition::new(position.x, position.y);
-				let size = dpi::PhysicalSize::new(size.width, size.height);
-				window.set_outer_position(position);
-				let _ = window.request_inner_size(size);
-			}
-
-			#[cfg(feature = "slint-qt-backend")]
-			ChildWindowInternal::Qt(window_adapter) => {
-				window_adapter.set_position(position.into());
-				window_adapter.set_size(slint::WindowSize::Physical(size));
-			}
-		}
+		let position =
+			dpi::PhysicalPosition::<u32>::new(position.x.try_into().unwrap(), position.y.try_into().unwrap());
+		let size = dpi::PhysicalSize::<u32>::new(size.width, size.height);
+		self.0.update(position, size);
 	}
 
 	pub fn text(&self) -> String {
-		match &self.0 {
-			ChildWindowInternal::Winit(window) => {
-				let raw_window_handle = window.window_handle().unwrap().as_raw();
-				handle_text(&raw_window_handle).unwrap()
-			}
-
-			#[cfg(feature = "slint-qt-backend")]
-			ChildWindowInternal::Qt(window_adapter) => window_adapter.qt_win_id().unwrap().to_string(),
-		}
+		self.0.text()
 	}
 
-	/// Hackish (and platform specific) method to "ensure" focus
 	pub fn ensure_child_focus(&self, container: &Window) {
-		#[allow(irrefutable_let_patterns)]
-		if let ChildWindowInternal::Winit(window) = &self.0 {
-			container.ensure_child_focus(window);
-		}
-	}
-}
-
-fn handle_text(raw_window_handle: &RawWindowHandle) -> Result<String> {
-	match raw_window_handle {
-		#[cfg(target_family = "windows")]
-		RawWindowHandle::Win32(win32_window_handle) => Ok(win32_window_handle.hwnd.to_string()),
-
-		#[cfg(target_family = "unix")]
-		RawWindowHandle::Xlib(xlib_window_handle) => Ok(xlib_window_handle.window.to_string()),
-
-		_ => Err(ThisError::UnknownRawHandleType.into()),
+		self.0.ensure_child_focus(container);
 	}
 }

@@ -26,6 +26,20 @@ fn main() -> std::io::Result<()> {
 	)
 	.unwrap();
 
+	// Qt interop stuff
+	#[cfg(feature = "slint-qt-backend")]
+	{
+		let dep_qt_include_path = env::var("DEP_QT_INCLUDE_PATH").unwrap();
+		let dep_qt_compile_flags = env::var("DEP_QT_COMPILE_FLAGS").unwrap();
+
+		let mut config = cpp_build::Config::new();
+		config.include(dep_qt_include_path);
+		for f in dep_qt_compile_flags.split_terminator(";") {
+			config.flag(f);
+		}
+		config.build("src/main.rs");
+	}
+
 	// BletchMAME icon
 	if env::var_os("CARGO_CFG_WINDOWS").is_some() {
 		// convert PNG to ICO
