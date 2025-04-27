@@ -52,7 +52,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: ${{ matrix.qt == 'true' && '--features slint-qt-backend' || '' }}
+          args: ${{ matrix.qt == 'true' && '--all-features' || '' }}
 
   clippy:
     name: Clippy
@@ -95,7 +95,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: ${{ matrix.qt == 'true' && '--features slint-qt-backend --all-targets -- -D warnings' || '--all-targets -- -D warnings' }}
+          args: ${{ matrix.qt == 'true' && '--all-features --all-targets -- -D warnings' || '--all-targets -- -D warnings' }}
 
   fmt:
     name: Rustfmt
