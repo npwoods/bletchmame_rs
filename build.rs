@@ -33,6 +33,8 @@ fn main() -> std::io::Result<()> {
 		let dep_qt_compile_flags = env::var("DEP_QT_COMPILE_FLAGS").unwrap();
 
 		let mut config = cpp_build::Config::new();
+		config.flag_if_supported("-std=c++17");
+		config.flag_if_supported("/std:c++17");
 		config.include(dep_qt_include_path);
 		for f in dep_qt_compile_flags.split_terminator(";") {
 			config.flag(f);
