@@ -63,7 +63,7 @@ impl MameCommand<'_> {
 	}
 }
 
-#[derive(AllValues, Copy, Clone, Debug, Default, PartialEq, strum_macros::Display)]
+#[derive(AllValues, Copy, Clone, Debug, Default, PartialEq, strum::Display)]
 pub enum MovieFormat {
 	#[default]
 	#[strum(to_string = "avi")]

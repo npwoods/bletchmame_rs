@@ -21,7 +21,7 @@ pub trait MessageBoxDefaults {
 		Self: std::marker::Sized;
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, AllValues, strum_macros::Display)]
+#[derive(Debug, Clone, Copy, PartialEq, AllValues, strum::Display)]
 pub enum OkOnly {
 	#[strum(to_string = "OK")]
 	Ok,
@@ -41,7 +41,7 @@ impl MessageBoxDefaults for OkOnly {
 	}
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, AllValues, strum_macros::Display)]
+#[derive(Debug, Clone, Copy, PartialEq, AllValues, strum::Display)]
 pub enum OkCancel {
 	#[strum(to_string = "OK")]
 	Ok,

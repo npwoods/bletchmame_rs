@@ -27,7 +27,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use slint::LogicalSize;
 use strum::EnumProperty;
-use strum_macros::EnumString;
+use strum::EnumString;
 use tracing::info;
 
 use crate::history::History;
@@ -157,7 +157,7 @@ fn access_paths(path_type: PathType) -> (fn(&PrefsPaths) -> &[String], PathsStor
 	}
 }
 
-#[derive(AllValues, Copy, Clone, Debug, strum_macros::Display, EnumString, EnumProperty)]
+#[derive(AllValues, Copy, Clone, Debug, strum::Display, EnumString, EnumProperty)]
 pub enum PreflightProblem {
 	#[strum(to_string = "No MAME executable path specified", props(ProblemType = "MAME Executable"))]
 	NoMameExecutablePath,
@@ -224,7 +224,7 @@ pub enum SortOrder {
 	Descending,
 }
 
-#[derive(AllValues, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, strum_macros::Display)]
+#[derive(AllValues, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, strum::Display)]
 #[serde(rename_all = "camelCase")]
 pub enum ColumnType {
 	#[strum(to_string = "Name")]
@@ -275,9 +275,7 @@ impl PrefsCollection {
 	}
 }
 
-#[derive(
-	AllValues, Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, strum_macros::Display, EnumString,
-)]
+#[derive(AllValues, Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, strum::Display, EnumString)]
 #[serde(rename_all = "camelCase", tag = "subtype")]
 pub enum BuiltinCollection {
 	#[strum(to_string = "All Systems")]

@@ -1,6 +1,6 @@
 use binary_serde::BinarySerde;
 use serde::Deserialize;
-use strum_macros::EnumString;
+use strum::EnumString;
 
 pub trait Fixup {
 	fn identify_machine_indexes(&mut self) -> impl IntoIterator<Item = &mut u32> {
