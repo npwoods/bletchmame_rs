@@ -1,27 +1,24 @@
 use std::default::Default;
 use std::fmt::Display;
 
-use derive_enum_all_values::AllValues;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
 use slint::ModelRc;
 use slint::SharedString;
 use slint::VecModel;
 use slint::Weak;
+use strum::VariantArray;
 
 use crate::dialogs::SingleResult;
 use crate::guiutils::modal::Modal;
 use crate::ui::MessageBoxDialog;
 
-pub trait MessageBoxDefaults {
+pub trait MessageBoxDefaults: VariantArray {
 	fn accept() -> Self;
 	fn abort() -> Self;
-	fn all_values() -> &'static [Self]
-	where
-		Self: std::marker::Sized;
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, AllValues, strum_macros::Display)]
+#[derive(Debug, Clone, Copy, PartialEq, VariantArray, strum::Display)]
 pub enum OkOnly {
 	#[strum(to_string = "OK")]
 	Ok,
@@ -35,13 +32,9 @@ impl MessageBoxDefaults for OkOnly {
 	fn abort() -> Self {
 		Self::Ok
 	}
-
-	fn all_values() -> &'static [Self] {
-		Self::all_values()
-	}
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, AllValues, strum_macros::Display)]
+#[derive(Debug, Clone, Copy, PartialEq, VariantArray, strum::Display)]
 pub enum OkCancel {
 	#[strum(to_string = "OK")]
 	Ok,
@@ -56,10 +49,6 @@ impl MessageBoxDefaults for OkCancel {
 
 	fn abort() -> Self {
 		Self::Cancel
-	}
-
-	fn all_values() -> &'static [Self] {
-		Self::all_values()
 	}
 }
 
@@ -76,7 +65,7 @@ where
 	let message = message.into();
 
 	// get the values
-	let values = T::all_values();
+	let values = T::VARIANTS;
 	let value_texts = values.iter().map(|x| format!("{}", x).into()).collect::<Vec<_>>();
 
 	// determine accept/abort indexes

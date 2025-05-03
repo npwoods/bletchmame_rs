@@ -4,7 +4,7 @@ pub mod session;
 
 use std::rc::Rc;
 
-use strum_macros::EnumString;
+use strum::EnumString;
 
 #[derive(Clone, Debug)]
 pub enum MameWindowing {

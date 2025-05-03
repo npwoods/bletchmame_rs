@@ -577,7 +577,7 @@ fn software_folder_item(dispenser: &mut SoftwareListDispenser, item: &PrefsSoftw
 }
 
 /// Sometimes, the items view is empty - we can (try to) report why
-#[derive(Clone, Copy, Debug, strum_macros::Display)]
+#[derive(Clone, Copy, Debug, strum::Display)]
 pub enum EmptyReason {
 	#[strum(to_string = "BletchMAME needs a working MAME to function")]
 	NoInfoDb,

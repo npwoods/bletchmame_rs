@@ -1,8 +1,9 @@
-use derive_enum_all_values::AllValues;
 use serde::Deserialize;
 use serde::Serialize;
+use strum::EnumIter;
 use strum::EnumProperty;
-use strum_macros::EnumString;
+use strum::EnumString;
+use strum::VariantArray;
 
 use crate::prefs::PathsStore;
 use crate::prefs::access_paths;
@@ -10,12 +11,13 @@ use crate::prefs::access_paths;
 const EXE_EXTENSION: &str = if cfg!(target_os = "windows") { "exe" } else { "" };
 
 #[derive(
-	AllValues,
+	EnumIter,
+	VariantArray,
 	Clone,
 	Copy,
 	Debug,
 	Default,
-	strum_macros::Display,
+	strum::Display,
 	EnumString,
 	EnumProperty,
 	PartialEq,

@@ -700,7 +700,6 @@ dependencies = [
  "cpp",
  "cpp_build",
  "default-ext",
- "derive-enum-all-values",
  "dirs",
  "dpi",
  "easy-ext",
@@ -1403,17 +1402,6 @@ name = "default-ext"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2078c7996bb61be756e89ecda0557d4bfdadc3f66a5ae8a3ea698b21b8af8a98"
-
-[[package]]
-name = "derive-enum-all-values"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9819d820ecd7f0c6644d01c5a083b030379fb43ff23af8c235b569126d9b7499"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.100",
-]
 
 [[package]]
 name = "derive_more"

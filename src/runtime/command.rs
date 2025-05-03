@@ -2,8 +2,8 @@ use std::borrow::Cow;
 use std::ffi::OsStr;
 use std::path::Path;
 
-use derive_enum_all_values::AllValues;
 use itertools::Itertools;
+use strum::EnumIter;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum MameCommand<'a> {
@@ -63,7 +63,7 @@ impl MameCommand<'_> {
 	}
 }
 
-#[derive(AllValues, Copy, Clone, Debug, Default, PartialEq, strum_macros::Display)]
+#[derive(EnumIter, Copy, Clone, Debug, Default, PartialEq, strum::Display)]
 pub enum MovieFormat {
 	#[default]
 	#[strum(to_string = "avi")]
