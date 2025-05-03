@@ -21,6 +21,7 @@ use slint::invoke_from_event_loop;
 use slint::quit_event_loop;
 use slint::spawn_local;
 use strum::EnumString;
+use strum::IntoEnumIterator;
 use tracing::debug;
 use tracing::info;
 
@@ -315,10 +316,8 @@ pub fn create(args: AppArgs) -> AppWindow {
 
 	// prepare the menu bar
 	app_window.set_menu_items_builtin_collections(ModelRc::new(VecModel::from(
-		BuiltinCollection::all_values()
-			.iter()
-			.map(BuiltinCollection::to_string)
-			.map(SharedString::from)
+		BuiltinCollection::iter()
+			.map(|x| SharedString::from(x.to_string()))
 			.collect::<Vec<_>>(),
 	)));
 	let app_window_weak = app_window.as_weak();
@@ -769,10 +768,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				let fut = async move {
 					let model = model_clone.as_ref();
 					let title = "Record Movie";
-					let file_types = MovieFormat::all_values()
-						.iter()
-						.map(MovieFormat::to_string)
-						.collect::<Vec<_>>();
+					let file_types = MovieFormat::iter().map(|x| x.to_string()).collect::<Vec<_>>();
 					let file_types = file_types.iter().map(|ext| (None, ext.as_str())).collect::<Vec<_>>();
 					let initial_file = model.suggested_initial_save_filename(&MovieFormat::default().to_string());
 					if let Some(filename) =

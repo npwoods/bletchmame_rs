@@ -71,13 +71,12 @@ fn rel_path(path: &Path, children: &[impl AsRef<Path>]) -> PathBuf {
 
 #[cfg(test)]
 mod test {
+	use strum::IntoEnumIterator;
+
 	use crate::prefs::PreflightProblem;
 
 	#[test]
 	fn preflight_problem_type() {
-		let _ = PreflightProblem::all_values()
-			.iter()
-			.map(PreflightProblem::problem_type)
-			.collect::<Vec<_>>();
+		let _ = PreflightProblem::iter().map(|x| x.problem_type()).collect::<Vec<_>>();
 	}
 }

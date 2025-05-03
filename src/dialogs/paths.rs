@@ -14,6 +14,8 @@ use slint::SharedString;
 use slint::VecModel;
 use slint::Weak;
 use slint::spawn_local;
+use strum::IntoEnumIterator;
+use strum::VariantArray;
 use tracing::info;
 
 use crate::dialogs::SingleResult;
@@ -56,10 +58,7 @@ pub async fn dialog_paths(
 	let state = Rc::new(state);
 
 	// set up the "path labels" combo box
-	let path_labels = PathType::all_values()
-		.iter()
-		.map(|x| format!("{}", *x).into())
-		.collect::<Vec<_>>();
+	let path_labels = PathType::iter().map(|x| x.to_string().into()).collect::<Vec<_>>();
 	let path_labels = VecModel::from(path_labels);
 	let path_labels = ModelRc::new(path_labels);
 	modal.dialog().set_path_labels(path_labels);
@@ -113,7 +112,7 @@ pub async fn dialog_paths(
 
 	// set the index on the path type dropdown
 	let path_label_index = path_type
-		.and_then(|path_type| PathType::all_values().iter().position(|&x| x == path_type))
+		.and_then(|path_type| PathType::iter().position(|x| x == path_type))
 		.unwrap_or_default();
 	if path_label_index != 0 {
 		let path_label_index = i32::try_from(path_label_index).unwrap();
@@ -152,7 +151,7 @@ fn path_type(dialog: &PathsDialog) -> PathType {
 		.get_path_label_index()
 		.try_into()
 		.ok()
-		.and_then(|x: usize| PathType::all_values().get(x))
+		.and_then(|x: usize| PathType::VARIANTS.get(x))
 		.cloned()
 		.unwrap_or_default()
 }

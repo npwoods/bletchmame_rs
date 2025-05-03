@@ -2,6 +2,8 @@ use std::borrow::Cow;
 use std::ffi::OsStr;
 use std::ffi::OsString;
 
+use strum::IntoEnumIterator;
+
 use crate::prefs::PrefsPaths;
 use crate::prefs::pathtype::PathType;
 use crate::runtime::MameWindowing;
@@ -15,11 +17,10 @@ pub struct MameArguments {
 impl MameArguments {
 	pub fn new(prefs_paths: &PrefsPaths, windowing: &MameWindowing) -> Self {
 		// convert all path vec's to the appropriate MAME arguments
-		let path_args = PathType::all_values()
-			.iter()
+		let path_args = PathType::iter()
 			.filter_map(|path_type| {
 				let arg = path_type.mame_argument()?;
-				let value = prefs_paths.full_string(*path_type)?;
+				let value = prefs_paths.full_string(path_type)?;
 				Some((arg, value))
 			})
 			.flat_map(|(arg, value)| [Cow::Borrowed(OsStr::new(arg)), Cow::Owned(value)]);
