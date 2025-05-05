@@ -58,6 +58,7 @@ byte-unit = "5.1.6"
 easy-ext = "1.0.2"
 qttypes = { version = "0.2.12", optional = true }
 cpp = "0.5.10"
+nu-utils = "0.104.0"
 
 [target.'cfg(target_os = "windows")'.dependencies.windows]
 version = "0.61.1"
