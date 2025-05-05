@@ -169,8 +169,9 @@ impl AppModel {
 		if prefs.current_history_entry() != old_prefs.current_history_entry()
 			|| prefs.current_collection() != old_prefs.current_collection()
 		{
-			info!("modify_prefs(): current history_entry/collection] changed");
-			update_ui_for_current_history_item(self);
+			let current_collection_changed = prefs.current_collection() != old_prefs.current_collection();
+			info!(current_collection_changed=?current_collection_changed, "modify_prefs(): current history_entry/collection] changed");
+			update_ui_for_current_history_item(self, current_collection_changed);
 		}
 		if prefs.items_columns != old_prefs.items_columns {
 			info!("modify_prefs(): items_columns changed");
@@ -589,7 +590,7 @@ pub fn create(args: AppArgs) -> AppWindow {
 	model.update_state(|_| state.activate());
 
 	// initial updates
-	update_ui_for_current_history_item(&model);
+	update_ui_for_current_history_item(&model, true);
 	update_items_model_for_columns_and_search(&model);
 
 	// and we're done!
@@ -1158,7 +1159,7 @@ fn update_menus(model: &AppModel) {
 }
 
 /// updates all UI elements to reflect the current history item
-fn update_ui_for_current_history_item(model: &AppModel) {
+fn update_ui_for_current_history_item(model: &AppModel, current_collection_changed: bool) {
 	let app_window = model.app_window();
 	let prefs = model.preferences.borrow();
 	let search = prefs.current_history_entry().search.clone();
@@ -1197,10 +1198,12 @@ fn update_ui_for_current_history_item(model: &AppModel) {
 		})
 	});
 
-	// update the items view
-	model.with_items_table_model(|items_model| {
-		items_model.set_current_collection(collection, search, &prefs.current_history_entry().selection);
-	});
+	// update the items view if the current collection changed
+	if current_collection_changed {
+		model.with_items_table_model(|items_model| {
+			items_model.set_current_collection(collection, search, &prefs.current_history_entry().selection);
+		});
+	}
 
 	drop(prefs);
 	update_ui_for_sort_changes(model);
