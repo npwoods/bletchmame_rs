@@ -13,6 +13,7 @@ use anyhow::Result;
 use itertools::Either;
 use itertools::Itertools;
 use levenshtein::levenshtein;
+use nu_utils::IgnoreCaseExt;
 use slint::Model;
 use slint::ModelNotify;
 use slint::ModelRc;
@@ -703,17 +704,20 @@ fn build_items_map(
 
 	// apply searching if appropriate
 	let iter = if !search.is_empty() {
+		let search_folded_case = search.to_folded_case();
 		let iter = iter
 			.filter_map(|(index, item)| {
-				let distance = column_types
+				column_types
 					.iter()
 					.filter_map(|&column| {
 						let text = column_text(info_db, item, column);
-						contains_and_distance(text.as_ref(), search)
+						let text_folded_case = text.to_folded_case();
+						text_folded_case
+							.contains(&search_folded_case)
+							.then(|| levenshtein(&text, search))
 					})
-					.min();
-
-				distance.map(|distance| (index, item, distance))
+					.min()
+					.map(|distance| (index, item, distance))
 			})
 			.sorted_by_key(|(_, _, distance)| *distance)
 			.map(|(index, item, _)| (index, item));
@@ -736,12 +740,6 @@ fn build_items_map(
 
 	// and finish up
 	iter.map(|(index, _)| u32::try_from(index).unwrap()).collect()
-}
-
-fn contains_and_distance(text: &str, target: &str) -> Option<usize> {
-	text.to_lowercase()
-		.contains(&target.to_lowercase())
-		.then(|| levenshtein(text, target))
 }
 
 fn column_text<'a>(_info_db: &'a InfoDb, item: &'a Item, column: ColumnType) -> Cow<'a, str> {
