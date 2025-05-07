@@ -203,8 +203,12 @@ impl AppModel {
 		if info_db_changed {
 			let info_db = self.state.borrow().info_db().cloned();
 			self.with_items_table_model(|items_model| {
+				let prefs = self.preferences.borrow();
 				let info_db = info_db.clone();
-				items_model.info_db_changed(info_db);
+				let (collection, _) = prefs.current_collection();
+				let search = prefs.current_history_entry().search.clone();
+				let selection = &prefs.current_history_entry().selection;
+				items_model.set_current_collection(info_db, collection, search, selection);
 			});
 			self.with_collections_view_model(|collections_model| {
 				let prefs = self.preferences.borrow();
@@ -584,14 +588,14 @@ pub fn create(args: AppArgs) -> AppWindow {
 		handle_command(&model, command);
 	});
 
+	// initial updates
+	update_ui_for_current_history_item(&model, false);
+	update_items_model_for_columns_and_search(&model);
+
 	// and lets do something with that state; specifically
 	// - load the InfoDB (if availble)
 	// - start the MAME session (and maybe an InfoDB build in parallel)
 	model.update_state(|_| state.activate());
-
-	// initial updates
-	update_ui_for_current_history_item(&model, true);
-	update_items_model_for_columns_and_search(&model);
 
 	// and we're done!
 	app_window
@@ -1200,8 +1204,9 @@ fn update_ui_for_current_history_item(model: &AppModel, current_collection_chang
 
 	// update the items view if the current collection changed
 	if current_collection_changed {
+		let info_db = model.state.borrow().info_db().cloned();
 		model.with_items_table_model(|items_model| {
-			items_model.set_current_collection(collection, search, &prefs.current_history_entry().selection);
+			items_model.set_current_collection(info_db, collection, search, &prefs.current_history_entry().selection);
 		});
 	}
 
