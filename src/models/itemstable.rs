@@ -92,12 +92,14 @@ impl ItemsTableModel {
 		Rc::new(result)
 	}
 
-	pub fn info_db_changed(&self, info_db: Option<Rc<InfoDb>>) {
+	pub fn set_current_collection(
+		&self,
+		info_db: Option<Rc<InfoDb>>,
+		collection: Rc<PrefsCollection>,
+		search: String,
+		selection: &[PrefsItem],
+	) {
 		self.info_db.replace(info_db);
-		self.refresh(&[]);
-	}
-
-	pub fn set_current_collection(&self, collection: Rc<PrefsCollection>, search: String, selection: &[PrefsItem]) {
 		self.current_collection.replace(collection);
 		self.search.replace(search);
 		self.refresh(selection);
