@@ -22,6 +22,7 @@ use slint::SharedString;
 use slint::StandardListViewItem;
 use slint::VecModel;
 use tracing::debug;
+use tracing::debug_span;
 use unicase::UniCase;
 
 use crate::appcommand::AppCommand;
@@ -31,7 +32,6 @@ use crate::mconfig::MachineConfig;
 use crate::prefs::BuiltinCollection;
 use crate::prefs::ColumnType;
 use crate::prefs::PrefsCollection;
-use crate::prefs::PrefsColumn;
 use crate::prefs::PrefsItem;
 use crate::prefs::PrefsMachineItem;
 use crate::prefs::PrefsSoftwareItem;
@@ -45,13 +45,13 @@ use crate::ui::ItemContextMenuInfo;
 pub struct ItemsTableModel {
 	info_db: RefCell<Option<Rc<InfoDb>>>,
 	software_list_paths: RefCell<Vec<String>>,
-	columns: RefCell<Rc<[ColumnType]>>,
+	column_types: RefCell<Rc<[ColumnType]>>,
 	sorting: Cell<Option<(ColumnType, SortOrder)>>,
 	search: RefCell<String>,
 	items: RefCell<Rc<[Item]>>,
 	items_map: RefCell<Box<[u32]>>,
 
-	current_collection: RefCell<Rc<PrefsCollection>>,
+	current_collection: RefCell<Option<Rc<PrefsCollection>>>,
 	selected_index: Cell<Option<u32>>,
 
 	selection: SelectionManager,
@@ -67,21 +67,16 @@ enum ThisError {
 }
 
 impl ItemsTableModel {
-	pub fn new(
-		current_collection: Rc<PrefsCollection>,
-		software_list_paths: Vec<String>,
-		selection: SelectionManager,
-		empty_callback: impl Fn(Option<EmptyReason>) + 'static,
-	) -> Rc<Self> {
+	pub fn new(selection: SelectionManager, empty_callback: impl Fn(Option<EmptyReason>) + 'static) -> Rc<Self> {
 		let result = Self {
 			info_db: RefCell::new(None),
-			software_list_paths: RefCell::new(software_list_paths),
-			columns: RefCell::new([].into()),
+			software_list_paths: RefCell::new([].into()),
+			column_types: RefCell::new([].into()),
 			sorting: Cell::new(None),
 			search: RefCell::new("".into()),
 			items: RefCell::new([].into()),
 			items_map: RefCell::new([].into()),
-			current_collection: RefCell::new(current_collection),
+			current_collection: RefCell::new(None),
 			selected_index: Cell::new(None),
 
 			selection,
@@ -92,27 +87,90 @@ impl ItemsTableModel {
 		Rc::new(result)
 	}
 
-	pub fn set_current_collection(
+	/// Updates the general state of the items table
+	#[allow(clippy::too_many_arguments)]
+	pub fn update(
 		&self,
-		info_db: Option<Rc<InfoDb>>,
-		collection: Rc<PrefsCollection>,
-		search: String,
-		selection: &[PrefsItem],
+		info_db: Option<Option<Rc<InfoDb>>>,
+		software_list_paths: Option<&[String]>,
+		collection: Option<Rc<PrefsCollection>>,
+		column_types: Option<Rc<[ColumnType]>>,
+		search: Option<&str>,
+		sorting: Option<Option<(ColumnType, SortOrder)>>,
+		selection: Option<&[PrefsItem]>,
 	) {
-		self.info_db.replace(info_db);
-		self.current_collection.replace(collection);
-		self.search.replace(search);
-		self.refresh(selection);
+		// tracing
+		let span = debug_span!("ItemsTableModel::update");
+		let _guard = span.enter();
+		debug!(info_db=?info_db, software_list_paths=?software_list_paths, collection=?collection, column_types=?column_types, search=?search, sorting=?sorting, selection=?selection, "ItemsTableModel::update()");
+
+		// update the state that forces items refreshes
+		let mut must_refresh_items = false;
+		if let Some(info_db) = info_db {
+			self.info_db.replace(info_db);
+			must_refresh_items = true;
+		}
+		if let Some(software_list_paths) = software_list_paths {
+			if software_list_paths != self.software_list_paths.borrow().as_slice() {
+				self.software_list_paths.replace(software_list_paths.to_vec());
+				must_refresh_items = true;
+			}
+		}
+		if let Some(collection) = collection {
+			if Some(collection.as_ref()) != self.current_collection.borrow().as_deref() {
+				self.current_collection.replace(Some(collection));
+				must_refresh_items = true;
+			}
+		}
+
+		// update the state that forces the map to refresh
+		let mut must_refresh_map = must_refresh_items;
+		if let Some(search) = search {
+			if search != self.search.borrow().as_str() {
+				self.search.replace(search.to_string());
+				must_refresh_map = true;
+			}
+		}
+		if let Some(sorting) = sorting {
+			if sorting != self.sorting.get() {
+				self.sorting.set(sorting);
+				must_refresh_map = true;
+			}
+		}
+
+		// update the state that forces Slint model notifications
+		let mut must_notify = must_refresh_map;
+		if let Some(column_types) = column_types {
+			if column_types.as_ref() != self.column_types.borrow().as_ref() {
+				self.column_types.replace(column_types);
+				must_notify = true;
+			}
+		}
+
+		// gauge whether we need to update the selection
+		let selection = if let Some(selection) = selection {
+			(must_refresh_map || selection != self.current_selection()).then_some(Cow::Borrowed(selection))
+		} else {
+			must_refresh_map.then(|| Cow::Owned(self.current_selection()))
+		};
+
+		// with all of that out of the way, do the actual refreshses
+		if must_refresh_items {
+			self.refresh_items();
+		}
+		if must_refresh_map {
+			self.refresh_map();
+		}
+		if must_notify {
+			self.notify.reset();
+		}
+		if let Some(selection) = selection {
+			self.set_current_selection(selection.as_ref());
+		}
 	}
 
-	pub fn set_software_list_paths(&self, software_list_paths: Vec<String>) {
-		let selection = self.current_selection();
-		self.software_list_paths.replace(software_list_paths);
-		self.refresh(&selection);
-	}
-
-	fn refresh(&self, selection: &[PrefsItem]) {
-		self.selected_index.set(None);
+	fn refresh_items(&self) {
+		debug!("ItemsTableModel::refresh_items()");
 		let info_db = self.info_db.borrow();
 		let collection = self.current_collection.borrow().clone();
 
@@ -122,8 +180,8 @@ impl ItemsTableModel {
 				let software_list_paths = self.software_list_paths.borrow();
 				let mut dispenser = SoftwareListDispenser::new(info_db, &software_list_paths);
 
-				let items = match collection.as_ref() {
-					PrefsCollection::Builtin(BuiltinCollection::All) => {
+				let items = match collection.as_deref() {
+					Some(PrefsCollection::Builtin(BuiltinCollection::All)) => {
 						let machine_count = info_db.machines().len();
 						(0..machine_count)
 							.map(|machine_index| {
@@ -136,7 +194,7 @@ impl ItemsTableModel {
 							})
 							.collect::<Rc<[_]>>()
 					}
-					PrefsCollection::Builtin(BuiltinCollection::AllSoftware) => dispenser
+					Some(PrefsCollection::Builtin(BuiltinCollection::AllSoftware)) => dispenser
 						.get_all()
 						.into_iter()
 						.flat_map(|(info, list)| {
@@ -162,7 +220,7 @@ impl ItemsTableModel {
 						})
 						.collect::<Rc<[_]>>(),
 
-					PrefsCollection::MachineSoftware { machine_name } => info_db
+					Some(PrefsCollection::MachineSoftware { machine_name }) => info_db
 						.machines()
 						.find(machine_name)
 						.into_iter()
@@ -182,7 +240,7 @@ impl ItemsTableModel {
 						})
 						.collect::<Rc<[_]>>(),
 
-					PrefsCollection::Folder { name: _, items } => items
+					Some(PrefsCollection::Folder { name: _, items }) => items
 						.iter()
 						.filter_map(|item| match item {
 							PrefsItem::Machine(item) => {
@@ -213,6 +271,8 @@ impl ItemsTableModel {
 							}
 						})
 						.collect::<Rc<[_]>>(),
+
+					None => Rc::new([]),
 				};
 				(items, dispenser.is_empty())
 			})
@@ -224,7 +284,8 @@ impl ItemsTableModel {
 				EmptyReason::NoInfoDb
 			} else if dispenser_is_empty || self.software_list_paths.borrow().is_empty() {
 				EmptyReason::NoSoftwareLists
-			} else if matches!(collection.as_ref(), PrefsCollection::Folder { name: _, items } if items.is_empty() ) {
+			} else if matches!(collection.as_deref(), Some(PrefsCollection::Folder { name: _, items }) if items.is_empty() )
+			{
 				EmptyReason::Folder
 			} else {
 				EmptyReason::Unknown
@@ -234,10 +295,6 @@ impl ItemsTableModel {
 
 		// update the items
 		self.items.replace(items);
-		self.update_items_map();
-
-		// and reset the collection
-		self.set_current_selection(selection);
 	}
 
 	pub fn context_commands(
@@ -251,11 +308,12 @@ impl ItemsTableModel {
 		let info_db = info_db.as_ref()?;
 
 		// find the current folder (if any)
-		let folder_name = if let PrefsCollection::Folder { name, .. } = &self.current_collection.borrow().as_ref() {
-			Some(name.clone())
-		} else {
-			None
-		};
+		let folder_name =
+			if let Some(PrefsCollection::Folder { name, .. }) = &self.current_collection.borrow().as_deref() {
+				Some(name.clone())
+			} else {
+				None
+			};
 
 		// access the selection
 		let items = self.items.borrow();
@@ -401,52 +459,9 @@ impl ItemsTableModel {
 		Some(result.into())
 	}
 
-	pub fn set_columns_and_search(&self, columns: &[PrefsColumn], search: &str, sort_suppressed: bool) {
-		// update columns
-		self.columns.replace(columns.iter().map(|x| x.column_type).collect());
+	fn refresh_map(&self) {
+		debug!("ItemsTableModel::refresh_map()");
 
-		// update search if it has changed
-		let search_changed = search != *self.search.borrow();
-		if search_changed {
-			self.search.replace(search.to_string());
-		}
-
-		// determine the new sorting
-		let sorting = (!sort_suppressed)
-			.then(|| {
-				columns
-					.iter()
-					.filter_map(|col| col.sort.map(|x| (col.column_type, x)))
-					.next()
-			})
-			.flatten();
-		let sorting_changed = sorting != self.sorting.get();
-		if sorting_changed {
-			self.sorting.set(sorting);
-		}
-
-		debug!(
-			search=?search,
-			sorting=?sorting,
-			search_changed=?search_changed,
-			sorting_changed=?sorting_changed,
-			"set_columns_and_search()"
-		);
-
-		// if anything changed, update our map
-		if search_changed || sorting_changed {
-			// get the selected index, because we're about to mess up all of the rows
-			let selected_index = self.current_selected_index();
-
-			self.update_items_map();
-
-			// restore the selection
-			let index = selected_index.and_then(|index| self.items_map.borrow().iter().position(|&x| index == x));
-			self.selection.set_selected_index(index);
-		}
-	}
-
-	fn update_items_map(&self) {
 		// borrow all the things
 		let info_db = self.info_db.borrow();
 		let info_db = info_db.as_ref().map(|x| x.as_ref());
@@ -455,15 +470,12 @@ impl ItemsTableModel {
 		// build the new items map
 		let new_items_map = build_items_map(
 			info_db,
-			&self.columns.borrow(),
+			&self.column_types.borrow(),
 			&items,
 			self.sorting.get(),
 			&self.search.borrow(),
 		);
 		self.items_map.replace(new_items_map);
-
-		// and notify
-		self.notify.reset();
 	}
 
 	pub fn current_selection(&self) -> Vec<PrefsItem> {
@@ -490,6 +502,7 @@ impl ItemsTableModel {
 	}
 
 	fn set_current_selection(&self, selection: &[PrefsItem]) {
+		debug!(selection=?selection, "ItemsTableModel::set_current_selection()");
 		let info_db = self.info_db.borrow();
 		let Some(info_db) = &*info_db else {
 			return;
@@ -529,7 +542,7 @@ impl Model for ItemsTableModel {
 		let info_db = self.info_db.borrow().as_ref().unwrap().clone();
 		let row = *self.items_map.borrow().get(row)?;
 		let row = row.try_into().unwrap();
-		let columns = self.columns.borrow().clone();
+		let columns = self.column_types.borrow().clone();
 		let items = self.items.borrow().clone();
 		let row_model = RowModel::new(info_db, columns, items, row);
 		Some(ModelRc::from(row_model))

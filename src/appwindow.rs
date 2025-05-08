@@ -166,21 +166,20 @@ impl AppModel {
 			let info_db = self.state.borrow().info_db().cloned();
 			self.with_collections_view_model(|x| x.update(info_db, &prefs.collections));
 		}
-		if prefs.current_history_entry() != old_prefs.current_history_entry()
-			|| prefs.current_collection() != old_prefs.current_collection()
-		{
-			let current_collection_changed = prefs.current_collection() != old_prefs.current_collection();
-			info!(current_collection_changed=?current_collection_changed, "modify_prefs(): current history_entry/collection] changed");
-			update_ui_for_current_history_item(self, current_collection_changed);
+
+		let must_update_for_current_history_item = prefs.current_history_entry() != old_prefs.current_history_entry();
+		let must_update_items_columns_model =
+			must_update_for_current_history_item || prefs.items_columns != old_prefs.items_columns;
+
+		if must_update_for_current_history_item {
+			info!("modify_prefs(): updating for current history item");
+			update_ui_for_current_history_item(self);
 		}
-		if prefs.items_columns != old_prefs.items_columns {
-			info!("modify_prefs(): items_columns changed");
-			update_ui_for_sort_changes(self);
+		if must_update_items_columns_model {
+			info!("modify_prefs(): updating items column model");
+			update_items_columns_model(self);
 		}
-		if prefs.paths.software_lists != old_prefs.paths.software_lists {
-			info!("modify_prefs(): paths.software_lists changed");
-			software_paths_updated(self);
-		}
+		update_items_model_for_current_prefs(self);
 	}
 
 	pub fn update_state(self: &Rc<Self>, callback: impl FnOnce(&AppState) -> Option<AppState>) {
@@ -203,12 +202,8 @@ impl AppModel {
 		if info_db_changed {
 			let info_db = self.state.borrow().info_db().cloned();
 			self.with_items_table_model(|items_model| {
-				let prefs = self.preferences.borrow();
 				let info_db = info_db.clone();
-				let (collection, _) = prefs.current_collection();
-				let search = prefs.current_history_entry().search.clone();
-				let selection = &prefs.current_history_entry().selection;
-				items_model.set_current_collection(info_db, collection, search, selection);
+				items_model.update(Some(info_db), None, None, None, None, None, None);
 			});
 			self.with_collections_view_model(|collections_model| {
 				let prefs = self.preferences.borrow();
@@ -420,11 +415,6 @@ pub fn create(args: AppArgs) -> AppWindow {
 	app_window.set_collections_model(ModelRc::new(collections_view_model.clone()));
 
 	// set up items view model
-	let current_collection = {
-		let prefs = model.preferences.borrow();
-		let (collection, _) = prefs.current_collection();
-		collection
-	};
 	let selection = SelectionManager::new(
 		&app_window,
 		AppWindow::get_items_view_selected_index,
@@ -434,15 +424,7 @@ pub fn create(args: AppArgs) -> AppWindow {
 	let empty_callback = move |empty_reason| {
 		update_empty_reason(&model_clone, empty_reason);
 	};
-	let items_model = {
-		let prefs = model.preferences.borrow();
-		ItemsTableModel::new(
-			current_collection,
-			prefs.paths.software_lists.clone(),
-			selection,
-			empty_callback,
-		)
-	};
+	let items_model = ItemsTableModel::new(selection, empty_callback);
 	let items_model_clone = items_model.clone();
 	app_window.set_items_model(ModelRc::new(items_model_clone));
 
@@ -589,8 +571,9 @@ pub fn create(args: AppArgs) -> AppWindow {
 	});
 
 	// initial updates
-	update_ui_for_current_history_item(&model, false);
-	update_items_model_for_columns_and_search(&model);
+	update_ui_for_current_history_item(&model);
+	update_items_columns_model(&model);
+	update_items_model_for_current_prefs(&model);
 
 	// and lets do something with that state; specifically
 	// - load the InfoDB (if availble)
@@ -1162,8 +1145,8 @@ fn update_menus(model: &AppModel) {
 	});
 }
 
-/// updates all UI elements to reflect the current history item
-fn update_ui_for_current_history_item(model: &AppModel, current_collection_changed: bool) {
+/// updates all UI elements (except items and items columns models) to reflect the current history item
+fn update_ui_for_current_history_item(model: &AppModel) {
 	let app_window = model.app_window();
 	let prefs = model.preferences.borrow();
 	let search = prefs.current_history_entry().search.clone();
@@ -1201,20 +1184,9 @@ fn update_ui_for_current_history_item(model: &AppModel, current_collection_chang
 				.invoke_collections_view_select(collection_index);
 		})
 	});
-
-	// update the items view if the current collection changed
-	if current_collection_changed {
-		let info_db = model.state.borrow().info_db().cloned();
-		model.with_items_table_model(|items_model| {
-			items_model.set_current_collection(info_db, collection, search, &prefs.current_history_entry().selection);
-		});
-	}
-
-	drop(prefs);
-	update_ui_for_sort_changes(model);
 }
 
-fn update_ui_for_sort_changes(model: &AppModel) {
+fn update_items_columns_model(model: &AppModel) {
 	let app_window = model.app_window();
 	let prefs = model.preferences.borrow();
 
@@ -1231,15 +1203,33 @@ fn update_ui_for_sort_changes(model: &AppModel) {
 			items_columns.set_row_data(index, data);
 		}
 	}
-
-	update_items_model_for_columns_and_search(model);
 }
 
-fn update_items_model_for_columns_and_search(model: &AppModel) {
-	model.with_items_table_model(move |x| {
+fn update_items_model_for_current_prefs(model: &AppModel) {
+	model.with_items_table_model(move |items_model| {
 		let prefs = model.preferences.borrow();
 		let entry = prefs.current_history_entry();
-		x.set_columns_and_search(&prefs.items_columns, &entry.search, entry.sort_suppressed);
+		let (current_collection, _) = prefs.current_collection();
+		let column_types = prefs.items_columns.iter().map(|col| col.column_type).collect();
+		let sorting = (!entry.sort_suppressed)
+			.then(|| {
+				prefs
+					.items_columns
+					.iter()
+					.filter_map(|col| col.sort.map(|x| (col.column_type, x)))
+					.next()
+			})
+			.flatten();
+
+		items_model.update(
+			None,
+			Some(&prefs.paths.software_lists),
+			Some(current_collection),
+			Some(column_types),
+			Some(entry.search.as_str()),
+			Some(sorting),
+			Some(&entry.selection),
+		);
 	});
 }
 
@@ -1266,11 +1256,6 @@ fn update_empty_reason(model: &AppModel, empty_reason: Option<EmptyReason>) {
 	let app_window = model.app_window();
 	let reason_string = empty_reason.map(|x| format!("{x}")).unwrap_or_default().into();
 	app_window.set_is_empty_reason(reason_string);
-}
-
-fn software_paths_updated(model: &AppModel) {
-	let software_list_paths = model.preferences.borrow().paths.software_lists.clone();
-	model.with_items_table_model(|x| x.set_software_list_paths(software_list_paths));
 }
 
 fn items_set_sorting(model: &Rc<AppModel>, column: i32, order: SortOrder) {
