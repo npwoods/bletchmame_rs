@@ -10,6 +10,7 @@ use anyhow::Error;
 use anyhow::Result;
 use binary_serde::BinarySerde;
 use itertools::Itertools;
+use more_asserts::assert_lt;
 use num::CheckedAdd;
 use tracing::debug;
 
@@ -412,12 +413,22 @@ impl State {
 				entry
 			})
 			.collect::<BinBuilder<_>>();
+
+		// resolves `software_list_index` entries that are actually name `strindex`
+		// values; part of the obnoxiousness is caused by how these can be short names
 		let software_list_indexmap = |software_list_index| {
-			software_list_indexmap
+			let index = *software_list_indexmap
 				.get(&software_list_index)
-				.copied()
-				.or_else(|| self.strings.lookup_immut(&self.strings.index(software_list_index)))
-				.unwrap()
+				.or_else(|| {
+					let software_list_index = self
+						.strings
+						.lookup_immut(&self.strings.index(software_list_index))
+						.unwrap();
+					software_list_indexmap.get(&software_list_index)
+				})
+				.unwrap();
+			assert_lt!(index, software_lists.len());
+			index
 		};
 
 		// and run the fixups
