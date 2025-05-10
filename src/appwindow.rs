@@ -6,6 +6,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::str::FromStr;
+use std::time::Instant;
 
 use muda::accelerator::Accelerator;
 use slint::CloseRequestResponse;
@@ -23,7 +24,9 @@ use slint::spawn_local;
 use strum::EnumString;
 use strum::IntoEnumIterator;
 use tracing::debug;
+use tracing::debug_span;
 use tracing::info;
+use tracing::info_span;
 
 use crate::appcommand::AppCommand;
 use crate::appstate::AppState;
@@ -634,7 +637,13 @@ fn menu_item_info(parent_title: Option<&str>, title: &str) -> (Option<AppCommand
 }
 
 fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
+	// tracing
+	let command_str: &'static str = (&command).into();
+	let span = info_span!("handle_command", command = command_str);
+	let _guard = span.enter();
 	info!(command=?&command, "handle_command()");
+	let start_instant = Instant::now();
+
 	match command {
 		AppCommand::FileStop => {
 			model.issue_command(MameCommand::Stop);
@@ -1073,6 +1082,9 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			spawn_local(fut).unwrap();
 		}
 	};
+
+	// finish up
+	debug!(duration=?start_instant.elapsed(), "handle_command");
 }
 
 async fn show_paths_dialog(model: Rc<AppModel>, path_type: Option<PathType>) {
@@ -1147,6 +1159,12 @@ fn update_menus(model: &AppModel) {
 
 /// updates all UI elements (except items and items columns models) to reflect the current history item
 fn update_ui_for_current_history_item(model: &AppModel) {
+	// tracing
+	let span = debug_span!("update_ui_for_current_history_item");
+	let _guard = span.enter();
+	let start_instant = Instant::now();
+
+	// the basics
 	let app_window = model.app_window();
 	let prefs = model.preferences.borrow();
 	let search = prefs.current_history_entry().search.clone();
@@ -1184,9 +1202,17 @@ fn update_ui_for_current_history_item(model: &AppModel) {
 				.invoke_collections_view_select(collection_index);
 		})
 	});
+
+	// and finish tracing
+	debug!(duration=?start_instant.elapsed(), "update_ui_for_current_history_item() completed");
 }
 
 fn update_items_columns_model(model: &AppModel) {
+	// tracing
+	let span = debug_span!("update_items_columns_model");
+	let _guard = span.enter();
+	let start_instant = Instant::now();
+
 	let app_window = model.app_window();
 	let prefs = model.preferences.borrow();
 
@@ -1203,9 +1229,17 @@ fn update_items_columns_model(model: &AppModel) {
 			items_columns.set_row_data(index, data);
 		}
 	}
+
+	// and finish tracing
+	debug!(duration=?start_instant.elapsed(), "update_items_columns_model() completed");
 }
 
 fn update_items_model_for_current_prefs(model: &AppModel) {
+	// tracing
+	let span = debug_span!("update_items_model_for_current_prefs");
+	let _guard = span.enter();
+	let start_instant = Instant::now();
+
 	model.with_items_table_model(move |items_model| {
 		let prefs = model.preferences.borrow();
 		let entry = prefs.current_history_entry();
@@ -1231,6 +1265,9 @@ fn update_items_model_for_current_prefs(model: &AppModel) {
 			Some(&entry.selection),
 		);
 	});
+
+	// and finish tracing
+	debug!(duration=?start_instant.elapsed(), "update_items_model_for_current_prefs() completed");
 }
 
 fn update_prefs(model: &Rc<AppModel>) {

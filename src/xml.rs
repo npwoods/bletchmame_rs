@@ -11,7 +11,7 @@ use quick_xml::escape::unescape;
 use quick_xml::events::BytesStart;
 use quick_xml::events::Event;
 use quick_xml::name::QName;
-use tracing::debug;
+use tracing::trace;
 
 /// quick-xml events are at a slightly different granularity than what we would prefer
 #[derive(Debug)]
@@ -58,7 +58,7 @@ where
 			self.set_done();
 		}
 
-		debug!(result=?result, "XmlReader::next()");
+		trace!(result=?result, "XmlReader::next()");
 		result
 	}
 
