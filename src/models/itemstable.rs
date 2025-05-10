@@ -709,52 +709,56 @@ fn build_items_map(
 	sorting: Option<(ColumnType, SortOrder)>,
 	search: &str,
 ) -> Box<[u32]> {
-	// if we have no InfoDB, we have no rows
-	let Some(info_db) = info_db else {
-		return [].into();
-	};
+	// do we have an InfoDb?
+	let result = if let Some(info_db) = info_db {
+		// start iterating
+		let iter = items.iter().enumerate();
 
-	// start iterating
-	let iter = items.iter().enumerate();
-
-	// apply searching if appropriate
-	let iter = if !search.is_empty() {
-		let search_folded_case = search.to_folded_case();
-		let iter = iter
-			.filter_map(|(index, item)| {
-				column_types
-					.iter()
-					.filter_map(|&column| {
-						let text = column_text(info_db, item, column);
-						let text_folded_case = text.to_folded_case();
-						text_folded_case
-							.contains(&search_folded_case)
-							.then(|| levenshtein(&text, search))
-					})
-					.min()
-					.map(|distance| (index, item, distance))
-			})
-			.sorted_by_key(|(_, _, distance)| *distance)
-			.map(|(index, item, _)| (index, item));
-		Either::Left(iter)
-	} else {
-		Either::Right(iter)
-	};
-
-	// now apply sorting
-	let iter = if let Some((column_type, sort_order)) = sorting {
-		let func = |item| UniCase::new(column_text(info_db, item, column_type));
-		let iter = match sort_order {
-			SortOrder::Ascending => Either::Left(iter.sorted_by_cached_key(|(_, item)| func(item))),
-			SortOrder::Descending => Either::Right(iter.sorted_by_cached_key(|(_, item)| Reverse(func(item)))),
+		// apply searching if appropriate
+		let iter = if !search.is_empty() {
+			let search_folded_case = search.to_folded_case();
+			let iter = iter
+				.filter_map(|(index, item)| {
+					column_types
+						.iter()
+						.filter_map(|&column| {
+							let text = column_text(info_db, item, column);
+							let text_folded_case = text.to_folded_case();
+							text_folded_case
+								.contains(&search_folded_case)
+								.then(|| levenshtein(&text, search))
+						})
+						.min()
+						.map(|distance| (index, item, distance))
+				})
+				.sorted_by_key(|(_, _, distance)| *distance)
+				.map(|(index, item, _)| (index, item));
+			Either::Left(iter)
+		} else {
+			Either::Right(iter)
 		};
-		Either::Left(iter)
+
+		// now apply sorting
+		let iter = if let Some((column_type, sort_order)) = sorting {
+			let func = |item| UniCase::new(column_text(info_db, item, column_type));
+			let iter = match sort_order {
+				SortOrder::Ascending => Either::Left(iter.sorted_by_cached_key(|(_, item)| func(item))),
+				SortOrder::Descending => Either::Right(iter.sorted_by_cached_key(|(_, item)| Reverse(func(item)))),
+			};
+			Either::Left(iter)
+		} else {
+			Either::Right(iter)
+		};
+
+		// and finish up
+		iter.map(|(index, _)| u32::try_from(index).unwrap()).collect()
 	} else {
-		Either::Right(iter)
+		// if we have no InfoDB, we have no rows
+		[].into()
 	};
 
-	// and finish up
-	iter.map(|(index, _)| u32::try_from(index).unwrap()).collect()
+	// and return
+	result
 }
 
 fn column_text<'a>(_info_db: &'a InfoDb, item: &'a Item, column: ColumnType) -> Cow<'a, str> {
