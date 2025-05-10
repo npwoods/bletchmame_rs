@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use std::iter::once;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::time::Instant;
 
 use anyhow::Error;
 use anyhow::Result;
@@ -23,6 +24,7 @@ use slint::StandardListViewItem;
 use slint::VecModel;
 use tracing::debug;
 use tracing::debug_span;
+use tracing::info_span;
 use unicase::UniCase;
 
 use crate::appcommand::AppCommand;
@@ -709,6 +711,11 @@ fn build_items_map(
 	sorting: Option<(ColumnType, SortOrder)>,
 	search: &str,
 ) -> Box<[u32]> {
+	// tracing
+	let span = info_span!("build_items_map");
+	let _guard = span.enter();
+	let start_instant = Instant::now();
+
 	// do we have an InfoDb?
 	let result = if let Some(info_db) = info_db {
 		// start iterating
@@ -751,13 +758,15 @@ fn build_items_map(
 		};
 
 		// and finish up
-		iter.map(|(index, _)| u32::try_from(index).unwrap()).collect()
+		iter.map(|(index, _)| u32::try_from(index).unwrap())
+			.collect::<Box<[u32]>>()
 	} else {
 		// if we have no InfoDB, we have no rows
 		[].into()
 	};
 
 	// and return
+	debug!(duration=?start_instant.elapsed(), items_len=?items.len(), result_len=?result.len(), "build_items_map");
 	result
 }
 

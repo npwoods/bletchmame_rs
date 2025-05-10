@@ -5,6 +5,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use slint::SharedString;
 use strum::EnumProperty;
+use strum::IntoStaticStr;
 
 use crate::prefs::BuiltinCollection;
 use crate::prefs::PrefsCollection;
@@ -14,7 +15,7 @@ use crate::prefs::pathtype::PathType;
 use crate::status::Update;
 use crate::version::MameVersion;
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, EnumProperty)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, EnumProperty, IntoStaticStr)]
 pub enum AppCommand {
 	// File menu
 	FileStop,
