@@ -28,6 +28,7 @@ mod version;
 mod xml;
 
 use std::path::PathBuf;
+use std::process::ExitCode;
 
 use appwindow::AppWindowing;
 use dirs::config_local_dir;
@@ -68,7 +69,7 @@ struct Opt {
 	no_capture_mame_stderr: bool,
 }
 
-fn main() {
+fn main() -> ExitCode {
 	// platform-specific stuff
 	let _platform_specific = platform_init().unwrap();
 
@@ -83,8 +84,7 @@ fn main() {
 
 	// are we doing diagnostics
 	if let Some(path) = opts.process_xml {
-		info_db_from_xml_file(path);
-		return;
+		return info_db_from_xml_file(path);
 	}
 
 	// identify the preferences directory
@@ -125,6 +125,7 @@ fn main() {
 
 	// ...and run run run!
 	app_window.run().unwrap();
+	ExitCode::SUCCESS
 }
 
 #[cfg(test)]

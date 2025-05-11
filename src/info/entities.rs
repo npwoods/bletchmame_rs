@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 use anyhow::Result;
+use anyhow::ensure;
 use binary_search::Direction;
 use binary_search::binary_search;
 
@@ -7,6 +8,7 @@ use crate::info::ChipType;
 use crate::info::IndirectView;
 use crate::info::Object;
 use crate::info::SimpleView;
+use crate::info::Validatable;
 use crate::info::View;
 use crate::info::binary;
 
@@ -213,6 +215,14 @@ impl<'a> MachineSoftwareList<'a> {
 	pub fn software_list(&self) -> SoftwareList<'a> {
 		let software_list_index = self.obj().software_list_index.try_into().unwrap();
 		self.db.software_lists().get(software_list_index).unwrap()
+	}
+}
+
+impl Validatable for MachineSoftwareList<'_> {
+	fn validate(&self) -> Result<()> {
+		let software_list_index = usize::try_from(self.obj().software_list_index)?;
+		ensure!(software_list_index < self.db.software_lists().len());
+		Ok(())
 	}
 }
 

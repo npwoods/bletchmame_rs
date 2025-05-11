@@ -4,6 +4,7 @@ mod build;
 mod entities;
 mod strings;
 
+use std::any::type_name;
 use std::borrow::Cow;
 use std::cmp::min;
 use std::fmt::Debug;
@@ -22,6 +23,7 @@ use std::process::Stdio;
 
 use anyhow::Error;
 use anyhow::Result;
+use anyhow::ensure;
 use binary_serde::BinarySerde;
 use binary_serde::DeserializeError;
 use binary_serde::Endianness;
@@ -51,6 +53,12 @@ use self::strings::validate_string_table;
 
 const MAGIC_HDR: &[u8; 8] = b"MAMEINFO";
 const ENDIANNESS: Endianness = Endianness::Little;
+
+#[derive(thiserror::Error, Debug)]
+enum ThisError {
+	#[error("InfoDb is corrupted")]
+	Validation(Vec<Error>),
+}
 
 pub struct InfoDb {
 	data: Box<[u8]>,
@@ -89,11 +97,6 @@ impl InfoDb {
 		let machine_software_lists = next_root_view(&mut cursor, hdr.machine_software_lists_count)?;
 		let ram_options = next_root_view(&mut cursor, hdr.ram_option_count)?;
 
-		// validations we want to skip if we're creating things ourselves
-		if !skip_validations {
-			validate_string_table(&data[cursor.start..]).map_err(|_| Error::msg("Corrupt String Table"))?;
-		}
-
 		// get the build
 		let build_str = read_string(&data[cursor.start..], hdr.build_strindex).unwrap_or_default();
 		let build = MameVersion::from(build_str.as_ref());
@@ -117,12 +120,7 @@ impl InfoDb {
 
 		// more validations
 		if !skip_validations {
-			result
-				.software_list_machine_indexes()
-				.iter()
-				.all(|x| x.obj() < result.machines().len().try_into().unwrap())
-				.then_some(())
-				.ok_or_else(|| Error::msg("Corrupt Software List Machine Index"))?;
+			result.validate().map_err(ThisError::Validation)?;
 		}
 
 		Ok(result)
@@ -184,6 +182,37 @@ impl InfoDb {
 
 		// and return!
 		db
+	}
+
+	pub fn validate(&self) -> std::result::Result<(), Vec<Error>> {
+		// prepare a vec of errors
+		let mut errors = Vec::new();
+		let mut emit = |e| errors.push(e);
+
+		// validate the views
+		validate_view(self.machine_software_lists(), &mut emit);
+		validate_view_custom(
+			self.software_list_machine_indexes(),
+			&mut emit,
+			"SoftwareListMachineIndex",
+			|x| {
+				ensure!(x.obj() < self.machines().len().try_into().unwrap());
+				Ok(())
+			},
+		);
+
+		// validate the string table
+		if let Err(e) = validate_string_table(&self.data[self.strings_offset..]) {
+			let message = format!("Corrupt string table: {e}");
+			errors.push(Error::msg(message));
+		}
+
+		// ..and finish up
+		if errors.is_empty() { Ok(()) } else { Err(errors) }
+	}
+
+	pub fn data_len(&self) -> usize {
+		self.data.len()
 	}
 
 	pub fn build(&self) -> &MameVersion {
@@ -503,6 +532,36 @@ where
 			.field("index", &self.index)
 			.field("obj", &self.obj())
 			.finish()
+	}
+}
+
+trait Validatable {
+	fn validate(&self) -> Result<()>;
+}
+
+fn validate_view<'a, T>(view: impl View<'a, Object<'a, T>>, emit: &mut impl FnMut(Error))
+where
+	T: 'a,
+	Object<'a, T>: Validatable,
+{
+	let type_name = type_name::<T>();
+	let type_name = type_name.rsplit_once("::").map(|x| x.1).unwrap_or(type_name);
+	validate_view_custom(view, emit, type_name, |obj| obj.validate());
+}
+
+fn validate_view_custom<'a, T>(
+	view: impl View<'a, Object<'a, T>>,
+	emit: &mut impl FnMut(Error),
+	type_name: &str,
+	validate_func: impl Fn(Object<'a, T>) -> Result<()>,
+) where
+	T: 'a,
+{
+	for (index, obj) in view.iter().enumerate() {
+		if let Err(e) = validate_func(obj) {
+			let message = format!("{}[{}]: {}", type_name, index, e);
+			emit(Error::msg(message));
+		}
 	}
 }
 
