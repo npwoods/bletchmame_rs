@@ -32,10 +32,6 @@ pub impl Window {
 		// do nothing for now
 	}
 
-	fn ensure_child_focus(&self, _child: &winit::window::Window) {
-		// do nothing for now
-	}
-
 	fn with_muda_menu<T>(&self, _callback: impl FnOnce(&::muda::Menu) -> T) -> Option<T> {
 		None
 	}

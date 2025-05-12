@@ -65,7 +65,7 @@ impl ChildWindowImpl for QtChildWindow {
 		self.qt_widget.win_id().to_string()
 	}
 
-	fn ensure_child_focus(&self, _container: &Window) {
+	fn ensure_proper_focus(&self) {
 		// do nothing
 	}
 }

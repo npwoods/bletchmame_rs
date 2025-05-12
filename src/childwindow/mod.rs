@@ -19,7 +19,7 @@ trait ChildWindowImpl {
 	fn text(&self) -> String;
 
 	/// Hackish (and platform specific) method to "ensure" focus
-	fn ensure_child_focus(&self, container: &Window);
+	fn ensure_proper_focus(&self);
 }
 
 #[cfg(not(feature = "slint-qt-backend"))]
@@ -68,7 +68,7 @@ impl ChildWindow {
 		self.0.text()
 	}
 
-	pub fn ensure_child_focus(&self, container: &Window) {
-		self.0.ensure_child_focus(container);
+	pub fn ensure_proper_focus(&self) {
+		self.0.ensure_proper_focus();
 	}
 }

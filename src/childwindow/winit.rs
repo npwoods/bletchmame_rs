@@ -6,7 +6,6 @@ use slint::Window;
 use winit::window::WindowAttributes;
 
 use crate::childwindow::ChildWindowImpl;
-use crate::platform::WindowExt;
 
 pub struct WinitChildWindow(winit::window::Window);
 
@@ -32,6 +31,10 @@ impl WinitChildWindow {
 		};
 
 		let window = parent.create_winit_window(window_attributes)?;
+
+		#[cfg(target_os = "windows")]
+		winit::platform::windows::WindowExtWindows::set_enable(&window, false);
+
 		Ok(Self(window))
 	}
 }
@@ -54,8 +57,32 @@ impl ChildWindowImpl for WinitChildWindow {
 		handle_text(&raw_window_handle).unwrap()
 	}
 
-	fn ensure_child_focus(&self, container: &Window) {
-		container.ensure_child_focus(&self.0);
+	fn ensure_proper_focus(&self) {
+		#[cfg(target_family = "windows")]
+		if let RawWindowHandle::Win32(win32_window_handle) = self.0.window_handle().unwrap().as_raw() {
+			use tracing::debug;
+			use windows::Win32::Foundation::HWND;
+			use windows::Win32::UI::Input::KeyboardAndMouse::GetFocus;
+			use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
+			use windows::Win32::UI::WindowsAndMessaging::GetParent;
+
+			let is_visible = self.0.is_visible().unwrap_or_default();
+			let child_hwnd = HWND(win32_window_handle.hwnd.get() as *mut std::ffi::c_void);
+			let parent_hwnd = unsafe { GetParent(child_hwnd) };
+			let focus_hwnd = unsafe { GetFocus() };
+
+			let set_focus_hwnd = if is_visible {
+				(Ok(focus_hwnd) == parent_hwnd).then_some(child_hwnd)
+			} else {
+				(focus_hwnd == child_hwnd).then_some(parent_hwnd.clone().ok()).flatten()
+			};
+
+			debug!(parent_hwnd=?parent_hwnd, child_hwnd=?child_hwnd, focus_hwnd=?focus_hwnd, is_visible=?is_visible, set_focus_hwnd=?set_focus_hwnd, "ensure_proper_focus()");
+
+			if let Some(set_focus_hwnd) = set_focus_hwnd {
+				let _ = unsafe { SetFocus(Some(set_focus_hwnd)) };
+			}
+		}
 	}
 }
 
