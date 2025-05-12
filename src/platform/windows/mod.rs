@@ -11,12 +11,12 @@ use raw_window_handle::RawWindowHandle;
 use raw_window_handle::Win32WindowHandle;
 use slint::Window;
 use win32job::Job;
+use windows::Win32::Foundation::HWND;
 use windows::Win32::System::Console::ATTACH_PARENT_PROCESS;
 use windows::Win32::System::Console::AttachConsole;
 use windows::Win32::System::Threading::CREATE_NO_WINDOW;
-use windows_sys::Win32::Foundation::HWND;
-use windows_sys::Win32::UI::Input::KeyboardAndMouse::GetFocus;
-use windows_sys::Win32::UI::Input::KeyboardAndMouse::SetFocus;
+use windows::Win32::UI::Input::KeyboardAndMouse::GetFocus;
+use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
 use winit::platform::windows::WindowAttributesExtWindows;
 use winit::platform::windows::WindowExtWindows;
 use winit::window::WindowAttributes;
@@ -76,13 +76,13 @@ pub impl Window {
 		if child.is_visible().unwrap_or_default() {
 			let do_set_focus = get_win32_window_handle(self)
 				.ok()
-				.map(|x| unsafe { GetFocus() } == isize::from(x.hwnd) as HWND)
+				.map(|x| unsafe { GetFocus() } == HWND(isize::from(x.hwnd) as *mut std::ffi::c_void))
 				.unwrap_or_default();
 
 			if do_set_focus {
 				if let RawWindowHandle::Win32(child_hwnd) = child.window_handle().unwrap().as_raw() {
 					unsafe {
-						SetFocus(isize::from(child_hwnd.hwnd) as HWND);
+						let _ = SetFocus(Some(HWND(isize::from(child_hwnd.hwnd) as *mut std::ffi::c_void)));
 					}
 				}
 			}

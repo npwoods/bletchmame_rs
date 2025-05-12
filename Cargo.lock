@@ -756,7 +756,6 @@ dependencies = [
  "vivi_ui",
  "win32job",
  "windows 0.61.1",
- "windows-sys 0.59.0",
  "winit",
  "winresource",
 ]
