@@ -14,9 +14,6 @@ use win32job::Job;
 use windows::Win32::System::Console::ATTACH_PARENT_PROCESS;
 use windows::Win32::System::Console::AttachConsole;
 use windows::Win32::System::Threading::CREATE_NO_WINDOW;
-use windows_sys::Win32::Foundation::HWND;
-use windows_sys::Win32::UI::Input::KeyboardAndMouse::GetFocus;
-use windows_sys::Win32::UI::Input::KeyboardAndMouse::SetFocus;
 use winit::platform::windows::WindowAttributesExtWindows;
 use winit::platform::windows::WindowExtWindows;
 use winit::window::WindowAttributes;
@@ -65,28 +62,6 @@ pub impl Window {
 
 	fn set_enabled_for_modal(&self, enabled: bool) {
 		self.with_winit_window(|window| window.set_enable(enabled));
-	}
-
-	fn ensure_child_focus(&self, child: &winit::window::Window) {
-		// hackish method that ensures so-called "appropriate focus"; this really needs
-		// to be generalized
-
-		// note that we avoid `Window::focus_window()`, as `winit` has a nasty hack that blasts
-		// keystrokes into the window
-		if child.is_visible().unwrap_or_default() {
-			let do_set_focus = get_win32_window_handle(self)
-				.ok()
-				.map(|x| unsafe { GetFocus() } == isize::from(x.hwnd) as HWND)
-				.unwrap_or_default();
-
-			if do_set_focus {
-				if let RawWindowHandle::Win32(child_hwnd) = child.window_handle().unwrap().as_raw() {
-					unsafe {
-						SetFocus(isize::from(child_hwnd.hwnd) as HWND);
-					}
-				}
-			}
-		}
 	}
 }
 

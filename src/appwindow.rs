@@ -76,6 +76,7 @@ use crate::runtime::command::MameCommand;
 use crate::runtime::command::MovieFormat;
 use crate::selection::SelectionManager;
 use crate::status::Status;
+use crate::threadlocalbubble::ThreadLocalBubble;
 use crate::ui::AboutDialog;
 use crate::ui::AppWindow;
 use crate::ui::ReportIssue;
@@ -239,12 +240,11 @@ impl AppModel {
 
 			// child window visibility
 			if let RuntimeWindowing::Child(child_window) = &self.windowing {
-				child_window.set_visible(running.is_some());
+				child_window.set_active(running.is_some());
 
-				// the running window should have focus
-				if running.is_some() {
-					child_window.ensure_child_focus(app_window.window());
-				}
+				// ensure that if we're running the child window has focus, and if not, the
+				// app window has focus
+				child_window.ensure_proper_focus();
 			}
 
 			// report view
@@ -571,6 +571,23 @@ pub fn create(args: AppArgs) -> AppWindow {
 	let state = AppState::new(prefs_path, paths, mame_windowing, args.mame_stderr, move |command| {
 		let model = model_weak.upgrade().unwrap();
 		handle_command(&model, command);
+	});
+
+	// on `winit`, ensure that if the focus changes we call `ChildWindow::ensure_proper_focus()`
+	let model_weak = Rc::downgrade(&model);
+	i_slint_backend_winit::WinitWindowAccessor::on_winit_window_event(app_window.window(), move |_, event| {
+		if let winit::event::WindowEvent::Focused(_) = event {
+			let model_bubble = ThreadLocalBubble::new(model_weak.clone());
+			invoke_from_event_loop(move || {
+				if let Some(model) = model_bubble.unwrap().upgrade() {
+					if let RuntimeWindowing::Child(child_window) = &model.windowing {
+						child_window.ensure_proper_focus();
+					}
+				}
+			})
+			.unwrap();
+		}
+		i_slint_backend_winit::WinitWindowEventResult::Propagate
 	});
 
 	// initial updates

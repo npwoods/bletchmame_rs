@@ -14,12 +14,12 @@ use crate::childwindow::winit::WinitChildWindow;
 use crate::childwindow::qt::QtChildWindow;
 
 trait ChildWindowImpl {
-	fn set_visible(&self, is_visible: bool);
+	fn set_active(&self, active: bool);
 	fn update(&self, position: dpi::PhysicalPosition<u32>, size: dpi::PhysicalSize<u32>);
 	fn text(&self) -> String;
 
 	/// Hackish (and platform specific) method to "ensure" focus
-	fn ensure_child_focus(&self, container: &Window);
+	fn ensure_proper_focus(&self);
 }
 
 #[cfg(not(feature = "slint-qt-backend"))]
@@ -45,8 +45,8 @@ impl ChildWindow {
 		Ok(Self(result))
 	}
 
-	pub fn set_visible(&self, is_visible: bool) {
-		self.0.set_visible(is_visible);
+	pub fn set_active(&self, active: bool) {
+		self.0.set_active(active);
 	}
 
 	pub fn update(&self, container: &Window, top: f32) {
@@ -68,7 +68,7 @@ impl ChildWindow {
 		self.0.text()
 	}
 
-	pub fn ensure_child_focus(&self, container: &Window) {
-		self.0.ensure_child_focus(container);
+	pub fn ensure_proper_focus(&self) {
+		self.0.ensure_proper_focus();
 	}
 }
