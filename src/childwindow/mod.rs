@@ -14,7 +14,7 @@ use crate::childwindow::winit::WinitChildWindow;
 use crate::childwindow::qt::QtChildWindow;
 
 trait ChildWindowImpl {
-	fn set_visible(&self, is_visible: bool);
+	fn set_active(&self, active: bool);
 	fn update(&self, position: dpi::PhysicalPosition<u32>, size: dpi::PhysicalSize<u32>);
 	fn text(&self) -> String;
 
@@ -45,8 +45,8 @@ impl ChildWindow {
 		Ok(Self(result))
 	}
 
-	pub fn set_visible(&self, is_visible: bool) {
-		self.0.set_visible(is_visible);
+	pub fn set_active(&self, active: bool) {
+		self.0.set_active(active);
 	}
 
 	pub fn update(&self, container: &Window, top: f32) {

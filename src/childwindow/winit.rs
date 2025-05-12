@@ -37,7 +37,7 @@ impl WinitChildWindow {
 }
 
 impl ChildWindowImpl for WinitChildWindow {
-	fn set_visible(&self, is_visible: bool) {
+	fn set_active(&self, is_visible: bool) {
 		self.0.set_visible(is_visible);
 
 		#[cfg(target_os = "windows")]

@@ -28,13 +28,13 @@ impl QtChildWindow {
 		Ok(result)
 	}
 
-	fn internal_update(&self, visible: Option<bool>) {
-		if let Some(visible) = visible {
-			self.qt_widget.set_visible(visible);
+	fn internal_update(&self, active: Option<bool>) {
+		if let Some(active) = active {
+			self.qt_widget.set_visible(active);
 		}
 
-		let visible = visible.unwrap_or_else(|| self.qt_widget.is_visible());
-		let (x, y, w, h) = if visible {
+		let active = active.unwrap_or_else(|| self.qt_widget.is_visible());
+		let (x, y, w, h) = if active {
 			self.geometry.get()
 		} else {
 			(-200, -200, 100, 100)
@@ -44,9 +44,9 @@ impl QtChildWindow {
 }
 
 impl ChildWindowImpl for QtChildWindow {
-	fn set_visible(&self, visible: bool) {
-		if visible != self.qt_widget.is_visible() {
-			self.internal_update(Some(visible));
+	fn set_active(&self, active: bool) {
+		if active != self.qt_widget.is_visible() {
+			self.internal_update(Some(active));
 		}
 	}
 

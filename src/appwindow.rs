@@ -239,7 +239,7 @@ impl AppModel {
 
 			// child window visibility
 			if let RuntimeWindowing::Child(child_window) = &self.windowing {
-				child_window.set_visible(running.is_some());
+				child_window.set_active(running.is_some());
 
 				// the running window should have focus
 				if running.is_some() {
