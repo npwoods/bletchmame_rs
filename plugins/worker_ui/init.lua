@@ -427,7 +427,12 @@ function emit_status(light, out)
 
 		-- <sound> (sound_manager)
 		emit("\t<sound");
-		emit("\t\tattenuation=\"" .. tostring(machine_sound().attenuation) .. "\"");
+		if (machine_sound().system_mute ~= nil) then
+			emit("\t\tsystem_mute=\"" .. string_from_bool(machine_sound().system_mute) .. "\"");
+		end
+		if (machine_sound().attenuation) then
+			emit("\t\tattenuation=\"" .. tostring(machine_sound().attenuation) .. "\"");
+		end
 		emit("\t/>");
 
 		-- <cheats> (cheat manager)
@@ -793,6 +798,13 @@ end
 function command_paste(args)
 	machine_ioport():natkeyboard():paste(args[2])
 	print("@OK ### Text inputted from clipboard")
+end
+
+-- SET_SYSTEM_MUTE command
+function command_set_system_mute(args)
+	machine_sound().system_mute = toboolean(args[2])
+	print("@OK STATUS ### System mute set to " .. tostring(machine_sound().system_mute))
+	emit_status()
 end
 
 -- SET_ATTENUATION command
@@ -1162,6 +1174,7 @@ local commands =
 	["classic_menu"]				= command_classic_menu,
 	["input"]						= command_input,
 	["paste"]						= command_paste,
+	["set_system_mute"]				= command_set_system_mute,
 	["set_attenuation"]				= command_set_attenuation,
 	["set_natural_keyboard_in_use"]	= command_set_natural_keyboard_in_use,
 	["state_load"]					= command_state_load,

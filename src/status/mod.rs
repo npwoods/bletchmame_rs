@@ -36,7 +36,8 @@ impl Status {
 			let is_paused = running.is_paused.unwrap_or(status_running.is_paused);
 			let is_throttled = running.is_throttled.unwrap_or(status_running.is_throttled);
 			let throttle_rate = running.throttle_rate.unwrap_or(status_running.throttle_rate);
-			let sound_attenuation = running.sound_attenuation.unwrap_or(status_running.sound_attenuation);
+			let system_mute = running.system_mute.or(status_running.system_mute);
+			let sound_attenuation = running.sound_attenuation.or(status_running.sound_attenuation);
 			let is_recording = running.is_recording.unwrap_or(status_running.is_recording);
 			let images = if let Some(images) = running.images {
 				images
@@ -71,6 +72,7 @@ impl Status {
 				is_paused,
 				is_throttled,
 				throttle_rate,
+				system_mute,
 				sound_attenuation,
 				is_recording,
 				images,
@@ -104,7 +106,8 @@ pub struct Running {
 	pub is_paused: bool,
 	pub is_throttled: bool,
 	pub throttle_rate: f32,
-	pub sound_attenuation: i32,
+	pub system_mute: Option<bool>,
+	pub sound_attenuation: Option<i32>,
 	pub is_recording: bool,
 	pub images: Arc<[Image]>,
 	pub slots: Arc<[Slot]>,
@@ -169,6 +172,7 @@ struct RunningUpdate {
 	pub is_paused: Option<bool>,
 	pub is_throttled: Option<bool>,
 	pub throttle_rate: Option<f32>,
+	pub system_mute: Option<bool>,
 	pub sound_attenuation: Option<i32>,
 	pub is_recording: Option<bool>,
 	pub images: Option<Vec<ImageUpdate>>,
