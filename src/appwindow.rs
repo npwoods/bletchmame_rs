@@ -828,20 +828,26 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			window.set_fullscreen(!is_fullscreen);
 		}
 		AppCommand::OptionsToggleSound => {
-			if let Some(sound_attenuation) = model
+			match model
 				.state
 				.borrow()
 				.status()
 				.and_then(|s| s.running.as_ref())
-				.map(|r| r.sound_attenuation)
+				.map(|r| (r.system_mute, r.sound_attenuation))
 			{
-				let is_sound_enabled = sound_attenuation > SOUND_ATTENUATION_OFF;
-				let new_attenuation = if is_sound_enabled {
-					SOUND_ATTENUATION_OFF
-				} else {
-					SOUND_ATTENUATION_ON
-				};
-				model.issue_command(MameCommand::SetAttenuation(new_attenuation));
+				Some((Some(system_mute), _)) => {
+					model.issue_command(MameCommand::SetSystemMute(!system_mute));
+				}
+				Some((None, Some(sound_attenuation))) => {
+					let is_sound_enabled = sound_attenuation > SOUND_ATTENUATION_OFF;
+					let new_attenuation = if is_sound_enabled {
+						SOUND_ATTENUATION_OFF
+					} else {
+						SOUND_ATTENUATION_ON
+					};
+					model.issue_command(MameCommand::SetAttenuation(new_attenuation));
+				}
+				_ => {}
 			}
 		}
 		AppCommand::OptionsClassic => {
@@ -1124,7 +1130,13 @@ fn update_menus(model: &AppModel) {
 	let throttle_rate = running.as_ref().map(|r| r.throttle_rate);
 	let is_sound_enabled = running
 		.as_ref()
-		.map(|r| r.sound_attenuation > SOUND_ATTENUATION_OFF)
+		.map(|r| {
+			if let Some(system_mute) = r.system_mute {
+				!system_mute
+			} else {
+				r.sound_attenuation.is_some_and(|x| x > SOUND_ATTENUATION_OFF)
+			}
+		})
 		.unwrap_or_default();
 	let can_refresh_info_db = has_mame_executable && !state.is_building_infodb();
 	let is_fullscreen = model.app_window().window().is_fullscreen();

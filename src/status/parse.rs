@@ -98,8 +98,10 @@ impl State {
 				None
 			}
 			(Phase::Status, b"sound") => {
-				let [attenuation] = evt.find_attributes([b"attenuation"])?;
+				let [system_mute, attenuation] = evt.find_attributes([b"system_mute", b"attenuation"])?;
+				let system_mute = system_mute.map(parse_mame_bool).transpose()?;
 				let attenuation = attenuation.map(|x| x.parse::<i32>()).transpose()?;
+				self.running.system_mute = system_mute.or(self.running.system_mute);
 				self.running.sound_attenuation = attenuation.or(self.running.sound_attenuation);
 				None
 			}
