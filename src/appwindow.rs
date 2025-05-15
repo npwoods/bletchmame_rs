@@ -117,6 +117,7 @@ struct AppModel {
 	windowing: RuntimeWindowing,
 }
 
+#[allow(clippy::large_enum_variant)]
 enum RuntimeWindowing {
 	Child(ChildWindow),
 	Windowed,
@@ -327,7 +328,7 @@ pub fn create(args: AppArgs) -> AppWindow {
 	invoke_from_event_loop(move || {
 		// need to invoke from event loop so this can happen after menu rebuild
 		app_window_weak.unwrap().window().with_muda_menu(|menu_bar| {
-			menu_bar.visit((), |_, sub_menu, item| {
+			let _ = menu_bar.visit((), |_, sub_menu, item| {
 				if let Some(title) = item.text() {
 					let parent_title = sub_menu.map(|x| x.text());
 					let (command, accelerator) = menu_item_info(parent_title.as_deref(), &title);
@@ -374,7 +375,7 @@ pub fn create(args: AppArgs) -> AppWindow {
 	app_window.on_menu_item_activated(move |parent_title, title| {
 		// hack to work around Muda automatically changing the check mark value
 		model_clone.app_window().window().with_muda_menu(|menu_bar| {
-			menu_bar.visit((), |_, sub_menu, item| {
+			let _ = menu_bar.visit((), |_, sub_menu, item| {
 				if sub_menu.is_some_and(|x| x.text().as_str() == parent_title.as_str())
 					&& item.text().is_some_and(|x| x.as_str() == title.as_str())
 				{

@@ -54,7 +54,7 @@ pub struct MenuItemUpdate {
 #[ext(MenuExt)]
 pub impl Menu {
 	fn update(&self, callback: impl Fn(Option<&str>, &str) -> MenuItemUpdate) {
-		self.visit((), |_, sub_menu, item| {
+		let _ = self.visit((), |_, sub_menu, item| {
 			if let Some(title) = item.text() {
 				let parent_title = sub_menu.map(|x| x.text());
 				let update = callback(parent_title.as_deref(), &title);
