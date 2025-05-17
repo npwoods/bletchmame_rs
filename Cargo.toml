@@ -47,7 +47,6 @@ num = "0.4.3"
 strum = { version = "0.27.1", features = ["derive"] }
 strum_macros = "0.27.1"
 structopt = "0.3.26"
-win32job = "2.0.2"
 is_executable = "1.0.4"
 anyhow = "1.0.97"
 hostname-validator = "1.1.1"
@@ -71,6 +70,9 @@ features = [
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_UI_WindowsAndMessaging",
 ]
+
+[target.'cfg(target_os = "windows")'.dependencies.win32job]
+version = "2.0.2"
 
 [dev-dependencies]
 assert_matches = "1.5.0"
