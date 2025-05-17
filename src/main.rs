@@ -59,8 +59,11 @@ struct Opt {
 	#[cfg_attr(feature = "slint-qt-backend", structopt(long))]
 	slint_backend: Option<SlintBackend>,
 
+	#[cfg_attr(feature = "diagnostics", structopt(long))]
+	process_listxml: bool,
+
 	#[cfg_attr(feature = "diagnostics", structopt(long, parse(from_os_str)))]
-	process_xml: Option<PathBuf>,
+	process_listxml_file: Option<PathBuf>,
 
 	#[cfg_attr(feature = "diagnostics", structopt(long))]
 	log: Option<String>,
@@ -83,7 +86,13 @@ fn main() -> ExitCode {
 	}
 
 	// are we doing diagnostics
-	if let Some(path) = opts.process_xml {
+	let process_listxml = match (opts.process_listxml, opts.process_listxml_file.as_deref()) {
+		(false, None) => None,
+		(true, None) => Some(None),
+		(false, Some(path)) => Some(Some(path)),
+		(true, Some(_)) => panic!("Cannot specify --process-listxml and --process-listxml-file simultaneously"),
+	};
+	if let Some(path) = process_listxml {
 		return info_db_from_xml_file(path);
 	}
 
