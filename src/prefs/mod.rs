@@ -267,7 +267,11 @@ impl PrefsCollection {
 		match self {
 			PrefsCollection::Builtin(x) => format!("{x}").into(),
 			PrefsCollection::MachineSoftware { machine_name } => {
-				let machine_desc = info_db.machines().find(machine_name).unwrap().description();
+				let machine_desc = info_db
+					.machines()
+					.find(machine_name.as_str())
+					.map(|x| x.description())
+					.unwrap_or(machine_name.as_str());
 				format!("Software for \"{}\"", machine_desc).into()
 			}
 			PrefsCollection::Folder { name, items: _ } => Cow::Borrowed(name),
