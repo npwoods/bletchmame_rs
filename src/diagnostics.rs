@@ -1,5 +1,9 @@
 use std::fs::File;
 use std::io::BufReader;
+use std::io::Read;
+use std::io::Write;
+use std::io::stdin;
+use std::io::stdout;
 use std::path::Path;
 use std::process::ExitCode;
 use std::time::Duration;
@@ -7,14 +11,10 @@ use std::time::Instant;
 
 use anyhow::Error;
 use byte_unit::Byte;
+use console::style;
 
 use crate::info::InfoDb;
-
-#[derive(Clone, Copy, Debug)]
-struct Metrics {
-	byte_count: usize,
-	elapsed_time: Duration,
-}
+use crate::info::View;
 
 #[derive(thiserror::Error, Debug)]
 enum ThisError {
@@ -26,13 +26,12 @@ enum ThisError {
 	Validation(Vec<Error>),
 }
 
-pub fn info_db_from_xml_file(path: impl AsRef<Path>) -> ExitCode {
+pub fn info_db_from_xml_file(path: Option<impl AsRef<Path>>) -> ExitCode {
 	match internal_info_db_from_xml_file(path) {
-		Ok(metrics) => {
-			let byte_count = Byte::from(metrics.byte_count);
-			let (byte_count, unit) = byte_count.get_exact_unit(true);
-			let elapsed_time = metrics.elapsed_time;
-			println!("\x1B[KSuccess ({elapsed_time:?} elapsed; total size {byte_count} {unit})");
+		Ok((info_db, elapsed_time)) => {
+			println!("\x1B[KInfoDB Processing Succeeded!");
+			println!();
+			print_stats(&info_db, elapsed_time);
 			ExitCode::SUCCESS
 		}
 		Err(e) => {
@@ -47,13 +46,74 @@ pub fn info_db_from_xml_file(path: impl AsRef<Path>) -> ExitCode {
 	}
 }
 
-fn internal_info_db_from_xml_file(path: impl AsRef<Path>) -> std::result::Result<Metrics, ThisError> {
+fn print_stats(info_db: &InfoDb, elapsed_time: Duration) {
+	let width = 8;
+	let (total_size, total_size_unit) = Byte::from(info_db.data_len()).get_exact_unit(true);
+	let (strings_size, strings_size_unit) = Byte::from(info_db.strings_len()).get_exact_unit(true);
+
+	println!("{}", style(info_db.build()).reverse());
+	println!(
+		"Machines:                          {:>width$}",
+		info_db.machines().len()
+	);
+	println!("Chips:                             {:>width$}", info_db.chips().len());
+	println!("Devices:                           {:>width$}", info_db.devices().len());
+	println!("Slots:                             {:>width$}", info_db.slots().len());
+	println!(
+		"Slot Options:                      {:>width$}",
+		info_db.slot_options().len()
+	);
+	println!(
+		"Software Lists:                    {:>width$}",
+		info_db.software_lists().len()
+	);
+	println!(
+		"Machine --> Software List Indexes: {:>width$}",
+		info_db.software_list_machine_indexes().len()
+	);
+	println!(
+		"Software List --> Machine Indexes: {:>width$}",
+		info_db.machine_software_lists().len()
+	);
+	println!(
+		"RAM Options:                       {:>width$}",
+		info_db.ram_options().len()
+	);
+	println!(
+		"String Table Length:               {:>width$} {}",
+		strings_size, strings_size_unit
+	);
+	println!();
+	println!(
+		"Total Size:                        {:>width$} {}",
+		total_size, total_size_unit
+	);
+	println!(
+		"Elapsed Time:                      {:>width$} secs",
+		elapsed_time.as_millis() as f32 / 1000.0
+	);
+}
+
+fn internal_info_db_from_xml_file(
+	path: Option<impl AsRef<Path>>,
+) -> std::result::Result<(InfoDb, Duration), ThisError> {
 	let start_instant = Instant::now();
-	let file = File::open(path).map_err(ThisError::ReadingPath)?;
+	let mut last_message_instant: Option<Instant> = None;
+	let file = if let Some(path) = path {
+		let file = File::open(path).map_err(ThisError::ReadingPath)?;
+		Box::new(file) as Box<dyn Read>
+	} else {
+		Box::new(stdin()) as Box<dyn Read>
+	};
 	let mut reader = BufReader::new(file);
 
 	let info_db = InfoDb::from_listxml_output(&mut reader, |machine_name| {
-		print!("\x1B[KProcessing {machine_name}...\r");
+		let now = Instant::now();
+		if last_message_instant.is_none_or(|x| now.duration_since(x) > Duration::from_millis(30)) {
+			last_message_instant = Some(now);
+			print!("\x1B[KProcessing {machine_name}...\r");
+			let _ = stdout().flush();
+		}
 		false
 	})
 	.map_err(ThisError::BuildingInfoDb)?;
@@ -65,9 +125,5 @@ fn internal_info_db_from_xml_file(path: impl AsRef<Path>) -> std::result::Result
 	info_db.validate().map_err(ThisError::Validation)?;
 
 	// and return!
-	let metrics = Metrics {
-		byte_count: info_db.data_len(),
-		elapsed_time: start_instant.elapsed(),
-	};
-	Ok(metrics)
+	Ok((info_db, start_instant.elapsed()))
 }

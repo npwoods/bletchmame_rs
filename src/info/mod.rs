@@ -215,6 +215,10 @@ impl InfoDb {
 		self.data.len()
 	}
 
+	pub fn strings_len(&self) -> usize {
+		self.data.len() - self.strings_offset
+	}
+
 	pub fn build(&self) -> &MameVersion {
 		&self.build
 	}
