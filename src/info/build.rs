@@ -79,10 +79,28 @@ enum ThisError {
 	MissingMandatoryAttribute(&'static str),
 }
 
+// capacity defaults based on MAME 0.277
+// 			48166 machines
+//         198694 chips
+//          11918 devices
+//          24252 slots
+//         434464 slot options
+//           6966 links
+//           6660 RAM options
+//        2473230 string bytes
+const CAPACITY_MACHINES: usize = 55000;
+const CAPACITY_CHIPS: usize = 240000;
+const CAPACITY_DEVICES: usize = 14000;
+const CAPACITY_SLOTS: usize = 26000;
+const CAPACITY_SLOT_OPTIONS: usize = 480000;
+const CAPACITY_MACHINE_SOFTWARE_LISTS: usize = 7500;
+const CAPACITY_RAM_OPTIONS: usize = 7200;
+const CAPACITY_STRING_TABLE: usize = 2600000;
+
 impl State {
 	pub fn new() -> Self {
-		// prepare a string table, allocating capacity with respect to what we know about MAME 0.239
-		let mut strings = StringTableBuilder::new(4500000); // 4326752 bytes
+		// prepare a string table, allocating capacity as above
+		let mut strings = StringTableBuilder::new(CAPACITY_STRING_TABLE);
 
 		// placeholder build string, which will be overridden later on
 		let build_strindex = strings.lookup("");
@@ -90,13 +108,13 @@ impl State {
 		// reserve space based the same MAME version as above
 		Self {
 			phase_stack: Vec::with_capacity(32),
-			machines: BinBuilder::new(48000),              // 44092 machines,
-			chips: BinBuilder::new(190000),                // 174679 chips
-			devices: BinBuilder::new(12000),               // 10738 devices
-			slots: BinBuilder::new(1000),                  // ??? slots
-			slot_options: BinBuilder::new(1000),           // ??? slot options
-			machine_software_lists: BinBuilder::new(6800), // 6337 software lists
-			ram_options: BinBuilder::new(6800),            // 6383 ram options
+			machines: BinBuilder::new(CAPACITY_MACHINES),
+			chips: BinBuilder::new(CAPACITY_CHIPS),
+			devices: BinBuilder::new(CAPACITY_DEVICES),
+			slots: BinBuilder::new(CAPACITY_SLOTS),
+			slot_options: BinBuilder::new(CAPACITY_SLOT_OPTIONS),
+			machine_software_lists: BinBuilder::new(CAPACITY_MACHINE_SOFTWARE_LISTS),
+			ram_options: BinBuilder::new(CAPACITY_RAM_OPTIONS),
 			software_lists: BTreeMap::new(),
 			strings,
 			build_strindex,
@@ -372,7 +390,7 @@ impl State {
 		};
 
 		// software lists require special processing
-		let mut software_list_machine_indexes = BinBuilder::<u32>::new(0);
+		let mut software_list_machine_indexes = BinBuilder::<u32>::new(CAPACITY_MACHINE_SOFTWARE_LISTS);
 		let mut software_list_indexmap = HashMap::new();
 		let software_lists = self
 			.software_lists
