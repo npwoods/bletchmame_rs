@@ -54,6 +54,38 @@ jobs:
           command: test
           args: ${{ matrix.qt == 'true' && '--all-features' || '' }}
 
+  diagnostics:
+    name: Diagnostics
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Install Linux Dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt update
+          sudo apt install -y libxdo-dev libpango1.0-dev libgtk-3-dev mame
+      - name: Caching
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+      - name: Diagnostics
+        run: |
+          mame -listxml | cargo run --release -- --process-listxml
+
   clippy:
     name: Clippy
     strategy:
