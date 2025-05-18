@@ -29,6 +29,7 @@ use binary_serde::DeserializeError;
 use binary_serde::Endianness;
 use entities::SoftwareListsView;
 use internment::Arena;
+use more_asserts::assert_le;
 
 use crate::platform::CommandExt;
 use crate::prefs::prefs_filename;
@@ -438,9 +439,9 @@ where
 	fn sub_view(&self, range: Range<u32>) -> Self {
 		let range = usize::try_from(range.start).unwrap()..usize::try_from(range.end).unwrap();
 
-		assert!(range.start <= range.end);
-		assert!(range.start <= self.end - self.start);
-		assert!(range.end <= self.end - self.start);
+		assert_le!(range.start, range.end);
+		assert_le!(range.start, self.end - self.start);
+		assert_le!(range.end, self.end - self.start);
 
 		Self {
 			start: self.start + range.start,
