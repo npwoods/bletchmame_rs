@@ -7,6 +7,9 @@ use anyhow::Error;
 use anyhow::Result;
 use smallvec::SmallVec;
 
+use crate::info::UsizeImpl;
+use crate::info::usize_db;
+
 const SMALL_STRING_CHARS: &[u8; 63] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ";
 
 const MAGIC_STRINGTABLE_BEGIN: &[u8; 2] = &[0x9D, 0x9B];
@@ -15,7 +18,7 @@ const MAGIC_STRINGTABLE_END: &[u8; 2] = &[0x9F, 0x99];
 #[derive(Debug)]
 pub struct StringTableBuilder {
 	data: Vec<u8>,
-	map: HashMap<u64, SmallVec<[u32; 4]>>,
+	map: HashMap<u64, SmallVec<[usize_db; 4]>>,
 }
 
 impl StringTableBuilder {
@@ -29,33 +32,33 @@ impl StringTableBuilder {
 
 		// seed the new StringTableBuilder with a value for empty strings
 		let mut result = Self { data, map };
-		result.map_insert("", 0);
+		result.map_insert("", 0.into());
 
 		// and return
 		result
 	}
 
-	pub fn lookup(&mut self, s: &str) -> u32 {
+	pub fn lookup(&mut self, s: &str) -> usize_db {
 		self.lookup_immut(s).unwrap_or_else(|| {
 			if !self.data.len() > MAGIC_STRINGTABLE_BEGIN.len() {
 				self.data.push(0x80);
 			}
-			let result = self.data.len().try_into().unwrap();
-			self.data.extend(s.as_bytes().iter());
+			let result = self.data.len();
+			self.data.extend(s.as_bytes());
 
 			for (pos, _) in s.char_indices() {
-				let element = result + u32::try_from(pos).unwrap();
-				self.map_insert(&s[pos..], element);
+				let element = result + pos;
+				self.map_insert(&s[pos..], element.to_db());
 			}
-			result
+			result.to_db()
 		})
 	}
 
-	pub fn lookup_immut(&self, s: &str) -> Option<u32> {
+	pub fn lookup_immut(&self, s: &str) -> Option<usize_db> {
 		self.map_lookup(s).or_else(|| lookup_small(s.as_bytes()))
 	}
 
-	pub fn index(&self, offset: u32) -> Cow<'_, str> {
+	pub fn index(&self, offset: usize_db) -> Cow<'_, str> {
 		read_string(&self.data, offset).unwrap()
 	}
 
@@ -64,7 +67,7 @@ impl StringTableBuilder {
 		self.data.into_iter()
 	}
 
-	fn map_lookup(&self, s: &str) -> Option<u32> {
+	fn map_lookup(&self, s: &str) -> Option<usize_db> {
 		self.map
 			.get(&hash(s))?
 			.iter()
@@ -72,7 +75,7 @@ impl StringTableBuilder {
 			.find(|&offset| s == self.index(offset))
 	}
 
-	fn map_insert(&mut self, s: &str, element: u32) {
+	fn map_insert(&mut self, s: &str, element: usize_db) {
 		let key = hash(s);
 		let entry = self.map.entry(key).or_default();
 
@@ -87,7 +90,7 @@ impl StringTableBuilder {
 	}
 }
 
-fn lookup_small(s: &[u8]) -> Option<u32> {
+fn lookup_small(s: &[u8]) -> Option<usize_db> {
 	(s.len() <= 5)
 		.then_some((0..5).try_fold(0xC0000000, |acc, index| {
 			let value = if let Some(&b) = s.get(index) {
@@ -98,9 +101,11 @@ fn lookup_small(s: &[u8]) -> Option<u32> {
 			Some(acc | (value << (index * 6)) as u32)
 		}))
 		.flatten()
+		.map(|x| usize::try_from(x).unwrap().to_db())
 }
 
-pub fn read_string(data: &[u8], offset: u32) -> Result<Cow<'_, str>> {
+pub fn read_string(data: &[u8], offset: usize_db) -> Result<Cow<'_, str>> {
+	let offset = offset.get();
 	let result = if (offset & 0xC0000000) == 0xC0000000 {
 		let iter = (0..5)
 			.filter_map(|i| SMALL_STRING_CHARS.get(((offset >> (i * 6)) & 0x3F) as usize))
@@ -152,6 +157,9 @@ mod test {
 	use itertools::Itertools;
 	use test_case::test_case;
 
+	use crate::info::UsizeDbImpl;
+	use crate::info::UsizeImpl;
+
 	use super::StringTableBuilder;
 
 	#[test_case(0, &[""])]
@@ -175,7 +183,7 @@ mod test {
 	#[test]
 	pub fn empty_is_zero() {
 		let mut builder = StringTableBuilder::new(0);
-		let actual = builder.lookup("");
+		let actual = builder.lookup("").from_db();
 		assert_eq!(0, actual);
 	}
 
@@ -185,9 +193,9 @@ mod test {
 	#[test_case(3, 10, Ok(""), b"\x9D\x9Bfoo\x80bar\x9F\x99")]
 	#[test_case(4, 11, Ok(""), b"\x9D\x9Bfoo\x80bar\x9F\x99")]
 	#[test_case(5, 4242, Err(()), b"\x9D\x9Bfoo\x80bar\x9F\x99")]
-	pub fn read_string(_index: usize, offset: u32, expected: std::result::Result<&str, ()>, bytes: &[u8]) {
+	pub fn read_string(_index: usize, offset: usize, expected: std::result::Result<&str, ()>, bytes: &[u8]) {
 		let expected = expected.map(String::from);
-		let actual = super::read_string(bytes, offset);
+		let actual = super::read_string(bytes, offset.to_db());
 		let actual = actual.map(String::from).map_err(|_| ());
 		assert_eq!(expected, actual);
 	}

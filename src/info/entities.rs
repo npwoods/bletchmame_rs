@@ -8,6 +8,7 @@ use crate::info::ChipType;
 use crate::info::IndirectView;
 use crate::info::Object;
 use crate::info::SimpleView;
+use crate::info::UsizeDbImpl;
 use crate::info::Validatable;
 use crate::info::View;
 use crate::info::binary;
@@ -45,12 +46,12 @@ impl<'a> Machine<'a> {
 	}
 
 	pub fn clone_of(&self) -> Option<Machine<'a>> {
-		let clone_of_machine_index = self.obj().clone_of_machine_index.try_into().unwrap();
+		let clone_of_machine_index = self.obj().clone_of_machine_index.from_db();
 		self.db.machines().get(clone_of_machine_index)
 	}
 
 	pub fn rom_of(&self) -> Option<Machine<'a>> {
-		let rom_of_machine_index = self.obj().rom_of_machine_index.try_into().unwrap();
+		let rom_of_machine_index = self.obj().rom_of_machine_index.from_db();
 		self.db.machines().get(rom_of_machine_index)
 	}
 
@@ -59,29 +60,28 @@ impl<'a> Machine<'a> {
 	}
 
 	pub fn chips(&self) -> impl View<'a, Chip<'a>> + use<'a> {
-		self.db.chips().sub_view(self.obj().chips_start..self.obj().chips_end)
+		let range = self.obj().chips_start.from_db()..self.obj().chips_end.from_db();
+		self.db.chips().sub_view(range)
 	}
 
 	pub fn devices(&self) -> impl View<'a, Device<'a>> + use<'a> {
-		self.db
-			.devices()
-			.sub_view(self.obj().devices_start..self.obj().devices_end)
+		let range = self.obj().devices_start.from_db()..self.obj().devices_end.from_db();
+		self.db.devices().sub_view(range)
 	}
 
 	pub fn slots(&self) -> impl View<'a, Slot<'a>> + use<'a> {
-		self.db.slots().sub_view(self.obj().slots_start..self.obj().slots_end)
+		let range = self.obj().slots_start.from_db()..self.obj().slots_end.from_db();
+		self.db.slots().sub_view(range)
 	}
 
 	pub fn machine_software_lists(&self) -> impl View<'a, MachineSoftwareList<'a>> + use<'a> {
-		self.db
-			.machine_software_lists()
-			.sub_view(self.obj().machine_software_lists_start..self.obj().machine_software_lists_end)
+		let range = self.obj().machine_software_lists_start.from_db()..self.obj().machine_software_lists_end.from_db();
+		self.db.machine_software_lists().sub_view(range)
 	}
 
 	pub fn ram_options(&self) -> impl View<'a, RamOption<'a>> + use<'a> {
-		self.db
-			.ram_options()
-			.sub_view(self.obj().ram_options_start..self.obj().ram_options_end)
+		let range = self.obj().ram_options_start.from_db()..self.obj().ram_options_end.from_db();
+		self.db.ram_options().sub_view(range)
 	}
 }
 
@@ -150,13 +150,12 @@ impl<'a> Slot<'a> {
 	}
 
 	pub fn options(&self) -> impl View<'a, SlotOption<'a>> + use<'a> {
-		self.db
-			.slot_options()
-			.sub_view(self.obj().options_start..self.obj().options_end)
+		let range = self.obj().options_start.from_db()..self.obj().options_end.from_db();
+		self.db.slot_options().sub_view(range)
 	}
 
 	pub fn default_option_index(&self) -> Option<usize> {
-		let index = self.obj().default_option_index as usize;
+		let index = self.obj().default_option_index.from_db();
 		(index < self.options().len()).then_some(index)
 	}
 }
@@ -177,18 +176,18 @@ impl<'a> SoftwareList<'a> {
 	}
 
 	pub fn original_for_machines(&self) -> impl View<'a, Machine<'a>> + use<'a> {
-		let start = self.obj().software_list_original_machines_start;
-		let end = self.obj().software_list_compatible_machines_start;
+		let start = self.obj().software_list_original_machines_start.from_db();
+		let end = self.obj().software_list_compatible_machines_start.from_db();
 		self.make_machine_view(start, end)
 	}
 
 	pub fn compatible_for_machines(&self) -> impl View<'a, Machine<'a>> + use<'a> {
-		let start = self.obj().software_list_compatible_machines_start;
-		let end = self.obj().software_list_compatible_machines_end;
+		let start = self.obj().software_list_compatible_machines_start.from_db();
+		let end = self.obj().software_list_compatible_machines_end.from_db();
 		self.make_machine_view(start, end)
 	}
 
-	fn make_machine_view(&self, start: u32, end: u32) -> impl View<'a, Machine<'a>> + use<'a> {
+	fn make_machine_view(&self, start: usize, end: usize) -> impl View<'a, Machine<'a>> + use<'a> {
 		let range = start..end;
 		let index_view = self.db.software_list_machine_indexes().sub_view(range);
 		let object_view = self.db.machines();
@@ -213,14 +212,14 @@ impl<'a> MachineSoftwareList<'a> {
 	}
 
 	pub fn software_list(&self) -> SoftwareList<'a> {
-		let software_list_index = self.obj().software_list_index.try_into().unwrap();
+		let software_list_index = self.obj().software_list_index.from_db();
 		self.db.software_lists().get(software_list_index).unwrap()
 	}
 }
 
 impl Validatable for MachineSoftwareList<'_> {
 	fn validate(&self) -> Result<()> {
-		let software_list_index = usize::try_from(self.obj().software_list_index)?;
+		let software_list_index = self.obj().software_list_index.try_from_db()?;
 		ensure!(software_list_index < self.db.software_lists().len());
 		Ok(())
 	}
@@ -228,7 +227,7 @@ impl Validatable for MachineSoftwareList<'_> {
 
 impl RamOption<'_> {
 	pub fn size(&self) -> u64 {
-		self.obj().size
+		self.obj().size.into()
 	}
 
 	pub fn is_default(&self) -> bool {
