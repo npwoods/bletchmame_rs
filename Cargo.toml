@@ -24,7 +24,6 @@ raw-window-handle = "0.6.2"
 rfd = "0.15.1"
 serde = { version = "1.0.219", features = ["rc"] }
 quick-xml = "0.37.4"
-binary_serde = "1.0.24"
 itertools = "0.14.0"
 winit = "0.30.3"
 tokio = { version = "1.44.2", features = [
@@ -59,6 +58,7 @@ qttypes = { version = "0.2.12", optional = true }
 cpp = "0.5.10"
 nu-utils = "0.104.0"
 console = { version = "0.15.11", optional = true }
+zerocopy = { version = "0.8.25", features = ["derive"] }
 
 [target.'cfg(target_os = "windows")'.dependencies.windows]
 version = "0.61.1"

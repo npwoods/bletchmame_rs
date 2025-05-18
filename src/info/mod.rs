@@ -24,11 +24,13 @@ use std::process::Stdio;
 use anyhow::Error;
 use anyhow::Result;
 use anyhow::ensure;
-use binary_serde::BinarySerde;
-use binary_serde::DeserializeError;
-use binary_serde::Endianness;
+use easy_ext::ext;
 use entities::SoftwareListsView;
 use internment::Arena;
+use more_asserts::assert_le;
+use zerocopy::Immutable;
+use zerocopy::KnownLayout;
+use zerocopy::TryFromBytes;
 
 use crate::platform::CommandExt;
 use crate::prefs::prefs_filename;
@@ -51,13 +53,16 @@ use self::build::data_from_listxml_output;
 use self::strings::read_string;
 use self::strings::validate_string_table;
 
+use zerocopy::little_endian::U32 as usize_db;
+
 const MAGIC_HDR: &[u8; 8] = b"MAMEINFO";
-const ENDIANNESS: Endianness = Endianness::Little;
 
 #[derive(thiserror::Error, Debug)]
 enum ThisError {
 	#[error("InfoDb is corrupted")]
 	Validation(Vec<Error>),
+	#[error("Cannot deserialize InfoDb header")]
+	CannotDeserializeHeader,
 }
 
 pub struct InfoDb {
@@ -68,7 +73,7 @@ pub struct InfoDb {
 	slots: RootView<binary::Slot>,
 	slot_options: RootView<binary::SlotOption>,
 	software_lists: RootView<binary::SoftwareList>,
-	software_list_machine_indexes: RootView<u32>,
+	software_list_machine_indexes: RootView<usize_db>,
 	machine_software_lists: RootView<binary::MachineSoftwareList>,
 	ram_options: RootView<binary::RamOption>,
 	strings_offset: usize,
@@ -86,7 +91,7 @@ impl InfoDb {
 		let hdr = decode_header(&data)?;
 
 		// now walk the views
-		let mut cursor = binary::Header::SERIALIZED_SIZE..data.len();
+		let mut cursor = size_of::<binary::Header>()..data.len();
 		let machines = next_root_view(&mut cursor, hdr.machine_count)?;
 		let chips = next_root_view(&mut cursor, hdr.chips_count)?;
 		let devices = next_root_view(&mut cursor, hdr.device_count)?;
@@ -196,7 +201,7 @@ impl InfoDb {
 			&mut emit,
 			"SoftwareListMachineIndex",
 			|x| {
-				ensure!(x.obj() < self.machines().len().try_into().unwrap());
+				ensure!(x.obj().from_db() < self.machines().len());
 				Ok(())
 			},
 		);
@@ -251,7 +256,7 @@ impl InfoDb {
 		self.make_view(&self.machine_software_lists)
 	}
 
-	pub fn software_list_machine_indexes(&self) -> impl View<'_, Object<'_, u32>> {
+	pub fn software_list_machine_indexes(&self) -> impl View<'_, Object<'_, usize_db>> {
 		self.make_view(&self.software_list_machine_indexes)
 	}
 
@@ -259,24 +264,19 @@ impl InfoDb {
 		self.make_view(&self.ram_options)
 	}
 
-	fn string(&self, offset: u32) -> &'_ str {
+	fn string(&self, offset: usize_db) -> &'_ str {
 		match read_string(&self.data[self.strings_offset..], offset).unwrap_or_default() {
 			Cow::Borrowed(s) => s,
 			Cow::Owned(s) => self.strings_arena.intern_string(s).into_ref(),
 		}
 	}
 
-	fn make_view<B>(&self, root_view: &RootView<B>) -> SimpleView<'_, B>
-	where
-		B: BinarySerde,
-	{
-		let byte_offset = root_view.offset.try_into().unwrap();
-		let count = root_view.count.try_into().unwrap();
+	fn make_view<B>(&self, root_view: &RootView<B>) -> SimpleView<'_, B> {
 		SimpleView {
 			db: self,
-			byte_offset,
+			byte_offset: root_view.offset,
 			start: 0,
-			end: count,
+			end: root_view.count,
 			phantom: PhantomData,
 		}
 	}
@@ -290,25 +290,20 @@ impl Debug for InfoDb {
 	}
 }
 
-fn next_root_view<T>(cursor: &mut Range<usize>, count: u32) -> Result<RootView<T>>
-where
-	T: BinarySerde,
-{
+fn next_root_view<T>(cursor: &mut Range<usize>, count: usize_db) -> Result<RootView<T>> {
 	let error_message = "Cannot deserialize InfoDB header";
 
 	// get the result
-	let offset = cursor
-		.start
-		.try_into()
-		.map_err(|e| Error::new(e).context(error_message))?;
+	let offset = cursor.start;
 
 	// advance the cursor
+	let count = count.from_db();
 	let count_bytes = count
-		.checked_mul(T::SERIALIZED_SIZE.try_into().unwrap())
+		.checked_mul(size_of::<T>())
 		.ok_or_else(|| Error::msg(error_message))?;
 	let new_start = cursor
 		.start
-		.checked_add(count_bytes.try_into().unwrap())
+		.checked_add(count_bytes)
 		.ok_or_else(|| Error::msg(error_message))?;
 	if new_start > cursor.end {
 		return Err(Error::msg(error_message));
@@ -322,8 +317,8 @@ where
 
 #[derive(Clone, Copy, Debug)]
 struct RootView<T> {
-	offset: u32,
-	count: u32,
+	offset: usize,
+	count: usize,
 	phantom: PhantomData<T>,
 }
 
@@ -348,15 +343,12 @@ fn infodb_filename_error() -> Error {
 	Error::msg("Cannot determine InfoDB filename")
 }
 
-fn infodb_deserialize_header_error(error: DeserializeError) -> Error {
-	Error::msg(error).context("Cannot deserialize InfoDB header")
-}
-
-fn decode_header(data: &[u8]) -> Result<binary::Header> {
-	let header_data = &data[0..min(binary::Header::SERIALIZED_SIZE, data.len())];
-	let header =
-		binary::Header::binary_deserialize(header_data, ENDIANNESS).map_err(infodb_deserialize_header_error)?;
-	if &header.magic != MAGIC_HDR {
+fn decode_header(data: &[u8]) -> Result<&binary::Header> {
+	let header_data = &data[0..min(size_of::<binary::Header>(), data.len())];
+	let header = binary::Header::try_ref_from_bytes(header_data)
+		.ok()
+		.ok_or(ThisError::CannotDeserializeHeader)?;
+	if header.magic != *MAGIC_HDR {
 		return Err(Error::msg("Bad InfoDB Magic Value In Header"));
 	}
 	if header.sizes_hash != calculate_sizes_hash() {
@@ -371,7 +363,7 @@ where
 {
 	fn get(&self, index: usize) -> Option<T>;
 	fn len(&self) -> usize;
-	fn sub_view(&self, range: Range<u32>) -> Self;
+	fn sub_view(&self, range: Range<usize>) -> Self;
 
 	fn iter(&self) -> impl Iterator<Item = T> {
 		ViewIter {
@@ -420,7 +412,7 @@ pub struct SimpleView<'a, B> {
 
 impl<'a, B> View<'a, Object<'a, B>> for SimpleView<'a, B>
 where
-	B: BinarySerde + Clone,
+	B: TryFromBytes + Clone,
 {
 	fn len(&self) -> usize {
 		self.end - self.start
@@ -435,12 +427,10 @@ where
 		})
 	}
 
-	fn sub_view(&self, range: Range<u32>) -> Self {
-		let range = usize::try_from(range.start).unwrap()..usize::try_from(range.end).unwrap();
-
-		assert!(range.start <= range.end);
-		assert!(range.start <= self.end - self.start);
-		assert!(range.end <= self.end - self.start);
+	fn sub_view(&self, range: Range<usize>) -> Self {
+		assert_le!(range.start, range.end);
+		assert_le!(range.start, self.end - self.start);
+		assert_le!(range.end, self.end - self.start);
 
 		Self {
 			start: self.start + range.start,
@@ -458,8 +448,8 @@ pub struct IndirectView<V, W> {
 
 impl<'a, B, VI, VO> View<'a, Object<'a, B>> for IndirectView<VI, VO>
 where
-	B: BinarySerde + Clone + 'a,
-	VI: View<'a, Object<'a, u32>> + 'a,
+	B: TryFromBytes + Clone + 'a,
+	VI: View<'a, Object<'a, usize_db>> + 'a,
 	VO: View<'a, Object<'a, B>> + 'a,
 {
 	fn len(&self) -> usize {
@@ -467,7 +457,7 @@ where
 	}
 
 	fn get(&self, index: usize) -> Option<Object<'a, B>> {
-		let object_index = self.index_view.get(index)?.obj().try_into().unwrap();
+		let object_index = self.index_view.get(index)?.obj().from_db();
 		let obj = self
 			.object_view
 			.get(object_index)
@@ -475,7 +465,7 @@ where
 		Some(obj)
 	}
 
-	fn sub_view(&self, range: Range<u32>) -> Self {
+	fn sub_view(&self, range: Range<usize>) -> Self {
 		let index_view = self.index_view.sub_view(range);
 		let object_view = self.object_view.clone();
 		Self {
@@ -505,16 +495,16 @@ impl<B> Object<'_, B> {
 
 impl<'a, B> Object<'a, B>
 where
-	B: BinarySerde,
+	B: TryFromBytes + KnownLayout + Immutable,
 {
-	fn obj(&self) -> B {
-		let start = self.byte_offset + self.index * B::SERIALIZED_SIZE;
-		let end = start + B::SERIALIZED_SIZE;
+	fn obj(&self) -> &'_ B {
+		let start = self.byte_offset + self.index * size_of::<B>();
+		let end = start + size_of::<B>();
 		let buf = &self.db.data[start..end];
-		B::binary_deserialize(buf, ENDIANNESS).unwrap()
+		TryFromBytes::try_ref_from_bytes(buf).unwrap()
 	}
 
-	fn string(&self, func: impl FnOnce(B) -> u32) -> &'a str {
+	fn string(&self, func: impl FnOnce(&B) -> usize_db) -> &'a str {
 		let offset = func(self.obj());
 		self.db.string(offset)
 	}
@@ -528,7 +518,7 @@ impl<B> PartialEq for Object<'_, B> {
 
 impl<B> Debug for Object<'_, B>
 where
-	B: BinarySerde + Debug,
+	B: TryFromBytes + KnownLayout + Immutable + Debug,
 {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("Object")
@@ -566,6 +556,29 @@ fn validate_view_custom<'a, T>(
 			let message = format!("{}[{}]: {}", type_name, index, e);
 			emit(Error::msg(message));
 		}
+	}
+}
+
+#[ext(UsizeImpl)]
+impl usize {
+	fn to_db(self) -> usize_db {
+		self.try_to_db().unwrap()
+	}
+
+	fn try_to_db(self) -> Result<usize_db> {
+		Ok(u32::try_from(self).map_err(|_| Error::msg("usize too large"))?.into())
+	}
+}
+
+#[ext(UsizeDbImpl)]
+impl usize_db {
+	#[allow(clippy::wrong_self_convention)]
+	fn from_db(self) -> usize {
+		self.try_from_db().unwrap()
+	}
+
+	fn try_from_db(self) -> Result<usize> {
+		usize::try_from(self.get()).map_err(|_| Error::msg("unexpected usize::try_from() failure"))
 	}
 }
 

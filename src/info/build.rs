@@ -1,26 +1,29 @@
-use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::io::BufRead;
-use std::marker::PhantomData;
 
 use anyhow::Error;
 use anyhow::Result;
-use binary_serde::BinarySerde;
+use easy_ext::ext;
 use itertools::Itertools;
 use more_asserts::assert_lt;
-use num::CheckedAdd;
 use tracing::debug;
+use zerocopy::Immutable;
+use zerocopy::IntoBytes;
+use zerocopy::little_endian::U32;
+use zerocopy::little_endian::U64;
 
 use crate::info::ChipType;
-use crate::info::ENDIANNESS;
 use crate::info::MAGIC_HDR;
 use crate::info::SoftwareListStatus;
+use crate::info::UsizeDbImpl;
+use crate::info::UsizeImpl;
 use crate::info::binary;
 use crate::info::binary::Fixup;
 use crate::info::strings::StringTableBuilder;
+use crate::info::usize_db;
 use crate::parse::normalize_tag;
 use crate::parse::parse_mame_bool;
 use crate::xml::XmlElement;
@@ -49,16 +52,16 @@ const TEXT_CAPTURE_PHASES: &[Phase] = &[
 
 struct State {
 	phase_stack: Vec<Phase>,
-	machines: BinBuilder<binary::Machine>,
-	chips: BinBuilder<binary::Chip>,
-	devices: BinBuilder<binary::Device>,
-	slots: BinBuilder<binary::Slot>,
-	slot_options: BinBuilder<binary::SlotOption>,
-	machine_software_lists: BinBuilder<binary::MachineSoftwareList>,
+	machines: Vec<binary::Machine>,
+	chips: Vec<binary::Chip>,
+	devices: Vec<binary::Device>,
+	slots: Vec<binary::Slot>,
+	slot_options: Vec<binary::SlotOption>,
+	machine_software_lists: Vec<binary::MachineSoftwareList>,
 	strings: StringTableBuilder,
 	software_lists: BTreeMap<String, SoftwareListBuild>,
-	ram_options: BinBuilder<binary::RamOption>,
-	build_strindex: u32,
+	ram_options: Vec<binary::RamOption>,
+	build_strindex: usize_db,
 	phase_specific: Option<PhaseSpecificState>,
 }
 
@@ -69,8 +72,8 @@ enum PhaseSpecificState {
 
 #[derive(Debug, Default)]
 struct SoftwareListBuild {
-	pub originals: Vec<u32>,
-	pub compatibles: Vec<u32>,
+	pub originals: Vec<usize_db>,
+	pub compatibles: Vec<usize_db>,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -108,13 +111,13 @@ impl State {
 		// reserve space based the same MAME version as above
 		Self {
 			phase_stack: Vec::with_capacity(32),
-			machines: BinBuilder::new(CAPACITY_MACHINES),
-			chips: BinBuilder::new(CAPACITY_CHIPS),
-			devices: BinBuilder::new(CAPACITY_DEVICES),
-			slots: BinBuilder::new(CAPACITY_SLOTS),
-			slot_options: BinBuilder::new(CAPACITY_SLOT_OPTIONS),
-			machine_software_lists: BinBuilder::new(CAPACITY_MACHINE_SOFTWARE_LISTS),
-			ram_options: BinBuilder::new(CAPACITY_RAM_OPTIONS),
+			machines: Vec::with_capacity(CAPACITY_MACHINES),
+			chips: Vec::with_capacity(CAPACITY_CHIPS),
+			devices: Vec::with_capacity(CAPACITY_DEVICES),
+			slots: Vec::with_capacity(CAPACITY_SLOTS),
+			slot_options: Vec::with_capacity(CAPACITY_SLOT_OPTIONS),
+			machine_software_lists: Vec::with_capacity(CAPACITY_MACHINE_SOFTWARE_LISTS),
+			ram_options: Vec::with_capacity(CAPACITY_RAM_OPTIONS),
 			software_lists: BTreeMap::new(),
 			strings,
 			build_strindex,
@@ -146,25 +149,26 @@ impl State {
 				let clone_of_machine_index = self.strings.lookup(&clone_of.unwrap_or_default());
 				let rom_of_machine_index = self.strings.lookup(&rom_of.unwrap_or_default());
 				let runnable = runnable.map(parse_mame_bool).transpose()?.unwrap_or(true);
+
 				let machine = binary::Machine {
 					name_strindex,
 					source_file_strindex,
 					clone_of_machine_index,
 					rom_of_machine_index,
-					chips_start: self.chips.len(),
-					chips_end: self.chips.len(),
-					devices_start: self.devices.len(),
-					devices_end: self.devices.len(),
-					slots_start: self.slots.len(),
-					slots_end: self.slots.len(),
-					machine_software_lists_start: self.machine_software_lists.len(),
-					machine_software_lists_end: self.machine_software_lists.len(),
-					ram_options_start: self.ram_options.len(),
-					ram_options_end: self.ram_options.len(),
+					chips_start: self.chips.len().to_db(),
+					chips_end: self.chips.len().to_db(),
+					devices_start: self.devices.len().to_db(),
+					devices_end: self.devices.len().to_db(),
+					slots_start: self.slots.len().to_db(),
+					slots_end: self.slots.len().to_db(),
+					machine_software_lists_start: self.machine_software_lists.len().to_db(),
+					machine_software_lists_end: self.machine_software_lists.len().to_db(),
+					ram_options_start: self.ram_options.len().to_db(),
+					ram_options_end: self.ram_options.len().to_db(),
 					runnable,
 					..Default::default()
 				};
-				self.machines.push(machine);
+				self.machines.push_db(machine)?;
 				Some(Phase::Machine)
 			}
 			(Phase::Machine, b"description") => Some(Phase::MachineDescription),
@@ -182,15 +186,15 @@ impl State {
 				};
 				let tag_strindex = self.strings.lookup(&tag.unwrap_or_default());
 				let name_strindex = self.strings.lookup(&name.unwrap_or_default());
-				let clock = clock.as_ref().and_then(|x| x.parse().ok()).unwrap_or(0);
+				let clock = clock.as_ref().and_then(|x| x.parse().ok()).unwrap_or(0).into();
 				let chip = binary::Chip {
 					chip_type,
 					tag_strindex,
 					name_strindex,
 					clock,
 				};
-				self.chips.push(chip);
-				self.machines.increment(|m| &mut m.chips_end)?;
+				self.chips.push_db(chip)?;
+				self.machines.last_mut().unwrap().chips_end += 1;
 				None
 			}
 			(Phase::Machine, b"device") => {
@@ -208,10 +212,10 @@ impl State {
 					tag_strindex,
 					mandatory,
 					interfaces_strindex,
-					extensions_strindex: 0,
+					extensions_strindex: 0.into(),
 				};
-				self.devices.push(device);
-				self.machines.increment(|m| &mut m.devices_end)?;
+				self.devices.push_db(device)?;
+				self.machines.last_mut().unwrap().devices_end += 1;
 				self.phase_specific = Some(PhaseSpecificState::Extensions(String::with_capacity(1024)));
 				Some(Phase::MachineDevice)
 			}
@@ -219,15 +223,16 @@ impl State {
 				let [name] = evt.find_attributes([b"name"])?;
 				let name = name.ok_or(ThisError::MissingMandatoryAttribute("slot"))?;
 				let name = normalize_tag(name);
-				let name_strindex: u32 = self.strings.lookup(&name);
+				let name_strindex = self.strings.lookup(&name);
+				let slot_options_pos = self.slot_options.len().to_db();
 				let slot = binary::Slot {
 					name_strindex,
-					options_start: self.slot_options.len(),
-					options_end: self.slot_options.len(),
-					default_option_index: !0,
+					options_start: slot_options_pos,
+					options_end: slot_options_pos,
+					default_option_index: (!0).into(),
 				};
-				self.slots.push(slot);
-				self.machines.increment(|m| &mut m.slots_end)?;
+				self.slots.push_db(slot)?;
+				self.machines.last_mut().unwrap().slots_end += 1;
 				Some(Phase::MachineSlot)
 			}
 			(Phase::Machine, b"softwarelist") => {
@@ -247,8 +252,8 @@ impl State {
 					status,
 					filter_strindex,
 				};
-				self.machine_software_lists.push(machine_software_list);
-				self.machines.increment(|m| &mut m.machine_software_lists_end)?;
+				self.machine_software_lists.push_db(machine_software_list)?;
+				self.machines.last_mut().unwrap().machine_software_lists_end += 1;
 
 				// add this machine to the global software list
 				let software_list = self.software_lists.entry(name.to_string()).or_default();
@@ -256,7 +261,7 @@ impl State {
 					SoftwareListStatus::Original => &mut software_list.originals,
 					SoftwareListStatus::Compatible => &mut software_list.compatibles,
 				};
-				list.push(self.machines.items().next_back().unwrap().name_strindex);
+				list.push(self.machines.last_mut().unwrap().name_strindex);
 				None
 			}
 			(Phase::Machine, b"ramoption") => {
@@ -286,15 +291,15 @@ impl State {
 				let devname_strindex = self.strings.lookup(&devname);
 				let is_default = is_default.map(parse_mame_bool).transpose()?.unwrap_or_default();
 				if is_default {
-					self.slots
-						.tweak(|s| s.default_option_index = s.options_end - s.options_start);
+					let slot = self.slots.last_mut().unwrap();
+					slot.default_option_index = slot.options_end - slot.options_start;
 				}
 				let slot_option = binary::SlotOption {
 					name_strindex,
 					devname_strindex,
 				};
-				self.slots.increment(|s| &mut s.options_end)?;
-				self.slot_options.push(slot_option);
+				self.slots.last_mut().unwrap().options_end += 1;
+				self.slot_options.push_db(slot_option)?;
 				None
 			}
 			_ => None,
@@ -312,15 +317,15 @@ impl State {
 					return Ok(None);
 				}
 				let description_strindex = self.strings.lookup(&description);
-				self.machines.tweak(|x| x.description_strindex = description_strindex);
+				self.machines.last_mut().unwrap().description_strindex = description_strindex;
 			}
 			Phase::MachineYear => {
 				let year_strindex = self.strings.lookup(&text.unwrap());
-				self.machines.tweak(|x| x.year_strindex = year_strindex);
+				self.machines.last_mut().unwrap().year_strindex = year_strindex;
 			}
 			Phase::MachineManufacturer => {
 				let manufacturer_strindex = self.strings.lookup(&text.unwrap());
-				self.machines.tweak(|x| x.manufacturer_strindex = manufacturer_strindex);
+				self.machines.last_mut().unwrap().manufacturer_strindex = manufacturer_strindex;
 			}
 			Phase::MachineDevice => {
 				let PhaseSpecificState::Extensions(extensions) = self.phase_specific.take().unwrap() else {
@@ -328,16 +333,17 @@ impl State {
 				};
 				let extensions = extensions.split('\0').sorted().join("\0");
 				let extensions_strindex = self.strings.lookup(&extensions);
-				self.devices.tweak(|d| d.extensions_strindex = extensions_strindex);
+				self.devices.last_mut().unwrap().extensions_strindex = extensions_strindex;
 			}
 			Phase::MachineRamOption => {
 				let PhaseSpecificState::RamOption(is_default) = self.phase_specific.take().unwrap() else {
 					unreachable!();
 				};
 				if let Ok(size) = text.unwrap().parse::<u64>() {
+					let size = size.into();
 					let ram_option = binary::RamOption { size, is_default };
-					self.ram_options.push(ram_option);
-					self.machines.increment(|x| &mut x.ram_options_end)?;
+					self.ram_options.push_db(ram_option)?;
+					self.machines.last_mut().unwrap().ram_options_end += 1;
 				}
 			}
 			_ => {}
@@ -346,35 +352,33 @@ impl State {
 	}
 
 	pub fn into_data(mut self) -> Result<Box<[u8]>> {
-		// canonicalize name_strindex, so we don't have both inline and indexed
-		// small sting references
-		self.machines
-			.tweak_all(|machine| {
+		// we need to do processing on machines, namely to  canonicalize name_strindex, so we
+		// don't have both inline and indexed small sting references, and sort it
+		let mut machines = self
+			.machines
+			.into_iter()
+			.map(|machine| {
 				let old_strindex = machine.name_strindex;
 				let new_strindex = self
 					.strings
 					.lookup_immut(&self.strings.index(old_strindex))
 					.unwrap_or(old_strindex);
-				machine.name_strindex = new_strindex;
-				Ok::<(), ()>(())
-			})
-			.unwrap();
 
-		// sort machines
-		self.machines.sort_by(|a, b| {
-			let a = self.strings.index(a.name_strindex);
-			let b = self.strings.index(b.name_strindex);
-			a.cmp(&b)
-		});
+				binary::Machine {
+					name_strindex: new_strindex,
+					..machine
+				}
+			})
+			.sorted_by_key(|m| self.strings.index(m.name_strindex))
+			.collect::<Vec<_>>();
 
 		// build a "machine.name_strindex" ==> "machine_index" map in preparations for fixups
-		let machines_indexmap = self
-			.machines
-			.items()
+		let machines_indexmap = machines
+			.iter()
 			.enumerate()
-			.map(|(index, obj)| (obj.name_strindex, u32::try_from(index).unwrap()))
+			.map(|(index, obj)| (obj.name_strindex, index.to_db()))
 			.collect::<HashMap<_, _>>();
-		let machine_count = self.machines.len();
+		let machine_count = machines.len();
 		let machines_indexmap = |strindex| {
 			let result = machines_indexmap
 				.get(&strindex)
@@ -385,12 +389,12 @@ impl State {
 				.copied();
 
 			// sanity check and return
-			assert!(result.is_none_or(|x| x < machine_count), "Invalid machine");
+			assert!(result.is_none_or(|x| x.from_db() < machine_count), "Invalid machine");
 			result
 		};
 
 		// software lists require special processing
-		let mut software_list_machine_indexes = BinBuilder::<u32>::new(CAPACITY_MACHINE_SOFTWARE_LISTS);
+		let mut software_list_machine_indexes = Vec::<U32>::with_capacity(CAPACITY_MACHINE_SOFTWARE_LISTS);
 		let mut software_list_indexmap = HashMap::new();
 		let software_lists = self
 			.software_lists
@@ -409,28 +413,29 @@ impl State {
 					.filter_map(machines_indexmap)
 					.sorted()
 					.collect::<Vec<_>>();
-				let index = u32::try_from(index).unwrap();
+				let index = index.to_db();
 				let name_strindex = self.strings.lookup_immut(&software_list_name).unwrap();
 				let software_list_original_machines_start = software_list_machine_indexes.len();
-				let software_list_compatible_machines_start =
-					software_list_original_machines_start + u32::try_from(originals.len()).unwrap();
-				let software_list_compatible_machines_end =
-					software_list_compatible_machines_start + u32::try_from(compatibles.len()).unwrap();
+				let software_list_compatible_machines_start = software_list_original_machines_start + originals.len();
+				let software_list_compatible_machines_end = software_list_compatible_machines_start + compatibles.len();
+				let software_list_original_machines_start = software_list_original_machines_start.to_db();
+				let software_list_compatible_machines_start = software_list_compatible_machines_start.to_db();
+				let software_list_compatible_machines_end = software_list_compatible_machines_end.to_db();
 				let entry = binary::SoftwareList {
 					name_strindex,
 					software_list_original_machines_start,
 					software_list_compatible_machines_start,
 					software_list_compatible_machines_end,
 				};
-				assert!(originals.iter().all(|&x| x < self.machines.len()));
-				assert!(compatibles.iter().all(|&x| x < self.machines.len()));
+				assert!(originals.iter().all(|&x| x.from_db() < machine_count));
+				assert!(compatibles.iter().all(|&x| x.from_db() < machine_count));
 
 				software_list_machine_indexes.extend(originals);
 				software_list_machine_indexes.extend(compatibles);
 				software_list_indexmap.insert(name_strindex, index);
 				entry
 			})
-			.collect::<BinBuilder<_>>();
+			.collect::<Vec<_>>();
 
 		// resolves `software_list_index` entries that are actually name `strindex`
 		// values; part of the obnoxiousness is caused by how these can be short names
@@ -445,17 +450,12 @@ impl State {
 					software_list_indexmap.get(&software_list_index)
 				})
 				.unwrap();
-			assert_lt!(index, software_lists.len());
+			assert_lt!(index.from_db(), software_lists.len());
 			index
 		};
 
 		// and run the fixups
-		fixup(
-			&mut self.machines,
-			&self.strings,
-			machines_indexmap,
-			software_list_indexmap,
-		)?;
+		fixup(&mut machines, &self.strings, machines_indexmap, software_list_indexmap)?;
 		fixup(
 			&mut self.machine_software_lists,
 			&self.strings,
@@ -468,31 +468,31 @@ impl State {
 			magic: *MAGIC_HDR,
 			sizes_hash: calculate_sizes_hash(),
 			build_strindex: self.build_strindex,
-			machine_count: self.machines.len(),
-			chips_count: self.chips.len(),
-			device_count: self.devices.len(),
-			slot_count: self.slots.len(),
-			slot_option_count: self.slot_options.len(),
-			software_list_count: software_lists.len(),
-			software_list_machine_count: software_list_machine_indexes.len(),
-			machine_software_lists_count: self.machine_software_lists.len(),
-			ram_option_count: self.ram_options.len(),
+			machine_count: machines.len().to_db(),
+			chips_count: self.chips.len().to_db(),
+			device_count: self.devices.len().to_db(),
+			slot_count: self.slots.len().to_db(),
+			slot_option_count: self.slot_options.len().to_db(),
+			software_list_count: software_lists.len().to_db(),
+			software_list_machine_count: software_list_machine_indexes.len().to_db(),
+			machine_software_lists_count: self.machine_software_lists.len().to_db(),
+			ram_option_count: self.ram_options.len().to_db(),
 		};
-		let mut header_bytes = [0u8; binary::Header::SERIALIZED_SIZE];
-		header.binary_serialize(&mut header_bytes, ENDIANNESS);
 
 		// get all bytes and return
-		let bytes = header_bytes
-			.into_iter()
-			.chain(self.machines.into_iter())
-			.chain(self.chips.into_iter())
-			.chain(self.devices.into_iter())
-			.chain(self.slots.into_iter())
-			.chain(self.slot_options.into_iter())
-			.chain(software_lists.into_iter())
-			.chain(software_list_machine_indexes.into_iter())
-			.chain(self.machine_software_lists.into_iter())
-			.chain(self.ram_options.into_iter())
+		let bytes = header
+			.as_bytes()
+			.iter()
+			.chain(machines.iter().flat_map(IntoBytes::as_bytes))
+			.chain(self.chips.iter().flat_map(IntoBytes::as_bytes))
+			.chain(self.devices.iter().flat_map(IntoBytes::as_bytes))
+			.chain(self.slots.iter().flat_map(IntoBytes::as_bytes))
+			.chain(self.slot_options.iter().flat_map(IntoBytes::as_bytes))
+			.chain(software_lists.iter().flat_map(IntoBytes::as_bytes))
+			.chain(software_list_machine_indexes.iter().flat_map(IntoBytes::as_bytes))
+			.chain(self.machine_software_lists.iter().flat_map(IntoBytes::as_bytes))
+			.chain(self.ram_options.iter().flat_map(IntoBytes::as_bytes))
+			.copied()
 			.chain(self.strings.into_iter())
 			.collect();
 		Ok(bytes)
@@ -510,12 +510,12 @@ impl Debug for State {
 }
 
 fn fixup(
-	bin_builder: &mut BinBuilder<impl Fixup + BinarySerde>,
+	vec: &mut [impl Fixup + Immutable + IntoBytes],
 	strings: &StringTableBuilder,
-	machines_indexmap: impl Fn(u32) -> Option<u32>,
-	software_list_indexmap: impl Fn(u32) -> u32,
+	machines_indexmap: impl Fn(usize_db) -> Option<usize_db>,
+	software_list_indexmap: impl Fn(usize_db) -> usize_db,
 ) -> Result<()> {
-	bin_builder.tweak_all(|x| {
+	for x in vec.iter_mut() {
 		for machine_index in x.identify_machine_indexes() {
 			let new_machine_index = if *machine_index != 0 {
 				machines_indexmap(*machine_index).ok_or_else(|| {
@@ -526,15 +526,15 @@ fn fixup(
 					Error::msg(message)
 				})?
 			} else {
-				!0
+				(!0).into()
 			};
 			*machine_index = new_machine_index;
 		}
 		for software_list_index in x.identify_software_list_indexes() {
 			*software_list_index = software_list_indexmap(*software_list_index);
 		}
-		Ok(())
-	})
+	}
+	Ok(())
 }
 
 fn listxml_err(reader: &XmlReader<impl BufRead>, e: impl Into<Error>) -> Error {
@@ -592,143 +592,33 @@ pub fn data_from_listxml_output(
 	Ok(Some(data))
 }
 
-#[derive(Debug)]
-struct BinBuilder<T>
-where
-	T: BinarySerde,
-{
-	vec: Vec<u8>,
-	phantom_data: PhantomData<T>,
-}
-
-impl<T> BinBuilder<T>
-where
-	T: BinarySerde,
-{
-	fn new(capacity: usize) -> Self {
-		Self {
-			vec: Vec::with_capacity(capacity * T::SERIALIZED_SIZE),
-			phantom_data: PhantomData,
-		}
-	}
-
-	fn push(&mut self, obj: T) {
-		let pos = self.vec.len();
-		self.vec.resize(pos + T::SERIALIZED_SIZE, 0x00);
-		obj.binary_serialize(&mut self.vec[pos..], ENDIANNESS);
-	}
-
-	fn tweak<R>(&mut self, func: impl FnOnce(&mut T) -> R) -> R {
-		let index = (self.len() - 1).try_into().unwrap();
-		self.tweak_by_index(index, func)
-	}
-
-	fn tweak_by_index<R>(&mut self, index: usize, func: impl FnOnce(&mut T) -> R) -> R {
-		let pos = index * T::SERIALIZED_SIZE;
-		let slice = &mut self.vec[pos..];
-		let mut obj = T::binary_deserialize(slice, ENDIANNESS).unwrap();
-		let result = func(&mut obj);
-		obj.binary_serialize(slice, ENDIANNESS);
-		result
-	}
-
-	fn tweak_all<E>(&mut self, func: impl Fn(&mut T) -> Result<(), E>) -> Result<(), E> {
-		for slice in self.vec.chunks_mut(T::SERIALIZED_SIZE) {
-			let mut obj = T::binary_deserialize(slice, ENDIANNESS).unwrap();
-			func(&mut obj)?;
-			obj.binary_serialize(slice, ENDIANNESS);
-		}
-		Ok(())
-	}
-
-	fn increment<N>(&mut self, func: impl FnOnce(&mut T) -> &mut N) -> Result<()>
-	where
-		N: CheckedAdd<Output = N> + Clone + From<u8> + Ord,
-	{
-		self.tweak(|x| {
-			let value = func(x);
-			if let Some(new_value) = (*value).clone().checked_add(&1.into()) {
-				*value = new_value;
-				Ok(())
-			} else {
-				Err(Error::msg("Overflow"))
-			}
-		})
-	}
-
-	fn len(&self) -> u32 {
-		(self.vec.len() / T::SERIALIZED_SIZE).try_into().unwrap()
-	}
-
-	fn items(&self) -> impl DoubleEndedIterator<Item = T> + '_ {
-		self.vec
-			.chunks(T::SERIALIZED_SIZE)
-			.map(|slice| T::binary_deserialize(slice, ENDIANNESS).unwrap())
-	}
-
-	fn into_iter(self) -> impl Iterator<Item = u8> {
-		self.vec.into_iter()
-	}
-
-	fn sort_by(&mut self, cmp: impl Fn(T, T) -> Ordering) {
-		let new_vec = self
-			.vec
-			.chunks(T::SERIALIZED_SIZE)
-			.sorted_by(|slice_a, slice_b| {
-				let obj_a = T::binary_deserialize(slice_a, ENDIANNESS).unwrap();
-				let obj_b = T::binary_deserialize(slice_b, ENDIANNESS).unwrap();
-				cmp(obj_a, obj_b)
-			})
-			.flat_map(|x| x.iter().cloned())
-			.collect::<Vec<_>>();
-		self.vec = new_vec;
-	}
-}
-
-impl<T> FromIterator<T> for BinBuilder<T>
-where
-	T: BinarySerde,
-{
-	fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
-		let iter = iter.into_iter();
-		let (_, capacity) = iter.size_hint();
-		let capacity = capacity.unwrap_or_default();
-		let mut bin_builder = Self::new(capacity);
-		for obj in iter {
-			bin_builder.push(obj);
-		}
-		bin_builder
-	}
-}
-
-impl<T> Extend<T> for BinBuilder<T>
-where
-	T: BinarySerde,
-{
-	fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
-		for obj in iter {
-			self.push(obj);
-		}
-	}
-}
-
-pub fn calculate_sizes_hash() -> u64 {
+pub fn calculate_sizes_hash() -> U64 {
 	let multiplicand = 4733; // arbitrary prime number
 	[
-		binary::Header::SERIALIZED_SIZE,
-		binary::Machine::SERIALIZED_SIZE,
-		binary::Chip::SERIALIZED_SIZE,
-		binary::Device::SERIALIZED_SIZE,
-		binary::Slot::SERIALIZED_SIZE,
-		binary::SlotOption::SERIALIZED_SIZE,
-		binary::SoftwareList::SERIALIZED_SIZE,
-		binary::MachineSoftwareList::SERIALIZED_SIZE,
-		binary::RamOption::SERIALIZED_SIZE,
+		size_of::<binary::Header>(),
+		size_of::<binary::Machine>(),
+		size_of::<binary::Chip>(),
+		size_of::<binary::Device>(),
+		size_of::<binary::Slot>(),
+		size_of::<binary::SlotOption>(),
+		size_of::<binary::SoftwareList>(),
+		size_of::<binary::MachineSoftwareList>(),
+		size_of::<binary::RamOption>(),
 	]
 	.into_iter()
 	.fold(0, |value, item| {
 		u64::overflowing_mul(value, multiplicand).0 ^ (item as u64)
 	})
+	.into()
+}
+
+#[ext]
+impl<T> Vec<T> {
+	pub fn push_db(&mut self, value: T) -> Result<()> {
+		self.push(value);
+		let _ = self.len().try_to_db().map_err(|_| Error::msg("too many records"))?;
+		Ok(())
+	}
 }
 
 #[cfg(test)]
