@@ -12,6 +12,7 @@ use std::time::Instant;
 use anyhow::Error;
 use byte_unit::Byte;
 use console::style;
+use throttle::Throttle;
 
 use crate::info::InfoDb;
 use crate::info::View;
@@ -98,7 +99,7 @@ fn internal_info_db_from_xml_file(
 	path: Option<impl AsRef<Path>>,
 ) -> std::result::Result<(InfoDb, Duration), ThisError> {
 	let start_instant = Instant::now();
-	let mut last_message_instant: Option<Instant> = None;
+	let mut throttle = Throttle::new(Duration::from_millis(30), 1);
 	let file = if let Some(path) = path {
 		let file = File::open(path).map_err(ThisError::ReadingPath)?;
 		Box::new(file) as Box<dyn Read>
@@ -108,9 +109,7 @@ fn internal_info_db_from_xml_file(
 	let mut reader = BufReader::new(file);
 
 	let info_db = InfoDb::from_listxml_output(&mut reader, |machine_name| {
-		let now = Instant::now();
-		if last_message_instant.is_none_or(|x| now.duration_since(x) > Duration::from_millis(30)) {
-			last_message_instant = Some(now);
+		if throttle.accept().is_ok() {
 			print!("\x1B[KProcessing {machine_name}...\r");
 			let _ = stdout().flush();
 		}
