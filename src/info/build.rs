@@ -12,18 +12,16 @@ use more_asserts::assert_lt;
 use tracing::debug;
 use zerocopy::Immutable;
 use zerocopy::IntoBytes;
-use zerocopy::little_endian::U32;
 use zerocopy::little_endian::U64;
 
 use crate::info::ChipType;
 use crate::info::MAGIC_HDR;
+use crate::info::SERIAL;
 use crate::info::SoftwareListStatus;
-use crate::info::UsizeDbImpl;
-use crate::info::UsizeImpl;
+use crate::info::UsizeDb;
 use crate::info::binary;
 use crate::info::binary::Fixup;
 use crate::info::strings::StringTableBuilder;
-use crate::info::usize_db;
 use crate::parse::normalize_tag;
 use crate::parse::parse_mame_bool;
 use crate::xml::XmlElement;
@@ -61,7 +59,7 @@ struct State {
 	strings: StringTableBuilder,
 	software_lists: BTreeMap<String, SoftwareListBuild>,
 	ram_options: Vec<binary::RamOption>,
-	build_strindex: usize_db,
+	build_strindex: UsizeDb,
 	phase_specific: Option<PhaseSpecificState>,
 }
 
@@ -72,8 +70,8 @@ enum PhaseSpecificState {
 
 #[derive(Debug, Default)]
 struct SoftwareListBuild {
-	pub originals: Vec<usize_db>,
-	pub compatibles: Vec<usize_db>,
+	pub originals: Vec<UsizeDb>,
+	pub compatibles: Vec<UsizeDb>,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -155,16 +153,16 @@ impl State {
 					source_file_strindex,
 					clone_of_machine_index,
 					rom_of_machine_index,
-					chips_start: self.chips.len().to_db(),
-					chips_end: self.chips.len().to_db(),
-					devices_start: self.devices.len().to_db(),
-					devices_end: self.devices.len().to_db(),
-					slots_start: self.slots.len().to_db(),
-					slots_end: self.slots.len().to_db(),
-					machine_software_lists_start: self.machine_software_lists.len().to_db(),
-					machine_software_lists_end: self.machine_software_lists.len().to_db(),
-					ram_options_start: self.ram_options.len().to_db(),
-					ram_options_end: self.ram_options.len().to_db(),
+					chips_start: self.chips.len_db(),
+					chips_end: self.chips.len_db(),
+					devices_start: self.devices.len_db(),
+					devices_end: self.devices.len_db(),
+					slots_start: self.slots.len_db(),
+					slots_end: self.slots.len_db(),
+					machine_software_lists_start: self.machine_software_lists.len_db(),
+					machine_software_lists_end: self.machine_software_lists.len_db(),
+					ram_options_start: self.ram_options.len_db(),
+					ram_options_end: self.ram_options.len_db(),
 					runnable,
 					..Default::default()
 				};
@@ -212,7 +210,7 @@ impl State {
 					tag_strindex,
 					mandatory,
 					interfaces_strindex,
-					extensions_strindex: 0.into(),
+					extensions_strindex: UsizeDb::default(),
 				};
 				self.devices.push_db(device)?;
 				self.machines.last_mut().unwrap().devices_end += 1;
@@ -224,12 +222,12 @@ impl State {
 				let name = name.ok_or(ThisError::MissingMandatoryAttribute("slot"))?;
 				let name = normalize_tag(name);
 				let name_strindex = self.strings.lookup(&name);
-				let slot_options_pos = self.slot_options.len().to_db();
+				let slot_options_pos = self.slot_options.len_db();
 				let slot = binary::Slot {
 					name_strindex,
 					options_start: slot_options_pos,
 					options_end: slot_options_pos,
-					default_option_index: (!0).into(),
+					default_option_index: !UsizeDb::default(),
 				};
 				self.slots.push_db(slot)?;
 				self.machines.last_mut().unwrap().slots_end += 1;
@@ -361,7 +359,7 @@ impl State {
 				let old_strindex = machine.name_strindex;
 				let new_strindex = self
 					.strings
-					.lookup_immut(&self.strings.index(old_strindex))
+					.lookup_immut(self.strings.index(old_strindex))
 					.unwrap_or(old_strindex);
 
 				binary::Machine {
@@ -376,25 +374,25 @@ impl State {
 		let machines_indexmap = machines
 			.iter()
 			.enumerate()
-			.map(|(index, obj)| (obj.name_strindex, index.to_db()))
+			.map(|(index, obj)| (obj.name_strindex, index.try_into().unwrap()))
 			.collect::<HashMap<_, _>>();
-		let machine_count = machines.len();
+		let machine_count = machines.len_db();
 		let machines_indexmap = |strindex| {
 			let result = machines_indexmap
 				.get(&strindex)
 				.or_else(|| {
-					let new_strindex = self.strings.lookup_immut(&self.strings.index(strindex));
+					let new_strindex = self.strings.lookup_immut(self.strings.index(strindex));
 					new_strindex.and_then(|x| machines_indexmap.get(&x))
 				})
 				.copied();
 
 			// sanity check and return
-			assert!(result.is_none_or(|x| x.from_db() < machine_count), "Invalid machine");
+			assert!(result.is_none_or(|x| x < machine_count), "Invalid machine");
 			result
 		};
 
 		// software lists require special processing
-		let mut software_list_machine_indexes = Vec::<U32>::with_capacity(CAPACITY_MACHINE_SOFTWARE_LISTS);
+		let mut software_list_machine_indexes = Vec::<UsizeDb>::with_capacity(CAPACITY_MACHINE_SOFTWARE_LISTS);
 		let mut software_list_indexmap = HashMap::new();
 		let software_lists = self
 			.software_lists
@@ -413,22 +411,23 @@ impl State {
 					.filter_map(machines_indexmap)
 					.sorted()
 					.collect::<Vec<_>>();
-				let index = index.to_db();
+				let index = UsizeDb::try_from(index).unwrap();
 				let name_strindex = self.strings.lookup_immut(&software_list_name).unwrap();
 				let software_list_original_machines_start = software_list_machine_indexes.len();
 				let software_list_compatible_machines_start = software_list_original_machines_start + originals.len();
 				let software_list_compatible_machines_end = software_list_compatible_machines_start + compatibles.len();
-				let software_list_original_machines_start = software_list_original_machines_start.to_db();
-				let software_list_compatible_machines_start = software_list_compatible_machines_start.to_db();
-				let software_list_compatible_machines_end = software_list_compatible_machines_end.to_db();
+				let software_list_original_machines_start = software_list_original_machines_start.try_into().unwrap();
+				let software_list_compatible_machines_start =
+					software_list_compatible_machines_start.try_into().unwrap();
+				let software_list_compatible_machines_end = software_list_compatible_machines_end.try_into().unwrap();
 				let entry = binary::SoftwareList {
 					name_strindex,
 					software_list_original_machines_start,
 					software_list_compatible_machines_start,
 					software_list_compatible_machines_end,
 				};
-				assert!(originals.iter().all(|&x| x.from_db() < machine_count));
-				assert!(compatibles.iter().all(|&x| x.from_db() < machine_count));
+				assert!(originals.iter().all(|&x| x < machine_count));
+				assert!(compatibles.iter().all(|&x| x < machine_count));
 
 				software_list_machine_indexes.extend(originals);
 				software_list_machine_indexes.extend(compatibles);
@@ -445,12 +444,12 @@ impl State {
 				.or_else(|| {
 					let software_list_index = self
 						.strings
-						.lookup_immut(&self.strings.index(software_list_index))
+						.lookup_immut(self.strings.index(software_list_index))
 						.unwrap();
 					software_list_indexmap.get(&software_list_index)
 				})
 				.unwrap();
-			assert_lt!(index.from_db(), software_lists.len());
+			assert_lt!(index, software_lists.len_db());
 			index
 		};
 
@@ -466,17 +465,18 @@ impl State {
 		// assemble the header
 		let header = binary::Header {
 			magic: *MAGIC_HDR,
+			serial: SERIAL.into(),
 			sizes_hash: calculate_sizes_hash(),
 			build_strindex: self.build_strindex,
-			machine_count: machines.len().to_db(),
-			chips_count: self.chips.len().to_db(),
-			device_count: self.devices.len().to_db(),
-			slot_count: self.slots.len().to_db(),
-			slot_option_count: self.slot_options.len().to_db(),
-			software_list_count: software_lists.len().to_db(),
-			software_list_machine_count: software_list_machine_indexes.len().to_db(),
-			machine_software_lists_count: self.machine_software_lists.len().to_db(),
-			ram_option_count: self.ram_options.len().to_db(),
+			machine_count: machines.len_db(),
+			chips_count: self.chips.len_db(),
+			device_count: self.devices.len_db(),
+			slot_count: self.slots.len_db(),
+			slot_option_count: self.slot_options.len_db(),
+			software_list_count: software_lists.len_db(),
+			software_list_machine_count: software_list_machine_indexes.len_db(),
+			machine_software_lists_count: self.machine_software_lists.len_db(),
+			ram_option_count: self.ram_options.len_db(),
 		};
 
 		// get all bytes and return
@@ -512,12 +512,12 @@ impl Debug for State {
 fn fixup(
 	vec: &mut [impl Fixup + Immutable + IntoBytes],
 	strings: &StringTableBuilder,
-	machines_indexmap: impl Fn(usize_db) -> Option<usize_db>,
-	software_list_indexmap: impl Fn(usize_db) -> usize_db,
+	machines_indexmap: impl Fn(UsizeDb) -> Option<UsizeDb>,
+	software_list_indexmap: impl Fn(UsizeDb) -> UsizeDb,
 ) -> Result<()> {
 	for x in vec.iter_mut() {
 		for machine_index in x.identify_machine_indexes() {
-			let new_machine_index = if *machine_index != 0 {
+			let new_machine_index = if *machine_index != UsizeDb::default() {
 				machines_indexmap(*machine_index).ok_or_else(|| {
 					let message = format!(
 						"Bad machine reference in MAME -listxml output: {}",
@@ -526,7 +526,7 @@ fn fixup(
 					Error::msg(message)
 				})?
 			} else {
-				(!0).into()
+				!UsizeDb::default()
 			};
 			*machine_index = new_machine_index;
 		}
@@ -616,8 +616,15 @@ pub fn calculate_sizes_hash() -> U64 {
 impl<T> Vec<T> {
 	pub fn push_db(&mut self, value: T) -> Result<()> {
 		self.push(value);
-		let _ = self.len().try_to_db().map_err(|_| Error::msg("too many records"))?;
-		Ok(())
+		self.try_len_db().map(|_| ())
+	}
+
+	pub fn len_db(&self) -> UsizeDb {
+		self.try_len_db().unwrap()
+	}
+
+	pub fn try_len_db(&self) -> Result<UsizeDb> {
+		self.len().try_into().map_err(|_| Error::msg("too many records"))
 	}
 }
 

@@ -5,17 +5,21 @@ mod entities;
 mod strings;
 
 use std::any::type_name;
-use std::borrow::Cow;
+use std::cmp::Ordering;
 use std::cmp::min;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::fs::File;
 use std::io::BufRead;
 use std::io::BufReader;
+use std::io::Cursor;
 use std::io::Read;
 use std::io::Write;
 use std::marker::PhantomData;
+use std::ops::AddAssign;
+use std::ops::Not;
 use std::ops::Range;
+use std::ops::Sub;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -24,13 +28,17 @@ use std::process::Stdio;
 use anyhow::Error;
 use anyhow::Result;
 use anyhow::ensure;
-use easy_ext::ext;
+use byteorder::LittleEndian;
+use byteorder::ReadBytesExt;
+use byteorder::WriteBytesExt;
 use entities::SoftwareListsView;
-use internment::Arena;
+use more_asserts::assert_ge;
 use more_asserts::assert_le;
 use zerocopy::Immutable;
+use zerocopy::IntoBytes;
 use zerocopy::KnownLayout;
 use zerocopy::TryFromBytes;
+use zerocopy::little_endian::U16;
 
 use crate::platform::CommandExt;
 use crate::prefs::prefs_filename;
@@ -53,9 +61,8 @@ use self::build::data_from_listxml_output;
 use self::strings::read_string;
 use self::strings::validate_string_table;
 
-use zerocopy::little_endian::U32 as usize_db;
-
 const MAGIC_HDR: &[u8; 8] = b"MAMEINFO";
+const SERIAL: u16 = 1;
 
 #[derive(thiserror::Error, Debug)]
 enum ThisError {
@@ -73,11 +80,10 @@ pub struct InfoDb {
 	slots: RootView<binary::Slot>,
 	slot_options: RootView<binary::SlotOption>,
 	software_lists: RootView<binary::SoftwareList>,
-	software_list_machine_indexes: RootView<usize_db>,
+	software_list_machine_indexes: RootView<UsizeDb>,
 	machine_software_lists: RootView<binary::MachineSoftwareList>,
 	ram_options: RootView<binary::RamOption>,
 	strings_offset: usize,
-	strings_arena: Arena<str>,
 	build: MameVersion,
 }
 
@@ -104,7 +110,7 @@ impl InfoDb {
 
 		// get the build
 		let build_str = read_string(&data[cursor.start..], hdr.build_strindex).unwrap_or_default();
-		let build = MameVersion::from(build_str.as_ref());
+		let build = MameVersion::from(build_str);
 
 		// and return
 		let result = Self {
@@ -119,7 +125,6 @@ impl InfoDb {
 			machine_software_lists,
 			ram_options,
 			strings_offset: cursor.start,
-			strings_arena: Arena::new(),
 			build,
 		};
 
@@ -201,7 +206,7 @@ impl InfoDb {
 			&mut emit,
 			"SoftwareListMachineIndex",
 			|x| {
-				ensure!(x.obj().from_db() < self.machines().len());
+				ensure!(usize::from(*x.obj()) < self.machines().len());
 				Ok(())
 			},
 		);
@@ -256,7 +261,7 @@ impl InfoDb {
 		self.make_view(&self.machine_software_lists)
 	}
 
-	pub fn software_list_machine_indexes(&self) -> impl View<'_, Object<'_, usize_db>> {
+	pub fn software_list_machine_indexes(&self) -> impl View<'_, Object<'_, UsizeDb>> {
 		self.make_view(&self.software_list_machine_indexes)
 	}
 
@@ -264,11 +269,8 @@ impl InfoDb {
 		self.make_view(&self.ram_options)
 	}
 
-	fn string(&self, offset: usize_db) -> &'_ str {
-		match read_string(&self.data[self.strings_offset..], offset).unwrap_or_default() {
-			Cow::Borrowed(s) => s,
-			Cow::Owned(s) => self.strings_arena.intern_string(s).into_ref(),
-		}
+	fn string(&self, offset: UsizeDb) -> &'_ str {
+		read_string(&self.data[self.strings_offset..], offset).unwrap_or_default()
 	}
 
 	fn make_view<B>(&self, root_view: &RootView<B>) -> SimpleView<'_, B> {
@@ -290,14 +292,14 @@ impl Debug for InfoDb {
 	}
 }
 
-fn next_root_view<T>(cursor: &mut Range<usize>, count: usize_db) -> Result<RootView<T>> {
+fn next_root_view<T>(cursor: &mut Range<usize>, count: UsizeDb) -> Result<RootView<T>> {
 	let error_message = "Cannot deserialize InfoDB header";
 
 	// get the result
 	let offset = cursor.start;
 
 	// advance the cursor
-	let count = count.from_db();
+	let count = usize::from(count);
 	let count_bytes = count
 		.checked_mul(size_of::<T>())
 		.ok_or_else(|| Error::msg(error_message))?;
@@ -350,6 +352,9 @@ fn decode_header(data: &[u8]) -> Result<&binary::Header> {
 		.ok_or(ThisError::CannotDeserializeHeader)?;
 	if header.magic != *MAGIC_HDR {
 		return Err(Error::msg("Bad InfoDB Magic Value In Header"));
+	}
+	if header.serial != U16::from(SERIAL) {
+		return Err(Error::msg("Bad InfoDB Serial Value In Header"));
 	}
 	if header.sizes_hash != calculate_sizes_hash() {
 		return Err(Error::msg("Bad Sizes Hash In Header"));
@@ -449,7 +454,7 @@ pub struct IndirectView<V, W> {
 impl<'a, B, VI, VO> View<'a, Object<'a, B>> for IndirectView<VI, VO>
 where
 	B: TryFromBytes + Clone + 'a,
-	VI: View<'a, Object<'a, usize_db>> + 'a,
+	VI: View<'a, Object<'a, UsizeDb>> + 'a,
 	VO: View<'a, Object<'a, B>> + 'a,
 {
 	fn len(&self) -> usize {
@@ -457,7 +462,7 @@ where
 	}
 
 	fn get(&self, index: usize) -> Option<Object<'a, B>> {
-		let object_index = self.index_view.get(index)?.obj().from_db();
+		let object_index = usize::from(*self.index_view.get(index)?.obj());
 		let obj = self
 			.object_view
 			.get(object_index)
@@ -504,7 +509,7 @@ where
 		TryFromBytes::try_ref_from_bytes(buf).unwrap()
 	}
 
-	fn string(&self, func: impl FnOnce(&B) -> usize_db) -> &'a str {
+	fn string(&self, func: impl FnOnce(&B) -> UsizeDb) -> &'a str {
 		let offset = func(self.obj());
 		self.db.string(offset)
 	}
@@ -559,26 +564,69 @@ fn validate_view_custom<'a, T>(
 	}
 }
 
-#[ext(UsizeImpl)]
-impl usize {
-	fn to_db(self) -> usize_db {
-		self.try_to_db().unwrap()
-	}
+#[repr(C, packed)]
+#[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, TryFromBytes, IntoBytes, Immutable, KnownLayout)]
+pub struct UsizeDb([u8; 3]);
 
-	fn try_to_db(self) -> Result<usize_db> {
-		Ok(u32::try_from(self).map_err(|_| Error::msg("usize too large"))?.into())
+impl AddAssign<usize> for UsizeDb {
+	fn add_assign(&mut self, rhs: usize) {
+		let result = usize::from(*self) + rhs;
+		self.0 = Self::try_from(result).unwrap().0;
 	}
 }
 
-#[ext(UsizeDbImpl)]
-impl usize_db {
-	#[allow(clippy::wrong_self_convention)]
-	fn from_db(self) -> usize {
-		self.try_from_db().unwrap()
-	}
+impl Sub for UsizeDb {
+	type Output = Self;
 
-	fn try_from_db(self) -> Result<usize> {
-		usize::try_from(self.get()).map_err(|_| Error::msg("unexpected usize::try_from() failure"))
+	fn sub(self, rhs: Self) -> Self::Output {
+		assert_ge!(self, rhs);
+		(usize::from(self) - usize::from(rhs)).try_into().unwrap()
+	}
+}
+
+impl Not for UsizeDb {
+	type Output = Self;
+
+	fn not(self) -> Self::Output {
+		Self([!self.0[0], !self.0[1], !self.0[2]])
+	}
+}
+
+impl Ord for UsizeDb {
+	fn cmp(&self, other: &Self) -> Ordering {
+		Ord::cmp(&usize::from(*self), &usize::from(*other))
+	}
+}
+
+impl PartialOrd for UsizeDb {
+	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+		Some(Ord::cmp(self, other))
+	}
+}
+
+impl TryFrom<usize> for UsizeDb {
+	type Error = Error;
+
+	fn try_from(value: usize) -> Result<Self> {
+		const ERROR_MESSAGE: &str = "usize too large";
+
+		let value = u32::try_from(value).map_err(|_| Error::msg(ERROR_MESSAGE))?;
+		let mut bytes = [0_u8, 0_u8, 0_u8];
+		let mut cursor = Cursor::new(bytes.as_mut_slice());
+		cursor
+			.write_u24::<LittleEndian>(value)
+			.map_err(|_| Error::msg(ERROR_MESSAGE))?;
+		Ok(UsizeDb(bytes))
+	}
+}
+
+impl From<UsizeDb> for usize {
+	fn from(value: UsizeDb) -> Self {
+		const ERROR_MESSAGE: &str = "unexpected error converting UsizeDb to usize";
+
+		let mut cursor = Cursor::new(&value.0);
+		let value = cursor.read_u24::<LittleEndian>().expect(ERROR_MESSAGE);
+		usize::try_from(value).expect(ERROR_MESSAGE)
 	}
 }
 
