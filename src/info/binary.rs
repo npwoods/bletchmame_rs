@@ -4,6 +4,7 @@ use zerocopy::Immutable;
 use zerocopy::IntoBytes;
 use zerocopy::KnownLayout;
 use zerocopy::TryFromBytes;
+use zerocopy::little_endian::U16;
 use zerocopy::little_endian::U64;
 
 use crate::info::UsizeDb;
@@ -21,6 +22,7 @@ pub trait Fixup {
 #[derive(Clone, Copy, Debug, Default, TryFromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct Header {
 	pub magic: [u8; 8],
+	pub serial: U16,
 	pub sizes_hash: U64,
 	pub build_strindex: UsizeDb,
 	pub machine_count: UsizeDb,

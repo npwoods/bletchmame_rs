@@ -29,6 +29,7 @@ use more_asserts::assert_le;
 use zerocopy::Immutable;
 use zerocopy::KnownLayout;
 use zerocopy::TryFromBytes;
+use zerocopy::little_endian::U16;
 
 use crate::platform::CommandExt;
 use crate::prefs::prefs_filename;
@@ -54,6 +55,7 @@ use self::strings::validate_string_table;
 use zerocopy::little_endian::U32 as UsizeDb;
 
 const MAGIC_HDR: &[u8; 8] = b"MAMEINFO";
+const SERIAL: u16 = 1;
 
 #[derive(thiserror::Error, Debug)]
 enum ThisError {
@@ -343,6 +345,9 @@ fn decode_header(data: &[u8]) -> Result<&binary::Header> {
 		.ok_or(ThisError::CannotDeserializeHeader)?;
 	if header.magic != *MAGIC_HDR {
 		return Err(Error::msg("Bad InfoDB Magic Value In Header"));
+	}
+	if header.serial != U16::from(SERIAL) {
+		return Err(Error::msg("Bad InfoDB Serial Value In Header"));
 	}
 	if header.sizes_hash != calculate_sizes_hash() {
 		return Err(Error::msg("Bad Sizes Hash In Header"));

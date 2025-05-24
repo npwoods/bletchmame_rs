@@ -16,6 +16,7 @@ use zerocopy::little_endian::U64;
 
 use crate::info::ChipType;
 use crate::info::MAGIC_HDR;
+use crate::info::SERIAL;
 use crate::info::SoftwareListStatus;
 use crate::info::UsizeDb;
 use crate::info::UsizeDbImpl;
@@ -465,6 +466,7 @@ impl State {
 		// assemble the header
 		let header = binary::Header {
 			magic: *MAGIC_HDR,
+			serial: SERIAL.into(),
 			sizes_hash: calculate_sizes_hash(),
 			build_strindex: self.build_strindex,
 			machine_count: machines.len().to_db(),
