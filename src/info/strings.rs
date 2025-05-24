@@ -29,7 +29,7 @@ impl StringTableBuilder {
 
 		// seed the new StringTableBuilder with a value for empty strings
 		let mut result = Self { data, map };
-		result.map_insert("", 0.into());
+		result.map_insert("", UsizeDb::default());
 
 		// and return
 		result

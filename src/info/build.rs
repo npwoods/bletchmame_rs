@@ -211,7 +211,7 @@ impl State {
 					tag_strindex,
 					mandatory,
 					interfaces_strindex,
-					extensions_strindex: 0.into(),
+					extensions_strindex: UsizeDb::default(),
 				};
 				self.devices.push_db(device)?;
 				self.machines.last_mut().unwrap().devices_end += 1;
@@ -228,7 +228,7 @@ impl State {
 					name_strindex,
 					options_start: slot_options_pos,
 					options_end: slot_options_pos,
-					default_option_index: (!0).into(),
+					default_option_index: !UsizeDb::default(),
 				};
 				self.slots.push_db(slot)?;
 				self.machines.last_mut().unwrap().slots_end += 1;
@@ -516,7 +516,7 @@ fn fixup(
 ) -> Result<()> {
 	for x in vec.iter_mut() {
 		for machine_index in x.identify_machine_indexes() {
-			let new_machine_index = if *machine_index != 0 {
+			let new_machine_index = if *machine_index != UsizeDb::default() {
 				machines_indexmap(*machine_index).ok_or_else(|| {
 					let message = format!(
 						"Bad machine reference in MAME -listxml output: {}",
@@ -525,7 +525,7 @@ fn fixup(
 					Error::msg(message)
 				})?
 			} else {
-				(!0).into()
+				!UsizeDb::default()
 			};
 			*machine_index = new_machine_index;
 		}
