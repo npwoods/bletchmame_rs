@@ -5,7 +5,6 @@ mod entities;
 mod strings;
 
 use std::any::type_name;
-use std::borrow::Cow;
 use std::cmp::min;
 use std::fmt::Debug;
 use std::fmt::Formatter;
@@ -26,7 +25,6 @@ use anyhow::Result;
 use anyhow::ensure;
 use easy_ext::ext;
 use entities::SoftwareListsView;
-use internment::Arena;
 use more_asserts::assert_le;
 use zerocopy::Immutable;
 use zerocopy::KnownLayout;
@@ -77,7 +75,6 @@ pub struct InfoDb {
 	machine_software_lists: RootView<binary::MachineSoftwareList>,
 	ram_options: RootView<binary::RamOption>,
 	strings_offset: usize,
-	strings_arena: Arena<str>,
 	build: MameVersion,
 }
 
@@ -104,7 +101,7 @@ impl InfoDb {
 
 		// get the build
 		let build_str = read_string(&data[cursor.start..], hdr.build_strindex).unwrap_or_default();
-		let build = MameVersion::from(build_str.as_ref());
+		let build = MameVersion::from(build_str);
 
 		// and return
 		let result = Self {
@@ -119,7 +116,6 @@ impl InfoDb {
 			machine_software_lists,
 			ram_options,
 			strings_offset: cursor.start,
-			strings_arena: Arena::new(),
 			build,
 		};
 
@@ -265,10 +261,7 @@ impl InfoDb {
 	}
 
 	fn string(&self, offset: UsizeDb) -> &'_ str {
-		match read_string(&self.data[self.strings_offset..], offset).unwrap_or_default() {
-			Cow::Borrowed(s) => s,
-			Cow::Owned(s) => self.strings_arena.intern_string(s).into_ref(),
-		}
+		read_string(&self.data[self.strings_offset..], offset).unwrap_or_default()
 	}
 
 	fn make_view<B>(&self, root_view: &RootView<B>) -> SimpleView<'_, B> {

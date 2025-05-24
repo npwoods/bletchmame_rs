@@ -360,7 +360,7 @@ impl State {
 				let old_strindex = machine.name_strindex;
 				let new_strindex = self
 					.strings
-					.lookup_immut(&self.strings.index(old_strindex))
+					.lookup_immut(self.strings.index(old_strindex))
 					.unwrap_or(old_strindex);
 
 				binary::Machine {
@@ -382,7 +382,7 @@ impl State {
 			let result = machines_indexmap
 				.get(&strindex)
 				.or_else(|| {
-					let new_strindex = self.strings.lookup_immut(&self.strings.index(strindex));
+					let new_strindex = self.strings.lookup_immut(self.strings.index(strindex));
 					new_strindex.and_then(|x| machines_indexmap.get(&x))
 				})
 				.copied();
@@ -444,7 +444,7 @@ impl State {
 				.or_else(|| {
 					let software_list_index = self
 						.strings
-						.lookup_immut(&self.strings.index(software_list_index))
+						.lookup_immut(self.strings.index(software_list_index))
 						.unwrap();
 					software_list_indexmap.get(&software_list_index)
 				})

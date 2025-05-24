@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::hash::DefaultHasher;
 use std::hash::Hasher;
@@ -9,8 +8,6 @@ use smallvec::SmallVec;
 
 use crate::info::UsizeDb;
 use crate::info::UsizeImpl;
-
-const SMALL_STRING_CHARS: &[u8; 63] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ";
 
 const MAGIC_STRINGTABLE_BEGIN: &[u8; 2] = &[0x9D, 0x9B];
 const MAGIC_STRINGTABLE_END: &[u8; 2] = &[0x9F, 0x99];
@@ -54,11 +51,7 @@ impl StringTableBuilder {
 		})
 	}
 
-	pub fn lookup_immut(&self, s: &str) -> Option<UsizeDb> {
-		self.map_lookup(s).or_else(|| lookup_small(s.as_bytes()))
-	}
-
-	pub fn index(&self, offset: UsizeDb) -> Cow<'_, str> {
+	pub fn index(&self, offset: UsizeDb) -> &'_ str {
 		read_string(&self.data, offset).unwrap()
 	}
 
@@ -67,7 +60,7 @@ impl StringTableBuilder {
 		self.data.into_iter()
 	}
 
-	fn map_lookup(&self, s: &str) -> Option<UsizeDb> {
+	pub fn lookup_immut(&self, s: &str) -> Option<UsizeDb> {
 		self.map
 			.get(&hash(s))?
 			.iter()
@@ -90,35 +83,14 @@ impl StringTableBuilder {
 	}
 }
 
-fn lookup_small(s: &[u8]) -> Option<UsizeDb> {
-	(s.len() <= 5)
-		.then_some((0..5).try_fold(0xC0000000, |acc, index| {
-			let value = if let Some(&b) = s.get(index) {
-				SMALL_STRING_CHARS.iter().position(|&x| x == b)?
-			} else {
-				SMALL_STRING_CHARS.len()
-			};
-			Some(acc | (value << (index * 6)) as u32)
-		}))
-		.flatten()
-		.map(|x| usize::try_from(x).unwrap().to_db())
-}
-
-pub fn read_string(data: &[u8], offset: UsizeDb) -> Result<Cow<'_, str>> {
+pub fn read_string(data: &[u8], offset: UsizeDb) -> Result<&'_ str> {
 	let offset = offset.get();
-	let result = if (offset & 0xC0000000) == 0xC0000000 {
-		let iter = (0..5)
-			.filter_map(|i| SMALL_STRING_CHARS.get(((offset >> (i * 6)) & 0x3F) as usize))
-			.map(|&x| char::from_u32(x as u32).unwrap());
-		Cow::Owned(iter.collect())
-	} else {
-		let offset = offset as usize;
-		let data = data.get(offset..).ok_or_else(|| {
-			let message = format!("read_string(): Invalid offset {offset}");
-			Error::msg(message)
-		})?;
-		data.utf8_chunks().next().map(|x| x.valid()).unwrap_or_default().into()
-	};
+	let offset = offset as usize;
+	let data = data.get(offset..).ok_or_else(|| {
+		let message = format!("read_string(): Invalid offset {offset}");
+		Error::msg(message)
+	})?;
+	let result = data.utf8_chunks().next().map(|x| x.valid()).unwrap_or_default();
 	Ok(result)
 }
 
@@ -151,9 +123,6 @@ fn hash(s: &str) -> u64 {
 
 #[cfg(test)]
 mod test {
-	use std::borrow::Cow;
-
-	use assert_matches::assert_matches;
 	use itertools::Itertools;
 	use test_case::test_case;
 
@@ -210,9 +179,7 @@ mod test {
 		for other in others {
 			let idx = builder.lookup(other);
 			let result = builder.index(idx);
-
-			assert_matches!(result, Cow::Borrowed(_));
-			assert_eq!((*other, len), (result.as_ref(), builder.data.len()));
+			assert_eq!((*other, len), (result, builder.data.len()));
 		}
 	}
 
