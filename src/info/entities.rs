@@ -45,12 +45,12 @@ impl<'a> Machine<'a> {
 	}
 
 	pub fn clone_of(&self) -> Option<Machine<'a>> {
-		let clone_of_machine_index = self.obj().clone_of_machine_index.from_db();
+		let clone_of_machine_index = self.obj().clone_of_machine_index.into();
 		self.db.machines().get(clone_of_machine_index)
 	}
 
 	pub fn rom_of(&self) -> Option<Machine<'a>> {
-		let rom_of_machine_index = self.obj().rom_of_machine_index.from_db();
+		let rom_of_machine_index = self.obj().rom_of_machine_index.into();
 		self.db.machines().get(rom_of_machine_index)
 	}
 
@@ -59,27 +59,27 @@ impl<'a> Machine<'a> {
 	}
 
 	pub fn chips(&self) -> impl View<'a, Chip<'a>> + use<'a> {
-		let range = self.obj().chips_start.from_db()..self.obj().chips_end.from_db();
+		let range = self.obj().chips_start.into()..self.obj().chips_end.into();
 		self.db.chips().sub_view(range)
 	}
 
 	pub fn devices(&self) -> impl View<'a, Device<'a>> + use<'a> {
-		let range = self.obj().devices_start.from_db()..self.obj().devices_end.from_db();
+		let range = self.obj().devices_start.into()..self.obj().devices_end.into();
 		self.db.devices().sub_view(range)
 	}
 
 	pub fn slots(&self) -> impl View<'a, Slot<'a>> + use<'a> {
-		let range = self.obj().slots_start.from_db()..self.obj().slots_end.from_db();
+		let range = self.obj().slots_start.into()..self.obj().slots_end.into();
 		self.db.slots().sub_view(range)
 	}
 
 	pub fn machine_software_lists(&self) -> impl View<'a, MachineSoftwareList<'a>> + use<'a> {
-		let range = self.obj().machine_software_lists_start.from_db()..self.obj().machine_software_lists_end.from_db();
+		let range = self.obj().machine_software_lists_start.into()..self.obj().machine_software_lists_end.into();
 		self.db.machine_software_lists().sub_view(range)
 	}
 
 	pub fn ram_options(&self) -> impl View<'a, RamOption<'a>> + use<'a> {
-		let range = self.obj().ram_options_start.from_db()..self.obj().ram_options_end.from_db();
+		let range = self.obj().ram_options_start.into()..self.obj().ram_options_end.into();
 		self.db.ram_options().sub_view(range)
 	}
 }
@@ -149,12 +149,12 @@ impl<'a> Slot<'a> {
 	}
 
 	pub fn options(&self) -> impl View<'a, SlotOption<'a>> + use<'a> {
-		let range = self.obj().options_start.from_db()..self.obj().options_end.from_db();
+		let range = self.obj().options_start.into()..self.obj().options_end.into();
 		self.db.slot_options().sub_view(range)
 	}
 
 	pub fn default_option_index(&self) -> Option<usize> {
-		let index = self.obj().default_option_index.from_db();
+		let index = self.obj().default_option_index.into();
 		(index < self.options().len()).then_some(index)
 	}
 }
@@ -175,14 +175,14 @@ impl<'a> SoftwareList<'a> {
 	}
 
 	pub fn original_for_machines(&self) -> impl View<'a, Machine<'a>> + use<'a> {
-		let start = self.obj().software_list_original_machines_start.from_db();
-		let end = self.obj().software_list_compatible_machines_start.from_db();
+		let start = self.obj().software_list_original_machines_start.into();
+		let end = self.obj().software_list_compatible_machines_start.into();
 		self.make_machine_view(start, end)
 	}
 
 	pub fn compatible_for_machines(&self) -> impl View<'a, Machine<'a>> + use<'a> {
-		let start = self.obj().software_list_compatible_machines_start.from_db();
-		let end = self.obj().software_list_compatible_machines_end.from_db();
+		let start = self.obj().software_list_compatible_machines_start.into();
+		let end = self.obj().software_list_compatible_machines_end.into();
 		self.make_machine_view(start, end)
 	}
 
@@ -211,14 +211,14 @@ impl<'a> MachineSoftwareList<'a> {
 	}
 
 	pub fn software_list(&self) -> SoftwareList<'a> {
-		let software_list_index = self.obj().software_list_index.from_db();
+		let software_list_index = self.obj().software_list_index.into();
 		self.db.software_lists().get(software_list_index).unwrap()
 	}
 }
 
 impl Validatable for MachineSoftwareList<'_> {
 	fn validate(&self) -> Result<()> {
-		let software_list_index = self.obj().software_list_index.try_from_db()?;
+		let software_list_index = usize::from(self.obj().software_list_index);
 		ensure!(software_list_index < self.db.software_lists().len());
 		Ok(())
 	}

@@ -19,7 +19,6 @@ use crate::info::MAGIC_HDR;
 use crate::info::SERIAL;
 use crate::info::SoftwareListStatus;
 use crate::info::UsizeDb;
-use crate::info::UsizeImpl;
 use crate::info::binary;
 use crate::info::binary::Fixup;
 use crate::info::strings::StringTableBuilder;
@@ -154,16 +153,16 @@ impl State {
 					source_file_strindex,
 					clone_of_machine_index,
 					rom_of_machine_index,
-					chips_start: self.chips.len().to_db(),
-					chips_end: self.chips.len().to_db(),
-					devices_start: self.devices.len().to_db(),
-					devices_end: self.devices.len().to_db(),
-					slots_start: self.slots.len().to_db(),
-					slots_end: self.slots.len().to_db(),
-					machine_software_lists_start: self.machine_software_lists.len().to_db(),
-					machine_software_lists_end: self.machine_software_lists.len().to_db(),
-					ram_options_start: self.ram_options.len().to_db(),
-					ram_options_end: self.ram_options.len().to_db(),
+					chips_start: self.chips.len_db(),
+					chips_end: self.chips.len_db(),
+					devices_start: self.devices.len_db(),
+					devices_end: self.devices.len_db(),
+					slots_start: self.slots.len_db(),
+					slots_end: self.slots.len_db(),
+					machine_software_lists_start: self.machine_software_lists.len_db(),
+					machine_software_lists_end: self.machine_software_lists.len_db(),
+					ram_options_start: self.ram_options.len_db(),
+					ram_options_end: self.ram_options.len_db(),
 					runnable,
 					..Default::default()
 				};
@@ -223,7 +222,7 @@ impl State {
 				let name = name.ok_or(ThisError::MissingMandatoryAttribute("slot"))?;
 				let name = normalize_tag(name);
 				let name_strindex = self.strings.lookup(&name);
-				let slot_options_pos = self.slot_options.len().to_db();
+				let slot_options_pos = self.slot_options.len_db();
 				let slot = binary::Slot {
 					name_strindex,
 					options_start: slot_options_pos,
@@ -375,9 +374,9 @@ impl State {
 		let machines_indexmap = machines
 			.iter()
 			.enumerate()
-			.map(|(index, obj)| (obj.name_strindex, index.to_db()))
+			.map(|(index, obj)| (obj.name_strindex, index.try_into().unwrap()))
 			.collect::<HashMap<_, _>>();
-		let machine_count = machines.len();
+		let machine_count = machines.len_db();
 		let machines_indexmap = |strindex| {
 			let result = machines_indexmap
 				.get(&strindex)
@@ -388,7 +387,7 @@ impl State {
 				.copied();
 
 			// sanity check and return
-			assert!(result.is_none_or(|x| x.from_db() < machine_count), "Invalid machine");
+			assert!(result.is_none_or(|x| x < machine_count), "Invalid machine");
 			result
 		};
 
@@ -412,22 +411,23 @@ impl State {
 					.filter_map(machines_indexmap)
 					.sorted()
 					.collect::<Vec<_>>();
-				let index = index.to_db();
+				let index = UsizeDb::try_from(index).unwrap();
 				let name_strindex = self.strings.lookup_immut(&software_list_name).unwrap();
 				let software_list_original_machines_start = software_list_machine_indexes.len();
 				let software_list_compatible_machines_start = software_list_original_machines_start + originals.len();
 				let software_list_compatible_machines_end = software_list_compatible_machines_start + compatibles.len();
-				let software_list_original_machines_start = software_list_original_machines_start.to_db();
-				let software_list_compatible_machines_start = software_list_compatible_machines_start.to_db();
-				let software_list_compatible_machines_end = software_list_compatible_machines_end.to_db();
+				let software_list_original_machines_start = software_list_original_machines_start.try_into().unwrap();
+				let software_list_compatible_machines_start =
+					software_list_compatible_machines_start.try_into().unwrap();
+				let software_list_compatible_machines_end = software_list_compatible_machines_end.try_into().unwrap();
 				let entry = binary::SoftwareList {
 					name_strindex,
 					software_list_original_machines_start,
 					software_list_compatible_machines_start,
 					software_list_compatible_machines_end,
 				};
-				assert!(originals.iter().all(|&x| x.from_db() < machine_count));
-				assert!(compatibles.iter().all(|&x| x.from_db() < machine_count));
+				assert!(originals.iter().all(|&x| x < machine_count));
+				assert!(compatibles.iter().all(|&x| x < machine_count));
 
 				software_list_machine_indexes.extend(originals);
 				software_list_machine_indexes.extend(compatibles);
@@ -449,7 +449,7 @@ impl State {
 					software_list_indexmap.get(&software_list_index)
 				})
 				.unwrap();
-			assert_lt!(index.from_db(), software_lists.len());
+			assert_lt!(index, software_lists.len_db());
 			index
 		};
 
@@ -468,15 +468,15 @@ impl State {
 			serial: SERIAL.into(),
 			sizes_hash: calculate_sizes_hash(),
 			build_strindex: self.build_strindex,
-			machine_count: machines.len().to_db(),
-			chips_count: self.chips.len().to_db(),
-			device_count: self.devices.len().to_db(),
-			slot_count: self.slots.len().to_db(),
-			slot_option_count: self.slot_options.len().to_db(),
-			software_list_count: software_lists.len().to_db(),
-			software_list_machine_count: software_list_machine_indexes.len().to_db(),
-			machine_software_lists_count: self.machine_software_lists.len().to_db(),
-			ram_option_count: self.ram_options.len().to_db(),
+			machine_count: machines.len_db(),
+			chips_count: self.chips.len_db(),
+			device_count: self.devices.len_db(),
+			slot_count: self.slots.len_db(),
+			slot_option_count: self.slot_options.len_db(),
+			software_list_count: software_lists.len_db(),
+			software_list_machine_count: software_list_machine_indexes.len_db(),
+			machine_software_lists_count: self.machine_software_lists.len_db(),
+			ram_option_count: self.ram_options.len_db(),
 		};
 
 		// get all bytes and return
@@ -616,8 +616,15 @@ pub fn calculate_sizes_hash() -> U64 {
 impl<T> Vec<T> {
 	pub fn push_db(&mut self, value: T) -> Result<()> {
 		self.push(value);
-		let _ = self.len().try_to_db().map_err(|_| Error::msg("too many records"))?;
-		Ok(())
+		self.try_len_db().map(|_| ())
+	}
+
+	pub fn len_db(&self) -> UsizeDb {
+		self.try_len_db().unwrap()
+	}
+
+	pub fn try_len_db(&self) -> Result<UsizeDb> {
+		self.len().try_into().map_err(|_| Error::msg("too many records"))
 	}
 }
 

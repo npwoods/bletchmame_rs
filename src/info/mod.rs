@@ -31,7 +31,6 @@ use anyhow::ensure;
 use byteorder::LittleEndian;
 use byteorder::ReadBytesExt;
 use byteorder::WriteBytesExt;
-use easy_ext::ext;
 use entities::SoftwareListsView;
 use more_asserts::assert_ge;
 use more_asserts::assert_le;
@@ -207,7 +206,7 @@ impl InfoDb {
 			&mut emit,
 			"SoftwareListMachineIndex",
 			|x| {
-				ensure!(x.obj().from_db() < self.machines().len());
+				ensure!(usize::from(*x.obj()) < self.machines().len());
 				Ok(())
 			},
 		);
@@ -300,7 +299,7 @@ fn next_root_view<T>(cursor: &mut Range<usize>, count: UsizeDb) -> Result<RootVi
 	let offset = cursor.start;
 
 	// advance the cursor
-	let count = count.from_db();
+	let count = usize::from(count);
 	let count_bytes = count
 		.checked_mul(size_of::<T>())
 		.ok_or_else(|| Error::msg(error_message))?;
@@ -463,7 +462,7 @@ where
 	}
 
 	fn get(&self, index: usize) -> Option<Object<'a, B>> {
-		let object_index = self.index_view.get(index)?.obj().from_db();
+		let object_index = usize::from(*self.index_view.get(index)?.obj());
 		let obj = self
 			.object_view
 			.get(object_index)
@@ -565,41 +564,14 @@ fn validate_view_custom<'a, T>(
 	}
 }
 
-#[ext(UsizeImpl)]
-impl usize {
-	fn to_db(self) -> UsizeDb {
-		self.try_to_db().unwrap()
-	}
-
-	fn try_to_db(self) -> Result<UsizeDb> {
-		let value = u32::try_from(self).map_err(|_| Error::msg("usize too large"))?;
-		let mut bytes = [0_u8, 0_u8, 0_u8];
-		let mut cursor = Cursor::new(bytes.as_mut_slice());
-		cursor.write_u24::<LittleEndian>(value)?;
-		Ok(UsizeDb(bytes))
-	}
-}
-
 #[repr(C, packed)]
 #[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, TryFromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct UsizeDb([u8; 3]);
 
-impl UsizeDb {
-	#[allow(clippy::wrong_self_convention)]
-	fn from_db(self) -> usize {
-		self.try_from_db().unwrap()
-	}
-
-	fn try_from_db(self) -> Result<usize> {
-		let mut cursor = Cursor::new(&self.0);
-		let value = cursor.read_u24::<LittleEndian>()?;
-		usize::try_from(value).map_err(|_| Error::msg("unexpected usize::try_from() failure"))
-	}
-}
-
 impl AddAssign<usize> for UsizeDb {
 	fn add_assign(&mut self, rhs: usize) {
-		self.0 = (self.from_db() + rhs).to_db().0;
+		let result = usize::from(*self) + rhs;
+		self.0 = Self::try_from(result).unwrap().0;
 	}
 }
 
@@ -608,7 +580,7 @@ impl Sub for UsizeDb {
 
 	fn sub(self, rhs: Self) -> Self::Output {
 		assert_ge!(self, rhs);
-		(self.from_db() - rhs.from_db()).to_db()
+		(usize::from(self) - usize::from(rhs)).try_into().unwrap()
 	}
 }
 
@@ -622,13 +594,39 @@ impl Not for UsizeDb {
 
 impl Ord for UsizeDb {
 	fn cmp(&self, other: &Self) -> Ordering {
-		Ord::cmp(&self.from_db(), &other.from_db())
+		Ord::cmp(&usize::from(*self), &usize::from(*other))
 	}
 }
 
 impl PartialOrd for UsizeDb {
 	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
 		Some(Ord::cmp(self, other))
+	}
+}
+
+impl TryFrom<usize> for UsizeDb {
+	type Error = Error;
+
+	fn try_from(value: usize) -> Result<Self> {
+		const ERROR_MESSAGE: &str = "usize too large";
+
+		let value = u32::try_from(value).map_err(|_| Error::msg(ERROR_MESSAGE))?;
+		let mut bytes = [0_u8, 0_u8, 0_u8];
+		let mut cursor = Cursor::new(bytes.as_mut_slice());
+		cursor
+			.write_u24::<LittleEndian>(value)
+			.map_err(|_| Error::msg(ERROR_MESSAGE))?;
+		Ok(UsizeDb(bytes))
+	}
+}
+
+impl From<UsizeDb> for usize {
+	fn from(value: UsizeDb) -> Self {
+		const ERROR_MESSAGE: &str = "unexpected error converting UsizeDb to usize";
+
+		let mut cursor = Cursor::new(&value.0);
+		let value = cursor.read_u24::<LittleEndian>().expect(ERROR_MESSAGE);
+		usize::try_from(value).expect(ERROR_MESSAGE)
 	}
 }
 

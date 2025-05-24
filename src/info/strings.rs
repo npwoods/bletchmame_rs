@@ -7,7 +7,6 @@ use anyhow::Result;
 use smallvec::SmallVec;
 
 use crate::info::UsizeDb;
-use crate::info::UsizeImpl;
 
 const MAGIC_STRINGTABLE_BEGIN: &[u8; 2] = &[0x9D, 0x9B];
 const MAGIC_STRINGTABLE_END: &[u8; 2] = &[0x9F, 0x99];
@@ -45,13 +44,13 @@ impl StringTableBuilder {
 
 			for (pos, _) in s.char_indices() {
 				let element = result + pos;
-				self.map_insert(&s[pos..], element.to_db());
+				self.map_insert(&s[pos..], element.try_into().unwrap());
 			}
-			result.to_db()
+			result.try_into().unwrap()
 		})
 	}
 
-	pub fn index(&self, offset: UsizeDb) -> &'_ str {
+	pub fn index(&self, offset: impl Into<usize>) -> &'_ str {
 		read_string(&self.data, offset).unwrap()
 	}
 
@@ -83,8 +82,8 @@ impl StringTableBuilder {
 	}
 }
 
-pub fn read_string(data: &[u8], offset: UsizeDb) -> Result<&'_ str> {
-	let offset = offset.from_db();
+pub fn read_string(data: &[u8], offset: impl Into<usize>) -> Result<&'_ str> {
+	let offset = offset.into();
 	let data = data.get(offset..).ok_or_else(|| {
 		let message = format!("read_string(): Invalid offset {offset}");
 		Error::msg(message)
@@ -125,8 +124,6 @@ mod test {
 	use itertools::Itertools;
 	use test_case::test_case;
 
-	use crate::info::UsizeImpl;
-
 	use super::StringTableBuilder;
 
 	#[test_case(0, &[""])]
@@ -150,7 +147,7 @@ mod test {
 	#[test]
 	pub fn empty_is_zero() {
 		let mut builder = StringTableBuilder::new(0);
-		let actual = builder.lookup("").from_db();
+		let actual = usize::from(builder.lookup(""));
 		assert_eq!(0, actual);
 	}
 
@@ -162,7 +159,7 @@ mod test {
 	#[test_case(5, 4242, Err(()), b"\x9D\x9Bfoo\x80bar\x9F\x99")]
 	pub fn read_string(_index: usize, offset: usize, expected: std::result::Result<&str, ()>, bytes: &[u8]) {
 		let expected = expected.map(String::from);
-		let actual = super::read_string(bytes, offset.to_db());
+		let actual = super::read_string(bytes, offset);
 		let actual = actual.map(String::from).map_err(|_| ());
 		assert_eq!(expected, actual);
 	}
