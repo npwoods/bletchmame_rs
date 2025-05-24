@@ -11,13 +11,15 @@ use std::thread::scope;
 
 use anyhow::Error;
 use anyhow::Result;
-use process::process_xml;
 
 use crate::info;
 use crate::info::InfoDb;
 use crate::info::View;
+use crate::software::process::process_xml;
+use crate::software::strings::StringDispenser;
 
 mod process;
+mod strings;
 
 pub struct SoftwareList {
 	pub name: Arc<str>,
@@ -43,14 +45,14 @@ pub struct SoftwarePart {
 }
 
 impl SoftwareList {
-	pub fn load(path: impl AsRef<Path>) -> Result<Self> {
+	pub fn load(path: impl AsRef<Path>, string_dispenser: &StringDispenser) -> Result<Self> {
 		let file = File::open(path)?;
 		let file = BufReader::new(file);
-		Self::from_reader(file)
+		Self::from_reader(file, string_dispenser)
 	}
 
-	pub fn from_reader(reader: impl BufRead) -> Result<Self> {
-		process_xml(reader)
+	pub fn from_reader(reader: impl BufRead, string_dispenser: &StringDispenser) -> Result<Self> {
+		process_xml(reader, string_dispenser)
 	}
 }
 
@@ -67,6 +69,7 @@ impl Debug for SoftwareList {
 pub struct SoftwareListDispenser<'a> {
 	pub info_db: &'a InfoDb,
 	software_list_paths: &'a [String],
+	pub string_dispenser: StringDispenser,
 	map: HashMap<String, (info::SoftwareList<'a>, Arc<SoftwareList>)>,
 }
 
@@ -75,6 +78,7 @@ impl<'a> SoftwareListDispenser<'a> {
 		Self {
 			info_db,
 			software_list_paths,
+			string_dispenser: StringDispenser::default(),
 			map: HashMap::new(),
 		}
 	}
@@ -85,7 +89,8 @@ impl<'a> SoftwareListDispenser<'a> {
 			Entry::Occupied(entry) => entry.get().clone(),
 			Entry::Vacant(entry) => {
 				let info_db_software_list = self.info_db.software_lists().find(software_list_name)?;
-				let software_list = load_software_list(self.software_list_paths, software_list_name)?;
+				let software_list =
+					load_software_list(self.software_list_paths, software_list_name, &self.string_dispenser)?;
 				entry.insert((info_db_software_list, software_list.clone()));
 				(info_db_software_list, software_list)
 			}
@@ -101,8 +106,9 @@ impl<'a> SoftwareListDispenser<'a> {
 				.software_lists()
 				.iter()
 				.map(|info_db_software_list| {
+					let string_dispenser = &self.string_dispenser;
 					scope.spawn(move || {
-						load_software_list(paths, info_db_software_list.name())
+						load_software_list(paths, info_db_software_list.name(), string_dispenser)
 							.map(|software_list| (info_db_software_list, software_list))
 					})
 				})
@@ -120,7 +126,7 @@ impl<'a> SoftwareListDispenser<'a> {
 	}
 }
 
-fn load_software_list(paths: &[String], name: &str) -> Result<Arc<SoftwareList>> {
+fn load_software_list(paths: &[String], name: &str, string_dispenser: &StringDispenser) -> Result<Arc<SoftwareList>> {
 	let mut err = Error::msg("Error loading software list: No paths specified");
 	paths
 		.iter()
@@ -129,7 +135,7 @@ fn load_software_list(paths: &[String], name: &str) -> Result<Arc<SoftwareList>>
 			let mut path = PathBuf::from(path);
 			path.push(name);
 			path.set_extension("xml");
-			match SoftwareList::load(&path) {
+			match SoftwareList::load(&path, string_dispenser) {
 				Ok(x) => Some(x.into()),
 				Err(e) => {
 					err = e;
