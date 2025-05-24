@@ -12,18 +12,17 @@ use more_asserts::assert_lt;
 use tracing::debug;
 use zerocopy::Immutable;
 use zerocopy::IntoBytes;
-use zerocopy::little_endian::U32;
 use zerocopy::little_endian::U64;
 
 use crate::info::ChipType;
 use crate::info::MAGIC_HDR;
 use crate::info::SoftwareListStatus;
+use crate::info::UsizeDb;
 use crate::info::UsizeDbImpl;
 use crate::info::UsizeImpl;
 use crate::info::binary;
 use crate::info::binary::Fixup;
 use crate::info::strings::StringTableBuilder;
-use crate::info::usize_db;
 use crate::parse::normalize_tag;
 use crate::parse::parse_mame_bool;
 use crate::xml::XmlElement;
@@ -61,7 +60,7 @@ struct State {
 	strings: StringTableBuilder,
 	software_lists: BTreeMap<String, SoftwareListBuild>,
 	ram_options: Vec<binary::RamOption>,
-	build_strindex: usize_db,
+	build_strindex: UsizeDb,
 	phase_specific: Option<PhaseSpecificState>,
 }
 
@@ -72,8 +71,8 @@ enum PhaseSpecificState {
 
 #[derive(Debug, Default)]
 struct SoftwareListBuild {
-	pub originals: Vec<usize_db>,
-	pub compatibles: Vec<usize_db>,
+	pub originals: Vec<UsizeDb>,
+	pub compatibles: Vec<UsizeDb>,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -394,7 +393,7 @@ impl State {
 		};
 
 		// software lists require special processing
-		let mut software_list_machine_indexes = Vec::<U32>::with_capacity(CAPACITY_MACHINE_SOFTWARE_LISTS);
+		let mut software_list_machine_indexes = Vec::<UsizeDb>::with_capacity(CAPACITY_MACHINE_SOFTWARE_LISTS);
 		let mut software_list_indexmap = HashMap::new();
 		let software_lists = self
 			.software_lists
@@ -512,8 +511,8 @@ impl Debug for State {
 fn fixup(
 	vec: &mut [impl Fixup + Immutable + IntoBytes],
 	strings: &StringTableBuilder,
-	machines_indexmap: impl Fn(usize_db) -> Option<usize_db>,
-	software_list_indexmap: impl Fn(usize_db) -> usize_db,
+	machines_indexmap: impl Fn(UsizeDb) -> Option<UsizeDb>,
+	software_list_indexmap: impl Fn(UsizeDb) -> UsizeDb,
 ) -> Result<()> {
 	for x in vec.iter_mut() {
 		for machine_index in x.identify_machine_indexes() {

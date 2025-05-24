@@ -7,8 +7,8 @@ use anyhow::Error;
 use anyhow::Result;
 use smallvec::SmallVec;
 
+use crate::info::UsizeDb;
 use crate::info::UsizeImpl;
-use crate::info::usize_db;
 
 const SMALL_STRING_CHARS: &[u8; 63] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ";
 
@@ -18,7 +18,7 @@ const MAGIC_STRINGTABLE_END: &[u8; 2] = &[0x9F, 0x99];
 #[derive(Debug)]
 pub struct StringTableBuilder {
 	data: Vec<u8>,
-	map: HashMap<u64, SmallVec<[usize_db; 4]>>,
+	map: HashMap<u64, SmallVec<[UsizeDb; 4]>>,
 }
 
 impl StringTableBuilder {
@@ -38,7 +38,7 @@ impl StringTableBuilder {
 		result
 	}
 
-	pub fn lookup(&mut self, s: &str) -> usize_db {
+	pub fn lookup(&mut self, s: &str) -> UsizeDb {
 		self.lookup_immut(s).unwrap_or_else(|| {
 			if !self.data.len() > MAGIC_STRINGTABLE_BEGIN.len() {
 				self.data.push(0x80);
@@ -54,11 +54,11 @@ impl StringTableBuilder {
 		})
 	}
 
-	pub fn lookup_immut(&self, s: &str) -> Option<usize_db> {
+	pub fn lookup_immut(&self, s: &str) -> Option<UsizeDb> {
 		self.map_lookup(s).or_else(|| lookup_small(s.as_bytes()))
 	}
 
-	pub fn index(&self, offset: usize_db) -> Cow<'_, str> {
+	pub fn index(&self, offset: UsizeDb) -> Cow<'_, str> {
 		read_string(&self.data, offset).unwrap()
 	}
 
@@ -67,7 +67,7 @@ impl StringTableBuilder {
 		self.data.into_iter()
 	}
 
-	fn map_lookup(&self, s: &str) -> Option<usize_db> {
+	fn map_lookup(&self, s: &str) -> Option<UsizeDb> {
 		self.map
 			.get(&hash(s))?
 			.iter()
@@ -75,7 +75,7 @@ impl StringTableBuilder {
 			.find(|&offset| s == self.index(offset))
 	}
 
-	fn map_insert(&mut self, s: &str, element: usize_db) {
+	fn map_insert(&mut self, s: &str, element: UsizeDb) {
 		let key = hash(s);
 		let entry = self.map.entry(key).or_default();
 
@@ -90,7 +90,7 @@ impl StringTableBuilder {
 	}
 }
 
-fn lookup_small(s: &[u8]) -> Option<usize_db> {
+fn lookup_small(s: &[u8]) -> Option<UsizeDb> {
 	(s.len() <= 5)
 		.then_some((0..5).try_fold(0xC0000000, |acc, index| {
 			let value = if let Some(&b) = s.get(index) {
@@ -104,7 +104,7 @@ fn lookup_small(s: &[u8]) -> Option<usize_db> {
 		.map(|x| usize::try_from(x).unwrap().to_db())
 }
 
-pub fn read_string(data: &[u8], offset: usize_db) -> Result<Cow<'_, str>> {
+pub fn read_string(data: &[u8], offset: UsizeDb) -> Result<Cow<'_, str>> {
 	let offset = offset.get();
 	let result = if (offset & 0xC0000000) == 0xC0000000 {
 		let iter = (0..5)

@@ -6,13 +6,13 @@ use zerocopy::KnownLayout;
 use zerocopy::TryFromBytes;
 use zerocopy::little_endian::U64;
 
-use crate::info::usize_db;
+use crate::info::UsizeDb;
 
 pub trait Fixup {
-	fn identify_machine_indexes(&mut self) -> impl IntoIterator<Item = &mut usize_db> {
+	fn identify_machine_indexes(&mut self) -> impl IntoIterator<Item = &mut UsizeDb> {
 		[]
 	}
-	fn identify_software_list_indexes(&mut self) -> impl IntoIterator<Item = &mut usize_db> {
+	fn identify_software_list_indexes(&mut self) -> impl IntoIterator<Item = &mut UsizeDb> {
 		[]
 	}
 }
@@ -22,45 +22,45 @@ pub trait Fixup {
 pub struct Header {
 	pub magic: [u8; 8],
 	pub sizes_hash: U64,
-	pub build_strindex: usize_db,
-	pub machine_count: usize_db,
-	pub chips_count: usize_db,
-	pub device_count: usize_db,
-	pub slot_count: usize_db,
-	pub slot_option_count: usize_db,
-	pub software_list_count: usize_db,
-	pub software_list_machine_count: usize_db,
-	pub machine_software_lists_count: usize_db,
-	pub ram_option_count: usize_db,
+	pub build_strindex: UsizeDb,
+	pub machine_count: UsizeDb,
+	pub chips_count: UsizeDb,
+	pub device_count: UsizeDb,
+	pub slot_count: UsizeDb,
+	pub slot_option_count: UsizeDb,
+	pub software_list_count: UsizeDb,
+	pub software_list_machine_count: UsizeDb,
+	pub machine_software_lists_count: UsizeDb,
+	pub ram_option_count: UsizeDb,
 }
 
 #[repr(C, packed)]
 #[derive(Clone, Copy, Debug, Default, TryFromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct Machine {
-	pub name_strindex: usize_db,
-	pub source_file_strindex: usize_db,
-	pub clone_of_machine_index: usize_db,
-	pub rom_of_machine_index: usize_db,
-	pub description_strindex: usize_db,
-	pub year_strindex: usize_db,
-	pub manufacturer_strindex: usize_db,
-	pub chips_start: usize_db,
-	pub chips_end: usize_db,
-	pub devices_start: usize_db,
-	pub devices_end: usize_db,
-	pub slots_start: usize_db,
-	pub slots_end: usize_db,
-	pub slot_options_start: usize_db,
-	pub slot_options_end: usize_db,
-	pub machine_software_lists_start: usize_db,
-	pub machine_software_lists_end: usize_db,
-	pub ram_options_start: usize_db,
-	pub ram_options_end: usize_db,
+	pub name_strindex: UsizeDb,
+	pub source_file_strindex: UsizeDb,
+	pub clone_of_machine_index: UsizeDb,
+	pub rom_of_machine_index: UsizeDb,
+	pub description_strindex: UsizeDb,
+	pub year_strindex: UsizeDb,
+	pub manufacturer_strindex: UsizeDb,
+	pub chips_start: UsizeDb,
+	pub chips_end: UsizeDb,
+	pub devices_start: UsizeDb,
+	pub devices_end: UsizeDb,
+	pub slots_start: UsizeDb,
+	pub slots_end: UsizeDb,
+	pub slot_options_start: UsizeDb,
+	pub slot_options_end: UsizeDb,
+	pub machine_software_lists_start: UsizeDb,
+	pub machine_software_lists_end: UsizeDb,
+	pub ram_options_start: UsizeDb,
+	pub ram_options_end: UsizeDb,
 	pub runnable: bool,
 }
 
 impl Fixup for Machine {
-	fn identify_machine_indexes(&mut self) -> impl IntoIterator<Item = &mut usize_db> {
+	fn identify_machine_indexes(&mut self) -> impl IntoIterator<Item = &mut UsizeDb> {
 		[&mut self.clone_of_machine_index, &mut self.rom_of_machine_index]
 	}
 }
@@ -69,8 +69,8 @@ impl Fixup for Machine {
 #[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct Chip {
 	pub clock: U64,
-	pub tag_strindex: usize_db,
-	pub name_strindex: usize_db,
+	pub tag_strindex: UsizeDb,
+	pub name_strindex: UsizeDb,
 	pub chip_type: ChipType,
 }
 
@@ -88,36 +88,36 @@ pub enum ChipType {
 #[repr(C, packed)]
 #[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct Device {
-	pub type_strindex: usize_db,
-	pub tag_strindex: usize_db,
+	pub type_strindex: UsizeDb,
+	pub tag_strindex: UsizeDb,
 	pub mandatory: bool,
-	pub interfaces_strindex: usize_db,
-	pub extensions_strindex: usize_db,
+	pub interfaces_strindex: UsizeDb,
+	pub extensions_strindex: UsizeDb,
 }
 
 #[repr(C, packed)]
 #[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct Slot {
-	pub name_strindex: usize_db,
-	pub options_start: usize_db,
-	pub options_end: usize_db,
-	pub default_option_index: usize_db,
+	pub name_strindex: UsizeDb,
+	pub options_start: UsizeDb,
+	pub options_end: UsizeDb,
+	pub default_option_index: UsizeDb,
 }
 
 #[repr(C, packed)]
 #[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct SlotOption {
-	pub name_strindex: usize_db,
-	pub devname_strindex: usize_db,
+	pub name_strindex: UsizeDb,
+	pub devname_strindex: UsizeDb,
 }
 
 #[repr(C, packed)]
 #[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct MachineSoftwareList {
-	pub tag_strindex: usize_db,
-	pub software_list_index: usize_db,
+	pub tag_strindex: UsizeDb,
+	pub software_list_index: UsizeDb,
 	pub status: SoftwareListStatus,
-	pub filter_strindex: usize_db,
+	pub filter_strindex: UsizeDb,
 }
 
 #[repr(C, packed)]
@@ -128,7 +128,7 @@ pub struct RamOption {
 }
 
 impl Fixup for MachineSoftwareList {
-	fn identify_software_list_indexes(&mut self) -> impl IntoIterator<Item = &mut usize_db> {
+	fn identify_software_list_indexes(&mut self) -> impl IntoIterator<Item = &mut UsizeDb> {
 		[&mut self.software_list_index]
 	}
 }
@@ -147,10 +147,10 @@ pub enum SoftwareListStatus {
 #[repr(C, packed)]
 #[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct SoftwareList {
-	pub name_strindex: usize_db,
-	pub software_list_original_machines_start: usize_db,
-	pub software_list_compatible_machines_start: usize_db,
-	pub software_list_compatible_machines_end: usize_db,
+	pub name_strindex: UsizeDb,
+	pub software_list_original_machines_start: UsizeDb,
+	pub software_list_compatible_machines_start: UsizeDb,
+	pub software_list_compatible_machines_end: UsizeDb,
 }
 
 #[cfg(test)]

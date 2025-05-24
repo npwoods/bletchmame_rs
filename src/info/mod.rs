@@ -53,7 +53,7 @@ use self::build::data_from_listxml_output;
 use self::strings::read_string;
 use self::strings::validate_string_table;
 
-use zerocopy::little_endian::U32 as usize_db;
+use zerocopy::little_endian::U32 as UsizeDb;
 
 const MAGIC_HDR: &[u8; 8] = b"MAMEINFO";
 
@@ -73,7 +73,7 @@ pub struct InfoDb {
 	slots: RootView<binary::Slot>,
 	slot_options: RootView<binary::SlotOption>,
 	software_lists: RootView<binary::SoftwareList>,
-	software_list_machine_indexes: RootView<usize_db>,
+	software_list_machine_indexes: RootView<UsizeDb>,
 	machine_software_lists: RootView<binary::MachineSoftwareList>,
 	ram_options: RootView<binary::RamOption>,
 	strings_offset: usize,
@@ -256,7 +256,7 @@ impl InfoDb {
 		self.make_view(&self.machine_software_lists)
 	}
 
-	pub fn software_list_machine_indexes(&self) -> impl View<'_, Object<'_, usize_db>> {
+	pub fn software_list_machine_indexes(&self) -> impl View<'_, Object<'_, UsizeDb>> {
 		self.make_view(&self.software_list_machine_indexes)
 	}
 
@@ -264,7 +264,7 @@ impl InfoDb {
 		self.make_view(&self.ram_options)
 	}
 
-	fn string(&self, offset: usize_db) -> &'_ str {
+	fn string(&self, offset: UsizeDb) -> &'_ str {
 		match read_string(&self.data[self.strings_offset..], offset).unwrap_or_default() {
 			Cow::Borrowed(s) => s,
 			Cow::Owned(s) => self.strings_arena.intern_string(s).into_ref(),
@@ -290,7 +290,7 @@ impl Debug for InfoDb {
 	}
 }
 
-fn next_root_view<T>(cursor: &mut Range<usize>, count: usize_db) -> Result<RootView<T>> {
+fn next_root_view<T>(cursor: &mut Range<usize>, count: UsizeDb) -> Result<RootView<T>> {
 	let error_message = "Cannot deserialize InfoDB header";
 
 	// get the result
@@ -449,7 +449,7 @@ pub struct IndirectView<V, W> {
 impl<'a, B, VI, VO> View<'a, Object<'a, B>> for IndirectView<VI, VO>
 where
 	B: TryFromBytes + Clone + 'a,
-	VI: View<'a, Object<'a, usize_db>> + 'a,
+	VI: View<'a, Object<'a, UsizeDb>> + 'a,
 	VO: View<'a, Object<'a, B>> + 'a,
 {
 	fn len(&self) -> usize {
@@ -504,7 +504,7 @@ where
 		TryFromBytes::try_ref_from_bytes(buf).unwrap()
 	}
 
-	fn string(&self, func: impl FnOnce(&B) -> usize_db) -> &'a str {
+	fn string(&self, func: impl FnOnce(&B) -> UsizeDb) -> &'a str {
 		let offset = func(self.obj());
 		self.db.string(offset)
 	}
@@ -561,17 +561,17 @@ fn validate_view_custom<'a, T>(
 
 #[ext(UsizeImpl)]
 impl usize {
-	fn to_db(self) -> usize_db {
+	fn to_db(self) -> UsizeDb {
 		self.try_to_db().unwrap()
 	}
 
-	fn try_to_db(self) -> Result<usize_db> {
+	fn try_to_db(self) -> Result<UsizeDb> {
 		Ok(u32::try_from(self).map_err(|_| Error::msg("usize too large"))?.into())
 	}
 }
 
 #[ext(UsizeDbImpl)]
-impl usize_db {
+impl UsizeDb {
 	#[allow(clippy::wrong_self_convention)]
 	fn from_db(self) -> usize {
 		self.try_from_db().unwrap()
