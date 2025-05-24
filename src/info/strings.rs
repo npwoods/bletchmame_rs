@@ -84,8 +84,7 @@ impl StringTableBuilder {
 }
 
 pub fn read_string(data: &[u8], offset: UsizeDb) -> Result<&'_ str> {
-	let offset = offset.get();
-	let offset = offset as usize;
+	let offset = offset.from_db();
 	let data = data.get(offset..).ok_or_else(|| {
 		let message = format!("read_string(): Invalid offset {offset}");
 		Error::msg(message)
@@ -126,7 +125,6 @@ mod test {
 	use itertools::Itertools;
 	use test_case::test_case;
 
-	use crate::info::UsizeDbImpl;
 	use crate::info::UsizeImpl;
 
 	use super::StringTableBuilder;

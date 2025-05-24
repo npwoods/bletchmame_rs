@@ -19,7 +19,6 @@ use crate::info::MAGIC_HDR;
 use crate::info::SERIAL;
 use crate::info::SoftwareListStatus;
 use crate::info::UsizeDb;
-use crate::info::UsizeDbImpl;
 use crate::info::UsizeImpl;
 use crate::info::binary;
 use crate::info::binary::Fixup;

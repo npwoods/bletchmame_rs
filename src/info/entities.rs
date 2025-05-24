@@ -8,7 +8,6 @@ use crate::info::ChipType;
 use crate::info::IndirectView;
 use crate::info::Object;
 use crate::info::SimpleView;
-use crate::info::UsizeDbImpl;
 use crate::info::Validatable;
 use crate::info::View;
 use crate::info::binary;

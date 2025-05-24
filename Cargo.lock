@@ -693,6 +693,7 @@ dependencies = [
  "assert_matches",
  "binary-search",
  "byte-unit",
+ "byteorder",
  "console",
  "cpp",
  "cpp_build",

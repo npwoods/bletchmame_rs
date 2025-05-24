@@ -5,16 +5,21 @@ mod entities;
 mod strings;
 
 use std::any::type_name;
+use std::cmp::Ordering;
 use std::cmp::min;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::fs::File;
 use std::io::BufRead;
 use std::io::BufReader;
+use std::io::Cursor;
 use std::io::Read;
 use std::io::Write;
 use std::marker::PhantomData;
+use std::ops::AddAssign;
+use std::ops::Not;
 use std::ops::Range;
+use std::ops::Sub;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -23,10 +28,15 @@ use std::process::Stdio;
 use anyhow::Error;
 use anyhow::Result;
 use anyhow::ensure;
+use byteorder::LittleEndian;
+use byteorder::ReadBytesExt;
+use byteorder::WriteBytesExt;
 use easy_ext::ext;
 use entities::SoftwareListsView;
+use more_asserts::assert_ge;
 use more_asserts::assert_le;
 use zerocopy::Immutable;
+use zerocopy::IntoBytes;
 use zerocopy::KnownLayout;
 use zerocopy::TryFromBytes;
 use zerocopy::little_endian::U16;
@@ -51,8 +61,6 @@ use self::build::calculate_sizes_hash;
 use self::build::data_from_listxml_output;
 use self::strings::read_string;
 use self::strings::validate_string_table;
-
-use zerocopy::little_endian::U32 as UsizeDb;
 
 const MAGIC_HDR: &[u8; 8] = b"MAMEINFO";
 const SERIAL: u16 = 1;
@@ -564,11 +572,18 @@ impl usize {
 	}
 
 	fn try_to_db(self) -> Result<UsizeDb> {
-		Ok(u32::try_from(self).map_err(|_| Error::msg("usize too large"))?.into())
+		let value = u32::try_from(self).map_err(|_| Error::msg("usize too large"))?;
+		let mut bytes = [0_u8, 0_u8, 0_u8];
+		let mut cursor = Cursor::new(bytes.as_mut_slice());
+		cursor.write_u24::<LittleEndian>(value)?;
+		Ok(UsizeDb(bytes))
 	}
 }
 
-#[ext(UsizeDbImpl)]
+#[repr(C, packed)]
+#[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, TryFromBytes, IntoBytes, Immutable, KnownLayout)]
+pub struct UsizeDb([u8; 3]);
+
 impl UsizeDb {
 	#[allow(clippy::wrong_self_convention)]
 	fn from_db(self) -> usize {
@@ -576,7 +591,44 @@ impl UsizeDb {
 	}
 
 	fn try_from_db(self) -> Result<usize> {
-		usize::try_from(self.get()).map_err(|_| Error::msg("unexpected usize::try_from() failure"))
+		let mut cursor = Cursor::new(&self.0);
+		let value = cursor.read_u24::<LittleEndian>()?;
+		usize::try_from(value).map_err(|_| Error::msg("unexpected usize::try_from() failure"))
+	}
+}
+
+impl AddAssign<usize> for UsizeDb {
+	fn add_assign(&mut self, rhs: usize) {
+		self.0 = (self.from_db() + rhs).to_db().0;
+	}
+}
+
+impl Sub for UsizeDb {
+	type Output = Self;
+
+	fn sub(self, rhs: Self) -> Self::Output {
+		assert_ge!(self, rhs);
+		(self.from_db() - rhs.from_db()).to_db()
+	}
+}
+
+impl Not for UsizeDb {
+	type Output = Self;
+
+	fn not(self) -> Self::Output {
+		Self([!self.0[0], !self.0[1], !self.0[2]])
+	}
+}
+
+impl Ord for UsizeDb {
+	fn cmp(&self, other: &Self) -> Ordering {
+		Ord::cmp(&self.from_db(), &other.from_db())
+	}
+}
+
+impl PartialOrd for UsizeDb {
+	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+		Some(Ord::cmp(self, other))
 	}
 }
 
