@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::convert::Infallible;
 use std::ops::ControlFlow;
 use std::path::Path;
@@ -47,6 +48,7 @@ use crate::dialogs::file::load_file_dialog;
 use crate::dialogs::file::save_file_dialog;
 use crate::dialogs::image::Format;
 use crate::dialogs::image::dialog_load_image;
+use crate::dialogs::input::dialog_input;
 use crate::dialogs::messagebox::OkCancel;
 use crate::dialogs::messagebox::OkOnly;
 use crate::dialogs::messagebox::dialog_message_box;
@@ -75,6 +77,7 @@ use crate::runtime::MameWindowing;
 use crate::runtime::command::MameCommand;
 use crate::runtime::command::MovieFormat;
 use crate::selection::SelectionManager;
+use crate::status::InputClass;
 use crate::status::Status;
 use crate::threadlocalbubble::ThreadLocalBubble;
 use crate::ui::AboutDialog;
@@ -635,6 +638,11 @@ fn menu_item_info(parent_title: Option<&str>, title: &str) -> (Option<AppCommand
 		(_, "Classic MAME Menu") => (Some(AppCommand::OptionsClassic), None),
 
 		// Settings menu
+		(_, "Joysticks and Controllers...") => (Some(AppCommand::SettingsInput(InputClass::Controller)), None),
+		(_, "Keyboard...") => (Some(AppCommand::SettingsInput(InputClass::Keyboard)), None),
+		(_, "Miscellaneous Input...") => (Some(AppCommand::SettingsInput(InputClass::Misc)), None),
+		(_, "Configuration...") => (Some(AppCommand::SettingsInput(InputClass::Config)), None),
+		(_, "DIP Switches...") => (Some(AppCommand::SettingsInput(InputClass::DipSwitch)), None),
 		(_, "Paths...") => (Some(AppCommand::SettingsPaths(None)), None),
 		(Some("Builtin Collections"), col) => {
 			let col = BuiltinCollection::from_str(col).unwrap();
@@ -853,6 +861,18 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 		}
 		AppCommand::OptionsClassic => {
 			model.issue_command(MameCommand::ClassicMenu);
+		}
+		AppCommand::SettingsInput(class) => {
+			let parent = model.app_window().as_weak();
+			let (inputs, input_device_classes) = {
+				let state = model.state.borrow();
+				let running = state.status().unwrap().running.as_ref().unwrap();
+				let inputs = running.inputs.clone();
+				let input_device_classes = running.input_device_classes.clone();
+				(inputs, input_device_classes)
+			};
+			let fut = dialog_input(parent, inputs, input_device_classes, class);
+			spawn_local(fut).unwrap();
 		}
 		AppCommand::SettingsPaths(path_type) => {
 			let fut = show_paths_dialog(model.clone(), path_type);
@@ -1148,6 +1168,12 @@ fn update_menus(model: &AppModel) {
 		"Record Movie..."
 	};
 	let has_last_save_state = is_running && state.last_save_state().is_some();
+	let input_classes = running
+		.map(|x| x.inputs.as_ref())
+		.unwrap_or_default()
+		.iter()
+		.filter_map(|x| x.class)
+		.collect::<HashSet<_>>();
 
 	// update the menu bar
 	model.app_window().window().with_muda_menu(|menu_bar| {
@@ -1171,6 +1197,7 @@ fn update_menus(model: &AppModel) {
 				Some(AppCommand::OptionsToggleFullScreen) => (None, Some(is_fullscreen), None),
 				Some(AppCommand::OptionsToggleSound) => (Some(is_running), Some(is_sound_enabled), None),
 				Some(AppCommand::OptionsClassic) => (Some(is_running), None, None),
+				Some(AppCommand::SettingsInput(class)) => (Some(input_classes.contains(&class)), None, None),
 				Some(AppCommand::HelpRefreshInfoDb) => (Some(can_refresh_info_db), None, None),
 				_ => (None, None, None),
 			};

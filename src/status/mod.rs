@@ -250,6 +250,12 @@ pub enum InputClass {
 	DipSwitch,
 }
 
+impl InputClass {
+	pub fn title(&self) -> &'static str {
+		self.get_str("Title").unwrap()
+	}
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct InputDeviceClass {
 	pub name: InputDeviceClassName,

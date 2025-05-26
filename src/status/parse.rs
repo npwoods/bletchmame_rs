@@ -364,7 +364,6 @@ impl State {
 				input_device.items.push(item);
 				None
 			}
-
 			_ => None,
 		};
 		Ok(new_phase)
