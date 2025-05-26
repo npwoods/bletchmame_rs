@@ -9,6 +9,8 @@ use std::sync::Arc;
 use anyhow::Result;
 use serde::Deserialize;
 use serde::Serialize;
+use strum::EnumProperty;
+use strum::EnumString;
 use tracing::debug;
 
 use crate::debugstr::DebugString;
@@ -66,6 +68,11 @@ impl Status {
 			} else {
 				status_running.slots.clone()
 			};
+			let inputs = if let Some(inputs) = running.inputs {
+				inputs.into_iter().collect()
+			} else {
+				status_running.inputs.clone()
+			};
 
 			Running {
 				machine_name,
@@ -77,6 +84,7 @@ impl Status {
 				is_recording,
 				images,
 				slots,
+				inputs,
 			}
 		});
 		debug!(running=?running, "Status::merge()");
@@ -111,6 +119,7 @@ pub struct Running {
 	pub is_recording: bool,
 	pub images: Arc<[Image]>,
 	pub slots: Arc<[Slot]>,
+	pub inputs: Arc<[Input]>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
@@ -177,6 +186,7 @@ struct RunningUpdate {
 	pub is_recording: Option<bool>,
 	pub images: Option<Vec<ImageUpdate>>,
 	pub slots: Option<Vec<Slot>>,
+	pub inputs: Option<Vec<Input>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
@@ -199,6 +209,37 @@ pub struct Slot {
 pub struct SlotOption {
 	pub name: String,
 	pub selectable: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
+pub struct Input {
+	pub port_tag: String,
+	pub mask: u32,
+	pub class: Option<InputClass>,
+	pub group: u8,
+	pub input_type: u32,
+	pub player: u8,
+	pub is_analog: bool,
+	pub name: String,
+	pub first_keyboard_code: Option<u32>,
+	pub seq_standard_tokens: Option<String>,
+	pub seq_increment_tokens: Option<String>,
+	pub seq_decrement_tokens: Option<String>,
+}
+
+#[derive(Copy, Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash, EnumProperty, EnumString)]
+#[strum(ascii_case_insensitive)]
+pub enum InputClass {
+	#[strum(props(Title = "Joysticks and Controllers"))]
+	Controller,
+	#[strum(props(Title = "Keyboard"))]
+	Keyboard,
+	#[strum(props(Title = "Miscellaneous Input"))]
+	Misc,
+	#[strum(props(Title = "Configuration"))]
+	Config,
+	#[strum(props(Title = "Dip Switches"))]
+	DipSwitch,
 }
 
 #[derive(thiserror::Error, Debug, PartialEq)]
