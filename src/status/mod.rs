@@ -73,6 +73,11 @@ impl Status {
 			} else {
 				status_running.inputs.clone()
 			};
+			let input_device_classes = if let Some(input_device_classes) = running.input_device_classes {
+				input_device_classes.into_iter().collect()
+			} else {
+				status_running.input_device_classes.clone()
+			};
 
 			Running {
 				machine_name,
@@ -85,6 +90,7 @@ impl Status {
 				images,
 				slots,
 				inputs,
+				input_device_classes,
 			}
 		});
 		debug!(running=?running, "Status::merge()");
@@ -120,6 +126,7 @@ pub struct Running {
 	pub images: Arc<[Image]>,
 	pub slots: Arc<[Slot]>,
 	pub inputs: Arc<[Input]>,
+	pub input_device_classes: Arc<[InputDeviceClass]>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
@@ -187,6 +194,7 @@ struct RunningUpdate {
 	pub images: Option<Vec<ImageUpdate>>,
 	pub slots: Option<Vec<Slot>>,
 	pub inputs: Option<Vec<Input>>,
+	pub input_device_classes: Option<Vec<InputDeviceClass>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
@@ -242,6 +250,40 @@ pub enum InputClass {
 	DipSwitch,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct InputDeviceClass {
+	pub name: InputDeviceClassName,
+	pub enabled: bool,
+	pub multi: bool,
+	pub devices: Vec<InputDevice>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, EnumProperty, EnumString)]
+#[strum(ascii_case_insensitive)]
+pub enum InputDeviceClassName {
+	Keyboard,
+	Joystick,
+	Lightgun,
+	Mouse,
+	#[strum(default)]
+	Other(String),
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
+pub struct InputDevice {
+	pub name: String,
+	pub id: String,
+	pub devindex: u32,
+	pub items: Vec<InputDeviceItem>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
+pub struct InputDeviceItem {
+	pub name: String,
+	pub token: String,
+	pub code: String,
+}
+
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum ValidationError {
 	#[error("Version mismatch; MAME is {0} InfoDb is {1}")]
@@ -259,10 +301,15 @@ pub enum UpdateXmlProblem {
 #[cfg(test)]
 mod test {
 	use std::io::BufReader;
+	use std::str::FromStr;
+
+	use test_case::test_case;
 
 	use crate::status::Status;
 	use crate::status::Update;
 	use crate::status::parse::parse_update;
+
+	use super::InputDeviceClassName;
 
 	#[test]
 	fn session() {
@@ -304,5 +351,15 @@ mod test {
 		let run = status.running.as_ref().unwrap();
 		let actual = (run.is_paused, run.is_throttled, run.throttle_rate);
 		assert_eq!((false, false, 3.0), actual);
+	}
+
+	#[test_case(0, "keyboard", InputDeviceClassName::Keyboard)]
+	#[test_case(1, "joystick", InputDeviceClassName::Joystick)]
+	#[test_case(2, "lightgun", InputDeviceClassName::Lightgun)]
+	#[test_case(3, "mouse", InputDeviceClassName::Mouse)]
+	#[test_case(4, "xyz", InputDeviceClassName::Other("xyz".into()))]
+	fn parse_input_device_class_name(_index: usize, s: &str, expected: InputDeviceClassName) {
+		let actual = InputDeviceClassName::from_str(s).unwrap();
+		assert_eq!(expected, actual);
 	}
 }

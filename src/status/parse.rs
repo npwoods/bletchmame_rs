@@ -13,6 +13,9 @@ use crate::status::ImageDetails;
 use crate::status::ImageFormat;
 use crate::status::ImageUpdate;
 use crate::status::Input;
+use crate::status::InputDevice;
+use crate::status::InputDeviceClass;
+use crate::status::InputDeviceItem;
 use crate::status::RunningUpdate;
 use crate::status::Slot;
 use crate::status::SlotOption;
@@ -29,12 +32,15 @@ enum Phase {
 	StatusImages,
 	StatusSlots,
 	StatusInputs,
+	StatusInputDevices,
 	Image,
 	ImageDetails,
 	ImageDetailsFormat,
 	ImageDetailsFormatExtension,
 	Slot,
 	Input,
+	InputDeviceClass,
+	InputDevice,
 }
 
 const TEXT_CAPTURE_PHASES: &[Phase] = &[Phase::ImageDetailsFormatExtension];
@@ -128,6 +134,10 @@ impl State {
 			(Phase::Status, b"inputs") => {
 				self.running.inputs = Some(Vec::new());
 				Some(Phase::StatusInputs)
+			}
+			(Phase::Status, b"input_devices") => {
+				self.running.input_device_classes = Some(Vec::new());
+				Some(Phase::StatusInputDevices)
 			}
 			(Phase::StatusImages, b"image") => {
 				let [tag, filename] = evt.find_attributes([b"tag", b"filename"])?;
@@ -305,6 +315,53 @@ impl State {
 					SeqType::Decrement => &mut current_input.seq_decrement_tokens,
 				};
 				*current_input_tokens = Some(tokens.into());
+				None
+			}
+			(Phase::StatusInputDevices, b"class") => {
+				let [name, enabled, multi] = evt.find_attributes([b"name", b"enabled", b"multi"])?;
+				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?.parse()?;
+				let enabled = parse_mame_bool(&enabled.ok_or(ThisError::MissingMandatoryAttribute("enabled"))?)?;
+				let multi = parse_mame_bool(&multi.ok_or(ThisError::MissingMandatoryAttribute("multi"))?)?;
+
+				let input_device_class = InputDeviceClass {
+					name,
+					enabled,
+					multi,
+					devices: Vec::new(),
+				};
+
+				let input_device_classes = self.running.input_device_classes.as_mut().unwrap();
+				input_device_classes.push(input_device_class);
+				Some(Phase::InputDeviceClass)
+			}
+			(Phase::InputDeviceClass, b"device") => {
+				let [name, id, devindex] = evt.find_attributes([b"name", b"id", b"devindex"])?;
+				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?.into_owned();
+				let id = id.ok_or(ThisError::MissingMandatoryAttribute("id"))?.into_owned();
+				let devindex = devindex.ok_or(ThisError::MissingMandatoryAttribute("devindex"))?;
+				let devindex = devindex.parse()?;
+
+				let input_device = InputDevice {
+					name,
+					id,
+					devindex,
+					items: Vec::new(),
+				};
+
+				let input_device_classes = self.running.input_device_classes.as_mut().unwrap();
+				input_device_classes.last_mut().unwrap().devices.push(input_device);
+				Some(Phase::InputDevice)
+			}
+			(Phase::InputDevice, b"item") => {
+				let [name, token, code] = evt.find_attributes([b"name", b"token", b"code"])?;
+				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?.into_owned();
+				let token = token.ok_or(ThisError::MissingMandatoryAttribute("token"))?.into_owned();
+				let code = code.ok_or(ThisError::MissingMandatoryAttribute("code"))?.into_owned();
+				let item = InputDeviceItem { name, token, code };
+
+				let input_device_classes = self.running.input_device_classes.as_mut().unwrap();
+				let input_device = input_device_classes.last_mut().unwrap().devices.last_mut().unwrap();
+				input_device.items.push(item);
 				None
 			}
 
