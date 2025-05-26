@@ -1,0 +1,53 @@
+import { GridBox, VerticalBox, HorizontalBox, Button, StandardButton } from "std-widgets.slint";
+
+export struct InputDialogEntry {
+    name: string,
+    text: string}
+
+export component InputDialog inherits Window {
+    title: dialog-title;
+    icon: @image-url("bletchmame.png");
+    preferred-width: 600px;
+    preferred-height: 500px;
+
+    // properties
+    in property <string> dialog-title;
+    in property <[InputDialogEntry]> entries;
+
+    // callbacks
+    callback ok-clicked();
+
+    // control hierarchy
+    VerticalBox {
+        for entry in root.entries: HorizontalLayout {
+            Button {
+                text: entry.name;
+                enabled: false;
+            }
+
+            Button {
+                text: "▼";
+                enabled: false;
+            }
+
+            Button {
+                text: entry.text;
+                enabled: false;
+            }
+        }
+        HorizontalBox {
+            Button {
+                text: @tr("Restore Defaults");
+                enabled: false;
+            }
+
+            StandardButton {
+                kind: ok;
+                enabled: false;
+                clicked => {
+                    root.ok-clicked();
+                }
+            }
+        }
+    }
+}

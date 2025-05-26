@@ -12,6 +12,7 @@ use crate::prefs::PrefsCollection;
 use crate::prefs::PrefsItem;
 use crate::prefs::SortOrder;
 use crate::prefs::pathtype::PathType;
+use crate::status::InputClass;
 use crate::status::Update;
 use crate::version::MameVersion;
 
@@ -42,6 +43,7 @@ pub enum AppCommand {
 	OptionsClassic,
 
 	// Settings menu
+	SettingsInput(InputClass),
 	SettingsPaths(Option<PathType>),
 	SettingsToggleBuiltinCollection(BuiltinCollection),
 	SettingsReset,

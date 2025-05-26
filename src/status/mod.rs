@@ -9,6 +9,8 @@ use std::sync::Arc;
 use anyhow::Result;
 use serde::Deserialize;
 use serde::Serialize;
+use strum::EnumProperty;
+use strum::EnumString;
 use tracing::debug;
 
 use crate::debugstr::DebugString;
@@ -66,6 +68,16 @@ impl Status {
 			} else {
 				status_running.slots.clone()
 			};
+			let inputs = if let Some(inputs) = running.inputs {
+				inputs.into_iter().collect()
+			} else {
+				status_running.inputs.clone()
+			};
+			let input_device_classes = if let Some(input_device_classes) = running.input_device_classes {
+				input_device_classes.into_iter().collect()
+			} else {
+				status_running.input_device_classes.clone()
+			};
 
 			Running {
 				machine_name,
@@ -77,6 +89,8 @@ impl Status {
 				is_recording,
 				images,
 				slots,
+				inputs,
+				input_device_classes,
 			}
 		});
 		debug!(running=?running, "Status::merge()");
@@ -111,6 +125,8 @@ pub struct Running {
 	pub is_recording: bool,
 	pub images: Arc<[Image]>,
 	pub slots: Arc<[Slot]>,
+	pub inputs: Arc<[Input]>,
+	pub input_device_classes: Arc<[InputDeviceClass]>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
@@ -177,6 +193,8 @@ struct RunningUpdate {
 	pub is_recording: Option<bool>,
 	pub images: Option<Vec<ImageUpdate>>,
 	pub slots: Option<Vec<Slot>>,
+	pub inputs: Option<Vec<Input>>,
+	pub input_device_classes: Option<Vec<InputDeviceClass>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
@@ -201,6 +219,77 @@ pub struct SlotOption {
 	pub selectable: bool,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
+pub struct Input {
+	pub port_tag: String,
+	pub mask: u32,
+	pub class: Option<InputClass>,
+	pub group: u8,
+	pub input_type: u32,
+	pub player: u8,
+	pub is_analog: bool,
+	pub name: String,
+	pub first_keyboard_code: Option<u32>,
+	pub seq_standard_tokens: Option<String>,
+	pub seq_increment_tokens: Option<String>,
+	pub seq_decrement_tokens: Option<String>,
+}
+
+#[derive(Copy, Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash, EnumProperty, EnumString)]
+#[strum(ascii_case_insensitive)]
+pub enum InputClass {
+	#[strum(props(Title = "Joysticks and Controllers"))]
+	Controller,
+	#[strum(props(Title = "Keyboard"))]
+	Keyboard,
+	#[strum(props(Title = "Miscellaneous Input"))]
+	Misc,
+	#[strum(props(Title = "Configuration"))]
+	Config,
+	#[strum(props(Title = "Dip Switches"))]
+	DipSwitch,
+}
+
+impl InputClass {
+	pub fn title(&self) -> &'static str {
+		self.get_str("Title").unwrap()
+	}
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct InputDeviceClass {
+	pub name: InputDeviceClassName,
+	pub enabled: bool,
+	pub multi: bool,
+	pub devices: Vec<InputDevice>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, EnumProperty, EnumString)]
+#[strum(ascii_case_insensitive)]
+pub enum InputDeviceClassName {
+	Keyboard,
+	Joystick,
+	Lightgun,
+	Mouse,
+	#[strum(default)]
+	Other(String),
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
+pub struct InputDevice {
+	pub name: String,
+	pub id: String,
+	pub devindex: u32,
+	pub items: Vec<InputDeviceItem>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
+pub struct InputDeviceItem {
+	pub name: String,
+	pub token: String,
+	pub code: String,
+}
+
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum ValidationError {
 	#[error("Version mismatch; MAME is {0} InfoDb is {1}")]
@@ -218,10 +307,15 @@ pub enum UpdateXmlProblem {
 #[cfg(test)]
 mod test {
 	use std::io::BufReader;
+	use std::str::FromStr;
+
+	use test_case::test_case;
 
 	use crate::status::Status;
 	use crate::status::Update;
 	use crate::status::parse::parse_update;
+
+	use super::InputDeviceClassName;
 
 	#[test]
 	fn session() {
@@ -263,5 +357,15 @@ mod test {
 		let run = status.running.as_ref().unwrap();
 		let actual = (run.is_paused, run.is_throttled, run.throttle_rate);
 		assert_eq!((false, false, 3.0), actual);
+	}
+
+	#[test_case(0, "keyboard", InputDeviceClassName::Keyboard)]
+	#[test_case(1, "joystick", InputDeviceClassName::Joystick)]
+	#[test_case(2, "lightgun", InputDeviceClassName::Lightgun)]
+	#[test_case(3, "mouse", InputDeviceClassName::Mouse)]
+	#[test_case(4, "xyz", InputDeviceClassName::Other("xyz".into()))]
+	fn parse_input_device_class_name(_index: usize, s: &str, expected: InputDeviceClassName) {
+		let actual = InputDeviceClassName::from_str(s).unwrap();
+		assert_eq!(expected, actual);
 	}
 }

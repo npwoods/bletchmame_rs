@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use anyhow::Error;
 use anyhow::Result;
+use strum::EnumString;
 use tracing::debug;
 
 use crate::parse::normalize_tag;
@@ -11,6 +12,10 @@ use crate::parse::parse_mame_bool;
 use crate::status::ImageDetails;
 use crate::status::ImageFormat;
 use crate::status::ImageUpdate;
+use crate::status::Input;
+use crate::status::InputDevice;
+use crate::status::InputDeviceClass;
+use crate::status::InputDeviceItem;
 use crate::status::RunningUpdate;
 use crate::status::Slot;
 use crate::status::SlotOption;
@@ -26,11 +31,16 @@ enum Phase {
 	Status,
 	StatusImages,
 	StatusSlots,
+	StatusInputs,
+	StatusInputDevices,
 	Image,
 	ImageDetails,
 	ImageDetailsFormat,
 	ImageDetailsFormatExtension,
 	Slot,
+	Input,
+	InputDeviceClass,
+	InputDevice,
 }
 
 const TEXT_CAPTURE_PHASES: &[Phase] = &[Phase::ImageDetailsFormatExtension];
@@ -54,6 +64,14 @@ enum PhaseSpecificState {
 enum ThisError {
 	#[error("Missing mandatory attribute {0} when parsing status XML")]
 	MissingMandatoryAttribute(&'static str),
+}
+
+#[derive(Copy, Clone, Debug, EnumString)]
+#[strum(ascii_case_insensitive)]
+enum SeqType {
+	Standard,
+	Increment,
+	Decrement,
 }
 
 impl State {
@@ -112,6 +130,14 @@ impl State {
 			(Phase::Status, b"slots") => {
 				self.running.slots = Some(Vec::new());
 				Some(Phase::StatusSlots)
+			}
+			(Phase::Status, b"inputs") => {
+				self.running.inputs = Some(Vec::new());
+				Some(Phase::StatusInputs)
+			}
+			(Phase::Status, b"input_devices") => {
+				self.running.input_device_classes = Some(Vec::new());
+				Some(Phase::StatusInputDevices)
 			}
 			(Phase::StatusImages, b"image") => {
 				let [tag, filename] = evt.find_attributes([b"tag", b"filename"])?;
@@ -223,7 +249,121 @@ impl State {
 				current_slot.options.push(option);
 				None
 			}
+			(Phase::StatusInputs, b"input") => {
+				let [
+					port_tag,
+					mask,
+					class,
+					group,
+					input_type,
+					player,
+					is_analog,
+					name,
+					first_keyboard_code,
+				] = evt.find_attributes([
+					b"port_tag",
+					b"mask",
+					b"class",
+					b"group",
+					b"type",
+					b"player",
+					b"is_analog",
+					b"name",
+					b"first_keyboard_code",
+				])?;
 
+				let port_tag = port_tag.ok_or(ThisError::MissingMandatoryAttribute("port_tag"))?;
+				let port_tag = normalize_tag(port_tag).into_owned();
+				let mask = mask.ok_or(ThisError::MissingMandatoryAttribute("mask"))?.parse()?;
+				let class = class.ok_or(ThisError::MissingMandatoryAttribute("class"))?.parse().ok();
+				let group = group.ok_or(ThisError::MissingMandatoryAttribute("group"))?.parse()?;
+				let input_type = input_type
+					.ok_or(ThisError::MissingMandatoryAttribute("type"))?
+					.parse()?;
+				let player = player.ok_or(ThisError::MissingMandatoryAttribute("player"))?.parse()?;
+				let is_analog = parse_mame_bool(is_analog.ok_or(ThisError::MissingMandatoryAttribute("is_analog"))?)?;
+				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?.into_owned();
+				let first_keyboard_code = first_keyboard_code.map(|x| x.parse()).transpose()?;
+
+				let input = Input {
+					port_tag,
+					mask,
+					class,
+					group,
+					input_type,
+					player,
+					is_analog,
+					name,
+					first_keyboard_code,
+					seq_standard_tokens: None,
+					seq_increment_tokens: None,
+					seq_decrement_tokens: None,
+				};
+				self.running.inputs.as_mut().unwrap().push(input);
+				Some(Phase::Input)
+			}
+			(Phase::Input, b"seq") => {
+				let [seq_type, tokens] = evt.find_attributes([b"type", b"tokens"])?;
+				let seq_type = seq_type.ok_or(ThisError::MissingMandatoryAttribute("seq_type"))?;
+				let seq_type = seq_type.parse::<SeqType>()?;
+				let tokens = tokens.ok_or(ThisError::MissingMandatoryAttribute("tokens"))?;
+
+				let current_input = self.running.inputs.as_mut().unwrap().last_mut().unwrap();
+				let current_input_tokens = match seq_type {
+					SeqType::Standard => &mut current_input.seq_standard_tokens,
+					SeqType::Increment => &mut current_input.seq_increment_tokens,
+					SeqType::Decrement => &mut current_input.seq_decrement_tokens,
+				};
+				*current_input_tokens = Some(tokens.into());
+				None
+			}
+			(Phase::StatusInputDevices, b"class") => {
+				let [name, enabled, multi] = evt.find_attributes([b"name", b"enabled", b"multi"])?;
+				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?.parse()?;
+				let enabled = parse_mame_bool(&enabled.ok_or(ThisError::MissingMandatoryAttribute("enabled"))?)?;
+				let multi = parse_mame_bool(&multi.ok_or(ThisError::MissingMandatoryAttribute("multi"))?)?;
+
+				let input_device_class = InputDeviceClass {
+					name,
+					enabled,
+					multi,
+					devices: Vec::new(),
+				};
+
+				let input_device_classes = self.running.input_device_classes.as_mut().unwrap();
+				input_device_classes.push(input_device_class);
+				Some(Phase::InputDeviceClass)
+			}
+			(Phase::InputDeviceClass, b"device") => {
+				let [name, id, devindex] = evt.find_attributes([b"name", b"id", b"devindex"])?;
+				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?.into_owned();
+				let id = id.ok_or(ThisError::MissingMandatoryAttribute("id"))?.into_owned();
+				let devindex = devindex.ok_or(ThisError::MissingMandatoryAttribute("devindex"))?;
+				let devindex = devindex.parse()?;
+
+				let input_device = InputDevice {
+					name,
+					id,
+					devindex,
+					items: Vec::new(),
+				};
+
+				let input_device_classes = self.running.input_device_classes.as_mut().unwrap();
+				input_device_classes.last_mut().unwrap().devices.push(input_device);
+				Some(Phase::InputDevice)
+			}
+			(Phase::InputDevice, b"item") => {
+				let [name, token, code] = evt.find_attributes([b"name", b"token", b"code"])?;
+				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?.into_owned();
+				let token = token.ok_or(ThisError::MissingMandatoryAttribute("token"))?.into_owned();
+				let code = code.ok_or(ThisError::MissingMandatoryAttribute("code"))?.into_owned();
+				let item = InputDeviceItem { name, token, code };
+
+				let input_device_classes = self.running.input_device_classes.as_mut().unwrap();
+				let input_device = input_device_classes.last_mut().unwrap().devices.last_mut().unwrap();
+				input_device.items.push(item);
+				None
+			}
 			_ => None,
 		};
 		Ok(new_phase)
@@ -315,6 +455,8 @@ mod test {
 	use assert_matches::assert_matches;
 	use test_case::test_case;
 
+	use crate::status::InputClass;
+
 	use super::parse_update;
 
 	#[test_case(0, include_str!("test_data/status_mame0226_coco2b_1.xml"))]
@@ -344,6 +486,65 @@ mod test {
 		let reader = BufReader::new(xml.as_bytes());
 		let running = parse_update(reader).unwrap().running.unwrap();
 		let actual = (running.is_throttled, running.throttle_rate);
+		assert_eq!(expected, actual);
+	}
+
+	#[allow(clippy::too_many_arguments)]
+	#[test_case(0, include_str!("test_data/status_mame0226_coco2b_1.xml"), "row0", 128, InputClass::Keyboard, 11, 49, 0, false, 
+		"g  G", Some(103), Some("KEYCODE_G"), None, None)]
+	#[test_case(1, include_str!("test_data/status_mame0226_coco2b_1.xml"), "joystick_rx", 255, InputClass::Controller, 1, 152, 0, true,
+		"Right Joystick X", None, Some("JOYCODE_1_XAXIS"), Some("KEYCODE_6PAD OR JOYCODE_1_XAXIS_RIGHT_SWITCH"), Some("KEYCODE_4PAD OR JOYCODE_1_XAXIS_LEFT_SWITCH"))]
+	fn inputs(
+		_index: usize,
+		xml: &str,
+		port_tag: &str,
+		mask: u32,
+		expected_class: InputClass,
+		expected_group: u8,
+		expected_type: u32,
+		expected_player: u8,
+		expected_is_analog: bool,
+		expected_name: &str,
+		expected_first_keyboard_code: Option<u32>,
+		expected_seq_standard_tokens: Option<&str>,
+		expected_seq_increment_tokens: Option<&str>,
+		expected_seq_decrement_tokens: Option<&str>,
+	) {
+		let expected = (
+			Some(expected_class),
+			expected_group,
+			expected_type,
+			expected_player,
+			expected_is_analog,
+			expected_name,
+			expected_first_keyboard_code,
+			expected_seq_standard_tokens,
+			expected_seq_increment_tokens,
+			expected_seq_decrement_tokens,
+		);
+
+		let reader = BufReader::new(xml.as_bytes());
+		let running = parse_update(reader).unwrap().running.unwrap();
+		let input = running
+			.inputs
+			.as_deref()
+			.unwrap()
+			.iter()
+			.find(|x| x.port_tag == port_tag && x.mask == mask)
+			.expect("could not find specified port_tag and mask");
+		let actual = (
+			input.class,
+			input.group,
+			input.input_type,
+			input.player,
+			input.is_analog,
+			input.name.as_ref(),
+			input.first_keyboard_code,
+			input.seq_standard_tokens.as_deref(),
+			input.seq_increment_tokens.as_deref(),
+			input.seq_decrement_tokens.as_deref(),
+		);
+
 		assert_eq!(expected, actual);
 	}
 }
