@@ -1,4 +1,4 @@
-import { GridBox, VerticalBox, HorizontalBox, Button, StandardButton } from "std-widgets.slint";
+import { GridBox, VerticalBox, HorizontalBox, Button, StandardButton, ScrollView } from "std-widgets.slint";
 
 export struct InputDialogEntry {
     name: string,
@@ -19,31 +19,46 @@ export component InputDialog inherits Window {
 
     // control hierarchy
     VerticalBox {
-        for entry in root.entries: HorizontalLayout {
-            Button {
-                text: entry.name;
-                enabled: false;
-            }
+        ScrollView {
+            viewport-height: root.entries.length * 30px;
+            VerticalBox {
+                padding: 3px;
+                for entry in root.entries: HorizontalLayout {
+                    vertical-stretch: 0;
+                    Button {
+                        width: 300px;
+                        text: entry.name;
+                        enabled: false;
+                    }
 
-            Button {
-                text: "▼";
-                enabled: false;
-            }
+                    Button {
+                        width: 40px;
+                        text: "▼";
+                        enabled: false;
+                    }
 
-            Button {
-                text: entry.text;
-                enabled: false;
+                    VerticalLayout {
+                        alignment: center;
+                        Text {
+                            width: 100%;
+                            text: entry.text;
+                        }
+                    }
+                }
             }
         }
+
         HorizontalBox {
+            alignment: end;
             Button {
                 text: @tr("Restore Defaults");
+                horizontal-stretch: 0;
                 enabled: false;
             }
 
             StandardButton {
                 kind: ok;
-                enabled: false;
+                horizontal-stretch: 0;
                 clicked => {
                     root.ok-clicked();
                 }
