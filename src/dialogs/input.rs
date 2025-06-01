@@ -1,13 +1,18 @@
-use std::borrow::Cow;
+use std::any::Any;
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::str::FromStr;
+use std::sync::Arc;
 
 use itertools::Either;
 use itertools::Itertools;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
+use slint::Model;
+use slint::ModelNotify;
 use slint::ModelRc;
-use slint::VecModel;
+use slint::ModelTracker;
 use slint::Weak;
 use strum::EnumString;
 
@@ -20,13 +25,27 @@ use crate::status::InputDeviceClassName;
 use crate::ui::InputDialog;
 use crate::ui::InputDialogEntry;
 
+struct InputDialogModel {
+	state: RefCell<InputDialogState>,
+	class: InputClass,
+	notify: ModelNotify,
+}
+
+#[derive(Debug, Default)]
+struct InputDialogState {
+	pub inputs: Arc<[Input]>,
+	pub input_device_classes: Arc<[InputDeviceClass]>,
+	pub clusters: Box<[InputCluster]>,
+	pub codes: HashMap<Box<str>, Box<str>>,
+}
+
 #[derive(Debug)]
-enum InputCluster<'a> {
-	Single(&'a Input),
+enum InputCluster {
+	Single(usize),
 	Multi {
-		x_input: Option<&'a Input>,
-		y_input: Option<&'a Input>,
-		aggregate_name: Option<&'a str>,
+		x_input_index: Option<usize>,
+		y_input_index: Option<usize>,
+		aggregate_name: Option<String>,
 	},
 }
 
@@ -53,8 +72,8 @@ enum SeqTokenModifier<'a> {
 
 pub async fn dialog_input(
 	parent: Weak<impl ComponentHandle + 'static>,
-	inputs: impl AsRef<[Input]>,
-	input_device_classes: impl AsRef<[InputDeviceClass]> + '_,
+	inputs: Arc<[Input]>,
+	input_device_classes: Arc<[InputDeviceClass]>,
 	class: InputClass,
 ) {
 	// prepare the dialog
@@ -77,15 +96,75 @@ pub async fn dialog_input(
 		signaller.signal(());
 	});
 
-	// build the codes map
-	let codes = build_codes(input_device_classes.as_ref());
+	// set up the model
+	let model = InputDialogModel::new(class);
+	let model = Rc::new(model);
+	let model = ModelRc::new(model);
+	let model_clone = model.clone();
+	modal.dialog().set_entries(model_clone);
 
-	// set up entries
-	let entries = inputs
-		.as_ref()
+	// update the model
+	InputDialogModel::get_model(&model).update(inputs, input_device_classes);
+
+	// present the modal dialog
+	modal.run(async { single_result.wait().await }).await
+}
+
+impl InputDialogModel {
+	pub fn new(class: InputClass) -> Self {
+		let state = InputDialogState::default();
+		let state = RefCell::new(state);
+		let notify = ModelNotify::default();
+		Self { state, class, notify }
+	}
+
+	pub fn update(&self, inputs: Arc<[Input]>, input_device_classes: Arc<[InputDeviceClass]>) {
+		let mut state = self.state.borrow_mut();
+		state.inputs = inputs;
+		state.input_device_classes = input_device_classes;
+		state.clusters = build_clusters(&state.inputs, self.class);
+		state.codes = build_codes(&state.input_device_classes);
+		drop(state);
+
+		self.notify.reset();
+	}
+
+	pub fn get_model(model: &impl Model) -> &'_ Self {
+		model.as_any().downcast_ref::<Self>().unwrap()
+	}
+}
+
+impl Model for InputDialogModel {
+	type Data = InputDialogEntry;
+
+	fn row_count(&self) -> usize {
+		let state = self.state.borrow();
+		state.clusters.len()
+	}
+
+	fn row_data(&self, row: usize) -> Option<Self::Data> {
+		let state = self.state.borrow();
+		let cluster = state.clusters.get(row)?;
+		let name = input_cluster_name(&state.inputs, cluster).into();
+		let text = input_cluster_code_text(&state.inputs, cluster, &state.codes).into();
+		Some(InputDialogEntry { name, text })
+	}
+
+	fn model_tracker(&self) -> &dyn ModelTracker {
+		&self.notify
+	}
+
+	fn as_any(&self) -> &dyn Any {
+		self
+	}
+}
+
+fn build_clusters(inputs: &[Input], class: InputClass) -> Box<[InputCluster]> {
+	inputs
 		.iter()
-		.filter(move |x| x.class == Some(class))
-		.sorted_by_key(|input| {
+		.enumerate()
+		.filter(move |(_, input)| input.class == Some(class))
+		.sorted_by_key(|(_, input)| {
 			(
 				input.group,
 				input.input_type,
@@ -96,29 +175,18 @@ pub async fn dialog_input(
 		.coalesce(|a, b| {
 			// because of how the LUA "fields" property works, there may be dupes in this data, and
 			// this logic removes the dupes
-			if a.port_tag == b.port_tag && a.mask == b.mask {
+			if a.1.port_tag == b.1.port_tag && a.1.mask == b.1.mask {
 				Ok(a)
 			} else {
 				Err((a, b))
 			}
 		})
-		.map(input_cluster_from_input)
+		.map(|(index, input)| input_cluster_from_input(index, input))
 		.coalesce(|a, b| coalesce_input_clusters(&a, &b).ok_or((a, b)))
-		.map(|input_cluster| {
-			let name = input_cluster_name(&input_cluster).into();
-			let text = input_cluster_code_text(&input_cluster, &codes).into();
-			InputDialogEntry { name, text }
-		})
-		.collect::<Vec<_>>();
-	let entries = VecModel::from(entries);
-	let entries = ModelRc::new(entries);
-	modal.dialog().set_entries(entries);
-
-	// present the modal dialog
-	modal.run(async { single_result.wait().await }).await
+		.collect()
 }
 
-fn build_codes(input_device_classes: &[InputDeviceClass]) -> HashMap<&'_ str, Cow<str>> {
+fn build_codes(input_device_classes: &[InputDeviceClass]) -> HashMap<Box<str>, Box<str>> {
 	input_device_classes
 		.iter()
 		.flat_map(|device_class| {
@@ -143,78 +211,80 @@ fn build_codes(input_device_classes: &[InputDeviceClass]) -> HashMap<&'_ str, Co
 		})
 		.map(|(device_class_name, device_index, item)| {
 			let label = if let Some(device_class_name) = device_class_name {
-				Cow::Owned(format!("{} #{} {}", device_class_name, device_index + 1, item.name))
+				format!("{} #{} {}", device_class_name, device_index + 1, item.name).into()
 			} else {
-				Cow::Borrowed(item.name.as_str())
+				item.name.as_str().into()
 			};
-			(item.code.as_str(), label)
+			(item.code.as_str().into(), label)
 		})
 		.collect::<HashMap<_, _>>()
 }
 
-fn input_cluster_from_input<'a>(input: &'a Input) -> InputCluster<'a> {
+fn input_cluster_from_input(index: usize, input: &Input) -> InputCluster {
 	if input.is_analog {
 		let name = input
 			.name
 			.trim_end_matches(|ch: char| ch.is_ascii_digit() || ch.is_whitespace());
-		let (x_input, y_input) = if name.ends_with('Y') {
-			(None, Some(input))
+		let (x_input_index, y_input_index) = if name.ends_with('Y') {
+			(None, Some(index))
 		} else {
-			(Some(input), None)
+			(Some(index), None)
 		};
 
 		let aggregate_name = name
 			.strip_suffix(['X', 'Y', 'Z'])
-			.map(|name| name.trim_end_matches(char::is_whitespace));
+			.map(|name| name.trim_end_matches(char::is_whitespace).to_string());
 
 		InputCluster::Multi {
-			x_input,
-			y_input,
+			x_input_index,
+			y_input_index,
 			aggregate_name,
 		}
 	} else {
-		InputCluster::Single(input)
+		InputCluster::Single(index)
 	}
 }
 
-fn input_cluster_as_multi<'a>(
-	input_cluster: &InputCluster<'a>,
-) -> Option<(Option<&'a Input>, Option<&'a Input>, Option<&'a str>)> {
-	match input_cluster {
-		InputCluster::Single(_) => None,
+fn input_cluster_name<'a>(inputs: &'a [Input], cluster: &'a InputCluster) -> &'a str {
+	match cluster {
+		InputCluster::Single(input_index) => &inputs[*input_index].name,
 		InputCluster::Multi {
-			x_input,
-			y_input,
-			aggregate_name,
-		} => Some((*x_input, *y_input, *aggregate_name)),
-	}
-}
-
-fn input_cluster_name<'a>(input_cluster: &InputCluster<'a>) -> &'a str {
-	match input_cluster {
-		InputCluster::Single(input) => &input.name,
-		InputCluster::Multi {
-			x_input,
-			y_input,
+			x_input_index,
+			y_input_index,
 			aggregate_name,
 		} => aggregate_name
-			.or_else(|| x_input.map(|i| i.name.as_str()))
-			.or_else(|| y_input.map(|i| i.name.as_str()))
+			.as_deref()
+			.or_else(|| x_input_index.map(|idx| inputs[idx].name.as_str()))
+			.or_else(|| y_input_index.map(|idx| inputs[idx].name.as_str()))
 			.unwrap(),
 	}
 }
 
-fn input_cluster_code_text(input_cluster: &InputCluster<'_>, codes: &HashMap<&'_ str, impl AsRef<str>>) -> String {
-	let seqs_iter = match input_cluster {
-		InputCluster::Single(input) => {
-			let seqs_iter = input.seq_standard_tokens.as_deref().into_iter();
+fn input_cluster_code_text(
+	inputs: &[Input],
+	cluster: &InputCluster,
+	codes: &HashMap<Box<str>, impl AsRef<str>>,
+) -> String {
+	let seqs_iter = match cluster {
+		InputCluster::Single(index) => {
+			let seqs_iter = inputs[*index].seq_standard_tokens.as_deref().into_iter();
 			Either::Left(seqs_iter)
 		}
-		InputCluster::Multi { x_input, y_input, .. } => {
-			let seqs_iter = [*x_input, *y_input]
+		InputCluster::Multi {
+			x_input_index,
+			y_input_index,
+			..
+		} => {
+			let seqs_iter = [*x_input_index, *y_input_index]
 				.into_iter()
 				.flatten()
-				.flat_map(|i| [i.seq_decrement_tokens.as_deref(), i.seq_increment_tokens.as_deref()])
+				.map(|index| &inputs[index])
+				.flat_map(|input| {
+					[
+						input.seq_decrement_tokens.as_deref(),
+						input.seq_increment_tokens.as_deref(),
+					]
+				})
 				.flatten();
 			Either::Right(seqs_iter)
 		}
@@ -225,31 +295,42 @@ fn input_cluster_code_text(input_cluster: &InputCluster<'_>, codes: &HashMap<&'_
 		.join(" / ")
 }
 
-fn coalesce_input_clusters<'a>(a: &InputCluster<'a>, b: &InputCluster<'a>) -> Option<InputCluster<'a>> {
-	let (a_x_input, a_y_input, a_aggregate_name) = input_cluster_as_multi(a)?;
-	let (b_x_input, b_y_input, b_aggregate_name) = input_cluster_as_multi(b)?;
+fn input_cluster_as_multi(input_cluster: &InputCluster) -> Option<(Option<usize>, Option<usize>, Option<&'_ str>)> {
+	match input_cluster {
+		InputCluster::Single(_) => None,
+		InputCluster::Multi {
+			x_input_index,
+			y_input_index,
+			aggregate_name,
+		} => Some((*x_input_index, *y_input_index, aggregate_name.as_deref())),
+	}
+}
+
+fn coalesce_input_clusters(a: &InputCluster, b: &InputCluster) -> Option<InputCluster> {
+	let (a_x_input_index, a_y_input_index, a_aggregate_name) = input_cluster_as_multi(a)?;
+	let (b_x_input_index, b_y_input_index, b_aggregate_name) = input_cluster_as_multi(b)?;
 	if a_aggregate_name != b_aggregate_name {
 		return None;
 	}
 
-	let (x_input, y_input) = match (a_x_input, a_y_input, b_x_input, b_y_input) {
-		(Some(x_input), None, None, Some(y_input)) => Some((x_input, y_input)),
-		(None, Some(x_input), Some(y_input), None) => Some((x_input, y_input)),
+	let (x_input_index, y_input_index) = match (a_x_input_index, a_y_input_index, b_x_input_index, b_y_input_index) {
+		(Some(x_input_index), None, None, Some(y_input_index)) => Some((x_input_index, y_input_index)),
+		(None, Some(x_input_index), Some(y_input_index), None) => Some((x_input_index, y_input_index)),
 		_ => None,
 	}?;
-	let x_input = Some(x_input);
-	let y_input = Some(y_input);
-	let aggregate_name = a_aggregate_name;
+	let x_input_index = Some(x_input_index);
+	let y_input_index = Some(y_input_index);
+	let aggregate_name = a_aggregate_name.map(|x| x.to_string());
 
 	let result = InputCluster::Multi {
-		x_input,
-		y_input,
+		x_input_index,
+		y_input_index,
 		aggregate_name,
 	};
 	Some(result)
 }
 
-fn seq_tokens_desc_from_string(s: &str, codes: &HashMap<&'_ str, impl AsRef<str>>) -> String {
+fn seq_tokens_desc_from_string(s: &str, codes: &HashMap<Box<str>, impl AsRef<str>>) -> String {
 	seq_tokens_from_string(s)
 		.flat_map(|token| match token {
 			SeqToken::Named(text, modifier) => {
