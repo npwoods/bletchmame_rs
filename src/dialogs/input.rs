@@ -13,6 +13,8 @@ use slint::Model;
 use slint::ModelNotify;
 use slint::ModelRc;
 use slint::ModelTracker;
+use slint::SharedString;
+use slint::VecModel;
 use slint::Weak;
 use strum::EnumString;
 
@@ -22,6 +24,7 @@ use crate::status::Input;
 use crate::status::InputClass;
 use crate::status::InputDeviceClass;
 use crate::status::InputDeviceClassName;
+use crate::ui::InputContextMenuEntry;
 use crate::ui::InputDialog;
 use crate::ui::InputDialogEntry;
 
@@ -103,6 +106,17 @@ pub async fn dialog_input(
 	let model_clone = model.clone();
 	modal.dialog().set_entries(model_clone);
 
+	// set up the context button clicked handler
+	let dialog_weak = modal.dialog().as_weak();
+	let model_clone = model.clone();
+	modal.dialog().on_context_button_clicked(move |index, point| {
+		let dialog = dialog_weak.unwrap();
+		let model = InputDialogModel::get_model(&model_clone);
+		let index = index.try_into().unwrap();
+		let (entries_1, entries_2) = model.context_menu(index);
+		dialog.invoke_show_context_menu(entries_1, entries_2, point);
+	});
+
 	// update the model
 	InputDialogModel::get_model(&model).update(inputs, input_device_classes);
 
@@ -127,6 +141,75 @@ impl InputDialogModel {
 		drop(state);
 
 		self.notify.reset();
+	}
+
+	pub fn context_menu(&self, index: usize) -> (ModelRc<InputContextMenuEntry>, ModelRc<InputContextMenuEntry>) {
+		let (entries_1, entries_2) = {
+			let state = self.state.borrow();
+			let cluster = &state.clusters[index];
+
+			match cluster {
+				InputCluster::Single(_) => {
+					let entries_1 = [].into();
+					let entries_2 = ["Specify", "Add...", "Clear"]
+						.iter()
+						.copied()
+						.map(|text| {
+							let text = SharedString::from(text);
+							InputContextMenuEntry { text }
+						})
+						.collect::<Vec<_>>();
+					(entries_1, entries_2)
+				}
+				InputCluster::Multi {
+					x_input_index,
+					y_input_index,
+					..
+				} => {
+					let entries_1 = (x_input_index.is_some() || y_input_index.is_some())
+						.then(|| {
+							let device_entry_iter = state
+								.input_device_classes
+								.iter()
+								.flat_map(|device_class| &device_class.devices)
+								.filter(|device| {
+									let has_x = device.items.iter().any(|item| item.token == "XAXIS");
+									let has_y = device.items.iter().any(|item| item.token == "YAXIS");
+									(x_input_index.is_some() && has_x) || (y_input_index.is_some() && has_y)
+								})
+								.map(|device| device.name.as_str());
+
+							["Arrow Keys", "Numeric Keypad"]
+								.iter()
+								.copied()
+								.chain(device_entry_iter)
+								.chain(["Multiple..."].iter().copied())
+								.map(|text| {
+									let text = SharedString::from(text);
+									InputContextMenuEntry { text }
+								})
+								.collect::<Vec<_>>()
+						})
+						.unwrap_or_default();
+
+					let entries_2 = ["Specify", "Clear"]
+						.iter()
+						.copied()
+						.map(|text| {
+							let text = SharedString::from(text);
+							InputContextMenuEntry { text }
+						})
+						.collect::<Vec<_>>();
+					(entries_1, entries_2)
+				}
+			}
+		};
+
+		let entries_1 = VecModel::from(entries_1);
+		let entries_2 = VecModel::from(entries_2);
+		let entries_1 = ModelRc::new(entries_1);
+		let entries_2 = ModelRc::new(entries_2);
+		(entries_1, entries_2)
 	}
 
 	pub fn get_model(model: &impl Model) -> &'_ Self {
