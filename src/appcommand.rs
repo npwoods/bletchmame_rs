@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use itertools::Itertools;
 use serde::Deserialize;
 use serde::Serialize;
@@ -12,6 +10,7 @@ use crate::prefs::PrefsCollection;
 use crate::prefs::PrefsItem;
 use crate::prefs::SortOrder;
 use crate::prefs::pathtype::PathType;
+use crate::runtime::command::MameCommand;
 use crate::status::InputClass;
 use crate::status::Update;
 use crate::version::MameVersion;
@@ -59,10 +58,7 @@ pub enum AppCommand {
 	ErrorMessageBox(String),
 
 	// Other
-	RunMame {
-		machine_name: String,
-		initial_loads: Vec<(Arc<str>, Arc<str>)>,
-	},
+	IssueMameCommand(MameCommand),
 	Browse(PrefsCollection),
 	HistoryAdvance(isize),
 	SearchText(String),
@@ -90,17 +86,12 @@ pub enum AppCommand {
 	LoadImageDialog {
 		tag: String,
 	},
-	LoadImage {
-		tag: String,
-		filename: String,
-	},
 	UnloadImage {
 		tag: String,
 	},
 	ConnectToSocketDialog {
 		tag: String,
 	},
-	ChangeSlots(Vec<(String, Option<String>)>),
 	InfoDbBuildProgress {
 		machine_description: String,
 	},
@@ -133,5 +124,11 @@ impl AppCommand {
 			let json = s.strip_prefix(MENU_PREFIX).expect("not a menu string");
 			serde_json::from_str(json).unwrap()
 		})
+	}
+}
+
+impl From<MameCommand> for AppCommand {
+	fn from(value: MameCommand) -> Self {
+		Self::IssueMameCommand(value)
 	}
 }

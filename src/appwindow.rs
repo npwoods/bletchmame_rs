@@ -292,7 +292,7 @@ impl AppModel {
 		update_menus(self);
 	}
 
-	pub fn issue_command(&self, command: MameCommand<'_>) {
+	pub fn issue_command(&self, command: MameCommand) {
 		self.state.borrow().issue_command(command);
 	}
 
@@ -672,7 +672,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 
 	match command {
 		AppCommand::FileStop => {
-			model.issue_command(MameCommand::Stop);
+			model.issue_command(MameCommand::stop());
 		}
 		AppCommand::FilePause => {
 			let is_paused = model
@@ -683,9 +683,9 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				.map(|r| r.is_paused)
 				.unwrap_or_default();
 			if is_paused {
-				model.issue_command(MameCommand::Resume);
+				model.issue_command(MameCommand::resume());
 			} else {
-				model.issue_command(MameCommand::Pause);
+				model.issue_command(MameCommand::pause());
 			}
 		}
 		AppCommand::FileDevicesAndImages => {
@@ -705,11 +705,11 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 		}
 		AppCommand::FileQuickLoadState => {
 			let last_save_state = model.state.borrow().last_save_state().unwrap();
-			model.issue_command(MameCommand::StateLoad(last_save_state.as_ref()));
+			model.issue_command(MameCommand::state_load(last_save_state));
 		}
 		AppCommand::FileQuickSaveState => {
 			let last_save_state = model.state.borrow().last_save_state().unwrap();
-			model.issue_command(MameCommand::StateSave(last_save_state.as_ref()));
+			model.issue_command(MameCommand::state_save(last_save_state));
 		}
 		AppCommand::FileLoadState => {
 			let model_clone = model.clone();
@@ -723,7 +723,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				if let Some(filename) =
 					load_file_dialog(&model_clone.app_window(), title, file_types, initial_dir, initial_file).await
 				{
-					model_clone.issue_command(MameCommand::StateLoad(&filename));
+					model_clone.issue_command(MameCommand::state_load(&filename));
 					model_clone.update_state(|state| Some(state.set_last_save_state(Some(filename.into()))));
 				}
 			};
@@ -751,7 +751,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				if let Some(filename) =
 					save_file_dialog(&model_clone.app_window(), title, file_types, initial_dir, initial_file).await
 				{
-					model_clone.issue_command(MameCommand::StateSave(&filename));
+					model_clone.issue_command(MameCommand::state_save(&filename));
 					model_clone.update_state(|state| Some(state.set_last_save_state(Some(filename.into()))));
 				}
 			};
@@ -767,7 +767,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				if let Some(filename) =
 					save_file_dialog(&model.app_window(), title, &file_types, None, initial_file.as_deref()).await
 				{
-					model.issue_command(MameCommand::SaveSnapshot(0, &filename));
+					model.issue_command(MameCommand::save_snapshot(0, &filename));
 				}
 			};
 			spawn_local(fut).unwrap();
@@ -785,7 +785,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				.is_recording;
 
 			if is_recording {
-				model.issue_command(MameCommand::EndRecording);
+				model.issue_command(MameCommand::end_recording());
 			} else {
 				let model_clone = model.clone();
 				let fut = async move {
@@ -798,26 +798,26 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 						save_file_dialog(&model.app_window(), title, &file_types, None, initial_file.as_deref()).await
 					{
 						let movie_format = MovieFormat::try_from(Path::new(&filename)).unwrap_or_default();
-						model.issue_command(MameCommand::BeginRecording(&filename, movie_format));
+						model.issue_command(MameCommand::begin_recording(&filename, movie_format));
 					}
 				};
 				spawn_local(fut).unwrap();
 			}
 		}
 		AppCommand::FileDebugger => {
-			model.issue_command(MameCommand::Debugger);
+			model.issue_command(MameCommand::debugger());
 		}
 		AppCommand::FileResetSoft => {
-			model.issue_command(MameCommand::SoftReset);
+			model.issue_command(MameCommand::soft_reset());
 		}
 		AppCommand::FileResetHard => {
-			model.issue_command(MameCommand::HardReset);
+			model.issue_command(MameCommand::hard_reset());
 		}
 		AppCommand::FileExit => {
 			model.update_state(AppState::shutdown);
 		}
 		AppCommand::OptionsThrottleRate(throttle) => {
-			model.issue_command(MameCommand::ThrottleRate(throttle));
+			model.issue_command(MameCommand::throttle_rate(throttle));
 		}
 		AppCommand::OptionsToggleWarp => {
 			let is_throttled = model
@@ -827,7 +827,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				.and_then(|s| s.running.as_ref())
 				.map(|r| r.is_throttled)
 				.unwrap_or_default();
-			model.issue_command(MameCommand::Throttled(!is_throttled));
+			model.issue_command(MameCommand::throttled(!is_throttled));
 		}
 		AppCommand::OptionsToggleFullScreen => {
 			let app_window = model.app_window();
@@ -845,7 +845,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				.map(|r| (r.system_mute, r.sound_attenuation))
 			{
 				Some((Some(system_mute), _)) => {
-					model.issue_command(MameCommand::SetSystemMute(!system_mute));
+					model.issue_command(MameCommand::set_system_mute(!system_mute));
 				}
 				Some((None, Some(sound_attenuation))) => {
 					let is_sound_enabled = sound_attenuation > SOUND_ATTENUATION_OFF;
@@ -854,13 +854,13 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 					} else {
 						SOUND_ATTENUATION_ON
 					};
-					model.issue_command(MameCommand::SetAttenuation(new_attenuation));
+					model.issue_command(MameCommand::set_attenuation(new_attenuation));
 				}
 				_ => {}
 			}
 		}
 		AppCommand::OptionsClassic => {
-			model.issue_command(MameCommand::ClassicMenu);
+			model.issue_command(MameCommand::classic_menu());
 		}
 		AppCommand::SettingsInput(class) => {
 			let parent = model.app_window().as_weak();
@@ -910,19 +910,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			};
 			spawn_local(fut).unwrap();
 		}
-		AppCommand::RunMame {
-			machine_name,
-			initial_loads,
-		} => {
-			let initial_loads = initial_loads
-				.iter()
-				.map(|(dev, arg)| (dev.as_ref(), arg.as_ref()))
-				.collect::<Vec<_>>();
-
-			let command = MameCommand::Start {
-				machine_name: &machine_name,
-				initial_loads: initial_loads.as_slice(),
-			};
+		AppCommand::IssueMameCommand(command) => {
 			model.issue_command(command);
 		}
 		AppCommand::Browse(collection) => {
@@ -1052,16 +1040,12 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				extensions: &f.extensions,
 			});
 			if let Some(filename) = dialog_load_image(parent, format_iter) {
-				let command = AppCommand::LoadImage { tag, filename };
+				let command = MameCommand::load_image(tag, &filename).into();
 				handle_command(model, command);
 			}
 		}
-		AppCommand::LoadImage { tag, filename } => {
-			let loads = [(tag.as_str(), filename.as_str())];
-			model.issue_command(MameCommand::LoadImage(&loads));
-		}
 		AppCommand::UnloadImage { tag } => {
-			model.issue_command(MameCommand::UnloadImage(tag.as_str()));
+			model.issue_command(MameCommand::unload_image(&tag));
 		}
 		AppCommand::ConnectToSocketDialog { tag } => {
 			let model_clone = model.clone();
@@ -1069,18 +1053,11 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				let parent = model_clone.app_window_weak.clone();
 				if let Some((hostname, port)) = dialog_connect_to_socket(parent).await {
 					let filename = format!("socket.{hostname}:{port}");
-					let command = AppCommand::LoadImage { tag, filename };
+					let command = MameCommand::load_image(tag, &filename).into();
 					handle_command(&model_clone, command);
 				}
 			};
 			spawn_local(fut).unwrap();
-		}
-		AppCommand::ChangeSlots(changes) => {
-			let changes = changes
-				.iter()
-				.map(|(slot, opt)| (slot.as_str(), opt.as_deref().unwrap_or_default()))
-				.collect::<Vec<_>>();
-			model.issue_command(MameCommand::ChangeSlots(&changes));
 		}
 		AppCommand::InfoDbBuildProgress { machine_description } => {
 			model.update_state(|state| Some(state.infodb_build_progress(machine_description)))

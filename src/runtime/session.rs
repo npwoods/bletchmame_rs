@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::ffi::OsStr;
 use std::io::BufRead;
 use std::io::BufReader;
@@ -29,6 +28,7 @@ use crate::prefs::PrefsPaths;
 use crate::runtime::MameStderr;
 use crate::runtime::MameWindowing;
 use crate::runtime::args::MameArguments;
+use crate::runtime::command::MameCommand;
 use crate::status::Update;
 use crate::threadlocalbubble::ThreadLocalBubble;
 
@@ -53,7 +53,7 @@ pub fn spawn_mame_session_thread(
 	mame_windowing: &MameWindowing,
 	mame_stderr: MameStderr,
 	callback: Rc<dyn Fn(AppCommand) + 'static>,
-) -> (Job<Result<()>>, Sender<Cow<'static, str>>) {
+) -> (Job<Result<()>>, Sender<MameCommand>) {
 	let callback_bubble = ThreadLocalBubble::new(callback);
 	let event_callback = move |event| {
 		let callback_bubble = callback_bubble.clone();
@@ -75,7 +75,7 @@ pub fn spawn_mame_session_thread(
 
 fn execute_mame(
 	mame_args: &MameArguments,
-	receiver: &Receiver<Cow<'static, str>>,
+	receiver: &Receiver<MameCommand>,
 	event_callback: &impl Fn(MameEvent),
 	mame_stderr: MameStderr,
 ) -> Result<()> {
@@ -119,7 +119,7 @@ fn execute_mame(
 
 fn interact_with_mame(
 	child: &mut Child,
-	receiver: &Receiver<Cow<'static, str>>,
+	receiver: &Receiver<MameCommand>,
 	event_callback: &impl Fn(MameEvent),
 ) -> Result<()> {
 	// set up what we need to interact with MAME as a child process
@@ -246,7 +246,7 @@ fn read_text_from_reader(read: &mut impl Read) -> String {
 }
 
 fn process_event_from_front_end(
-	receiver: &Receiver<Cow<'static, str>>,
+	receiver: &Receiver<MameCommand>,
 	mame_stdin: &mut BufWriter<impl Write>,
 	is_running: bool,
 ) -> Result<bool> {
@@ -255,19 +255,19 @@ fn process_event_from_front_end(
 	} else {
 		Duration::from_secs(10)
 	};
-	let (command_text, is_exit) = match receiver.recv_timeout(timeout) {
-		Ok(command_text) => (command_text, false),
-		Err(RecvTimeoutError::Timeout) => (Cow::Borrowed("PING"), false),
-		Err(RecvTimeoutError::Disconnected) => (Cow::Borrowed("EXIT"), true),
+	let (command, is_exit) = match receiver.recv_timeout(timeout) {
+		Ok(command) => (command, false),
+		Err(RecvTimeoutError::Timeout) => (MameCommand::ping(), false),
+		Err(RecvTimeoutError::Disconnected) => (MameCommand::exit(), true),
 	};
 
-	info!(?command_text);
+	info!(?command);
 
 	fn mame_write_err(e: impl Into<Error>) -> Error {
 		e.into().context("Error writing to MAME")
 	}
 
-	writeln!(mame_stdin, "{}", command_text).map_err(mame_write_err)?;
+	writeln!(mame_stdin, "{}", command.text()).map_err(mame_write_err)?;
 	mame_stdin.flush().map_err(mame_write_err)?;
 
 	Ok(is_exit)

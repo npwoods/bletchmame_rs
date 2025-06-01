@@ -60,7 +60,7 @@ struct Live {
 #[derive(Clone)]
 struct Session {
 	job: Job<Result<()>>,
-	command_sender: Option<Arc<Sender<Cow<'static, str>>>>,
+	command_sender: Option<Arc<Sender<MameCommand>>>,
 	status: Option<Rc<Status>>,
 	pending_status: Option<Rc<Status>>,
 	pending_paths_update: Option<Rc<PrefsPaths>>,
@@ -273,10 +273,10 @@ impl AppState {
 	}
 
 	/// Issues a command to MAME
-	pub fn issue_command(&self, command: MameCommand<'_>) {
+	pub fn issue_command(&self, command: MameCommand) {
 		let session = self.live.as_ref().unwrap().session.as_ref().unwrap();
 		if let Some(command_sender) = session.command_sender.as_deref() {
-			command_sender.send(command.text()).unwrap();
+			command_sender.send(command).unwrap();
 		}
 	}
 

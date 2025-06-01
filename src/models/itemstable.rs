@@ -38,6 +38,7 @@ use crate::prefs::PrefsItem;
 use crate::prefs::PrefsMachineItem;
 use crate::prefs::PrefsSoftwareItem;
 use crate::prefs::SortOrder;
+use crate::runtime::command::MameCommand;
 use crate::selection::SelectionManager;
 use crate::software::Software;
 use crate::software::SoftwareList;
@@ -334,7 +335,7 @@ impl ItemsTableModel {
 				let machine = machine_config.machine();
 				let ramsize_arg = (
 					self.ramsize_arg_string.clone(),
-					ram_size.as_ref().map(u64::to_string).unwrap_or_default().into(),
+					ram_size.as_ref().map(u64::to_string).unwrap_or_default(),
 				);
 				let initial_loads = once(ramsize_arg)
 					.chain(
@@ -342,7 +343,7 @@ impl ItemsTableModel {
 							.changed_slots(None)
 							.into_iter()
 							.map(|(slot_name, slot_value)| {
-								(format!("&{slot_name}").into(), slot_value.unwrap_or_default().into())
+								(format!("&{slot_name}").into(), slot_value.unwrap_or_default())
 							}),
 					)
 					.chain(
@@ -351,10 +352,7 @@ impl ItemsTableModel {
 							.map(|(tag, filename)| (tag.as_str().into(), filename.as_str().into())),
 					)
 					.collect::<Vec<_>>();
-				let command = has_mame_initialized.then(|| AppCommand::RunMame {
-					machine_name: machine.name().to_string(),
-					initial_loads,
-				});
+				let command = has_mame_initialized.then(|| MameCommand::start(machine.name(), &initial_loads).into());
 				let title = run_item_text(machine.description()).into();
 				let browse_target =
 					(!machine.machine_software_lists().is_empty()).then(|| PrefsCollection::MachineSoftware {
@@ -391,11 +389,8 @@ impl ItemsTableModel {
 
 						parts_with_devices.ok().map(|initial_loads| {
 							// running is not yet supported!
-							let command = AppCommand::RunMame {
-								machine_name: machine.name().to_string(),
-								initial_loads,
-							};
-							let command = Some(command);
+							let command = MameCommand::start(machine.name(), &initial_loads);
+							let command = Some(command.into());
 							let title = machine.description().into();
 							MenuDesc { command, title }
 						})

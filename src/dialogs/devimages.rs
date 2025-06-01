@@ -11,6 +11,7 @@ use crate::devimageconfig::EntryDetails;
 use crate::dialogs::SingleResult;
 use crate::guiutils::modal::Modal;
 use crate::models::devimages::DevicesAndImagesModel;
+use crate::runtime::command::MameCommand;
 use crate::status::Status;
 use crate::ui::DevicesAndImagesContextMenuInfo;
 use crate::ui::DevicesAndImagesDialog;
@@ -48,7 +49,7 @@ pub async fn dialog_devices_and_images(
 	modal.dialog().on_apply_changes_clicked(move || {
 		let model = DevicesAndImagesModel::get_model(&model_clone);
 		let changed_slots = model.with_diconfig(|diconfig| diconfig.changed_slots(true));
-		let command = AppCommand::ChangeSlots(changed_slots);
+		let command = MameCommand::change_slots(&changed_slots).into();
 		invoke_command_clone(command);
 	});
 
