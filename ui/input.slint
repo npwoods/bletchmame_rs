@@ -4,6 +4,9 @@ export struct InputDialogEntry {
     name: string,
     text: string}
 
+export struct InputContextMenuEntry {
+    text: string}
+    
 export component InputDialog inherits Window {
     title: dialog-title;
     icon: @image-url("bletchmame.png");
@@ -16,6 +19,31 @@ export component InputDialog inherits Window {
 
     // callbacks
     callback ok-clicked();
+    callback context-button-clicked(int, Point);
+
+    // context menu
+    in-out property <[InputContextMenuEntry]> context-menu-entries-1;
+    in-out property <[InputContextMenuEntry]> context-menu-entries-2;
+    public function show-context-menu(entries-1: [InputContextMenuEntry], entries-2: [InputContextMenuEntry], point: Point) {
+        self.context-menu-entries-1 = entries-1;
+        self.context-menu-entries-2 = entries-2;
+        context-menu.show(point);
+    }
+
+    // context menu control
+    context-menu := ContextMenuArea {
+        Menu {
+            for entry in context-menu-entries-1: MenuItem {
+                title: entry.text;
+                enabled: false;
+            }
+            if context-menu-entries-1.length > 0: MenuSeparator { }
+            for entry in context-menu-entries-2: MenuItem {
+                title: entry.text;
+                enabled: false;
+            }
+        }
+    }
 
     // control hierarchy
     VerticalBox {
@@ -23,7 +51,7 @@ export component InputDialog inherits Window {
             viewport-height: root.entries.length * 30px;
             VerticalBox {
                 padding: 3px;
-                for entry in root.entries: HorizontalLayout {
+                for entry[index] in root.entries: HorizontalLayout {
                     vertical-stretch: 0;
                     Button {
                         width: 300px;
@@ -34,7 +62,10 @@ export component InputDialog inherits Window {
                     Button {
                         width: 40px;
                         text: "▼";
-                        enabled: false;
+                        enabled: true;
+                        clicked => {
+                            root.context-button-clicked(index, { x: self.absolute-position.x, y: self.absolute-position.y + self.height });
+                        }
                     }
 
                     VerticalLayout {
