@@ -130,7 +130,12 @@ impl MameCommand {
 }
 
 /// Internal method to build a `MameCommand`
-fn build<'a>(command_name: &'a str, args: impl IntoIterator<Item = &'a str>) -> MameCommand {
+fn build<'a, T>(command_name: &'a str, args: impl IntoIterator<Item = T>) -> MameCommand
+where
+	T: Into<Cow<'a, str>>,
+{
+	let command_name = Cow::Borrowed(command_name);
+	let args = args.into_iter().map(|x| x.into());
 	MameCommand(once(command_name).chain(args).map(quote_if_needed).join(" ").into())
 }
 
@@ -159,11 +164,11 @@ fn bool_str(b: bool) -> &'static str {
 	if b { "true" } else { "false" }
 }
 
-fn quote_if_needed(s: &str) -> Cow<'_, str> {
+fn quote_if_needed(s: Cow<'_, str>) -> Cow<'_, str> {
 	if s.is_empty() || s.contains(' ') {
 		Cow::Owned(format!("\"{s}\""))
 	} else {
-		Cow::Borrowed(s)
+		s
 	}
 }
 
@@ -189,7 +194,7 @@ mod test {
 	#[test_case(1, "Foo", "Foo")]
 	#[test_case(2, "Foo Bar", "\"Foo Bar\"")]
 	fn quote_if_needed(_index: usize, s: &str, expected: &str) {
-		let actual = super::quote_if_needed(s);
+		let actual = super::quote_if_needed(s.into());
 		assert_eq!(expected, &actual);
 	}
 }
