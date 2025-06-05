@@ -1,5 +1,6 @@
 mod parse;
 mod validate;
+
 use std::borrow::Cow;
 use std::fmt::Debug;
 use std::fmt::Formatter;
@@ -7,6 +8,7 @@ use std::io::BufRead;
 use std::sync::Arc;
 
 use anyhow::Result;
+use itertools::Itertools;
 use serde::Deserialize;
 use serde::Serialize;
 use strum::EnumProperty;
@@ -219,7 +221,7 @@ pub struct SlotOption {
 	pub selectable: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
+#[derive(Clone, Deserialize, Serialize, PartialEq, Default)]
 pub struct Input {
 	pub port_tag: String,
 	pub mask: u32,
@@ -233,6 +235,33 @@ pub struct Input {
 	pub seq_standard_tokens: Option<String>,
 	pub seq_increment_tokens: Option<String>,
 	pub seq_decrement_tokens: Option<String>,
+}
+
+impl Debug for Input {
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		let port = format!("{} {:#x}", self.port_tag, self.mask);
+		let seq_tokens_all = [
+			("", &self.seq_standard_tokens),
+			("[◄] ", &self.seq_decrement_tokens),
+			("[►] ", &self.seq_increment_tokens),
+		];
+		let seq_tokens = seq_tokens_all
+			.iter()
+			.filter_map(|(prefix, tokens)| tokens.as_deref().map(|tokens| format!("{prefix}{tokens}")))
+			.join(" ; ");
+
+		f.debug_struct("Input")
+			.field("port", &port)
+			.field("class", &self.class)
+			.field("group", &self.group)
+			.field("input_type", &self.input_type)
+			.field("player", &self.player)
+			.field("is_analog", &self.is_analog)
+			.field("name", &self.name)
+			.field("first_keyboard_code", &self.first_keyboard_code)
+			.field("seq_tokens", &seq_tokens)
+			.finish()
+	}
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash, EnumProperty, EnumString)]
