@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::future::Future;
 use std::rc::Rc;
 
@@ -10,20 +11,35 @@ use slint::Window;
 use winit::event::WindowEvent;
 use winit::window::WindowAttributes;
 
+use crate::guiutils::component::ComponentWrap;
+use crate::guiutils::component::WeakComponentWrap;
 use crate::guiutils::hook::with_attributes_hook;
 use crate::platform::WindowAttributesExt;
 use crate::platform::WindowExt;
 
+#[derive(Clone)]
+pub struct ModalStack(Rc<RefCell<Vec<WeakComponentWrap>>>);
+
 pub struct Modal<D> {
+	modal_stack: ModalStack,
+	modal_stack_pos: usize,
 	reenable_parent: Rc<dyn Fn() + 'static>,
 	dialog: D,
 }
 
-impl<D> Modal<D>
-where
-	D: ComponentHandle + 'static,
-{
-	pub fn new(parent: &(impl ComponentHandle + 'static), func: impl FnOnce() -> D) -> Self {
+impl ModalStack {
+	pub fn new(window: &(impl ComponentHandle + Sized + 'static)) -> Self {
+		let vec: Vec<WeakComponentWrap> = vec![WeakComponentWrap::from(window)];
+		Self(Rc::new(RefCell::new(vec)))
+	}
+
+	pub fn modal<D>(&self, func: impl FnOnce() -> D) -> Modal<D>
+	where
+		D: ComponentHandle + 'static,
+	{
+		let modal_stack_pos = self.0.borrow().len();
+		let parent = self.0.borrow().last().unwrap().unwrap();
+
 		// disable the parent
 		parent.window().set_enabled_for_modal(false);
 
@@ -73,12 +89,19 @@ where
 		let reenable_parent = Rc::from(reenable_parent);
 
 		// and return
-		Self {
+		Modal {
+			modal_stack: self.clone(),
+			modal_stack_pos,
 			reenable_parent,
 			dialog,
 		}
 	}
+}
 
+impl<D> Modal<D>
+where
+	D: ComponentHandle + 'static,
+{
 	pub fn dialog(&self) -> &'_ D {
 		&self.dialog
 	}
@@ -112,6 +135,9 @@ where
 		// hide the dialog
 		self.dialog.hide().unwrap();
 
+		// truncate the modal stack
+		self.modal_stack.0.borrow_mut().truncate(self.modal_stack_pos);
+
 		// return
 		result
 	}
@@ -125,7 +151,7 @@ fn set_window_attributes_for_modal_parent(
 	window_attributes
 }
 
-fn reenable_modal_parent(parent: &impl ComponentHandle) {
+fn reenable_modal_parent(parent: &ComponentWrap) {
 	parent.window().set_enabled_for_modal(true);
 	parent
 		.window()

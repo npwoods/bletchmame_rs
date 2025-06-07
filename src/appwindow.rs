@@ -61,7 +61,7 @@ use crate::guiutils::menuing::MenuExt;
 use crate::guiutils::menuing::MenuItemKindExt;
 use crate::guiutils::menuing::MenuItemUpdate;
 use crate::guiutils::menuing::accel;
-use crate::guiutils::modal::Modal;
+use crate::guiutils::modal::ModalStack;
 use crate::history::History;
 use crate::models::collectionsview::CollectionsViewModel;
 use crate::models::itemstable::EmptyReason;
@@ -114,6 +114,7 @@ pub enum AppWindowing {
 
 struct AppModel {
 	app_window_weak: Weak<AppWindow>,
+	modal_stack: ModalStack,
 	preferences: RefCell<Preferences>,
 	state: RefCell<AppState>,
 	status_changed_channel: Channel<Status>,
@@ -363,9 +364,13 @@ pub fn create(args: AppArgs) -> AppWindow {
 	}
 	app_window.window().set_fullscreen(preferences.is_fullscreen);
 
+	// create the window stack
+	let modal_stack = ModalStack::new(&app_window);
+
 	// create the model
 	let model = AppModel {
 		app_window_weak: app_window.as_weak(),
+		modal_stack,
 		preferences: RefCell::new(preferences),
 		state: RefCell::new(AppState::bogus()),
 		status_changed_channel: Channel::default(),
@@ -696,7 +701,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			let model_clone = model.clone();
 			let invoke_command = move |command| handle_command(&model_clone, command);
 			let fut = dialog_devices_and_images(
-				model.app_window_weak.clone(),
+				model.modal_stack.clone(),
 				diconfig,
 				status_update_channel,
 				invoke_command,
@@ -863,7 +868,6 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			model.issue_command(MameCommand::classic_menu());
 		}
 		AppCommand::SettingsInput(class) => {
-			let parent = model.app_window().as_weak();
 			let status_update_channel = model.status_changed_channel.clone();
 			let model_clone = model.clone();
 			let invoke_command = move |command| handle_command(&model_clone, command);
@@ -875,7 +879,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				(inputs, input_device_classes)
 			};
 			let fut = dialog_input(
-				parent,
+				model.modal_stack.clone(),
 				inputs,
 				input_device_classes,
 				class,
@@ -904,7 +908,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			let _ = open::that("https://www.bletchmame.org");
 		}
 		AppCommand::HelpAbout => {
-			let modal = Modal::new(&model.app_window(), || AboutDialog::new().unwrap());
+			let modal = model.modal_stack.modal(|| AboutDialog::new().unwrap());
 			modal.launch();
 		}
 		AppCommand::MameSessionEnded => {
@@ -914,10 +918,8 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			model.update_state(|state| state.status_update(update));
 		}
 		AppCommand::ErrorMessageBox(message) => {
-			let parent = model.app_window().as_weak();
-			let fut = async move {
-				dialog_message_box::<OkOnly>(parent, "Error", message).await;
-			};
+			let model_clone = model.clone();
+			let fut = dialog_message_box::<OkOnly>(model_clone.modal_stack.clone(), "Error", message);
 			spawn_local(fut).unwrap();
 		}
 		AppCommand::IssueMameCommand(command) => {
@@ -966,10 +968,9 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 		}
 		AppCommand::AddToNewFolderDialog(items) => {
 			let existing_names = get_folder_collection_names(&model.preferences.borrow().collections);
-			let parent = model.app_window().as_weak();
 			let model_clone = model.clone();
 			let fut = async move {
-				if let Some(name) = dialog_new_collection(parent, existing_names).await {
+				if let Some(name) = dialog_new_collection(model_clone.modal_stack.clone(), existing_names).await {
 					let command = AppCommand::AddToNewFolder(name, items);
 					handle_command(&model_clone, command);
 				}
@@ -997,12 +998,13 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			});
 		}
 		AppCommand::DeleteCollectionDialog { index } => {
-			let parent = model.app_window().as_weak();
 			let model_clone = model.clone();
 			let old_name = get_collection_name(&model.preferences.borrow().collections, index).to_string();
 			let fut = async move {
 				let message = format!("Are you sure you want to delete \"{}\"", old_name);
-				if dialog_message_box::<OkCancel>(parent, "Delete", message).await == OkCancel::Ok {
+				if dialog_message_box::<OkCancel>(model_clone.modal_stack.clone(), "Delete", message).await
+					== OkCancel::Ok
+				{
 					let command = AppCommand::MoveCollection {
 						old_index: index,
 						new_index: None,
@@ -1014,11 +1016,12 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 		}
 		AppCommand::RenameCollectionDialog { index } => {
 			let existing_names = get_folder_collection_names(&model.preferences.borrow().collections);
-			let parent = model.app_window().as_weak();
 			let model_clone = model.clone();
 			let old_name = get_collection_name(&model.preferences.borrow().collections, index).to_string();
 			let fut = async move {
-				if let Some(new_name) = dialog_rename_collection(parent, existing_names, old_name).await {
+				if let Some(new_name) =
+					dialog_rename_collection(model_clone.modal_stack.clone(), existing_names, old_name).await
+				{
 					let command = AppCommand::RenameCollection { index, new_name };
 					handle_command(&model_clone, command);
 				}
@@ -1035,7 +1038,6 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			})
 		}
 		AppCommand::LoadImageDialog { tag } => {
-			let parent = model.app_window_weak.clone();
 			let state = model.state.borrow();
 			let image = state
 				.status()
@@ -1049,7 +1051,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				description: &f.description,
 				extensions: &f.extensions,
 			});
-			if let Some(filename) = dialog_load_image(parent, format_iter) {
+			if let Some(filename) = dialog_load_image(model.modal_stack.clone(), format_iter) {
 				let command = MameCommand::load_image(tag, &filename).into();
 				handle_command(model, command);
 			}
@@ -1060,8 +1062,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 		AppCommand::ConnectToSocketDialog { tag } => {
 			let model_clone = model.clone();
 			let fut = async move {
-				let parent = model_clone.app_window_weak.clone();
-				if let Some((hostname, port)) = dialog_connect_to_socket(parent).await {
+				if let Some((hostname, port)) = dialog_connect_to_socket(model_clone.modal_stack.clone()).await {
 					let filename = format!("socket.{hostname}:{port}");
 					let command = MameCommand::load_image(tag, &filename).into();
 					handle_command(&model_clone, command);
@@ -1095,9 +1096,8 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				.unwrap();
 
 			let fut = async move {
-				let parent = model_clone.app_window_weak.clone();
 				let paths = model_clone.preferences.borrow().paths.clone();
-				if let Some(item) = dialog_configure(parent, info_db, item, &paths).await {
+				if let Some(item) = dialog_configure(model_clone.modal_stack.clone(), info_db, item, &paths).await {
 					model_clone.modify_prefs(|prefs| {
 						let old_collection = prefs.collections[folder_index].clone();
 						let PrefsCollection::Folder { name, mut items } = old_collection.as_ref().clone() else {
@@ -1119,9 +1119,8 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 }
 
 async fn show_paths_dialog(model: Rc<AppModel>, path_type: Option<PathType>) {
-	let parent = model.app_window_weak.clone();
 	let paths = model.preferences.borrow().paths.clone();
-	if let Some(new_paths) = dialog_paths(parent, paths, path_type).await {
+	if let Some(new_paths) = dialog_paths(model.modal_stack.clone(), paths, path_type).await {
 		model.modify_prefs(|prefs| prefs.paths = new_paths.into());
 	}
 }

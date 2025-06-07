@@ -2,14 +2,13 @@ use slint::CloseRequestResponse;
 use slint::ComponentHandle;
 use slint::LogicalPosition;
 use slint::ModelRc;
-use slint::Weak;
 
 use crate::appcommand::AppCommand;
 use crate::channel::Channel;
 use crate::devimageconfig::DevicesImagesConfig;
 use crate::devimageconfig::EntryDetails;
 use crate::dialogs::SingleResult;
-use crate::guiutils::modal::Modal;
+use crate::guiutils::modal::ModalStack;
 use crate::models::devimages::DevicesAndImagesModel;
 use crate::runtime::command::MameCommand;
 use crate::status::Status;
@@ -18,13 +17,13 @@ use crate::ui::DevicesAndImagesDialog;
 use crate::ui::DevicesAndImagesState;
 
 pub async fn dialog_devices_and_images(
-	parent: Weak<impl ComponentHandle + 'static>,
+	modal_stack: ModalStack,
 	diconfig: DevicesImagesConfig,
 	status_update_channel: Channel<Status>,
 	invoke_command: impl Fn(AppCommand) + Clone + 'static,
 ) {
 	// prepare the dialog
-	let modal = Modal::new(&parent.unwrap(), || DevicesAndImagesDialog::new().unwrap());
+	let modal = modal_stack.modal(|| DevicesAndImagesDialog::new().unwrap());
 	let single_result = SingleResult::default();
 
 	// set up the model

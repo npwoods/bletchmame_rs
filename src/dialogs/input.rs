@@ -14,7 +14,6 @@ use slint::ModelNotify;
 use slint::ModelRc;
 use slint::ModelTracker;
 use slint::VecModel;
-use slint::Weak;
 use strum::EnumString;
 use tracing::info;
 use tracing::trace;
@@ -23,7 +22,7 @@ use tracing::trace_span;
 use crate::appcommand::AppCommand;
 use crate::channel::Channel;
 use crate::dialogs::SingleResult;
-use crate::guiutils::modal::Modal;
+use crate::guiutils::modal::ModalStack;
 use crate::runtime::command::MameCommand;
 use crate::runtime::command::SeqType;
 use crate::status::Input;
@@ -87,7 +86,7 @@ enum SeqTokenModifier<'a> {
 }
 
 pub async fn dialog_input(
-	parent: Weak<impl ComponentHandle + 'static>,
+	modal_stack: ModalStack,
 	inputs: Arc<[Input]>,
 	input_device_classes: Arc<[InputDeviceClass]>,
 	class: InputClass,
@@ -95,7 +94,7 @@ pub async fn dialog_input(
 	invoke_command: impl Fn(AppCommand) + Clone + 'static,
 ) {
 	// prepare the dialog
-	let modal = Modal::new(&parent.unwrap(), || InputDialog::new().unwrap());
+	let modal = modal_stack.modal(|| InputDialog::new().unwrap());
 	let single_result = SingleResult::default();
 
 	// set the title

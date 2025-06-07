@@ -1,6 +1,6 @@
 use rfd::FileDialog;
-use slint::ComponentHandle;
-use slint::Weak;
+
+use crate::guiutils::modal::ModalStack;
 
 #[derive(Clone, Debug)]
 pub struct Format<'a> {
@@ -9,7 +9,7 @@ pub struct Format<'a> {
 }
 
 pub fn dialog_load_image<'a>(
-	_parent: Weak<impl ComponentHandle + 'static>,
+	_modal_stack: ModalStack,
 	format_iter: impl Iterator<Item = Format<'a>> + Clone,
 ) -> Option<String> {
 	let all_extensions = format_iter.clone().flat_map(|f| f.extensions).collect::<Vec<_>>();

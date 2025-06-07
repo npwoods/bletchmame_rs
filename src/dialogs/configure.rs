@@ -22,7 +22,7 @@ use crate::dialogs::devimages::entry_popup_menu;
 use crate::dialogs::image::Format;
 use crate::dialogs::image::dialog_load_image;
 use crate::dialogs::socket::dialog_connect_to_socket;
-use crate::guiutils::modal::Modal;
+use crate::guiutils::modal::ModalStack;
 use crate::info::InfoDb;
 use crate::info::View;
 use crate::mconfig::MachineConfig;
@@ -39,6 +39,7 @@ use crate::ui::SoftwareMachine;
 
 struct State {
 	dialog_weak: Weak<ConfigureDialog>,
+	modal_stack: ModalStack,
 	core: CoreState,
 }
 
@@ -63,18 +64,19 @@ enum CoreState {
 }
 
 pub async fn dialog_configure(
-	parent: Weak<impl ComponentHandle + 'static>,
+	modal_stack: ModalStack,
 	info_db: Rc<InfoDb>,
 	item: PrefsItem,
 	paths: &PrefsPaths,
 ) -> Option<PrefsItem> {
 	// prepare the dialog
-	let modal = Modal::new(&parent.unwrap(), || ConfigureDialog::new().unwrap());
+	let modal = modal_stack.modal(|| ConfigureDialog::new().unwrap());
 	let single_result = SingleResult::default();
 
 	// get the state
 	let dialog_weak = modal.dialog().as_weak();
-	let state = State::new(dialog_weak, &info_db, item);
+	let modal_stack = modal_stack.clone();
+	let state: State = State::new(dialog_weak, modal_stack, &info_db, item);
 	let state = Rc::new(state);
 
 	// set the title
@@ -260,15 +262,14 @@ fn context_menu_command(state: &Rc<State>, command: AppCommand) {
 				extensions: &extensions,
 			}];
 			let format_iter = formats.iter().cloned();
-			if let Some(filename) = dialog_load_image(state.dialog_weak.clone(), format_iter) {
+			if let Some(filename) = dialog_load_image(state.modal_stack.clone(), format_iter) {
 				state.set_image_filename(tag, Some(filename));
 			}
 		}
 		AppCommand::ConnectToSocketDialog { tag } => {
 			let state = state.clone();
 			let fut = async move {
-				let parent: Weak<ConfigureDialog> = state.dialog_weak.clone();
-				if let Some((hostname, port)) = dialog_connect_to_socket(parent).await {
+				if let Some((hostname, port)) = dialog_connect_to_socket(state.modal_stack.clone()).await {
 					let filename = format!("socket.{hostname}:{port}");
 					state.set_image_filename(tag, Some(filename));
 				}
@@ -283,7 +284,12 @@ fn context_menu_command(state: &Rc<State>, command: AppCommand) {
 }
 
 impl State {
-	pub fn new(dialog_weak: Weak<ConfigureDialog>, info_db: &Rc<InfoDb>, item: PrefsItem) -> Self {
+	pub fn new(
+		dialog_weak: Weak<ConfigureDialog>,
+		modal_stack: ModalStack,
+		info_db: &Rc<InfoDb>,
+		item: PrefsItem,
+	) -> Self {
 		let core = match item {
 			PrefsItem::Machine(item) => {
 				// figure out the diconfig
@@ -343,7 +349,11 @@ impl State {
 				}
 			}
 		};
-		let state = Self { dialog_weak, core };
+		let state = Self {
+			dialog_weak,
+			modal_stack,
+			core,
+		};
 		if matches!(&state.core, CoreState::Machine { .. }) {
 			state.update_images();
 		}
