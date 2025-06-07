@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use itertools::Itertools;
 use serde::Deserialize;
 use serde::Serialize;
@@ -5,12 +7,14 @@ use slint::SharedString;
 use strum::EnumProperty;
 use strum::IntoStaticStr;
 
+use crate::dialogs::seqpoll::SeqPollDialogType;
 use crate::prefs::BuiltinCollection;
 use crate::prefs::PrefsCollection;
 use crate::prefs::PrefsItem;
 use crate::prefs::SortOrder;
 use crate::prefs::pathtype::PathType;
 use crate::runtime::command::MameCommand;
+use crate::runtime::command::SeqType;
 use crate::status::InputClass;
 use crate::status::Update;
 use crate::version::MameVersion;
@@ -101,6 +105,12 @@ pub enum AppCommand {
 	Configure {
 		folder_name: String,
 		index: usize,
+	},
+	SeqPollDialog {
+		port_tag: Arc<str>,
+		mask: u32,
+		seq_type: SeqType,
+		poll_type: SeqPollDialogType,
 	},
 }
 

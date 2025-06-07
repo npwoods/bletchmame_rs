@@ -55,6 +55,7 @@ use crate::dialogs::messagebox::dialog_message_box;
 use crate::dialogs::namecollection::dialog_new_collection;
 use crate::dialogs::namecollection::dialog_rename_collection;
 use crate::dialogs::paths::dialog_paths;
+use crate::dialogs::seqpoll::dialog_seq_poll;
 use crate::dialogs::socket::dialog_connect_to_socket;
 use crate::guiutils::is_context_menu_event;
 use crate::guiutils::menuing::MenuExt;
@@ -1110,6 +1111,35 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 					})
 				}
 			};
+			spawn_local(fut).unwrap();
+		}
+		AppCommand::SeqPollDialog {
+			port_tag,
+			mask,
+			seq_type,
+			poll_type,
+		} => {
+			let modal_stack: ModalStack = model.modal_stack.clone();
+			let inputs = model
+				.state
+				.borrow()
+				.status()
+				.and_then(|x| x.running.as_ref())
+				.map(|x| x.inputs.clone())
+				.unwrap_or_default();
+			let status_changed_channel = model.status_changed_channel.clone();
+			let model_clone = model.clone();
+			let invoke_command = move |command| handle_command(&model_clone, command);
+			let fut = dialog_seq_poll(
+				modal_stack,
+				port_tag,
+				mask,
+				seq_type,
+				poll_type,
+				inputs,
+				status_changed_channel,
+				invoke_command,
+			);
 			spawn_local(fut).unwrap();
 		}
 	};

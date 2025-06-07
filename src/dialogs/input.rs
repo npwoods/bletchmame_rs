@@ -22,6 +22,7 @@ use tracing::trace_span;
 use crate::appcommand::AppCommand;
 use crate::channel::Channel;
 use crate::dialogs::SingleResult;
+use crate::dialogs::seqpoll::SeqPollDialogType;
 use crate::guiutils::modal::ModalStack;
 use crate::runtime::command::MameCommand;
 use crate::runtime::command::SeqType;
@@ -235,7 +236,30 @@ impl Model for InputDialogModel {
 		let cluster = state.clusters.get(row)?;
 		let name = input_cluster_name(&state.inputs, cluster).into();
 		let text = input_cluster_code_text(&state.inputs, cluster, &state.codes).into();
-		Some(InputDialogEntry { name, text })
+
+		let primary_command = match cluster {
+			InputCluster::Single(input_index) => {
+				let input = &state.inputs[*input_index];
+				let command = AppCommand::SeqPollDialog {
+					port_tag: input.port_tag.clone(),
+					mask: input.mask,
+					seq_type: SeqType::Standard,
+					poll_type: SeqPollDialogType::Specify,
+				};
+				Some(command)
+			}
+			InputCluster::Multi { .. } => None,
+		};
+		let primary_command = primary_command
+			.as_ref()
+			.map(AppCommand::encode_for_slint)
+			.unwrap_or_default();
+
+		Some(InputDialogEntry {
+			name,
+			text,
+			primary_command,
+		})
 	}
 
 	fn model_tracker(&self) -> &dyn ModelTracker {
@@ -426,10 +450,22 @@ fn input_cluster_context_menu<'a>(
 	match cluster {
 		InputCluster::Single(index) => {
 			let input = &inputs[*index];
+			let specify_command = AppCommand::SeqPollDialog {
+				port_tag: input.port_tag.clone(),
+				mask: input.mask,
+				seq_type: SeqType::Standard,
+				poll_type: SeqPollDialogType::Specify,
+			};
+			let add_command = AppCommand::SeqPollDialog {
+				port_tag: input.port_tag.clone(),
+				mask: input.mask,
+				seq_type: SeqType::Standard,
+				poll_type: SeqPollDialogType::Add,
+			};
 			let clear_command = MameCommand::seq_set_standard(&input.port_tag, input.mask, "");
-			let entries = [
-				("Specify...", None),
-				("Add...", None),
+			let entries: [(&'static str, Option<AppCommand>); 3] = [
+				("Specify...", Some(specify_command)),
+				("Add...", Some(add_command)),
 				("Clear", Some(clear_command.into())),
 			];
 			entries
