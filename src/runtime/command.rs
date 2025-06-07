@@ -7,6 +7,7 @@ use itertools::Itertools;
 use serde::Deserialize;
 use serde::Serialize;
 use strum::EnumIter;
+use strum::EnumString;
 use strum::IntoStaticStr;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -120,6 +121,41 @@ impl MameCommand {
 		Self("DEBUGGER".into())
 	}
 
+	pub fn seq_set_standard(port_tag: impl AsRef<str>, mask: u32, tokens: impl AsRef<str>) -> Self {
+		let seqs = &[(port_tag, mask, SeqType::Standard, tokens)];
+		Self::seq_set(seqs)
+	}
+
+	pub fn seq_set_all<S>(
+		port_tag: impl AsRef<str>,
+		mask: u32,
+		standard_tokens: S,
+		decrement_tokens: S,
+		increment_tokens: S,
+	) -> Self
+	where
+		S: AsRef<str>,
+	{
+		let port_tag = port_tag.as_ref();
+		let seqs = &[
+			(port_tag, mask, SeqType::Standard, standard_tokens),
+			(port_tag, mask, SeqType::Decrement, decrement_tokens),
+			(port_tag, mask, SeqType::Increment, increment_tokens),
+		];
+		Self::seq_set(seqs)
+	}
+
+	pub fn seq_set(seqs: &[(impl AsRef<str>, u32, SeqType, impl AsRef<str>)]) -> Self {
+		let args = seqs.iter().flat_map(|(port_tag, mask, seq_type, tokens)| {
+			let port_tag = Cow::Borrowed(port_tag.as_ref());
+			let mask = Cow::Owned(mask.to_string());
+			let seq_type = Cow::Borrowed(seq_type.into());
+			let tokens = Cow::Borrowed(tokens.as_ref());
+			[port_tag, mask, seq_type, tokens]
+		});
+		build("SEQ_SET", args)
+	}
+
 	pub fn ping() -> Self {
 		Self("PING".into())
 	}
@@ -160,6 +196,15 @@ impl TryFrom<&Path> for MovieFormat {
 	}
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, IntoStaticStr, EnumString)]
+#[strum(ascii_case_insensitive)]
+#[strum(serialize_all = "lowercase")]
+pub enum SeqType {
+	Standard,
+	Decrement,
+	Increment,
+}
+
 fn bool_str(b: bool) -> &'static str {
 	if b { "true" } else { "false" }
 }
@@ -185,6 +230,7 @@ mod test {
 	#[test_case(3, MameCommand::start("coco2b", &[("ext:fdc:wd17xx:0", "foo.dsk")]), "START coco2b ext:fdc:wd17xx:0 foo.dsk")]
 	#[test_case(4, MameCommand::load_image("ext:fdc:wd17xx:0", "foo bar.dsk"), "LOAD ext:fdc:wd17xx:0 \"foo bar.dsk\"")]
 	#[test_case(5, MameCommand::load_images(&[("ext:fdc:wd17xx:0", "foo bar.dsk")]), "LOAD ext:fdc:wd17xx:0 \"foo bar.dsk\"")]
+	#[test_case(6, MameCommand::seq_set_standard("foobar", 0x20, "KEYCODE_X or KEYCODE_Y"), "SEQ_SET foobar 32 standard \"KEYCODE_X or KEYCODE_Y\"")]
 	fn command_test(_index: usize, command: MameCommand, expected: &str) {
 		let actual = command.text();
 		assert_eq!(expected, actual);

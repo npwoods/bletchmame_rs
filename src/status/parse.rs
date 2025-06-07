@@ -4,11 +4,11 @@ use std::sync::Arc;
 
 use anyhow::Error;
 use anyhow::Result;
-use strum::EnumString;
 use tracing::debug;
 
 use crate::parse::normalize_tag;
 use crate::parse::parse_mame_bool;
+use crate::runtime::command::SeqType;
 use crate::status::ImageDetails;
 use crate::status::ImageFormat;
 use crate::status::ImageUpdate;
@@ -64,14 +64,6 @@ enum PhaseSpecificState {
 enum ThisError {
 	#[error("Missing mandatory attribute {0} when parsing status XML")]
 	MissingMandatoryAttribute(&'static str),
-}
-
-#[derive(Copy, Clone, Debug, EnumString)]
-#[strum(ascii_case_insensitive)]
-enum SeqType {
-	Standard,
-	Increment,
-	Decrement,
 }
 
 impl State {
@@ -273,7 +265,7 @@ impl State {
 				])?;
 
 				let port_tag = port_tag.ok_or(ThisError::MissingMandatoryAttribute("port_tag"))?;
-				let port_tag = normalize_tag(port_tag).into_owned();
+				let port_tag = normalize_tag(port_tag).into();
 				let mask = mask.ok_or(ThisError::MissingMandatoryAttribute("mask"))?.parse()?;
 				let class = class.ok_or(ThisError::MissingMandatoryAttribute("class"))?.parse().ok();
 				let group = group.ok_or(ThisError::MissingMandatoryAttribute("group"))?.parse()?;
@@ -530,7 +522,7 @@ mod test {
 			.as_deref()
 			.unwrap()
 			.iter()
-			.find(|x| x.port_tag == port_tag && x.mask == mask)
+			.find(|x| x.port_tag.as_ref() == port_tag && x.mask == mask)
 			.expect("could not find specified port_tag and mask");
 		let actual = (
 			input.class,

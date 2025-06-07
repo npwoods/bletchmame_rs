@@ -864,6 +864,9 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 		}
 		AppCommand::SettingsInput(class) => {
 			let parent = model.app_window().as_weak();
+			let status_update_channel = model.status_changed_channel.clone();
+			let model_clone = model.clone();
+			let invoke_command = move |command| handle_command(&model_clone, command);
 			let (inputs, input_device_classes) = {
 				let state = model.state.borrow();
 				let running = state.status().unwrap().running.as_ref().unwrap();
@@ -871,7 +874,14 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				let input_device_classes = running.input_device_classes.clone();
 				(inputs, input_device_classes)
 			};
-			let fut = dialog_input(parent, inputs, input_device_classes, class);
+			let fut = dialog_input(
+				parent,
+				inputs,
+				input_device_classes,
+				class,
+				status_update_channel,
+				invoke_command,
+			);
 			spawn_local(fut).unwrap();
 		}
 		AppCommand::SettingsPaths(path_type) => {
