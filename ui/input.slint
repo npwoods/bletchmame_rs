@@ -2,7 +2,8 @@ import { GridBox, VerticalBox, HorizontalBox, Button, StandardButton, ScrollView
 
 export struct InputDialogEntry {
     name: string,
-    text: string}
+    text: string,
+    primary-command: string}
 
 export struct InputContextMenuEntry {
     title: string,
@@ -64,7 +65,10 @@ export component InputDialog inherits Window {
                     Button {
                         width: 300px;
                         text: entry.name;
-                        enabled: false;
+                        enabled: entry.primary-command != "";
+                        clicked => {
+                            root.menu-item-command(entry.primary-command);
+                        }
                     }
 
                     Button {

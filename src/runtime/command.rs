@@ -156,6 +156,18 @@ impl MameCommand {
 		build("SEQ_SET", args)
 	}
 
+	pub fn seq_poll_start(port_tag: impl AsRef<str>, mask: u32, seq_type: SeqType, start_seq: impl AsRef<str>) -> Self {
+		let port_tag = port_tag.as_ref();
+		let mask = mask.to_string();
+		let seq_type = seq_type.into();
+		let start_seq = start_seq.as_ref();
+		build("SEQ_POLL_START", [port_tag, mask.as_str(), seq_type, start_seq])
+	}
+
+	pub fn seq_poll_stop() -> Self {
+		Self("SEQ_POLL_STOP".into())
+	}
+
 	pub fn ping() -> Self {
 		Self("PING".into())
 	}

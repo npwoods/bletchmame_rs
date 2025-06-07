@@ -1,14 +1,13 @@
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
-use slint::Weak;
 
 use crate::dialogs::SingleResult;
-use crate::guiutils::modal::Modal;
+use crate::guiutils::modal::ModalStack;
 use crate::ui::ConnectToSocketDialog;
 
-pub async fn dialog_connect_to_socket(parent: Weak<impl ComponentHandle + 'static>) -> Option<(String, u16)> {
+pub async fn dialog_connect_to_socket(modal_stack: ModalStack) -> Option<(String, u16)> {
 	// prepare the dialog
-	let modal = Modal::new(&parent.unwrap(), || ConnectToSocketDialog::new().unwrap());
+	let modal = modal_stack.modal(|| ConnectToSocketDialog::new().unwrap());
 	let single_result = SingleResult::default();
 
 	// set up the accepted handler (when "OK" is clicked)

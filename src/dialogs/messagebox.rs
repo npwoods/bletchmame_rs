@@ -2,15 +2,13 @@ use std::default::Default;
 use std::fmt::Display;
 
 use slint::CloseRequestResponse;
-use slint::ComponentHandle;
 use slint::ModelRc;
 use slint::SharedString;
 use slint::VecModel;
-use slint::Weak;
 use strum::VariantArray;
 
 use crate::dialogs::SingleResult;
-use crate::guiutils::modal::Modal;
+use crate::guiutils::modal::ModalStack;
 use crate::ui::MessageBoxDialog;
 
 pub trait MessageBoxDefaults: VariantArray {
@@ -53,7 +51,7 @@ impl MessageBoxDefaults for OkCancel {
 }
 
 pub async fn dialog_message_box<T>(
-	parent: Weak<impl ComponentHandle + 'static>,
+	modal_stack: ModalStack,
 	title: impl Into<SharedString>,
 	message: impl Into<SharedString>,
 ) -> T
@@ -74,12 +72,12 @@ where
 
 	// and run it
 	let result_index =
-		internal_dialog_message_box(parent, title, message, value_texts, accept_index, abort_index).await;
+		internal_dialog_message_box(modal_stack, title, message, value_texts, accept_index, abort_index).await;
 	values[result_index].clone()
 }
 
 async fn internal_dialog_message_box(
-	parent: Weak<impl ComponentHandle + 'static>,
+	modal_stack: ModalStack,
 	title: SharedString,
 	message: SharedString,
 	value_texts: Vec<SharedString>,
@@ -87,7 +85,7 @@ async fn internal_dialog_message_box(
 	abort_index: usize,
 ) -> usize {
 	// prepare the dialog
-	let modal = Modal::new(&parent.unwrap(), || MessageBoxDialog::new().unwrap());
+	let modal = modal_stack.modal(|| MessageBoxDialog::new().unwrap());
 	let single_result = SingleResult::default();
 
 	// turn value_texts into a model

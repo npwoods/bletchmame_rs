@@ -4,20 +4,19 @@ use std::default::Default;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
 use slint::SharedString;
-use slint::Weak;
 
 use crate::dialogs::SingleResult;
-use crate::guiutils::modal::Modal;
+use crate::guiutils::modal::ModalStack;
 use crate::ui::NameCollectionDialog;
 
 async fn dialog_name_collection(
-	parent: Weak<impl ComponentHandle + 'static>,
+	modal_stack: ModalStack,
 	title: impl Into<SharedString>,
 	existing_names: Vec<String>,
 	default_name: impl Into<SharedString>,
 ) -> Option<String> {
 	// prepare the dialog
-	let modal = Modal::new(&parent.unwrap(), || NameCollectionDialog::new().unwrap());
+	let modal = modal_stack.modal(|| NameCollectionDialog::new().unwrap());
 	let single_result = SingleResult::default();
 
 	// set the title and default name
@@ -56,13 +55,10 @@ async fn dialog_name_collection(
 	modal.run(async { single_result.wait().await }).await
 }
 
-pub async fn dialog_new_collection(
-	parent: Weak<impl ComponentHandle + 'static>,
-	existing_names: Vec<String>,
-) -> Option<String> {
+pub async fn dialog_new_collection(modal_stack: ModalStack, existing_names: Vec<String>) -> Option<String> {
 	let default_name = create_new_name(&existing_names);
 	let title = "Create New Collection";
-	dialog_name_collection(parent, title, existing_names, default_name.as_ref()).await
+	dialog_name_collection(modal_stack, title, existing_names, default_name.as_ref()).await
 }
 
 fn create_new_name(existing_names: &[String]) -> impl AsRef<str> + use<> {
@@ -85,12 +81,12 @@ fn is_good_new_name(existing_names: &[String], new_name: &str) -> bool {
 }
 
 pub async fn dialog_rename_collection(
-	parent: Weak<impl ComponentHandle + 'static>,
+	modal_stack: ModalStack,
 	existing_names: Vec<String>,
 	old_name: String,
 ) -> Option<String> {
 	let title = format!("Rename Folder \"{}\"", old_name);
-	dialog_name_collection(parent, title, existing_names, old_name).await
+	dialog_name_collection(modal_stack, title, existing_names, old_name).await
 }
 
 #[cfg(test)]

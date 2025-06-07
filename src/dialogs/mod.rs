@@ -11,6 +11,7 @@ pub mod input;
 pub mod messagebox;
 pub mod namecollection;
 pub mod paths;
+pub mod seqpoll;
 pub mod socket;
 
 struct SingleResult<T>(Rc<(Notify, RefCell<Option<T>>)>);

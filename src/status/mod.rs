@@ -43,6 +43,7 @@ impl Status {
 			let system_mute = running.system_mute.or(status_running.system_mute);
 			let sound_attenuation = running.sound_attenuation.or(status_running.sound_attenuation);
 			let is_recording = running.is_recording.unwrap_or(status_running.is_recording);
+			let polling_input_seq = running.polling_input_seq.unwrap_or(status_running.polling_input_seq);
 
 			let images = running.images.map(|images| {
 				images
@@ -78,6 +79,7 @@ impl Status {
 				system_mute,
 				sound_attenuation,
 				is_recording,
+				polling_input_seq,
 				images,
 				slots,
 				inputs,
@@ -114,6 +116,7 @@ pub struct Running {
 	pub system_mute: Option<bool>,
 	pub sound_attenuation: Option<i32>,
 	pub is_recording: bool,
+	pub polling_input_seq: bool,
 	pub images: Arc<[Image]>,
 	pub slots: Arc<[Slot]>,
 	pub inputs: Arc<[Input]>,
@@ -182,6 +185,7 @@ struct RunningUpdate {
 	pub system_mute: Option<bool>,
 	pub sound_attenuation: Option<i32>,
 	pub is_recording: Option<bool>,
+	pub polling_input_seq: Option<bool>,
 	pub images: Option<Vec<ImageUpdate>>,
 	pub slots: Option<Vec<Slot>>,
 	pub inputs: Option<Vec<Input>>,

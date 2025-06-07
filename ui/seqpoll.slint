@@ -1,0 +1,30 @@
+
+import { VerticalBox, HorizontalBox, Button } from "std-widgets.slint";
+
+export component SeqPollDialog inherits Window {
+    title: dialog-title;
+    icon: @image-url("bletchmame.png");
+
+    // properties
+    in property <string> dialog-title;
+    in property <string> dialog-caption;
+
+    // controls
+    VerticalBox {
+        Text {
+            text: dialog-caption;
+        }
+
+        HorizontalBox {
+            Text {
+                text: "For mouse inputs, press the button to the right";
+                vertical-alignment: center;
+            }
+
+            Button {
+                text: "Mouse Inputs";
+                enabled: false;
+            }
+        }
+    }
+}

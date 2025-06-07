@@ -20,7 +20,7 @@ use tracing::info;
 
 use crate::dialogs::SingleResult;
 use crate::dialogs::file::choose_path_by_type_dialog;
-use crate::guiutils::modal::Modal;
+use crate::guiutils::modal::ModalStack;
 use crate::icon::Icon;
 use crate::prefs::PrefsPaths;
 use crate::prefs::pathtype::PathType;
@@ -43,12 +43,12 @@ impl Debug for State {
 }
 
 pub async fn dialog_paths(
-	parent: Weak<impl ComponentHandle + 'static>,
+	modal_stack: ModalStack,
 	paths: Rc<PrefsPaths>,
 	path_type: Option<PathType>,
 ) -> Option<PrefsPaths> {
 	// prepare the dialog
-	let modal = Modal::new(&parent.unwrap(), || PathsDialog::new().unwrap());
+	let modal = modal_stack.modal(|| PathsDialog::new().unwrap());
 	let single_result = SingleResult::default();
 	let state = State {
 		dialog_weak: modal.dialog().as_weak(),
