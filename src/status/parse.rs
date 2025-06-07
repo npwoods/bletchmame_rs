@@ -4,11 +4,11 @@ use std::sync::Arc;
 
 use anyhow::Error;
 use anyhow::Result;
-use strum::EnumString;
 use tracing::debug;
 
 use crate::parse::normalize_tag;
 use crate::parse::parse_mame_bool;
+use crate::runtime::command::SeqType;
 use crate::status::ImageDetails;
 use crate::status::ImageFormat;
 use crate::status::ImageUpdate;
@@ -64,14 +64,6 @@ enum PhaseSpecificState {
 enum ThisError {
 	#[error("Missing mandatory attribute {0} when parsing status XML")]
 	MissingMandatoryAttribute(&'static str),
-}
-
-#[derive(Copy, Clone, Debug, EnumString)]
-#[strum(ascii_case_insensitive)]
-enum SeqType {
-	Standard,
-	Increment,
-	Decrement,
 }
 
 impl State {

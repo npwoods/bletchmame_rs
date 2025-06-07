@@ -13,17 +13,25 @@ use slint::Model;
 use slint::ModelNotify;
 use slint::ModelRc;
 use slint::ModelTracker;
-use slint::SharedString;
 use slint::VecModel;
 use slint::Weak;
 use strum::EnumString;
+use tracing::info;
+use tracing::trace;
+use tracing::trace_span;
 
+use crate::appcommand::AppCommand;
+use crate::channel::Channel;
 use crate::dialogs::SingleResult;
 use crate::guiutils::modal::Modal;
+use crate::runtime::command::MameCommand;
+use crate::runtime::command::SeqType;
 use crate::status::Input;
 use crate::status::InputClass;
+use crate::status::InputDevice;
 use crate::status::InputDeviceClass;
 use crate::status::InputDeviceClassName;
+use crate::status::Status;
 use crate::ui::InputContextMenuEntry;
 use crate::ui::InputDialog;
 use crate::ui::InputDialogEntry;
@@ -52,6 +60,11 @@ enum InputCluster {
 	},
 }
 
+struct ContextMenuEntry<'a> {
+	pub title: &'a str,
+	pub command: Option<AppCommand>,
+}
+
 #[derive(Debug, PartialEq)]
 enum SeqToken<'a> {
 	Named(&'a str, Option<SeqTokenModifier<'a>>),
@@ -78,6 +91,8 @@ pub async fn dialog_input(
 	inputs: Arc<[Input]>,
 	input_device_classes: Arc<[InputDeviceClass]>,
 	class: InputClass,
+	status_update_channel: Channel<Status>,
+	invoke_command: impl Fn(AppCommand) + Clone + 'static,
 ) {
 	// prepare the dialog
 	let modal = Modal::new(&parent.unwrap(), || InputDialog::new().unwrap());
@@ -99,6 +114,13 @@ pub async fn dialog_input(
 		signaller.signal(());
 	});
 
+	// set up the context menu command handler
+	modal.dialog().on_menu_item_command(move |command_string| {
+		if let Some(command) = AppCommand::decode_from_slint(command_string) {
+			invoke_command(command);
+		}
+	});
+
 	// set up the model
 	let model = InputDialogModel::new(class);
 	let model = Rc::new(model);
@@ -117,6 +139,17 @@ pub async fn dialog_input(
 		dialog.invoke_show_context_menu(entries_1, entries_2, point);
 	});
 
+	// subscribe to status changes
+	let model_clone = model.clone();
+	let _subscription = status_update_channel.subscribe(move |status| {
+		// update the model
+		let model = InputDialogModel::get_model(&model_clone);
+		let running = status.running.as_ref();
+		let inputs = running.map(|r| &r.inputs).cloned().unwrap_or_default();
+		let input_device_classes = running.map(|r| &r.input_device_classes).cloned().unwrap_or_default();
+		model.update(inputs, input_device_classes);
+	});
+
 	// update the model
 	InputDialogModel::get_model(&model).update(inputs, input_device_classes);
 
@@ -133,83 +166,56 @@ impl InputDialogModel {
 	}
 
 	pub fn update(&self, inputs: Arc<[Input]>, input_device_classes: Arc<[InputDeviceClass]>) {
-		let mut state = self.state.borrow_mut();
-		state.inputs = inputs;
-		state.input_device_classes = input_device_classes;
-		state.clusters = build_clusters(&state.inputs, self.class);
-		state.codes = build_codes(&state.input_device_classes);
-		drop(state);
+		let changed = {
+			let mut state = self.state.borrow_mut();
+			let changed = state.inputs != inputs || state.input_device_classes != input_device_classes;
+			if changed {
+				state.inputs = inputs;
+				state.input_device_classes = input_device_classes;
+				state.clusters = build_clusters(&state.inputs, self.class);
+				state.codes = build_codes(&state.input_device_classes);
 
-		self.notify.reset();
+				info!(inputs_len=?state.inputs.len(), input_device_classes_len=?state.input_device_classes.len(), "InputDialogModel::update(): Changing state");
+				dump_clusters_trace(state.inputs.as_ref(), state.clusters.as_ref());
+			}
+			changed
+		};
+
+		if changed {
+			self.notify.reset();
+		}
 	}
 
 	pub fn context_menu(&self, index: usize) -> (ModelRc<InputContextMenuEntry>, ModelRc<InputContextMenuEntry>) {
-		let (entries_1, entries_2) = {
-			let state = self.state.borrow();
-			let cluster = &state.clusters[index];
-
-			match cluster {
-				InputCluster::Single(_) => {
-					let entries_1 = [].into();
-					let entries_2 = ["Specify", "Add...", "Clear"]
-						.iter()
-						.copied()
-						.map(|text| {
-							let text = SharedString::from(text);
-							InputContextMenuEntry { text }
-						})
-						.collect::<Vec<_>>();
-					(entries_1, entries_2)
-				}
-				InputCluster::Multi {
-					x_input_index,
-					y_input_index,
-					..
-				} => {
-					let entries_1 = (x_input_index.is_some() || y_input_index.is_some())
-						.then(|| {
-							let device_entry_iter = state
-								.input_device_classes
-								.iter()
-								.flat_map(|device_class| &device_class.devices)
-								.filter(|device| {
-									let has_x = device.items.iter().any(|item| item.token == "XAXIS");
-									let has_y = device.items.iter().any(|item| item.token == "YAXIS");
-									(x_input_index.is_some() && has_x) || (y_input_index.is_some() && has_y)
-								})
-								.map(|device| device.name.as_str());
-
-							["Arrow Keys", "Numeric Keypad"]
-								.iter()
-								.copied()
-								.chain(device_entry_iter)
-								.chain(["Multiple..."].iter().copied())
-								.map(|text| {
-									let text = SharedString::from(text);
-									InputContextMenuEntry { text }
-								})
-								.collect::<Vec<_>>()
-						})
+		fn convert_entries(entries: &[Option<ContextMenuEntry>]) -> ModelRc<InputContextMenuEntry> {
+			let entries = entries
+				.iter()
+				.map(|entry| {
+					let entry = entry.as_ref().unwrap();
+					let title = entry.title.into();
+					let command = entry
+						.command
+						.as_ref()
+						.map(AppCommand::encode_for_slint)
 						.unwrap_or_default();
+					InputContextMenuEntry { title, command }
+				})
+				.collect::<Vec<_>>();
+			let entries = VecModel::from(entries);
+			ModelRc::new(entries)
+		}
 
-					let entries_2 = ["Specify", "Clear"]
-						.iter()
-						.copied()
-						.map(|text| {
-							let text = SharedString::from(text);
-							InputContextMenuEntry { text }
-						})
-						.collect::<Vec<_>>();
-					(entries_1, entries_2)
-				}
-			}
-		};
+		let state = self.state.borrow();
+		let cluster = &state.clusters[index];
+		let entries = input_cluster_context_menu(&state.inputs, &state.input_device_classes, cluster);
 
-		let entries_1 = VecModel::from(entries_1);
-		let entries_2 = VecModel::from(entries_2);
-		let entries_1 = ModelRc::new(entries_1);
-		let entries_2 = ModelRc::new(entries_2);
-		(entries_1, entries_2)
+		let (entries_1, entries_2) = entries
+			.iter()
+			.position(Option::is_none)
+			.map(|x| (&entries[..x], &entries[(x + 1)..]))
+			.unwrap_or((&[], &entries));
+
+		(convert_entries(entries_1), convert_entries(entries_2))
 	}
 
 	pub fn get_model(model: &impl Model) -> &'_ Self {
@@ -411,6 +417,222 @@ fn coalesce_input_clusters(a: &InputCluster, b: &InputCluster) -> Option<InputCl
 		aggregate_name,
 	};
 	Some(result)
+}
+
+fn input_cluster_context_menu<'a>(
+	inputs: &'a [Input],
+	input_device_classes: &'a [InputDeviceClass],
+	cluster: &InputCluster,
+) -> Vec<Option<ContextMenuEntry<'a>>> {
+	match cluster {
+		InputCluster::Single(index) => {
+			let input = &inputs[*index];
+			let clear_command = MameCommand::seq_set_standard(&input.port_tag, input.mask, "");
+			let entries = [
+				("Specify...", None),
+				("Add...", None),
+				("Clear", Some(clear_command.into())),
+			];
+			entries
+				.into_iter()
+				.map(|(title, command)| Some(ContextMenuEntry { title, command }))
+				.collect::<Vec<_>>()
+		}
+		InputCluster::Multi {
+			x_input_index,
+			y_input_index,
+			..
+		} => {
+			let x_input = x_input_index.map(|index| &inputs[index]);
+			let y_input = y_input_index.map(|index| &inputs[index]);
+
+			let entries_iter = if x_input.is_some() || y_input.is_some() {
+				let arrow_keys_entry = ContextMenuEntry {
+					title: "Arrow Keys",
+					command: Some(app_command_for_set_multi_seq(
+						x_input,
+						y_input,
+						"",
+						"KEYCODE_LEFT",
+						"KEYCODE_RIGHT",
+						"",
+						"KEYCODE_UP",
+						"KEYCODE_DOWN",
+					)),
+				};
+				let numpad_entry = ContextMenuEntry {
+					title: "Number Pad",
+					command: Some(app_command_for_set_multi_seq(
+						x_input,
+						y_input,
+						"",
+						"KEYCODE_4PAD",
+						"KEYCODE_6PAD",
+						"",
+						"KEYCODE_8PAD",
+						"KEYCODE_2PAD",
+					)),
+				};
+				let device_entries_iter = input_device_classes
+					.iter()
+					.flat_map(|device_class| &device_class.devices)
+					.filter_map(|device| context_menu_entry_for_quick_device(device, x_input, y_input));
+
+				Either::Left(
+					[arrow_keys_entry]
+						.into_iter()
+						.chain([numpad_entry])
+						.chain(device_entries_iter)
+						.map(Some)
+						.chain([None]),
+				)
+			} else {
+				Either::Right([].into_iter())
+			};
+
+			let specify_entry = ContextMenuEntry {
+				title: "Specify...",
+				command: None,
+			};
+			let clear_entry = ContextMenuEntry {
+				title: "Clear",
+				command: Some(app_command_for_set_multi_seq(x_input, y_input, "", "", "", "", "", "")),
+			};
+			entries_iter
+				.chain([Some(specify_entry)])
+				.chain([Some(clear_entry)])
+				.collect::<Vec<_>>()
+		}
+	}
+}
+
+fn dump_clusters_trace(inputs: &[Input], clusters: &[InputCluster]) {
+	let span = trace_span!("dump_clusters_trace");
+	let _guard = span.enter();
+
+	for (idx, cluster) in clusters.iter().enumerate() {
+		match cluster {
+			InputCluster::Single(input_index) => {
+				if let Some(input) = inputs.get(*input_index) {
+					trace!("Cluster[{idx}]: {input:?}");
+				}
+			}
+			InputCluster::Multi {
+				x_input_index,
+				y_input_index,
+				..
+			} => {
+				if let Some(input) = x_input_index.and_then(|i| inputs.get(i)) {
+					trace!("Cluster[{idx}].X: {input:?}");
+				}
+				if let Some(input) = y_input_index.and_then(|i| inputs.get(i)) {
+					trace!("Cluster[{idx}].Y: {input:?}");
+				}
+			}
+		}
+	}
+}
+
+fn context_menu_entry_for_quick_device<'a>(
+	device: &'a InputDevice,
+	x_input: Option<&Input>,
+	y_input: Option<&Input>,
+) -> Option<ContextMenuEntry<'a>> {
+	app_command_for_set_quick_devices([device].into_iter(), x_input, y_input).map(|command| {
+		let title = &device.name;
+		let command = Some(command);
+		ContextMenuEntry { title, command }
+	})
+}
+
+fn app_command_for_set_quick_devices<'a>(
+	device_iter: impl Iterator<Item = &'a InputDevice> + Clone,
+	x_input: Option<&Input>,
+	y_input: Option<&Input>,
+) -> Option<AppCommand> {
+	let get_codes = |token: &str| {
+		device_iter
+			.clone()
+			.flat_map(|device| {
+				device
+					.items
+					.iter()
+					.filter(|item| item.token == token)
+					.map(|item| &item.code)
+			})
+			.join(" or ")
+	};
+
+	let x_codes = x_input.is_some().then(|| get_codes("XAXIS")).unwrap_or_default();
+	let y_codes = y_input.is_some().then(|| get_codes("YAXIS")).unwrap_or_default();
+
+	(!x_codes.is_empty() && !y_codes.is_empty())
+		.then(|| app_command_for_set_multi_seq(x_input, y_input, x_codes.as_str(), "", "", y_codes.as_str(), "", ""))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn app_command_for_set_multi_seq(
+	x_input: Option<&Input>,
+	y_input: Option<&Input>,
+	x_standard_tokens: &str,
+	x_decrement_tokens: &str,
+	x_increment_tokens: &str,
+	y_standard_tokens: &str,
+	y_decrement_tokens: &str,
+	y_increment_tokens: &str,
+) -> AppCommand {
+	let seqs = [
+		x_input.map(|x_input| {
+			(
+				x_input.port_tag.as_ref(),
+				x_input.mask,
+				SeqType::Standard,
+				x_standard_tokens,
+			)
+		}),
+		x_input.map(|x_input| {
+			(
+				x_input.port_tag.as_ref(),
+				x_input.mask,
+				SeqType::Decrement,
+				x_decrement_tokens,
+			)
+		}),
+		x_input.map(|x_input| {
+			(
+				x_input.port_tag.as_ref(),
+				x_input.mask,
+				SeqType::Increment,
+				x_increment_tokens,
+			)
+		}),
+		y_input.map(|y_input| {
+			(
+				y_input.port_tag.as_ref(),
+				y_input.mask,
+				SeqType::Standard,
+				y_standard_tokens,
+			)
+		}),
+		y_input.map(|y_input| {
+			(
+				y_input.port_tag.as_ref(),
+				y_input.mask,
+				SeqType::Decrement,
+				y_decrement_tokens,
+			)
+		}),
+		y_input.map(|y_input| {
+			(
+				y_input.port_tag.as_ref(),
+				y_input.mask,
+				SeqType::Increment,
+				y_increment_tokens,
+			)
+		}),
+	];
+	let seqs = seqs.into_iter().flatten().collect::<Vec<_>>();
+	MameCommand::seq_set(seqs.as_slice()).into()
 }
 
 fn seq_tokens_desc_from_string(s: &str, codes: &HashMap<Box<str>, impl AsRef<str>>) -> String {
