@@ -212,7 +212,7 @@ pub struct SlotOption {
 
 #[derive(Clone, Deserialize, Serialize, PartialEq, Default)]
 pub struct Input {
-	pub port_tag: String,
+	pub port_tag: Arc<str>,
 	pub mask: u32,
 	pub class: Option<InputClass>,
 	pub group: u8,

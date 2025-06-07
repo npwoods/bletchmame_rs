@@ -273,7 +273,7 @@ impl State {
 				])?;
 
 				let port_tag = port_tag.ok_or(ThisError::MissingMandatoryAttribute("port_tag"))?;
-				let port_tag = normalize_tag(port_tag).into_owned();
+				let port_tag = normalize_tag(port_tag).into();
 				let mask = mask.ok_or(ThisError::MissingMandatoryAttribute("mask"))?.parse()?;
 				let class = class.ok_or(ThisError::MissingMandatoryAttribute("class"))?.parse().ok();
 				let group = group.ok_or(ThisError::MissingMandatoryAttribute("group"))?.parse()?;
@@ -530,7 +530,7 @@ mod test {
 			.as_deref()
 			.unwrap()
 			.iter()
-			.find(|x| x.port_tag == port_tag && x.mask == mask)
+			.find(|x| x.port_tag.as_ref() == port_tag && x.mask == mask)
 			.expect("could not find specified port_tag and mask");
 		let actual = (
 			input.class,
