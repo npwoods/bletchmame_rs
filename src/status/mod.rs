@@ -43,7 +43,8 @@ impl Status {
 			let system_mute = running.system_mute.or(status_running.system_mute);
 			let sound_attenuation = running.sound_attenuation.or(status_running.sound_attenuation);
 			let is_recording = running.is_recording.unwrap_or(status_running.is_recording);
-			let images = if let Some(images) = running.images {
+
+			let images = running.images.map(|images| {
 				images
 					.into_iter()
 					.filter_map(|update_image| {
@@ -62,24 +63,12 @@ impl Status {
 						Some(new_status_image)
 					})
 					.collect()
-			} else {
-				status_running.images.clone()
-			};
-			let slots = if let Some(slots) = running.slots {
-				slots.into_iter().collect()
-			} else {
-				status_running.slots.clone()
-			};
-			let inputs = if let Some(inputs) = running.inputs {
-				inputs.into_iter().collect()
-			} else {
-				status_running.inputs.clone()
-			};
-			let input_device_classes = if let Some(input_device_classes) = running.input_device_classes {
-				input_device_classes.into_iter().collect()
-			} else {
-				status_running.input_device_classes.clone()
-			};
+			});
+			let images = collect_or_clone_existing(images, &status_running.images);
+			let slots = collect_or_clone_existing(running.slots, &status_running.slots);
+			let inputs = collect_or_clone_existing(running.inputs, &status_running.inputs);
+			let input_device_classes =
+				collect_or_clone_existing(running.input_device_classes, &status_running.input_device_classes);
 
 			Running {
 				machine_name,
@@ -333,10 +322,23 @@ pub enum UpdateXmlProblem {
 	UnknownMachine(String),
 }
 
+fn collect_or_clone_existing<T>(update: Option<Vec<T>>, existing: &Arc<[T]>) -> Arc<[T]>
+where
+	T: PartialEq,
+{
+	let update = update.and_then(|update| (update.as_slice() != existing.as_ref()).then_some(update));
+	if let Some(update) = update {
+		update.into_iter().collect()
+	} else {
+		existing.clone()
+	}
+}
+
 #[cfg(test)]
 mod test {
 	use std::io::BufReader;
 	use std::str::FromStr;
+	use std::sync::Arc;
 
 	use test_case::test_case;
 
@@ -386,6 +388,17 @@ mod test {
 		let run = status.running.as_ref().unwrap();
 		let actual = (run.is_paused, run.is_throttled, run.throttle_rate);
 		assert_eq!((false, false, 3.0), actual);
+
+		// and apply the same update again!
+		let old_run = run;
+		let status = Status::new(Some(&status), update(xml4));
+		let run = status.running.as_ref().unwrap();
+		let actual = (run.is_paused, run.is_throttled, run.throttle_rate);
+		assert_eq!((false, false, 3.0), actual);
+		assert!(Arc::ptr_eq(&old_run.images, &run.images));
+		assert!(Arc::ptr_eq(&old_run.slots, &run.slots));
+		assert!(Arc::ptr_eq(&old_run.inputs, &run.inputs));
+		assert!(Arc::ptr_eq(&old_run.input_device_classes, &run.input_device_classes));
 	}
 
 	#[test_case(0, "keyboard", InputDeviceClassName::Keyboard)]
