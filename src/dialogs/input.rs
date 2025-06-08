@@ -14,6 +14,7 @@ use slint::ModelNotify;
 use slint::ModelRc;
 use slint::ModelTracker;
 use slint::VecModel;
+use slint::Weak;
 use strum::EnumString;
 use tracing::info;
 use tracing::trace;
@@ -37,6 +38,7 @@ use crate::ui::InputDialog;
 use crate::ui::InputDialogEntry;
 
 struct InputDialogModel {
+	dialog_weak: Weak<InputDialog>,
 	state: RefCell<InputDialogState>,
 	class: InputClass,
 	notify: ModelNotify,
@@ -128,7 +130,8 @@ pub async fn dialog_input(
 	});
 
 	// set up the model
-	let model = InputDialogModel::new(class);
+	let dialog_weak = modal.dialog().as_weak();
+	let model = InputDialogModel::new(class, dialog_weak);
 	let model = Rc::new(model);
 	let model = ModelRc::new(model);
 	let model_clone = model.clone();
@@ -164,11 +167,16 @@ pub async fn dialog_input(
 }
 
 impl InputDialogModel {
-	pub fn new(class: InputClass) -> Self {
+	pub fn new(class: InputClass, dialog_weak: Weak<InputDialog>) -> Self {
 		let state = InputDialogState::default();
 		let state = RefCell::new(state);
 		let notify = ModelNotify::default();
-		Self { state, class, notify }
+		Self {
+			dialog_weak,
+			state,
+			class,
+			notify,
+		}
 	}
 
 	pub fn update(&self, inputs: Arc<[Input]>, input_device_classes: Arc<[InputDeviceClass]>) {
@@ -180,6 +188,10 @@ impl InputDialogModel {
 				state.input_device_classes = input_device_classes;
 				state.clusters = build_clusters(&state.inputs, self.class);
 				state.codes = build_codes(&state.input_device_classes);
+
+				let command = build_restore_defaults_command(&state.inputs, &state.clusters);
+				let command = command.as_ref().map(AppCommand::encode_for_slint).unwrap_or_default();
+				self.dialog_weak.unwrap().set_restore_defaults_command(command);
 
 				info!(inputs_len=?state.inputs.len(), input_device_classes_len=?state.input_device_classes.len(), "InputDialogModel::update(): Changing state");
 				dump_clusters_trace(state.inputs.as_ref(), state.clusters.as_ref());
@@ -336,6 +348,17 @@ fn build_codes(input_device_classes: &[InputDeviceClass]) -> HashMap<Box<str>, B
 			(item.code.as_str().into(), label)
 		})
 		.collect::<HashMap<_, _>>()
+}
+
+fn build_restore_defaults_command(inputs: &[Input], clusters: &[InputCluster]) -> Option<AppCommand> {
+	let seqs = clusters
+		.iter()
+		.flat_map(|cluster| input_cluster_input_seqs(inputs, cluster))
+		.map(|(input, _, seq_type)| (input.port_tag.as_ref(), input.mask, seq_type, "*"))
+		.collect::<Vec<_>>();
+
+	let command = MameCommand::seq_set(&seqs);
+	Some(command.into())
 }
 
 fn input_cluster_from_input(index: usize, input: &Input) -> InputCluster {
