@@ -8,6 +8,7 @@ pub mod devimages;
 pub mod file;
 pub mod image;
 pub mod input;
+pub mod input_multi;
 pub mod messagebox;
 pub mod namecollection;
 pub mod paths;
