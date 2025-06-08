@@ -65,6 +65,12 @@ struct ContextMenuEntry<'a> {
 	pub command: Option<AppCommand>,
 }
 
+#[derive(Copy, Clone, Debug)]
+enum InputAxis {
+	X,
+	Y,
+}
+
 #[derive(Debug, PartialEq)]
 enum SeqToken<'a> {
 	Named(&'a str, Option<SeqTokenModifier<'a>>),
@@ -377,34 +383,59 @@ fn input_cluster_code_text(
 	cluster: &InputCluster,
 	codes: &HashMap<Box<str>, impl AsRef<str>>,
 ) -> String {
-	let seqs_iter = match cluster {
-		InputCluster::Single(index) => {
-			let seqs_iter = inputs[*index].seq_standard_tokens.as_deref().into_iter();
-			Either::Left(seqs_iter)
+	input_cluster_input_seqs(inputs, cluster)
+		.filter_map(|(input, axis, seq_type)| {
+			let seq_tokens = match seq_type {
+				SeqType::Standard => &input.seq_standard_tokens,
+				SeqType::Decrement => &input.seq_decrement_tokens,
+				SeqType::Increment => &input.seq_increment_tokens,
+			};
+
+			seq_tokens
+				.as_deref()
+				.and_then(|seq_tokens| (!seq_tokens.is_empty()).then_some((axis, seq_type, seq_tokens)))
+		})
+		.map(|(axis, seq_type, seq_tokens)| {
+			let prefix = match (axis, seq_type) {
+				(None, _) => "",
+				(Some(InputAxis::X), SeqType::Standard) => "\u{2194}",
+				(Some(InputAxis::X), SeqType::Decrement) => "\u{25C0}",
+				(Some(InputAxis::X), SeqType::Increment) => "\u{25B6}",
+				(Some(InputAxis::Y), SeqType::Standard) => "\u{2195}",
+				(Some(InputAxis::Y), SeqType::Decrement) => "\u{25B2}",
+				(Some(InputAxis::Y), SeqType::Increment) => "\u{25BC}",
+			};
+			format!("{}{}", prefix, seq_tokens_desc_from_string(seq_tokens, codes))
+		})
+		.join(" / ")
+}
+
+fn input_cluster_input_seqs<'a>(
+	inputs: &'a [Input],
+	cluster: &InputCluster,
+) -> impl Iterator<Item = (&'a Input, Option<InputAxis>, SeqType)> {
+	match cluster {
+		InputCluster::Single(input_index) => {
+			let input = &inputs[*input_index];
+			Either::Left([(input, None, SeqType::Standard)].into_iter())
 		}
 		InputCluster::Multi {
 			x_input_index,
 			y_input_index,
 			..
 		} => {
-			let seqs_iter = [*x_input_index, *y_input_index]
-				.into_iter()
-				.flatten()
-				.map(|index| &inputs[index])
-				.flat_map(|input| {
-					[
-						input.seq_decrement_tokens.as_deref(),
-						input.seq_increment_tokens.as_deref(),
-					]
-				})
-				.flatten();
-			Either::Right(seqs_iter)
+			let inputs = [
+				x_input_index.map(|idx| (&inputs[idx], InputAxis::X)),
+				y_input_index.map(|idx| (&inputs[idx], InputAxis::Y)),
+			];
+			let results_iter = inputs.into_iter().flatten().flat_map(|(input, axis)| {
+				[SeqType::Standard, SeqType::Decrement, SeqType::Increment]
+					.into_iter()
+					.map(move |seq_type| (input, Some(axis), seq_type))
+			});
+			Either::Right(results_iter)
 		}
-	};
-
-	seqs_iter
-		.map(|seq_tokens| seq_tokens_desc_from_string(seq_tokens, codes))
-		.join(" / ")
+	}
 }
 
 fn input_cluster_as_multi(input_cluster: &InputCluster) -> Option<(Option<usize>, Option<usize>, Option<&'_ str>)> {
