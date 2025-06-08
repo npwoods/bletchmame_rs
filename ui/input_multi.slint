@@ -1,0 +1,86 @@
+import { VerticalBox, GridBox, HorizontalBox, Button, StandardButton } from "std-widgets.slint";
+import { InputDialogEntry } from "input.slint";
+
+component InputMulti {
+    in property <InputDialogEntry> entry;
+    VerticalBox {
+        visible: !(entry.name.is-empty && entry.text.is-empty && entry.primary-command.is-empty);
+        Text {
+            text: entry.text;
+        }
+
+        HorizontalBox {
+            Button {
+                text: entry.name;
+                enabled: false;
+            }
+
+            Button {
+                width: 40px;
+                text: "▼";
+                enabled: false;
+            }
+        }
+    }
+}
+
+export component InputMultiDialog inherits Window {
+    // properties
+    in property <string> dialog-title;
+    in property <InputDialogEntry> left-entry;
+    in property <InputDialogEntry> right-entry;
+    in property <InputDialogEntry> up-entry;
+    in property <InputDialogEntry> down-entry;
+
+    // callbacks
+    callback ok-clicked();
+
+    // widgets
+    title: dialog-title;
+    VerticalBox {
+        GridBox {
+            InputMulti {
+                col: 0;
+                row: 1;
+                entry: root.left-entry;
+            }
+
+            InputMulti {
+                col: 2;
+                row: 1;
+                entry: root.right-entry;
+            }
+
+            InputMulti {
+                col: 1;
+                row: 0;
+                entry: root.up-entry;
+            }
+
+            InputMulti {
+                col: 1;
+                row: 2;
+                entry: root.down-entry;
+            }
+        }
+
+        HorizontalBox {
+            Button {
+                text: "Clear";
+                enabled: false;
+            }
+
+            Button {
+                text: "Restore Defaults";
+                enabled: false;
+            }
+
+            StandardButton {
+                kind: ok;
+                clicked => {
+                    root.ok-clicked();
+                }
+            }
+        }
+    }
+}

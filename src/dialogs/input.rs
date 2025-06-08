@@ -266,7 +266,16 @@ impl Model for InputDialogModel {
 				};
 				Some(command)
 			}
-			InputCluster::Multi { .. } => None,
+			InputCluster::Multi {
+				x_input_index,
+				y_input_index,
+				..
+			} => {
+				let x_input = x_input_index.map(|idx| &state.inputs[idx]);
+				let y_input = y_input_index.map(|idx| &state.inputs[idx]);
+				let command = app_command_for_multi_dialog(x_input, y_input);
+				Some(command)
+			}
 		};
 		let primary_command = primary_command
 			.as_ref()
@@ -581,7 +590,7 @@ fn input_cluster_context_menu<'a>(
 
 			let specify_entry = ContextMenuEntry {
 				title: "Specify...",
-				command: None,
+				command: Some(app_command_for_multi_dialog(x_input, y_input)),
 			};
 			let clear_entry = ContextMenuEntry {
 				title: "Clear",
@@ -722,6 +731,12 @@ fn app_command_for_set_multi_seq(
 	];
 	let seqs = seqs.into_iter().flatten().collect::<Vec<_>>();
 	MameCommand::seq_set(seqs.as_slice()).into()
+}
+
+fn app_command_for_multi_dialog(x_input: Option<&Input>, y_input: Option<&Input>) -> AppCommand {
+	let x_input = x_input.map(|input| (input.port_tag.clone(), input.mask));
+	let y_input = y_input.map(|input| (input.port_tag.clone(), input.mask));
+	AppCommand::InputMultiDialog { x_input, y_input }
 }
 
 fn seq_tokens_desc_from_string(s: &str, codes: &HashMap<Box<str>, impl AsRef<str>>) -> String {

@@ -112,6 +112,10 @@ pub enum AppCommand {
 		seq_type: SeqType,
 		poll_type: SeqPollDialogType,
 	},
+	InputMultiDialog {
+		x_input: Option<(Arc<str>, u32)>,
+		y_input: Option<(Arc<str>, u32)>,
+	},
 }
 
 const MENU_PREFIX: &str = "MENU_";
