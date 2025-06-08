@@ -18,6 +18,7 @@ export component InputDialog inherits Window {
     // properties
     in property <string> dialog-title;
     in property <[InputDialogEntry]> entries;
+    in property <string> restore-defaults-command;
 
     // callbacks
     callback ok-clicked();
@@ -96,7 +97,10 @@ export component InputDialog inherits Window {
             Button {
                 text: @tr("Restore Defaults");
                 horizontal-stretch: 0;
-                enabled: false;
+                enabled: !root.restore-defaults-command.is-empty;
+                clicked => {
+                    menu-item-command(root.restore-defaults-command);
+                }
             }
 
             StandardButton {
