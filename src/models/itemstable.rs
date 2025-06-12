@@ -11,6 +11,7 @@ use std::time::Instant;
 
 use anyhow::Error;
 use anyhow::Result;
+use easy_ext::ext;
 use itertools::Either;
 use itertools::Itertools;
 use levenshtein::levenshtein;
@@ -29,6 +30,7 @@ use unicase::UniCase;
 
 use crate::appcommand::AppCommand;
 use crate::info::InfoDb;
+use crate::info::Machine;
 use crate::info::View;
 use crate::mconfig::MachineConfig;
 use crate::prefs::BuiltinCollection;
@@ -352,7 +354,7 @@ impl ItemsTableModel {
 							.map(|(tag, filename)| (tag.as_str().into(), filename.as_str().into())),
 					)
 					.collect::<Vec<_>>();
-				let command = has_mame_initialized.then(|| MameCommand::start(machine.name(), &initial_loads).into());
+				let command = has_mame_initialized.then(|| AppCommand::start_machine(&machine, &initial_loads));
 				let title = run_item_text(machine.description()).into();
 				let browse_target =
 					(!machine.machine_software_lists().is_empty()).then(|| PrefsCollection::MachineSoftware {
@@ -388,9 +390,7 @@ impl ItemsTableModel {
 							.collect::<std::result::Result<Vec<_>, ()>>();
 
 						parts_with_devices.ok().map(|initial_loads| {
-							// running is not yet supported!
-							let command = MameCommand::start(machine.name(), &initial_loads);
-							let command = Some(command.into());
+							let command = Some(AppCommand::start_machine(&machine, &initial_loads));
 							let title = machine.description().into();
 							MenuDesc { command, title }
 						})
@@ -894,5 +894,14 @@ impl MenuDesc {
 				.unwrap_or_default(),
 			self.title,
 		)
+	}
+}
+
+#[ext]
+impl AppCommand {
+	pub fn start_machine(machine: &Machine, initial_loads: &[(impl AsRef<str>, impl AsRef<str>)]) -> Self {
+		let name = machine.name();
+		assert!(machine.runnable(), "should not get here; {name:?} is not runnable");
+		MameCommand::start(name, initial_loads).into()
 	}
 }
