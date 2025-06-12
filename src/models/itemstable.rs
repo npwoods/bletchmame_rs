@@ -186,19 +186,20 @@ impl ItemsTableModel {
 				let mut dispenser = SoftwareListDispenser::new(info_db, &software_list_paths);
 
 				let items = match collection.as_deref() {
-					Some(PrefsCollection::Builtin(BuiltinCollection::All)) => {
-						let machine_count = info_db.machines().len();
-						(0..machine_count)
-							.map(|machine_index| {
-								let machine_config = MachineConfig::from_machine_index(info_db.clone(), machine_index);
-								Item::Machine {
-									machine_config,
-									images: Default::default(),
-									ram_size: None,
-								}
-							})
-							.collect::<Rc<[_]>>()
-					}
+					Some(PrefsCollection::Builtin(BuiltinCollection::All)) => info_db
+						.machines()
+						.iter()
+						.enumerate()
+						.filter(|(_, machine)| machine.runnable())
+						.map(|(machine_index, _)| {
+							let machine_config = MachineConfig::from_machine_index(info_db.clone(), machine_index);
+							Item::Machine {
+								machine_config,
+								images: Default::default(),
+								ram_size: None,
+							}
+						})
+						.collect::<Rc<[_]>>(),
 					Some(PrefsCollection::Builtin(BuiltinCollection::AllSoftware)) => dispenser
 						.get_all()
 						.into_iter()
