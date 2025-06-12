@@ -58,11 +58,12 @@ export component InputDialog inherits Window {
     // control hierarchy
     VerticalBox {
         ScrollView {
-            viewport-height: root.entries.length * 30px;
             VerticalBox {
                 padding: 3px;
+                vertical-stretch: 0;
                 for entry[index] in root.entries: HorizontalLayout {
                     vertical-stretch: 0;
+                    height: 30px;
                     Button {
                         width: 300px;
                         text: entry.name;
