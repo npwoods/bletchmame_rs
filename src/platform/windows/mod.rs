@@ -10,6 +10,7 @@ use raw_window_handle::HasWindowHandle;
 use raw_window_handle::RawWindowHandle;
 use raw_window_handle::Win32WindowHandle;
 use slint::Window;
+use tracing::info;
 use win32job::Job;
 use windows::Win32::System::Console::ATTACH_PARENT_PROCESS;
 use windows::Win32::System::Console::AttachConsole;
@@ -61,7 +62,10 @@ pub impl Window {
 	}
 
 	fn set_enabled_for_modal(&self, enabled: bool) {
-		self.with_winit_window(|window| window.set_enable(enabled));
+		self.with_winit_window(|window| {
+			info!(window.id=?window.id(), window.title=?window.title(), enabled=?enabled, "Window::set_enabled_for_modal");
+			window.set_enable(enabled);
+		});
 	}
 }
 
