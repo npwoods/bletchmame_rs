@@ -52,6 +52,10 @@ impl ModalStack {
 		// invoke the func
 		let dialog = with_attributes_hook(func, hook);
 
+		// add this dialog to the stack
+		self.0.borrow_mut().push(dialog.as_weak().into());
+
+		// position the new dialog
 		let new_dialog_position = {
 			let parent_size = parent.window().size();
 			let parent_position = parent.window().position();
