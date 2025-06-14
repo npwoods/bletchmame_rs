@@ -49,6 +49,7 @@ pub async fn dialog_seq_poll(
 		.find(|x| x.port_tag.as_ref() == port_tag.as_ref() && x.mask == mask)
 		.unwrap();
 	let target_name = input.name.as_str();
+	let target_name_suffix = seq_type.suffix();
 	let seq_tokens = match seq_type {
 		SeqType::Standard => &input.seq_standard_tokens,
 		SeqType::Decrement => &input.seq_decrement_tokens,
@@ -56,13 +57,13 @@ pub async fn dialog_seq_poll(
 	};
 	let (dialog_title, dialog_caption, start_seq) = match poll_type {
 		SeqPollDialogType::Specify => (
-			format!("Specify {target_name}"),
-			format!("Press key or button to specify {target_name}"),
+			format!("Specify {target_name}{target_name_suffix}"),
+			format!("Press key or button to specify {target_name}{target_name_suffix}"),
 			"",
 		),
 		SeqPollDialogType::Add => (
-			format!("Add To {target_name}"),
-			format!("Press key or button to add to {target_name}"),
+			format!("Add To {target_name}{target_name_suffix}"),
+			format!("Press key or button to add to {target_name}{target_name_suffix}"),
 			seq_tokens.as_deref().unwrap_or_default(),
 		),
 	};
