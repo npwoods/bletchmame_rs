@@ -565,7 +565,7 @@ fn validate_view_custom<'a, T>(
 }
 
 #[repr(C, packed)]
-#[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, TryFromBytes, IntoBytes, Immutable, KnownLayout)]
+#[derive(Clone, Copy, Default, Hash, PartialEq, Eq, TryFromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct UsizeDb([u8; 3]);
 
 impl AddAssign<usize> for UsizeDb {
@@ -627,6 +627,12 @@ impl From<UsizeDb> for usize {
 		let mut cursor = Cursor::new(&value.0);
 		let value = cursor.read_u24::<LittleEndian>().expect(ERROR_MESSAGE);
 		usize::try_from(value).expect(ERROR_MESSAGE)
+	}
+}
+
+impl Debug for UsizeDb {
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		usize::from(*self).fmt(f)
 	}
 }
 
