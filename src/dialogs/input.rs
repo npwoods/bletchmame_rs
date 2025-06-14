@@ -1,10 +1,12 @@
 use std::any::Any;
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use easy_ext::ext;
 use itertools::Either;
 use itertools::Itertools;
 use slint::CloseRequestResponse;
@@ -32,6 +34,7 @@ use crate::status::InputClass;
 use crate::status::InputDevice;
 use crate::status::InputDeviceClass;
 use crate::status::InputDeviceClassName;
+use crate::status::InputDeviceItem;
 use crate::status::Status;
 use crate::ui::InputContextMenuEntry;
 use crate::ui::InputDialog;
@@ -63,7 +66,7 @@ enum InputCluster {
 }
 
 struct ContextMenuEntry<'a> {
-	pub title: &'a str,
+	pub title: Cow<'a, str>,
 	pub command: Option<AppCommand>,
 }
 
@@ -210,7 +213,7 @@ impl InputDialogModel {
 				.iter()
 				.map(|entry| {
 					let entry = entry.as_ref().unwrap();
-					let title = entry.title.into();
+					let title = entry.title.as_ref().into();
 					let command = entry
 						.command
 						.as_ref()
@@ -258,13 +261,7 @@ impl Model for InputDialogModel {
 		let primary_command = match cluster {
 			InputCluster::Single(input_index) => {
 				let input = &state.inputs[*input_index];
-				let command = AppCommand::SeqPollDialog {
-					port_tag: input.port_tag.clone(),
-					mask: input.mask,
-					seq_type: SeqType::Standard,
-					poll_type: SeqPollDialogType::Specify,
-				};
-				Some(command)
+				Some(AppCommand::seq_specify_dialog(input, SeqType::Standard))
 			}
 			InputCluster::Multi {
 				x_input_index,
@@ -273,7 +270,7 @@ impl Model for InputDialogModel {
 			} => {
 				let x_input = x_input_index.map(|idx| &state.inputs[idx]);
 				let y_input = y_input_index.map(|idx| &state.inputs[idx]);
-				let command = app_command_for_multi_dialog(x_input, y_input);
+				let command = AppCommand::input_multi_dialog(x_input, y_input);
 				Some(command)
 			}
 		};
@@ -327,30 +324,10 @@ fn build_clusters(inputs: &[Input], class: InputClass) -> Box<[InputCluster]> {
 
 fn build_codes(input_device_classes: &[InputDeviceClass]) -> HashMap<Box<str>, Box<str>> {
 	input_device_classes
-		.iter()
-		.flat_map(|device_class| {
-			let device_class_name = match (&device_class.name, device_class.devices.len() > 1) {
-				(InputDeviceClassName::Keyboard, false) => None,
-				(InputDeviceClassName::Keyboard, true) => Some("Kbd"),
-				(InputDeviceClassName::Joystick, _) => Some("Joy"),
-				(InputDeviceClassName::Lightgun, _) => Some("Gun"),
-				(InputDeviceClassName::Mouse, _) => Some("Mouse"),
-				(InputDeviceClassName::Other(x), _) => Some(x.as_ref()),
-			};
-			device_class
-				.devices
-				.iter()
-				.map(move |device| (device_class_name, device))
-		})
-		.flat_map(|(device_class_name, device)| {
-			device
-				.items
-				.iter()
-				.map(move |item| (device_class_name, device.devindex, item))
-		})
-		.map(|(device_class_name, device_index, item)| {
-			let label = if let Some(device_class_name) = device_class_name {
-				format!("{} #{} {}", device_class_name, device_index + 1, item.name).into()
+		.iter_device_items()
+		.map(|(device_class, device, item)| {
+			let label = if let Some(prefix) = device_class.prefix() {
+				format!("{} #{} {}", prefix, device.devindex + 1, item.name).into()
 			} else {
 				item.name.as_str().into()
 			};
@@ -513,27 +490,20 @@ fn input_cluster_context_menu<'a>(
 	match cluster {
 		InputCluster::Single(index) => {
 			let input = &inputs[*index];
-			let specify_command = AppCommand::SeqPollDialog {
-				port_tag: input.port_tag.clone(),
-				mask: input.mask,
-				seq_type: SeqType::Standard,
-				poll_type: SeqPollDialogType::Specify,
-			};
-			let add_command = AppCommand::SeqPollDialog {
-				port_tag: input.port_tag.clone(),
-				mask: input.mask,
-				seq_type: SeqType::Standard,
-				poll_type: SeqPollDialogType::Add,
-			};
-			let clear_command = MameCommand::seq_set_standard(&input.port_tag, input.mask, "");
-			let entries: [(&'static str, Option<AppCommand>); 3] = [
+			let specify_command = AppCommand::seq_specify_dialog(input, SeqType::Standard);
+			let add_command = AppCommand::seq_add_dialog(input, SeqType::Standard);
+			let clear_command = AppCommand::seq_clear(input, SeqType::Standard);
+			let entries = [
 				("Specify...", Some(specify_command)),
 				("Add...", Some(add_command)),
-				("Clear", Some(clear_command.into())),
+				("Clear", Some(clear_command)),
 			];
 			entries
 				.into_iter()
-				.map(|(title, command)| Some(ContextMenuEntry { title, command }))
+				.map(|(title, command)| {
+					let title = title.into();
+					Some(ContextMenuEntry { title, command })
+				})
 				.collect::<Vec<_>>()
 		}
 		InputCluster::Multi {
@@ -546,8 +516,8 @@ fn input_cluster_context_menu<'a>(
 
 			let entries_iter = if x_input.is_some() || y_input.is_some() {
 				let arrow_keys_entry = ContextMenuEntry {
-					title: "Arrow Keys",
-					command: Some(app_command_for_set_multi_seq(
+					title: "Arrow Keys".into(),
+					command: Some(AppCommand::set_multi_seq(
 						x_input,
 						y_input,
 						"",
@@ -559,8 +529,8 @@ fn input_cluster_context_menu<'a>(
 					)),
 				};
 				let numpad_entry = ContextMenuEntry {
-					title: "Number Pad",
-					command: Some(app_command_for_set_multi_seq(
+					title: "Number Pad".into(),
+					command: Some(AppCommand::set_multi_seq(
 						x_input,
 						y_input,
 						"",
@@ -572,9 +542,10 @@ fn input_cluster_context_menu<'a>(
 					)),
 				};
 				let device_entries_iter = input_device_classes
-					.iter()
-					.flat_map(|device_class| &device_class.devices)
-					.filter_map(|device| context_menu_entry_for_quick_device(device, x_input, y_input));
+					.iter_devices()
+					.filter_map(|(device_class, device)| {
+						context_menu_entry_for_quick_device(device_class, device, x_input, y_input)
+					});
 
 				Either::Left(
 					[arrow_keys_entry]
@@ -589,12 +560,12 @@ fn input_cluster_context_menu<'a>(
 			};
 
 			let specify_entry = ContextMenuEntry {
-				title: "Specify...",
-				command: Some(app_command_for_multi_dialog(x_input, y_input)),
+				title: "Specify...".into(),
+				command: Some(AppCommand::input_multi_dialog(x_input, y_input)),
 			};
 			let clear_entry = ContextMenuEntry {
-				title: "Clear",
-				command: Some(app_command_for_set_multi_seq(x_input, y_input, "", "", "", "", "", "")),
+				title: "Clear".into(),
+				command: Some(AppCommand::set_multi_seq(x_input, y_input, "", "", "", "", "", "")),
 			};
 			entries_iter
 				.chain([Some(specify_entry)])
@@ -632,12 +603,17 @@ fn dump_clusters_trace(inputs: &[Input], clusters: &[InputCluster]) {
 }
 
 fn context_menu_entry_for_quick_device<'a>(
+	device_class: &InputDeviceClass,
 	device: &'a InputDevice,
 	x_input: Option<&Input>,
 	y_input: Option<&Input>,
 ) -> Option<ContextMenuEntry<'a>> {
 	app_command_for_set_quick_devices([device].into_iter(), x_input, y_input).map(|command| {
-		let title = &device.name;
+		let title = if let Some(prefix) = device_class.prefix() {
+			format!("{} #{} ({})", prefix, device.devindex + 1, device.name).into()
+		} else {
+			device.name.as_str().into()
+		};
 		let command = Some(command);
 		ContextMenuEntry { title, command }
 	})
@@ -665,78 +641,7 @@ fn app_command_for_set_quick_devices<'a>(
 	let y_codes = y_input.is_some().then(|| get_codes("YAXIS")).unwrap_or_default();
 
 	(!x_codes.is_empty() && !y_codes.is_empty())
-		.then(|| app_command_for_set_multi_seq(x_input, y_input, x_codes.as_str(), "", "", y_codes.as_str(), "", ""))
-}
-
-#[allow(clippy::too_many_arguments)]
-fn app_command_for_set_multi_seq(
-	x_input: Option<&Input>,
-	y_input: Option<&Input>,
-	x_standard_tokens: &str,
-	x_decrement_tokens: &str,
-	x_increment_tokens: &str,
-	y_standard_tokens: &str,
-	y_decrement_tokens: &str,
-	y_increment_tokens: &str,
-) -> AppCommand {
-	let seqs = [
-		x_input.map(|x_input| {
-			(
-				x_input.port_tag.as_ref(),
-				x_input.mask,
-				SeqType::Standard,
-				x_standard_tokens,
-			)
-		}),
-		x_input.map(|x_input| {
-			(
-				x_input.port_tag.as_ref(),
-				x_input.mask,
-				SeqType::Decrement,
-				x_decrement_tokens,
-			)
-		}),
-		x_input.map(|x_input| {
-			(
-				x_input.port_tag.as_ref(),
-				x_input.mask,
-				SeqType::Increment,
-				x_increment_tokens,
-			)
-		}),
-		y_input.map(|y_input| {
-			(
-				y_input.port_tag.as_ref(),
-				y_input.mask,
-				SeqType::Standard,
-				y_standard_tokens,
-			)
-		}),
-		y_input.map(|y_input| {
-			(
-				y_input.port_tag.as_ref(),
-				y_input.mask,
-				SeqType::Decrement,
-				y_decrement_tokens,
-			)
-		}),
-		y_input.map(|y_input| {
-			(
-				y_input.port_tag.as_ref(),
-				y_input.mask,
-				SeqType::Increment,
-				y_increment_tokens,
-			)
-		}),
-	];
-	let seqs = seqs.into_iter().flatten().collect::<Vec<_>>();
-	MameCommand::seq_set(seqs.as_slice()).into()
-}
-
-fn app_command_for_multi_dialog(x_input: Option<&Input>, y_input: Option<&Input>) -> AppCommand {
-	let x_input = x_input.map(|input| (input.port_tag.clone(), input.mask));
-	let y_input = y_input.map(|input| (input.port_tag.clone(), input.mask));
-	AppCommand::InputMultiDialog { x_input, y_input }
+		.then(|| AppCommand::set_multi_seq(x_input, y_input, x_codes.as_str(), "", "", y_codes.as_str(), "", ""))
 }
 
 fn seq_tokens_desc_from_string(s: &str, codes: &HashMap<Box<str>, impl AsRef<str>>) -> String {
@@ -813,6 +718,130 @@ fn seq_tokens_from_string(s: &str) -> impl Iterator<Item = SeqToken<'_>> {
 			}
 		})
 		.skip_while(|token| *token == SeqToken::Or)
+}
+
+#[ext]
+pub impl InputDeviceClass {
+	fn prefix(&self) -> Option<&'_ str> {
+		match (&self.name, self.devices.len() > 1) {
+			(InputDeviceClassName::Keyboard, false) => None,
+			(InputDeviceClassName::Keyboard, true) => Some("Kbd"),
+			(InputDeviceClassName::Joystick, _) => Some("Joy"),
+			(InputDeviceClassName::Lightgun, _) => Some("Gun"),
+			(InputDeviceClassName::Mouse, _) => Some("Mouse"),
+			(InputDeviceClassName::Other(x), _) => Some(x.as_ref()),
+		}
+	}
+}
+
+#[ext]
+pub impl [InputDeviceClass] {
+	fn iter_devices(&self) -> impl Iterator<Item = (&'_ InputDeviceClass, &'_ InputDevice)> {
+		self.iter()
+			.flat_map(|device_class| device_class.devices.iter().map(move |device| (device_class, device)))
+	}
+
+	fn iter_device_items(&self) -> impl Iterator<Item = (&'_ InputDeviceClass, &'_ InputDevice, &'_ InputDeviceItem)> {
+		self.iter_devices()
+			.flat_map(|(device_class, device)| device.items.iter().map(move |item| (device_class, device, item)))
+	}
+}
+
+#[ext]
+pub impl AppCommand {
+	fn seq_specify_dialog(input: &Input, seq_type: SeqType) -> Self {
+		AppCommand::SeqPollDialog {
+			port_tag: input.port_tag.clone(),
+			mask: input.mask,
+			seq_type,
+			poll_type: SeqPollDialogType::Specify,
+		}
+	}
+
+	fn seq_add_dialog(input: &Input, seq_type: SeqType) -> Self {
+		AppCommand::SeqPollDialog {
+			port_tag: input.port_tag.clone(),
+			mask: input.mask,
+			seq_type,
+			poll_type: SeqPollDialogType::Add,
+		}
+	}
+
+	fn seq_clear(input: &Input, seq_type: SeqType) -> Self {
+		let seqs = &[(input.port_tag.as_ref(), input.mask, seq_type, "")];
+		MameCommand::seq_set(seqs).into()
+	}
+
+	#[allow(clippy::too_many_arguments)]
+	fn set_multi_seq(
+		x_input: Option<&Input>,
+		y_input: Option<&Input>,
+		x_standard_tokens: &str,
+		x_decrement_tokens: &str,
+		x_increment_tokens: &str,
+		y_standard_tokens: &str,
+		y_decrement_tokens: &str,
+		y_increment_tokens: &str,
+	) -> AppCommand {
+		let seqs = [
+			x_input.map(|x_input| {
+				(
+					x_input.port_tag.as_ref(),
+					x_input.mask,
+					SeqType::Standard,
+					x_standard_tokens,
+				)
+			}),
+			x_input.map(|x_input| {
+				(
+					x_input.port_tag.as_ref(),
+					x_input.mask,
+					SeqType::Decrement,
+					x_decrement_tokens,
+				)
+			}),
+			x_input.map(|x_input| {
+				(
+					x_input.port_tag.as_ref(),
+					x_input.mask,
+					SeqType::Increment,
+					x_increment_tokens,
+				)
+			}),
+			y_input.map(|y_input| {
+				(
+					y_input.port_tag.as_ref(),
+					y_input.mask,
+					SeqType::Standard,
+					y_standard_tokens,
+				)
+			}),
+			y_input.map(|y_input| {
+				(
+					y_input.port_tag.as_ref(),
+					y_input.mask,
+					SeqType::Decrement,
+					y_decrement_tokens,
+				)
+			}),
+			y_input.map(|y_input| {
+				(
+					y_input.port_tag.as_ref(),
+					y_input.mask,
+					SeqType::Increment,
+					y_increment_tokens,
+				)
+			}),
+		];
+		let seqs = seqs.into_iter().flatten().collect::<Vec<_>>();
+		MameCommand::seq_set(seqs.as_slice()).into()
+	}
+
+	fn input_multi_dialog(x_input: Option<&Input>, y_input: Option<&Input>) -> AppCommand {
+		let x_input = x_input.map(|input| (input.port_tag.clone(), input.mask));
+		let y_input = y_input.map(|input| (input.port_tag.clone(), input.mask));
+		AppCommand::InputMultiDialog { x_input, y_input }
+	}
 }
 
 #[cfg(test)]
