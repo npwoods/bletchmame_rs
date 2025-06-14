@@ -71,7 +71,7 @@ struct ContextMenuEntry<'a> {
 }
 
 #[derive(Copy, Clone, Debug)]
-enum InputAxis {
+pub enum InputAxis {
 	X,
 	Y,
 }
@@ -256,7 +256,8 @@ impl Model for InputDialogModel {
 		let state = self.state.borrow();
 		let cluster = state.clusters.get(row)?;
 		let name = input_cluster_name(&state.inputs, cluster).into();
-		let text = input_cluster_code_text(&state.inputs, cluster, &state.codes).into();
+		let input_seqs = input_cluster_input_seqs(&state.inputs, cluster);
+		let text = build_code_text(input_seqs, &state.codes).as_ref().into();
 
 		let primary_command = match cluster {
 			InputCluster::Single(input_index) => {
@@ -322,7 +323,7 @@ fn build_clusters(inputs: &[Input], class: InputClass) -> Box<[InputCluster]> {
 		.collect()
 }
 
-fn build_codes(input_device_classes: &[InputDeviceClass]) -> HashMap<Box<str>, Box<str>> {
+pub fn build_codes(input_device_classes: &[InputDeviceClass]) -> HashMap<Box<str>, Box<str>> {
 	input_device_classes
 		.iter_device_items()
 		.map(|(device_class, device, item)| {
@@ -387,12 +388,12 @@ fn input_cluster_name<'a>(inputs: &'a [Input], cluster: &'a InputCluster) -> &'a
 	}
 }
 
-fn input_cluster_code_text(
-	inputs: &[Input],
-	cluster: &InputCluster,
+pub fn build_code_text<'a>(
+	input_seqs: impl IntoIterator<Item = (&'a Input, Option<InputAxis>, SeqType)>,
 	codes: &HashMap<Box<str>, impl AsRef<str>>,
-) -> String {
-	input_cluster_input_seqs(inputs, cluster)
+) -> Cow<'static, str> {
+	let result = input_seqs
+		.into_iter()
 		.filter_map(|(input, axis, seq_type)| {
 			let seq_tokens = match seq_type {
 				SeqType::Standard => &input.seq_standard_tokens,
@@ -416,7 +417,13 @@ fn input_cluster_code_text(
 			};
 			format!("{}{}", prefix, seq_tokens_desc_from_string(seq_tokens, codes))
 		})
-		.join(" / ")
+		.join(" / ");
+
+	if result.is_empty() {
+		"None".into()
+	} else {
+		result.into()
+	}
 }
 
 fn input_cluster_input_seqs<'a>(
@@ -720,7 +727,7 @@ fn seq_tokens_from_string(s: &str) -> impl Iterator<Item = SeqToken<'_>> {
 		.skip_while(|token| *token == SeqToken::Or)
 }
 
-#[ext]
+#[ext(InputDeviceClassExt)]
 pub impl InputDeviceClass {
 	fn prefix(&self) -> Option<&'_ str> {
 		match (&self.name, self.devices.len() > 1) {
@@ -734,7 +741,7 @@ pub impl InputDeviceClass {
 	}
 }
 
-#[ext]
+#[ext(InputDeviceClassSliceExt)]
 pub impl [InputDeviceClass] {
 	fn iter_devices(&self) -> impl Iterator<Item = (&'_ InputDeviceClass, &'_ InputDevice)> {
 		self.iter()
@@ -747,7 +754,7 @@ pub impl [InputDeviceClass] {
 	}
 }
 
-#[ext]
+#[ext(InputSeqExt)]
 pub impl AppCommand {
 	fn seq_specify_dialog(input: &Input, seq_type: SeqType) -> Self {
 		AppCommand::SeqPollDialog {

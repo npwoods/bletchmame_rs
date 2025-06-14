@@ -7,8 +7,10 @@ use itertools::Itertools;
 use serde::Deserialize;
 use serde::Serialize;
 use strum::EnumIter;
+use strum::EnumProperty;
 use strum::EnumString;
 use strum::IntoStaticStr;
+use strum::VariantArray;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MameCommand(Cow<'static, str>);
@@ -121,11 +123,6 @@ impl MameCommand {
 		Self("DEBUGGER".into())
 	}
 
-	pub fn seq_set_standard(port_tag: impl AsRef<str>, mask: u32, tokens: impl AsRef<str>) -> Self {
-		let seqs = &[(port_tag, mask, SeqType::Standard, tokens)];
-		Self::seq_set(seqs)
-	}
-
 	pub fn seq_set_all<S>(
 		port_tag: impl AsRef<str>,
 		mask: u32,
@@ -208,13 +205,24 @@ impl TryFrom<&Path> for MovieFormat {
 	}
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, IntoStaticStr, EnumString)]
+#[derive(
+	Clone, Copy, Debug, Serialize, Deserialize, PartialEq, EnumProperty, IntoStaticStr, EnumString, VariantArray,
+)]
 #[strum(ascii_case_insensitive)]
 #[strum(serialize_all = "lowercase")]
 pub enum SeqType {
+	#[strum(props(Suffix = ""))]
 	Standard,
+	#[strum(props(Suffix = " Dec"))]
 	Decrement,
+	#[strum(props(Suffix = " Inc"))]
 	Increment,
+}
+
+impl SeqType {
+	pub fn suffix(&self) -> &'static str {
+		self.get_str("Suffix").unwrap()
+	}
 }
 
 fn bool_str(b: bool) -> &'static str {
@@ -233,6 +241,8 @@ fn quote_if_needed(s: Cow<'_, str>) -> Cow<'_, str> {
 mod test {
 	use test_case::test_case;
 
+	use crate::runtime::command::SeqType;
+
 	use super::MameCommand;
 
 	#[rustfmt::skip]
@@ -242,7 +252,7 @@ mod test {
 	#[test_case(3, MameCommand::start("coco2b", &[("ext:fdc:wd17xx:0", "foo.dsk")]), "START coco2b ext:fdc:wd17xx:0 foo.dsk")]
 	#[test_case(4, MameCommand::load_image("ext:fdc:wd17xx:0", "foo bar.dsk"), "LOAD ext:fdc:wd17xx:0 \"foo bar.dsk\"")]
 	#[test_case(5, MameCommand::load_images(&[("ext:fdc:wd17xx:0", "foo bar.dsk")]), "LOAD ext:fdc:wd17xx:0 \"foo bar.dsk\"")]
-	#[test_case(6, MameCommand::seq_set_standard("foobar", 0x20, "KEYCODE_X or KEYCODE_Y"), "SEQ_SET foobar 32 standard \"KEYCODE_X or KEYCODE_Y\"")]
+	#[test_case(6, MameCommand::seq_set(&[("foobar", 0x20, SeqType::Standard, "KEYCODE_X or KEYCODE_Y")]), "SEQ_SET foobar 32 standard \"KEYCODE_X or KEYCODE_Y\"")]
 	fn command_test(_index: usize, command: MameCommand, expected: &str) {
 		let actual = command.text();
 		assert_eq!(expected, actual);
