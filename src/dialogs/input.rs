@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -65,7 +66,7 @@ enum InputCluster {
 }
 
 struct ContextMenuEntry<'a> {
-	pub title: &'a str,
+	pub title: Cow<'a, str>,
 	pub command: Option<AppCommand>,
 }
 
@@ -212,7 +213,7 @@ impl InputDialogModel {
 				.iter()
 				.map(|entry| {
 					let entry = entry.as_ref().unwrap();
-					let title = entry.title.into();
+					let title = entry.title.as_ref().into();
 					let command = entry
 						.command
 						.as_ref()
@@ -499,7 +500,10 @@ fn input_cluster_context_menu<'a>(
 			];
 			entries
 				.into_iter()
-				.map(|(title, command)| Some(ContextMenuEntry { title, command }))
+				.map(|(title, command)| {
+					let title = title.into();
+					Some(ContextMenuEntry { title, command })
+				})
 				.collect::<Vec<_>>()
 		}
 		InputCluster::Multi {
@@ -512,7 +516,7 @@ fn input_cluster_context_menu<'a>(
 
 			let entries_iter = if x_input.is_some() || y_input.is_some() {
 				let arrow_keys_entry = ContextMenuEntry {
-					title: "Arrow Keys",
+					title: "Arrow Keys".into(),
 					command: Some(AppCommand::set_multi_seq(
 						x_input,
 						y_input,
@@ -525,7 +529,7 @@ fn input_cluster_context_menu<'a>(
 					)),
 				};
 				let numpad_entry = ContextMenuEntry {
-					title: "Number Pad",
+					title: "Number Pad".into(),
 					command: Some(AppCommand::set_multi_seq(
 						x_input,
 						y_input,
@@ -539,7 +543,9 @@ fn input_cluster_context_menu<'a>(
 				};
 				let device_entries_iter = input_device_classes
 					.iter_devices()
-					.filter_map(|(_, device)| context_menu_entry_for_quick_device(device, x_input, y_input));
+					.filter_map(|(device_class, device)| {
+						context_menu_entry_for_quick_device(device_class, device, x_input, y_input)
+					});
 
 				Either::Left(
 					[arrow_keys_entry]
@@ -554,11 +560,11 @@ fn input_cluster_context_menu<'a>(
 			};
 
 			let specify_entry = ContextMenuEntry {
-				title: "Specify...",
+				title: "Specify...".into(),
 				command: Some(AppCommand::input_multi_dialog(x_input, y_input)),
 			};
 			let clear_entry = ContextMenuEntry {
-				title: "Clear",
+				title: "Clear".into(),
 				command: Some(AppCommand::set_multi_seq(x_input, y_input, "", "", "", "", "", "")),
 			};
 			entries_iter
@@ -597,12 +603,17 @@ fn dump_clusters_trace(inputs: &[Input], clusters: &[InputCluster]) {
 }
 
 fn context_menu_entry_for_quick_device<'a>(
+	device_class: &InputDeviceClass,
 	device: &'a InputDevice,
 	x_input: Option<&Input>,
 	y_input: Option<&Input>,
 ) -> Option<ContextMenuEntry<'a>> {
 	app_command_for_set_quick_devices([device].into_iter(), x_input, y_input).map(|command| {
-		let title = &device.name;
+		let title = if let Some(prefix) = device_class.prefix() {
+			format!("{} #{} ({})", prefix, device.devindex + 1, device.name).into()
+		} else {
+			device.name.as_str().into()
+		};
 		let command = Some(command);
 		ContextMenuEntry { title, command }
 	})
