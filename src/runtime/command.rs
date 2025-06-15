@@ -206,7 +206,18 @@ impl TryFrom<&Path> for MovieFormat {
 }
 
 #[derive(
-	Clone, Copy, Debug, Serialize, Deserialize, PartialEq, EnumProperty, IntoStaticStr, EnumString, VariantArray,
+	Clone,
+	Copy,
+	Debug,
+	Serialize,
+	Deserialize,
+	PartialEq,
+	Eq,
+	Hash,
+	EnumProperty,
+	IntoStaticStr,
+	EnumString,
+	VariantArray,
 )]
 #[strum(ascii_case_insensitive)]
 #[strum(serialize_all = "lowercase")]
