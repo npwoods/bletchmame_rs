@@ -1,24 +1,28 @@
 import { StandardListView, HorizontalBox, VerticalBox, StandardButton, CheckBox } from "std-widgets.slint";
+
 export component InputSelectMultipleDialog inherits Window {
     // properties
-    in property <[string]> entries;
+    in-out property <[string]> entries;
     
     // callbacks
     callback ok-clicked();
     callback cancel-clicked();
+    callback checkbox-toggled(int, bool);
 
     // control hierarchy
     title: "Multiple";
     icon: @image-url("bletchmame.png");
     VerticalBox {
-        for entry in entries: CheckBox {
-            text: entry;
+        for text[i] in entries: CheckBox {
+            text: text;
+            toggled() => {
+                checkbox-toggled(i, self.checked);
+            }
         }
         HorizontalBox {
             alignment: end;
             StandardButton {
                 kind: ok;
-                enabled: false;
                 clicked => {
                     root.ok-clicked();
                 }
