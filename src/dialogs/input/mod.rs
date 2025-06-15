@@ -1,3 +1,4 @@
+pub mod multi;
 pub mod primary;
 pub mod xy;
 
@@ -250,6 +251,25 @@ fn build_context_menu<'a>(
 		})
 		.collect::<Vec<_>>();
 
+	// do we need a "Multiple..." entry?
+	let multiple_command = (quick_items.len() >= 2).then(|| {
+		let selections = quick_items
+			.iter()
+			.map(|(title, seqs)| {
+				let title = title.to_string();
+				let seqs = seqs
+					.iter()
+					.map(|(port_tag, mask, seq_type, code)| ((*port_tag).clone(), *mask, *seq_type, code.to_string()))
+					.collect::<Vec<_>>();
+				(title, seqs)
+			})
+			.collect::<Vec<_>>();
+		let command = AppCommand::InputSelectMultipleDialog { selections };
+		let command = command.encode_for_slint();
+		let title = "Multiple...".into();
+		InputContextMenuEntry { title, command }
+	});
+
 	// now combine
 	let entries_1 = quick_items
 		.into_iter()
@@ -259,6 +279,7 @@ fn build_context_menu<'a>(
 			let title = title.as_ref().into();
 			InputContextMenuEntry { title, command }
 		})
+		.chain(multiple_command)
 		.collect::<Vec<_>>();
 
 	let entries_2 = [

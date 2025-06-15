@@ -116,6 +116,10 @@ pub enum AppCommand {
 		x_input: Option<(Arc<str>, u32)>,
 		y_input: Option<(Arc<str>, u32)>,
 	},
+	InputSelectMultipleDialog {
+		#[allow(clippy::type_complexity)]
+		selections: Vec<(String, Vec<(Arc<str>, u32, SeqType, String)>)>,
+	},
 }
 
 const MENU_PREFIX: &str = "MENU_";

@@ -48,6 +48,7 @@ use crate::dialogs::file::load_file_dialog;
 use crate::dialogs::file::save_file_dialog;
 use crate::dialogs::image::Format;
 use crate::dialogs::image::dialog_load_image;
+use crate::dialogs::input::multi::dialog_input_select_multiple;
 use crate::dialogs::input::primary::dialog_input;
 use crate::dialogs::input::xy::dialog_input_xy;
 use crate::dialogs::messagebox::OkCancel;
@@ -1164,6 +1165,17 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				status_changed_channel,
 				invoke_command,
 			);
+			spawn_local(fut).unwrap();
+		}
+		AppCommand::InputSelectMultipleDialog { selections } => {
+			let modal_stack = model.modal_stack.clone();
+			let model = model.clone();
+			let fut = async move {
+				let command = dialog_input_select_multiple(modal_stack, selections).await;
+				if let Some(command) = command {
+					handle_command(&model, command);
+				}
+			};
 			spawn_local(fut).unwrap();
 		}
 	};
