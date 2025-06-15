@@ -1,7 +1,7 @@
 import { VerticalBox, GridBox, HorizontalBox, Button, StandardButton } from "std-widgets.slint";
 import { InputDialogEntry, InputContextMenuEntry } from "input.slint";
 
-component InputMulti {
+component InputXyPart {
     // properties
     in property <InputDialogEntry> entry;
 
@@ -36,7 +36,7 @@ component InputMulti {
     }
 }
 
-export component InputMultiDialog inherits Window {
+export component InputXyDialog inherits Window {
     // properties
     in property <string> dialog-title;
     in property <InputDialogEntry> left-entry;
@@ -89,7 +89,7 @@ export component InputMultiDialog inherits Window {
     icon: @image-url("bletchmame.png");
     VerticalBox {
         GridBox {
-            InputMulti {
+            InputXyPart {
                 col: 0;
                 row: 1;
                 entry: root.left-entry;
@@ -101,7 +101,7 @@ export component InputMultiDialog inherits Window {
                 }
             }
 
-            InputMulti {
+            InputXyPart {
                 col: 2;
                 row: 1;
                 entry: root.right-entry;
@@ -113,7 +113,7 @@ export component InputMultiDialog inherits Window {
                 }
             }
 
-            InputMulti {
+            InputXyPart {
                 col: 1;
                 row: 0;
                 entry: root.up-entry;
@@ -125,7 +125,7 @@ export component InputMultiDialog inherits Window {
                 }
             }
 
-            InputMulti {
+            InputXyPart {
                 col: 1;
                 row: 2;
                 entry: root.down-entry;

@@ -3,10 +3,8 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::str::FromStr;
 use std::sync::Arc;
 
-use easy_ext::ext;
 use itertools::Either;
 use itertools::Itertools;
 use slint::CloseRequestResponse;
@@ -17,7 +15,6 @@ use slint::ModelRc;
 use slint::ModelTracker;
 use slint::VecModel;
 use slint::Weak;
-use strum::EnumString;
 use tracing::info;
 use tracing::trace;
 use tracing::trace_span;
@@ -25,7 +22,12 @@ use tracing::trace_span;
 use crate::appcommand::AppCommand;
 use crate::channel::Channel;
 use crate::dialogs::SingleResult;
-use crate::dialogs::seqpoll::SeqPollDialogType;
+use crate::dialogs::input::InputAxis;
+use crate::dialogs::input::InputDeviceClassExt;
+use crate::dialogs::input::InputDeviceClassSliceExt;
+use crate::dialogs::input::InputSeqExt;
+use crate::dialogs::input::build_code_text;
+use crate::dialogs::input::build_codes;
 use crate::guiutils::modal::ModalStack;
 use crate::runtime::command::MameCommand;
 use crate::runtime::command::SeqType;
@@ -33,8 +35,6 @@ use crate::status::Input;
 use crate::status::InputClass;
 use crate::status::InputDevice;
 use crate::status::InputDeviceClass;
-use crate::status::InputDeviceClassName;
-use crate::status::InputDeviceItem;
 use crate::status::Status;
 use crate::ui::InputContextMenuEntry;
 use crate::ui::InputDialog;
@@ -58,7 +58,7 @@ struct InputDialogState {
 #[derive(Debug)]
 enum InputCluster {
 	Single(usize),
-	Multi {
+	Xy {
 		x_input_index: Option<usize>,
 		y_input_index: Option<usize>,
 		aggregate_name: Option<String>,
@@ -68,33 +68,6 @@ enum InputCluster {
 struct ContextMenuEntry<'a> {
 	pub title: Cow<'a, str>,
 	pub command: Option<AppCommand>,
-}
-
-#[derive(Copy, Clone, Debug)]
-pub enum InputAxis {
-	X,
-	Y,
-}
-
-#[derive(Debug, PartialEq)]
-enum SeqToken<'a> {
-	Named(&'a str, Option<SeqTokenModifier<'a>>),
-	Or,
-	Not,
-	Default,
-}
-
-#[derive(Debug, PartialEq, EnumString)]
-#[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
-enum SeqTokenModifier<'a> {
-	LeftSwitch,
-	UpSwitch,
-	RightSwitch,
-	DownSwitch,
-	Relative,
-	Absolute,
-	#[strum(disabled)]
-	Unknown(&'a str),
 }
 
 pub async fn dialog_input(
@@ -264,14 +237,14 @@ impl Model for InputDialogModel {
 				let input = &state.inputs[*input_index];
 				Some(AppCommand::seq_specify_dialog(input, SeqType::Standard))
 			}
-			InputCluster::Multi {
+			InputCluster::Xy {
 				x_input_index,
 				y_input_index,
 				..
 			} => {
 				let x_input = x_input_index.map(|idx| &state.inputs[idx]);
 				let y_input = y_input_index.map(|idx| &state.inputs[idx]);
-				let command = AppCommand::input_multi_dialog(x_input, y_input);
+				let command = AppCommand::input_xy_dialog(x_input, y_input);
 				Some(command)
 			}
 		};
@@ -323,20 +296,6 @@ fn build_clusters(inputs: &[Input], class: InputClass) -> Box<[InputCluster]> {
 		.collect()
 }
 
-pub fn build_codes(input_device_classes: &[InputDeviceClass]) -> HashMap<Box<str>, Box<str>> {
-	input_device_classes
-		.iter_device_items()
-		.map(|(device_class, device, item)| {
-			let label = if let Some(prefix) = device_class.prefix() {
-				format!("{} #{} {}", prefix, device.devindex + 1, item.name).into()
-			} else {
-				item.name.as_str().into()
-			};
-			(item.code.as_str().into(), label)
-		})
-		.collect::<HashMap<_, _>>()
-}
-
 fn build_restore_defaults_command(inputs: &[Input], clusters: &[InputCluster]) -> Option<AppCommand> {
 	let seqs = clusters
 		.iter()
@@ -363,7 +322,7 @@ fn input_cluster_from_input(index: usize, input: &Input) -> InputCluster {
 			.strip_suffix(['X', 'Y', 'Z'])
 			.map(|name| name.trim_end_matches(char::is_whitespace).to_string());
 
-		InputCluster::Multi {
+		InputCluster::Xy {
 			x_input_index,
 			y_input_index,
 			aggregate_name,
@@ -376,7 +335,7 @@ fn input_cluster_from_input(index: usize, input: &Input) -> InputCluster {
 fn input_cluster_name<'a>(inputs: &'a [Input], cluster: &'a InputCluster) -> &'a str {
 	match cluster {
 		InputCluster::Single(input_index) => &inputs[*input_index].name,
-		InputCluster::Multi {
+		InputCluster::Xy {
 			x_input_index,
 			y_input_index,
 			aggregate_name,
@@ -385,44 +344,6 @@ fn input_cluster_name<'a>(inputs: &'a [Input], cluster: &'a InputCluster) -> &'a
 			.or_else(|| x_input_index.map(|idx| inputs[idx].name.as_str()))
 			.or_else(|| y_input_index.map(|idx| inputs[idx].name.as_str()))
 			.unwrap(),
-	}
-}
-
-pub fn build_code_text<'a>(
-	input_seqs: impl IntoIterator<Item = (&'a Input, Option<InputAxis>, SeqType)>,
-	codes: &HashMap<Box<str>, impl AsRef<str>>,
-) -> Cow<'static, str> {
-	let result = input_seqs
-		.into_iter()
-		.filter_map(|(input, axis, seq_type)| {
-			let seq_tokens = match seq_type {
-				SeqType::Standard => &input.seq_standard_tokens,
-				SeqType::Decrement => &input.seq_decrement_tokens,
-				SeqType::Increment => &input.seq_increment_tokens,
-			};
-
-			seq_tokens
-				.as_deref()
-				.and_then(|seq_tokens| (!seq_tokens.is_empty()).then_some((axis, seq_type, seq_tokens)))
-		})
-		.map(|(axis, seq_type, seq_tokens)| {
-			let prefix = match (axis, seq_type) {
-				(None, _) => "",
-				(Some(InputAxis::X), SeqType::Standard) => "\u{2194}",
-				(Some(InputAxis::X), SeqType::Decrement) => "\u{25C0}",
-				(Some(InputAxis::X), SeqType::Increment) => "\u{25B6}",
-				(Some(InputAxis::Y), SeqType::Standard) => "\u{2195}",
-				(Some(InputAxis::Y), SeqType::Decrement) => "\u{25B2}",
-				(Some(InputAxis::Y), SeqType::Increment) => "\u{25BC}",
-			};
-			format!("{}{}", prefix, seq_tokens_desc_from_string(seq_tokens, codes))
-		})
-		.join(" / ");
-
-	if result.is_empty() {
-		"None".into()
-	} else {
-		result.into()
 	}
 }
 
@@ -435,7 +356,7 @@ fn input_cluster_input_seqs<'a>(
 			let input = &inputs[*input_index];
 			Either::Left([(input, None, SeqType::Standard)].into_iter())
 		}
-		InputCluster::Multi {
+		InputCluster::Xy {
 			x_input_index,
 			y_input_index,
 			..
@@ -457,7 +378,7 @@ fn input_cluster_input_seqs<'a>(
 fn input_cluster_as_multi(input_cluster: &InputCluster) -> Option<(Option<usize>, Option<usize>, Option<&'_ str>)> {
 	match input_cluster {
 		InputCluster::Single(_) => None,
-		InputCluster::Multi {
+		InputCluster::Xy {
 			x_input_index,
 			y_input_index,
 			aggregate_name,
@@ -481,7 +402,7 @@ fn coalesce_input_clusters(a: &InputCluster, b: &InputCluster) -> Option<InputCl
 	let y_input_index = Some(y_input_index);
 	let aggregate_name = a_aggregate_name.map(|x| x.to_string());
 
-	let result = InputCluster::Multi {
+	let result = InputCluster::Xy {
 		x_input_index,
 		y_input_index,
 		aggregate_name,
@@ -513,7 +434,7 @@ fn input_cluster_context_menu<'a>(
 				})
 				.collect::<Vec<_>>()
 		}
-		InputCluster::Multi {
+		InputCluster::Xy {
 			x_input_index,
 			y_input_index,
 			..
@@ -568,7 +489,7 @@ fn input_cluster_context_menu<'a>(
 
 			let specify_entry = ContextMenuEntry {
 				title: "Specify...".into(),
-				command: Some(AppCommand::input_multi_dialog(x_input, y_input)),
+				command: Some(AppCommand::input_xy_dialog(x_input, y_input)),
 			};
 			let clear_entry = ContextMenuEntry {
 				title: "Clear".into(),
@@ -593,7 +514,7 @@ fn dump_clusters_trace(inputs: &[Input], clusters: &[InputCluster]) {
 					trace!("Cluster[{idx}]: {input:?}");
 				}
 			}
-			InputCluster::Multi {
+			InputCluster::Xy {
 				x_input_index,
 				y_input_index,
 				..
@@ -649,225 +570,4 @@ fn app_command_for_set_quick_devices<'a>(
 
 	(!x_codes.is_empty() && !y_codes.is_empty())
 		.then(|| AppCommand::set_multi_seq(x_input, y_input, x_codes.as_str(), "", "", y_codes.as_str(), "", ""))
-}
-
-fn seq_tokens_desc_from_string(s: &str, codes: &HashMap<Box<str>, impl AsRef<str>>) -> String {
-	seq_tokens_from_string(s)
-		.flat_map(|token| match token {
-			SeqToken::Named(text, modifier) => {
-				let text = codes.get(text).map(|x| x.as_ref()).unwrap_or(text);
-				match modifier {
-					None => vec![text],
-					Some(SeqTokenModifier::LeftSwitch) => vec![text, "Left"],
-					Some(SeqTokenModifier::UpSwitch) => vec![text, "Up"],
-					Some(SeqTokenModifier::RightSwitch) => vec![text, "Right"],
-					Some(SeqTokenModifier::DownSwitch) => vec![text, "Down"],
-					Some(SeqTokenModifier::Relative) => vec![text, "Relative"],
-					Some(SeqTokenModifier::Absolute) => vec![text, "Absolute"],
-					Some(SeqTokenModifier::Unknown(modifier)) => vec![text, modifier],
-				}
-			}
-			SeqToken::Or => vec!["or"],
-			SeqToken::Not => vec!["not"],
-			SeqToken::Default => vec!["default"],
-		})
-		.join(" ")
-}
-
-fn seq_tokens_from_string(s: &str) -> impl Iterator<Item = SeqToken<'_>> {
-	s.split(' ')
-		.map(|token_text| {
-			// binary tokens like OR/NOT/DEFAULT should just be "lowercased" (this
-			// will need to be reevaluated when it is time to localize this)
-			match token_text {
-				"OR" => SeqToken::Or,
-				"NOT" => SeqToken::Not,
-				"DEFAULT" => SeqToken::Default,
-				_ => {
-					// here we need to split tokens into their base and modifier, like this:
-					//
-					//  KEYCODE_0                       ==> "KEYCODE_0", ""
-					//  JOYCODE_1_BUTTON1               ==> "JOYCODE_1_BUTTON1", ""
-					//  JOYCODE_1_XAXIS                 ==> "JOYCODE_1_XAXIS", ""
-					//  JOYCODE_1_XAXIS_RIGHT_SWITCH    ==> "JOYCODE_1_XAXIS", "RIGHT_SWITCH"
-					//
-					// first step is to iterate over the first two words, or three if the
-					// second word is numeric
-					let mut sep_iter = token_text.match_indices('_').map(|x| x.0);
-					let sep_1_pos = sep_iter.next();
-					let sep_2_pos = sep_iter.next();
-
-					// now find the index of the modifier sep
-					let sep_modifier_pos = if Option::zip(sep_1_pos, sep_2_pos).is_some_and(|(sep_1_pos, sep_2_pos)| {
-						token_text[(sep_1_pos + 1)..sep_2_pos]
-							.chars()
-							.all(|ch| ch.is_ascii_digit())
-					}) {
-						sep_iter.next()
-					} else {
-						sep_2_pos
-					};
-
-					// parse out the base and modifier
-					let (base, modifier) = if let Some(sep_modifier_pos) = sep_modifier_pos {
-						(&token_text[..sep_modifier_pos], &token_text[(sep_modifier_pos + 1)..])
-					} else {
-						(token_text, "")
-					};
-
-					// interpret the modifier
-					let modifier = (!modifier.is_empty())
-						.then(|| SeqTokenModifier::from_str(modifier).unwrap_or(SeqTokenModifier::Unknown(modifier)));
-
-					// and return
-					SeqToken::Named(base, modifier)
-				}
-			}
-		})
-		.skip_while(|token| *token == SeqToken::Or)
-}
-
-#[ext(InputDeviceClassExt)]
-pub impl InputDeviceClass {
-	fn prefix(&self) -> Option<&'_ str> {
-		match (&self.name, self.devices.len() > 1) {
-			(InputDeviceClassName::Keyboard, false) => None,
-			(InputDeviceClassName::Keyboard, true) => Some("Kbd"),
-			(InputDeviceClassName::Joystick, _) => Some("Joy"),
-			(InputDeviceClassName::Lightgun, _) => Some("Gun"),
-			(InputDeviceClassName::Mouse, _) => Some("Mouse"),
-			(InputDeviceClassName::Other(x), _) => Some(x.as_ref()),
-		}
-	}
-}
-
-#[ext(InputDeviceClassSliceExt)]
-pub impl [InputDeviceClass] {
-	fn iter_devices(&self) -> impl Iterator<Item = (&'_ InputDeviceClass, &'_ InputDevice)> {
-		self.iter()
-			.flat_map(|device_class| device_class.devices.iter().map(move |device| (device_class, device)))
-	}
-
-	fn iter_device_items(&self) -> impl Iterator<Item = (&'_ InputDeviceClass, &'_ InputDevice, &'_ InputDeviceItem)> {
-		self.iter_devices()
-			.flat_map(|(device_class, device)| device.items.iter().map(move |item| (device_class, device, item)))
-	}
-}
-
-#[ext(InputSeqExt)]
-pub impl AppCommand {
-	fn seq_specify_dialog(input: &Input, seq_type: SeqType) -> Self {
-		AppCommand::SeqPollDialog {
-			port_tag: input.port_tag.clone(),
-			mask: input.mask,
-			seq_type,
-			poll_type: SeqPollDialogType::Specify,
-		}
-	}
-
-	fn seq_add_dialog(input: &Input, seq_type: SeqType) -> Self {
-		AppCommand::SeqPollDialog {
-			port_tag: input.port_tag.clone(),
-			mask: input.mask,
-			seq_type,
-			poll_type: SeqPollDialogType::Add,
-		}
-	}
-
-	fn seq_clear(input: &Input, seq_type: SeqType) -> Self {
-		let seqs = &[(input.port_tag.as_ref(), input.mask, seq_type, "")];
-		MameCommand::seq_set(seqs).into()
-	}
-
-	#[allow(clippy::too_many_arguments)]
-	fn set_multi_seq(
-		x_input: Option<&Input>,
-		y_input: Option<&Input>,
-		x_standard_tokens: &str,
-		x_decrement_tokens: &str,
-		x_increment_tokens: &str,
-		y_standard_tokens: &str,
-		y_decrement_tokens: &str,
-		y_increment_tokens: &str,
-	) -> AppCommand {
-		let seqs = [
-			x_input.map(|x_input| {
-				(
-					x_input.port_tag.as_ref(),
-					x_input.mask,
-					SeqType::Standard,
-					x_standard_tokens,
-				)
-			}),
-			x_input.map(|x_input| {
-				(
-					x_input.port_tag.as_ref(),
-					x_input.mask,
-					SeqType::Decrement,
-					x_decrement_tokens,
-				)
-			}),
-			x_input.map(|x_input| {
-				(
-					x_input.port_tag.as_ref(),
-					x_input.mask,
-					SeqType::Increment,
-					x_increment_tokens,
-				)
-			}),
-			y_input.map(|y_input| {
-				(
-					y_input.port_tag.as_ref(),
-					y_input.mask,
-					SeqType::Standard,
-					y_standard_tokens,
-				)
-			}),
-			y_input.map(|y_input| {
-				(
-					y_input.port_tag.as_ref(),
-					y_input.mask,
-					SeqType::Decrement,
-					y_decrement_tokens,
-				)
-			}),
-			y_input.map(|y_input| {
-				(
-					y_input.port_tag.as_ref(),
-					y_input.mask,
-					SeqType::Increment,
-					y_increment_tokens,
-				)
-			}),
-		];
-		let seqs = seqs.into_iter().flatten().collect::<Vec<_>>();
-		MameCommand::seq_set(seqs.as_slice()).into()
-	}
-
-	fn input_multi_dialog(x_input: Option<&Input>, y_input: Option<&Input>) -> AppCommand {
-		let x_input = x_input.map(|input| (input.port_tag.clone(), input.mask));
-		let y_input = y_input.map(|input| (input.port_tag.clone(), input.mask));
-		AppCommand::InputMultiDialog { x_input, y_input }
-	}
-}
-
-#[cfg(test)]
-mod test {
-	use test_case::test_case;
-
-	use super::SeqToken;
-	use super::SeqToken::Named;
-	use super::SeqToken::Or;
-	use super::SeqTokenModifier::RightSwitch;
-
-	#[test_case(0, "KEYCODE_0", &[Named("KEYCODE_0", None)])]
-	#[test_case(1, "KEYCODE_0 OR KEYCODE_1", &[Named("KEYCODE_0", None), Or, Named("KEYCODE_1", None)])]
-	#[test_case(2, "OR KEYCODE_A OR KEYCODE_B", &[Named("KEYCODE_A", None), Or, Named("KEYCODE_B", None)])]
-	#[test_case(3, "JOYCODE_1_BUTTON1", &[Named("JOYCODE_1_BUTTON1", None)])]
-	#[test_case(4, "JOYCODE_1_XAXIS", &[Named("JOYCODE_1_XAXIS", None)])]
-	#[test_case(5, "JOYCODE_1_XAXIS_RIGHT_SWITCH", &[Named("JOYCODE_1_XAXIS", Some(RightSwitch))])]
-	fn seq_tokens_from_string(_index: usize, s: &str, expected: &[SeqToken<'_>]) {
-		let actual = super::seq_tokens_from_string(s).collect::<Vec<_>>();
-		assert_eq!(expected, actual.as_slice());
-	}
 }

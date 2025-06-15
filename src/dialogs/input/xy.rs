@@ -29,10 +29,10 @@ use crate::status::InputDeviceClass;
 use crate::status::Status;
 use crate::ui::InputContextMenuEntry;
 use crate::ui::InputDialogEntry;
-use crate::ui::InputMultiDialog;
+use crate::ui::InputXyDialog;
 
 struct Model {
-	dialog_weak: Weak<InputMultiDialog>,
+	dialog_weak: Weak<InputXyDialog>,
 	x_input: Option<(Arc<str>, u32)>,
 	y_input: Option<(Arc<str>, u32)>,
 	state: RefCell<State>,
@@ -44,7 +44,7 @@ struct State {
 	input_device_classes: Arc<[InputDeviceClass]>,
 }
 
-pub async fn dialog_input_multi(
+pub async fn dialog_input_xy(
 	modal_stack: ModalStack,
 	x_input: Option<(Arc<str>, u32)>,
 	y_input: Option<(Arc<str>, u32)>,
@@ -54,7 +54,7 @@ pub async fn dialog_input_multi(
 	invoke_command: impl Fn(AppCommand) + Clone + 'static,
 ) {
 	// prepare the dialog
-	let modal = modal_stack.modal(|| InputMultiDialog::new().unwrap());
+	let modal = modal_stack.modal(|| InputXyDialog::new().unwrap());
 	let single_result = SingleResult::default();
 
 	// set up the close handler
@@ -117,7 +117,7 @@ pub async fn dialog_input_multi(
 
 impl Model {
 	pub fn new(
-		dialog_weak: Weak<InputMultiDialog>,
+		dialog_weak: Weak<InputXyDialog>,
 		x_input: Option<(Arc<str>, u32)>,
 		y_input: Option<(Arc<str>, u32)>,
 	) -> Self {

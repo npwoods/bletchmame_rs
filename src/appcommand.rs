@@ -112,7 +112,7 @@ pub enum AppCommand {
 		seq_type: SeqType,
 		poll_type: SeqPollDialogType,
 	},
-	InputMultiDialog {
+	InputXyDialog {
 		x_input: Option<(Arc<str>, u32)>,
 		y_input: Option<(Arc<str>, u32)>,
 	},
