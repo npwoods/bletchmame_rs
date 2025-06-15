@@ -48,8 +48,9 @@ use crate::dialogs::file::load_file_dialog;
 use crate::dialogs::file::save_file_dialog;
 use crate::dialogs::image::Format;
 use crate::dialogs::image::dialog_load_image;
-use crate::dialogs::input::dialog_input;
-use crate::dialogs::input_multi::dialog_input_multi;
+use crate::dialogs::input::multi::dialog_input_select_multiple;
+use crate::dialogs::input::primary::dialog_input;
+use crate::dialogs::input::xy::dialog_input_xy;
 use crate::dialogs::messagebox::OkCancel;
 use crate::dialogs::messagebox::OkOnly;
 use crate::dialogs::messagebox::dialog_message_box;
@@ -1143,7 +1144,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			);
 			spawn_local(fut).unwrap();
 		}
-		AppCommand::InputMultiDialog { x_input, y_input } => {
+		AppCommand::InputXyDialog { x_input, y_input } => {
 			let modal_stack: ModalStack = model.modal_stack.clone();
 			let (inputs, input_device_classes) = model
 				.state
@@ -1155,7 +1156,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			let status_changed_channel = model.status_changed_channel.clone();
 			let model_clone = model.clone();
 			let invoke_command = move |command| handle_command(&model_clone, command);
-			let fut = dialog_input_multi(
+			let fut = dialog_input_xy(
 				modal_stack,
 				x_input,
 				y_input,
@@ -1164,6 +1165,17 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				status_changed_channel,
 				invoke_command,
 			);
+			spawn_local(fut).unwrap();
+		}
+		AppCommand::InputSelectMultipleDialog { selections } => {
+			let modal_stack = model.modal_stack.clone();
+			let model = model.clone();
+			let fut = async move {
+				let command = dialog_input_select_multiple(modal_stack, selections).await;
+				if let Some(command) = command {
+					handle_command(&model, command);
+				}
+			};
 			spawn_local(fut).unwrap();
 		}
 	};

@@ -1,164 +1,33 @@
-import { VerticalBox, GridBox, HorizontalBox, Button, StandardButton } from "std-widgets.slint";
-import { InputDialogEntry, InputContextMenuEntry } from "input.slint";
-
-component InputMulti {
+import { StandardListView, HorizontalBox, VerticalBox, StandardButton, CheckBox } from "std-widgets.slint";
+export component InputSelectMultipleDialog inherits Window {
     // properties
-    in property <InputDialogEntry> entry;
-
-    // callbacks
-    callback menu-item-command(string);
-    callback context-button-clicked(Point);
-
-    // widgets
-    VerticalBox {
-        visible: !(entry.name.is-empty && entry.text.is-empty && entry.primary-command.is-empty);
-        Text {
-            text: entry.text;
-        }
-
-        HorizontalBox {
-            Button {
-                text: entry.name;
-                enabled: !entry.primary-command.is-empty;
-                clicked => {
-                    root.menu-item-command(entry.primary-command);
-                }
-            }
-
-            Button {
-                width: 40px;
-                text: "▼";
-                clicked => {
-                    root.context-button-clicked({ x: self.absolute-position.x, y: self.absolute-position.y + self.height });
-                }
-            }
-        }
-    }
-}
-
-export component InputMultiDialog inherits Window {
-    // properties
-    in property <string> dialog-title;
-    in property <InputDialogEntry> left-entry;
-    in property <InputDialogEntry> right-entry;
-    in property <InputDialogEntry> up-entry;
-    in property <InputDialogEntry> down-entry;
-    in property <string> clear-command;
-    in property <string> restore-defaults-command;
-
+    in property <[string]> entries;
+    
     // callbacks
     callback ok-clicked();
-    callback menu-item-command(string);
-    callback left-context-button-clicked(Point);
-    callback right-context-button-clicked(Point);
-    callback up-context-button-clicked(Point);
-    callback down-context-button-clicked(Point);
-
-    // context menu
-    in-out property <[InputContextMenuEntry]> context-menu-entries-1;
-    in-out property <[InputContextMenuEntry]> context-menu-entries-2;
-    public function show-context-menu(entries-1: [InputContextMenuEntry], entries-2: [InputContextMenuEntry], point: Point) {
-        self.context-menu-entries-1 = entries-1;
-        self.context-menu-entries-2 = entries-2;
-        context-menu.show(point);
-    }
-
-    // context menu control
-    context-menu := ContextMenuArea {
-        Menu {
-            for entry in context-menu-entries-1: MenuItem {
-                title: entry.title;
-                enabled: entry.command != "";
-                activated => {
-                    root.menu-item-command(entry.command);
-                }
-            }
-            if context-menu-entries-1.length > 0: MenuSeparator { }
-            for entry in context-menu-entries-2: MenuItem {
-                title: entry.title;
-                enabled: entry.command != "";
-                activated => {
-                    root.menu-item-command(entry.command);
-                }
-            }
-        }
-    }
+    callback cancel-clicked();
 
     // control hierarchy
-    title: dialog-title;
+    title: "Multiple";
     icon: @image-url("bletchmame.png");
     VerticalBox {
-        GridBox {
-            InputMulti {
-                col: 0;
-                row: 1;
-                entry: root.left-entry;
-                menu-item-command(command) => {
-                    root.menu-item-command(command);
-                }
-                context-button-clicked(point) => {
-                    root.left-context-button-clicked(point);
-                }
-            }
-
-            InputMulti {
-                col: 2;
-                row: 1;
-                entry: root.right-entry;
-                menu-item-command(command) => {
-                    root.menu-item-command(command);
-                }
-                context-button-clicked(point) => {
-                    root.right-context-button-clicked(point);
-                }
-            }
-
-            InputMulti {
-                col: 1;
-                row: 0;
-                entry: root.up-entry;
-                menu-item-command(command) => {
-                    root.menu-item-command(command);
-                }
-                context-button-clicked(point) => {
-                    root.up-context-button-clicked(point);
-                }
-            }
-
-            InputMulti {
-                col: 1;
-                row: 2;
-                entry: root.down-entry;
-                menu-item-command(command) => {
-                    root.menu-item-command(command);
-                }
-                context-button-clicked(point) => {
-                    root.down-context-button-clicked(point);
-                }
-            }
+        for entry in entries: CheckBox {
+            text: entry;
         }
-
         HorizontalBox {
-            Button {
-                text: "Clear";
-                enabled: !clear-command.is-empty;
+            alignment: end;
+            StandardButton {
+                kind: ok;
+                enabled: false;
                 clicked => {
-                    root.menu-item-command(clear-command);
-                }
-            }
-
-            Button {
-                text: "Restore Defaults";
-                enabled: !restore-defaults-command.is-empty;
-                clicked => {
-                    root.menu-item-command(restore-defaults-command);
+                    root.ok-clicked();
                 }
             }
 
             StandardButton {
-                kind: ok;
+                kind: cancel;
                 clicked => {
-                    root.ok-clicked();
+                    root.cancel-clicked();
                 }
             }
         }
