@@ -7,6 +7,8 @@ use std::str::FromStr;
 
 use easy_ext::ext;
 use itertools::Itertools;
+use slint::ModelRc;
+use slint::VecModel;
 use strum::EnumString;
 
 use crate::appcommand::AppCommand;
@@ -18,6 +20,7 @@ use crate::status::InputDevice;
 use crate::status::InputDeviceClass;
 use crate::status::InputDeviceClassName;
 use crate::status::InputDeviceItem;
+use crate::ui::InputContextMenuEntry;
 
 #[derive(Copy, Clone, Debug)]
 enum InputAxis {
@@ -220,6 +223,65 @@ fn build_codes(input_device_classes: &[InputDeviceClass]) -> HashMap<Box<str>, B
 			(item.code.as_str().into(), label)
 		})
 		.collect::<HashMap<_, _>>()
+}
+
+fn build_context_menu<'a>(
+	quick_item_inputs: &[Option<&'a Input>],
+	quick_items: impl IntoIterator<Item = (Cow<'a, str>, Vec<(usize, SeqType, &'a str)>)>,
+	specify_command: Option<AppCommand>,
+	add_command: Option<AppCommand>,
+	clear_command: Option<AppCommand>,
+) -> (ModelRc<InputContextMenuEntry>, ModelRc<InputContextMenuEntry>) {
+	// first pass on processing quick items
+	let quick_items = quick_items
+		.into_iter()
+		.filter(|(_, seqs)| !seqs.is_empty())
+		.map(|(title, seqs)| {
+			let seqs = seqs
+				.into_iter()
+				.filter_map(|(input_index, seq_type, code)| {
+					quick_item_inputs[input_index]
+						.as_ref()
+						.map(|input| (input, seq_type, code))
+				})
+				.map(|(input, seq_type, code)| (&input.port_tag, input.mask, seq_type, code))
+				.collect::<Vec<_>>();
+			(title, seqs)
+		})
+		.collect::<Vec<_>>();
+
+	// now combine
+	let entries_1 = quick_items
+		.into_iter()
+		.map(|(title, seqs)| {
+			let command = MameCommand::seq_set(&seqs);
+			let command = AppCommand::from(command).encode_for_slint();
+			let title = title.as_ref().into();
+			InputContextMenuEntry { title, command }
+		})
+		.collect::<Vec<_>>();
+
+	let entries_2 = [
+		("Specify...", specify_command),
+		("Add...", add_command),
+		("Clear", clear_command),
+	];
+	let entries_2 = entries_2
+		.into_iter()
+		.filter_map(|(title, command)| {
+			command.map(|command| {
+				let title = title.into();
+				let command = command.encode_for_slint();
+				InputContextMenuEntry { title, command }
+			})
+		})
+		.collect::<Vec<_>>();
+
+	let entries_1 = VecModel::from(entries_1);
+	let entries_2 = VecModel::from(entries_2);
+	let entries_1 = ModelRc::new(entries_1);
+	let entries_2 = ModelRc::new(entries_2);
+	(entries_1, entries_2)
 }
 
 fn seq_tokens_desc_from_string(s: &str, codes: &HashMap<Box<str>, impl AsRef<str>>) -> String {

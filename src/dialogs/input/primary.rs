@@ -1,5 +1,4 @@
 use std::any::Any;
-use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -13,8 +12,8 @@ use slint::Model;
 use slint::ModelNotify;
 use slint::ModelRc;
 use slint::ModelTracker;
-use slint::VecModel;
 use slint::Weak;
+use strum::VariantArray;
 use tracing::info;
 use tracing::trace;
 use tracing::trace_span;
@@ -28,12 +27,12 @@ use crate::dialogs::input::InputDeviceClassSliceExt;
 use crate::dialogs::input::InputSeqExt;
 use crate::dialogs::input::build_code_text;
 use crate::dialogs::input::build_codes;
+use crate::dialogs::input::build_context_menu;
 use crate::guiutils::modal::ModalStack;
 use crate::runtime::command::MameCommand;
 use crate::runtime::command::SeqType;
 use crate::status::Input;
 use crate::status::InputClass;
-use crate::status::InputDevice;
 use crate::status::InputDeviceClass;
 use crate::status::Status;
 use crate::ui::InputContextMenuEntry;
@@ -63,11 +62,6 @@ enum InputCluster {
 		y_input_index: Option<usize>,
 		aggregate_name: Option<String>,
 	},
-}
-
-struct ContextMenuEntry<'a> {
-	pub title: Cow<'a, str>,
-	pub command: Option<AppCommand>,
 }
 
 pub async fn dialog_input(
@@ -181,35 +175,85 @@ impl InputDialogModel {
 	}
 
 	pub fn context_menu(&self, index: usize) -> (ModelRc<InputContextMenuEntry>, ModelRc<InputContextMenuEntry>) {
-		fn convert_entries(entries: &[Option<ContextMenuEntry>]) -> ModelRc<InputContextMenuEntry> {
-			let entries = entries
-				.iter()
-				.map(|entry| {
-					let entry = entry.as_ref().unwrap();
-					let title = entry.title.as_ref().into();
-					let command = entry
-						.command
-						.as_ref()
-						.map(AppCommand::encode_for_slint)
-						.unwrap_or_default();
-					InputContextMenuEntry { title, command }
-				})
-				.collect::<Vec<_>>();
-			let entries = VecModel::from(entries);
-			ModelRc::new(entries)
-		}
-
 		let state = self.state.borrow();
-		let cluster = &state.clusters[index];
-		let entries = input_cluster_context_menu(&state.inputs, &state.input_device_classes, cluster);
+		let inputs = state.inputs.as_ref();
 
-		let (entries_1, entries_2) = entries
-			.iter()
-			.position(Option::is_none)
-			.map(|x| (&entries[..x], &entries[(x + 1)..]))
-			.unwrap_or((&[], &entries));
+		match &state.clusters[index] {
+			InputCluster::Single(index) => {
+				let input = &inputs[*index];
+				let specify_command = Some(AppCommand::seq_specify_dialog(input, SeqType::Standard));
+				let add_command = Some(AppCommand::seq_add_dialog(input, SeqType::Standard));
+				let clear_command = Some(AppCommand::seq_clear(input, SeqType::Standard));
+				build_context_menu(&[], [], specify_command, add_command, clear_command)
+			}
+			InputCluster::Xy {
+				x_input_index,
+				y_input_index,
+				..
+			} => {
+				let x_input = x_input_index.map(|index| &inputs[index]);
+				let y_input = y_input_index.map(|index| &inputs[index]);
 
-		(convert_entries(entries_1), convert_entries(entries_2))
+				// prepare builtin quick items
+				let arrow_keys_seqs = vec![
+					(0, SeqType::Standard, ""),
+					(0, SeqType::Decrement, "KEYCODE_LEFT"),
+					(0, SeqType::Increment, "KEYCODE_RIGHT"),
+					(1, SeqType::Standard, ""),
+					(1, SeqType::Decrement, "KEYCODE_UP"),
+					(1, SeqType::Increment, "KEYCODE_DOWN"),
+				];
+				let numpad_seqs = vec![
+					(0, SeqType::Standard, ""),
+					(0, SeqType::Decrement, "KEYCODE_4PAD"),
+					(0, SeqType::Increment, "KEYCODE_6PAD"),
+					(1, SeqType::Standard, ""),
+					(1, SeqType::Decrement, "KEYCODE_2PAD"),
+					(1, SeqType::Increment, "KEYCODE_8PAD"),
+				];
+				let builtin_entries = [
+					("Arrow Keys".into(), arrow_keys_seqs),
+					("Number Pad".into(), numpad_seqs),
+				];
+
+				// prepare input device-specific quick items
+				let device_entries_iter = state.input_device_classes.iter_devices().map(|(device_class, device)| {
+					let title = if let Some(prefix) = device_class.prefix() {
+						format!("{} #{} ({})", prefix, device.devindex + 1, device.name).into()
+					} else {
+						device.name.as_str().into()
+					};
+					let codes = device
+						.items
+						.iter()
+						.flat_map(|item| {
+							let input_index = match item.token.as_str() {
+								"XAXIS" => Some(0),
+								"YAXIS" => Some(1),
+								_ => None,
+							};
+							SeqType::VARIANTS
+								.iter()
+								.filter_map(move |seq_type| input_index.map(|input_index| (input_index, seq_type)))
+								.map(|(input_index, seq_type)| {
+									let code = if *seq_type == SeqType::Standard { &item.code } else { "" };
+									(input_index, *seq_type, code)
+								})
+						})
+						.collect::<Vec<_>>();
+					(title, codes)
+				});
+
+				// and combine them
+				let quick_items = builtin_entries.into_iter().chain(device_entries_iter);
+
+				// finally build the context menu
+				let quick_item_inputs = [x_input, y_input];
+				let specify_command = Some(AppCommand::input_xy_dialog(x_input, y_input));
+				let clear_command = Some(AppCommand::set_multi_seq(x_input, y_input, "", "", "", "", "", ""));
+				build_context_menu(&quick_item_inputs, quick_items, specify_command, None, clear_command)
+			}
+		}
 	}
 
 	pub fn get_model(model: &impl Model) -> &'_ Self {
@@ -410,99 +454,6 @@ fn coalesce_input_clusters(a: &InputCluster, b: &InputCluster) -> Option<InputCl
 	Some(result)
 }
 
-fn input_cluster_context_menu<'a>(
-	inputs: &'a [Input],
-	input_device_classes: &'a [InputDeviceClass],
-	cluster: &InputCluster,
-) -> Vec<Option<ContextMenuEntry<'a>>> {
-	match cluster {
-		InputCluster::Single(index) => {
-			let input = &inputs[*index];
-			let specify_command = AppCommand::seq_specify_dialog(input, SeqType::Standard);
-			let add_command = AppCommand::seq_add_dialog(input, SeqType::Standard);
-			let clear_command = AppCommand::seq_clear(input, SeqType::Standard);
-			let entries = [
-				("Specify...", Some(specify_command)),
-				("Add...", Some(add_command)),
-				("Clear", Some(clear_command)),
-			];
-			entries
-				.into_iter()
-				.map(|(title, command)| {
-					let title = title.into();
-					Some(ContextMenuEntry { title, command })
-				})
-				.collect::<Vec<_>>()
-		}
-		InputCluster::Xy {
-			x_input_index,
-			y_input_index,
-			..
-		} => {
-			let x_input = x_input_index.map(|index| &inputs[index]);
-			let y_input = y_input_index.map(|index| &inputs[index]);
-
-			let entries_iter = if x_input.is_some() || y_input.is_some() {
-				let arrow_keys_entry = ContextMenuEntry {
-					title: "Arrow Keys".into(),
-					command: Some(AppCommand::set_multi_seq(
-						x_input,
-						y_input,
-						"",
-						"KEYCODE_LEFT",
-						"KEYCODE_RIGHT",
-						"",
-						"KEYCODE_UP",
-						"KEYCODE_DOWN",
-					)),
-				};
-				let numpad_entry = ContextMenuEntry {
-					title: "Number Pad".into(),
-					command: Some(AppCommand::set_multi_seq(
-						x_input,
-						y_input,
-						"",
-						"KEYCODE_4PAD",
-						"KEYCODE_6PAD",
-						"",
-						"KEYCODE_8PAD",
-						"KEYCODE_2PAD",
-					)),
-				};
-				let device_entries_iter = input_device_classes
-					.iter_devices()
-					.filter_map(|(device_class, device)| {
-						context_menu_entry_for_quick_device(device_class, device, x_input, y_input)
-					});
-
-				Either::Left(
-					[arrow_keys_entry]
-						.into_iter()
-						.chain([numpad_entry])
-						.chain(device_entries_iter)
-						.map(Some)
-						.chain([None]),
-				)
-			} else {
-				Either::Right([].into_iter())
-			};
-
-			let specify_entry = ContextMenuEntry {
-				title: "Specify...".into(),
-				command: Some(AppCommand::input_xy_dialog(x_input, y_input)),
-			};
-			let clear_entry = ContextMenuEntry {
-				title: "Clear".into(),
-				command: Some(AppCommand::set_multi_seq(x_input, y_input, "", "", "", "", "", "")),
-			};
-			entries_iter
-				.chain([Some(specify_entry)])
-				.chain([Some(clear_entry)])
-				.collect::<Vec<_>>()
-		}
-	}
-}
-
 fn dump_clusters_trace(inputs: &[Input], clusters: &[InputCluster]) {
 	let span = trace_span!("dump_clusters_trace");
 	let _guard = span.enter();
@@ -528,46 +479,4 @@ fn dump_clusters_trace(inputs: &[Input], clusters: &[InputCluster]) {
 			}
 		}
 	}
-}
-
-fn context_menu_entry_for_quick_device<'a>(
-	device_class: &InputDeviceClass,
-	device: &'a InputDevice,
-	x_input: Option<&Input>,
-	y_input: Option<&Input>,
-) -> Option<ContextMenuEntry<'a>> {
-	app_command_for_set_quick_devices([device].into_iter(), x_input, y_input).map(|command| {
-		let title = if let Some(prefix) = device_class.prefix() {
-			format!("{} #{} ({})", prefix, device.devindex + 1, device.name).into()
-		} else {
-			device.name.as_str().into()
-		};
-		let command = Some(command);
-		ContextMenuEntry { title, command }
-	})
-}
-
-fn app_command_for_set_quick_devices<'a>(
-	device_iter: impl Iterator<Item = &'a InputDevice> + Clone,
-	x_input: Option<&Input>,
-	y_input: Option<&Input>,
-) -> Option<AppCommand> {
-	let get_codes = |token: &str| {
-		device_iter
-			.clone()
-			.flat_map(|device| {
-				device
-					.items
-					.iter()
-					.filter(|item| item.token == token)
-					.map(|item| &item.code)
-			})
-			.join(" or ")
-	};
-
-	let x_codes = x_input.is_some().then(|| get_codes("XAXIS")).unwrap_or_default();
-	let y_codes = y_input.is_some().then(|| get_codes("YAXIS")).unwrap_or_default();
-
-	(!x_codes.is_empty() && !y_codes.is_empty())
-		.then(|| AppCommand::set_multi_seq(x_input, y_input, x_codes.as_str(), "", "", y_codes.as_str(), "", ""))
 }

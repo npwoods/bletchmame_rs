@@ -6,8 +6,6 @@ use std::sync::Arc;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
 use slint::LogicalPosition;
-use slint::ModelRc;
-use slint::VecModel;
 use slint::Weak;
 use strum::VariantArray;
 
@@ -20,6 +18,7 @@ use crate::dialogs::input::InputDeviceClassSliceExt;
 use crate::dialogs::input::InputSeqExt;
 use crate::dialogs::input::build_code_text;
 use crate::dialogs::input::build_codes;
+use crate::dialogs::input::build_context_menu;
 use crate::dialogs::seqpoll::SeqPollDialogType;
 use crate::guiutils::modal::ModalStack;
 use crate::runtime::command::MameCommand;
@@ -27,7 +26,6 @@ use crate::runtime::command::SeqType;
 use crate::status::Input;
 use crate::status::InputDeviceClass;
 use crate::status::Status;
-use crate::ui::InputContextMenuEntry;
 use crate::ui::InputDialogEntry;
 use crate::ui::InputXyDialog;
 
@@ -183,7 +181,8 @@ impl Model {
 			};
 			let input = lookup_input(&state.inputs, input).unwrap();
 
-			let entries_1 = state
+			// prepare quick items
+			let quick_items = state
 				.input_device_classes
 				.iter_device_items()
 				.filter(|(_, _, item)| {
@@ -195,35 +194,27 @@ impl Model {
 					} else {
 						format!("{} ({})", item.name, device.name).into()
 					};
-					let seqs = [(&input.port_tag, input.mask, SeqType::Standard, &item.code)];
-					let command = Some(MameCommand::seq_set(&seqs).into());
-					let command = command.as_ref().map(AppCommand::encode_for_slint).unwrap_or_default();
-					InputContextMenuEntry { title, command }
-				})
-				.collect::<Vec<_>>();
+					let seqs = vec![
+						(0, SeqType::Standard, item.code.as_str()),
+						(0, SeqType::Decrement, ""),
+						(0, SeqType::Increment, ""),
+					];
+					(title, seqs)
+				});
 
-			let entries_2 = [
-				("Specify...", AppCommand::seq_specify_dialog(input, seq_type)),
-				("Add...", AppCommand::seq_add_dialog(input, seq_type)),
-				("Clear", AppCommand::seq_clear(input, seq_type)),
-			];
-			let entries_2 = entries_2
-				.into_iter()
-				.map(|(title, command)| {
-					let title = title.into();
-					let command = command.encode_for_slint();
-					InputContextMenuEntry { title, command }
-				})
-				.collect::<Vec<_>>();
-
-			(entries_1, entries_2)
+			// and build the rest of the context menu
+			let quick_item_inputs = [Some(input)];
+			let specify_command = Some(AppCommand::seq_specify_dialog(input, seq_type));
+			let add_command = Some(AppCommand::seq_add_dialog(input, seq_type));
+			let clear_command = Some(AppCommand::seq_clear(input, seq_type));
+			build_context_menu(
+				&quick_item_inputs,
+				quick_items,
+				specify_command,
+				add_command,
+				clear_command,
+			)
 		};
-
-		let entries_1 = VecModel::from(entries_1);
-		let entries_1 = ModelRc::new(entries_1);
-
-		let entries_2 = VecModel::from(entries_2);
-		let entries_2 = ModelRc::new(entries_2);
 
 		let dialog = self.dialog_weak.unwrap();
 		dialog.invoke_show_context_menu(entries_1, entries_2, point);
