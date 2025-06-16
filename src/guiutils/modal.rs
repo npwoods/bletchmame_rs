@@ -139,11 +139,15 @@ where
 		// hide the dialog
 		self.dialog.hide().unwrap();
 
-		// truncate the modal stack
-		self.modal_stack.0.borrow_mut().truncate(self.modal_stack_pos);
-
 		// return
 		result
+	}
+}
+
+impl<D> Drop for Modal<D> {
+	fn drop(&mut self) {
+		// truncate the modal stack
+		self.modal_stack.0.borrow_mut().truncate(self.modal_stack_pos);
 	}
 }
 
