@@ -305,11 +305,28 @@ pub struct InputDevice {
 	pub items: Vec<InputDeviceItem>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct InputDeviceItem {
 	pub name: String,
-	pub token: String,
+	pub token: InputDeviceToken,
 	pub code: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, EnumString)]
+#[strum(serialize_all = "UPPERCASE")]
+pub enum InputDeviceToken {
+	XAxis,
+	YAxis,
+	ZAxis,
+	RZAxis,
+	#[strum(default)]
+	Other(String),
+}
+
+impl InputDeviceToken {
+	pub fn is_axis(&self) -> bool {
+		!matches!(self, Self::Other(_))
+	}
 }
 
 #[derive(thiserror::Error, Debug, PartialEq)]
@@ -351,6 +368,7 @@ mod test {
 	use crate::status::parse::parse_update;
 
 	use super::InputDeviceClassName;
+	use super::InputDeviceToken;
 
 	#[test]
 	fn session() {
@@ -413,5 +431,15 @@ mod test {
 	fn parse_input_device_class_name(_index: usize, s: &str, expected: InputDeviceClassName) {
 		let actual = InputDeviceClassName::from_str(s).unwrap();
 		assert_eq!(expected, actual);
+	}
+
+	#[test_case(0, "XAXIS", InputDeviceToken::XAxis, true)]
+	#[test_case(1, "YAXIS", InputDeviceToken::YAxis, true)]
+	#[test_case(2, "ZAXIS", InputDeviceToken::ZAxis, true)]
+	#[test_case(3, "RZAXIS", InputDeviceToken::RZAxis, true)]
+	#[test_case(4, "BUTTON1", InputDeviceToken::Other("BUTTON1".into()), false)]
+	fn input_device_token(_index: usize, s: &str, expected: InputDeviceToken, expected_is_axis: bool) {
+		let actual = InputDeviceToken::from_str(s).unwrap();
+		assert_eq!((&expected, expected_is_axis), (&actual, actual.is_axis()));
 	}
 }
