@@ -1,8 +1,13 @@
+use std::borrow::Cow;
 use std::cell::Cell;
 
+use itertools::Itertools;
 use serde::Deserialize;
 use serde::Serialize;
 use slint::CloseRequestResponse;
+use slint::ModelRc;
+use slint::SharedString;
+use slint::VecModel;
 
 use crate::appcommand::AppCommand;
 use crate::channel::Channel;
@@ -11,6 +16,8 @@ use crate::guiutils::modal::ModalStack;
 use crate::runtime::command::MameCommand;
 use crate::runtime::command::SeqType;
 use crate::status::Input;
+use crate::status::InputDeviceClass;
+use crate::status::InputDeviceClassName;
 use crate::status::Status;
 use crate::ui::SeqPollDialog;
 
@@ -28,6 +35,7 @@ pub async fn dialog_seq_poll(
 	seq_type: SeqType,
 	poll_type: SeqPollDialogType,
 	inputs: impl AsRef<[Input]>,
+	input_device_classes: impl AsRef<[InputDeviceClass]>,
 	status_changed_channel: Channel<Status>,
 	invoke_command: impl Fn(AppCommand) + Clone + 'static,
 ) {
@@ -38,7 +46,7 @@ pub async fn dialog_seq_poll(
 	// set up the close handler
 	let signaller = single_result.signaller();
 	modal.window().on_close_requested(move || {
-		signaller.signal(());
+		signaller.signal(None);
 		CloseRequestResponse::KeepWindowShown
 	});
 
@@ -70,13 +78,47 @@ pub async fn dialog_seq_poll(
 	modal.dialog().set_dialog_title(dialog_title.into());
 	modal.dialog().set_dialog_caption(dialog_caption.into());
 
+	// identify and build mouse input items
+	let (mouse_input_titles, mouse_input_commands): (Vec<_>, Vec<_>) = input_device_classes
+		.as_ref()
+		.iter()
+		.filter(|device_class| device_class.name == InputDeviceClassName::Mouse)
+		.flat_map(|device_class| &device_class.devices)
+		.flat_map(|device| &device.items)
+		.filter(|item| !item.token.is_axis())
+		.map(|item| {
+			let codes = if start_seq.is_empty() {
+				Cow::Borrowed(item.code.as_str())
+			} else {
+				format!("{} or {}", start_seq, item.code.as_str()).into()
+			};
+			let seqs = [(port_tag.as_ref(), mask, seq_type, codes)];
+			let command = MameCommand::seq_set(&seqs);
+			(item.name.as_str(), command)
+		})
+		.sorted_by_key(|(name, _)| (*name))
+		.map(|(name, command)| (SharedString::from(name), command))
+		.unzip();
+
+	// set up the mouse input items menu...
+	let mouse_input_titles = VecModel::from(mouse_input_titles);
+	let mouse_input_titles = ModelRc::new(mouse_input_titles);
+	modal.dialog().set_mouse_input_titles(mouse_input_titles);
+
+	// ...and also the corresponding callback
+	let signaller = single_result.signaller();
+	modal.dialog().on_mouse_input_selected(move |index| {
+		let index = usize::try_from(index).unwrap();
+		signaller.signal(Some(index));
+	});
+
 	// subscribe to status changes
 	let polling_input_seq = Cell::new(false);
 	let signaller = single_result.signaller();
 	let _subscription = status_changed_channel.subscribe(move |status| {
 		let running = status.running.as_ref();
 		if running.is_none_or(|running| polling_input_seq.get() && !running.polling_input_seq) {
-			signaller.signal(());
+			signaller.signal(None);
 		} else if running.is_some_and(|running| running.polling_input_seq) {
 			polling_input_seq.set(true);
 		}
@@ -87,9 +129,15 @@ pub async fn dialog_seq_poll(
 	invoke_command(command.into());
 
 	// present the modal dialog
-	modal.run(async { single_result.wait().await }).await;
+	let mouse_selection = modal.run(async { single_result.wait().await }).await;
 
 	// invoke the command to stop polling
 	let command = MameCommand::seq_poll_stop();
 	invoke_command(command.into());
+
+	// and if we have a mouse selection, specify it
+	if let Some(mouse_selection) = mouse_selection {
+		let command = mouse_input_commands.into_iter().nth(mouse_selection).unwrap();
+		invoke_command(command.into());
+	}
 }

@@ -8,6 +8,23 @@ export component SeqPollDialog inherits Window {
     // properties
     in property <string> dialog-title;
     in property <string> dialog-caption;
+    in property <[string]> mouse-input-titles;
+
+    // callbacks
+    callback mouse-input-selected(int);
+
+    // mouse context menu control
+    mouse-context-menu := ContextMenuArea {
+        Menu {
+            for titles[index] in mouse-input-titles: MenuItem {
+                title: titles;
+                enabled: true;
+                activated => {
+                    root.mouse-input-selected(index);
+                }
+            }
+        }
+    }
 
     // controls
     VerticalBox {
@@ -23,7 +40,10 @@ export component SeqPollDialog inherits Window {
 
             Button {
                 text: "Mouse Inputs";
-                enabled: false;
+                enabled: mouse-input-titles.length > 0;
+                clicked => {
+                    mouse-context-menu.show({ x: self.absolute-position.x, y: self.absolute-position.y + self.height });
+                }
             }
         }
     }
