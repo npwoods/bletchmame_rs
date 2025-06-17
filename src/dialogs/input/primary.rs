@@ -34,6 +34,7 @@ use crate::runtime::command::SeqType;
 use crate::status::Input;
 use crate::status::InputClass;
 use crate::status::InputDeviceClass;
+use crate::status::InputDeviceToken;
 use crate::status::Status;
 use crate::ui::InputContextMenuEntry;
 use crate::ui::InputDialog;
@@ -227,9 +228,9 @@ impl InputDialogModel {
 						.items
 						.iter()
 						.flat_map(|item| {
-							let input_index = match item.token.as_str() {
-								"XAXIS" => Some(0),
-								"YAXIS" => Some(1),
+							let input_index = match item.token {
+								InputDeviceToken::XAxis => Some(0),
+								InputDeviceToken::YAxis => Some(1),
 								_ => None,
 							};
 							SeqType::VARIANTS

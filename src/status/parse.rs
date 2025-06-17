@@ -354,7 +354,8 @@ impl State {
 			(Phase::InputDevice, b"item") => {
 				let [name, token, code] = evt.find_attributes([b"name", b"token", b"code"])?;
 				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?.into_owned();
-				let token = token.ok_or(ThisError::MissingMandatoryAttribute("token"))?.into_owned();
+				let token = token.as_deref().ok_or(ThisError::MissingMandatoryAttribute("token"))?;
+				let token = token.try_into().unwrap();
 				let code = code.ok_or(ThisError::MissingMandatoryAttribute("code"))?.into_owned();
 				let item = InputDeviceItem { name, token, code };
 

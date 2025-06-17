@@ -1122,12 +1122,12 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			poll_type,
 		} => {
 			let modal_stack: ModalStack = model.modal_stack.clone();
-			let inputs = model
+			let (inputs, input_device_classes) = model
 				.state
 				.borrow()
 				.status()
 				.and_then(|x| x.running.as_ref())
-				.map(|x| x.inputs.clone())
+				.map(|x| (x.inputs.clone(), x.input_device_classes.clone()))
 				.unwrap_or_default();
 			let status_changed_channel = model.status_changed_channel.clone();
 			let model_clone = model.clone();
@@ -1139,6 +1139,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				seq_type,
 				poll_type,
 				inputs,
+				input_device_classes,
 				status_changed_channel,
 				invoke_command,
 			);

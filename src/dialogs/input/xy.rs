@@ -185,9 +185,7 @@ impl Model {
 			let quick_items = state
 				.input_device_classes
 				.iter_device_items()
-				.filter(|(_, _, item)| {
-					item.token == "XAXIS" || item.token == "YAXIS" || item.token == "ZAXIS" || item.token == "RZAXIS"
-				})
+				.filter(|(_, _, item)| item.token.is_axis())
 				.map(|(device_class, device, item)| {
 					let title = if let Some(prefix) = device_class.prefix() {
 						format!("{} #{} {} ({})", prefix, device.devindex + 1, item.name, device.name).into()
