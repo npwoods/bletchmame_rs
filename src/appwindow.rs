@@ -673,7 +673,11 @@ fn menu_item_info(parent_title: Option<&str>, title: &str) -> (Option<AppCommand
 fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 	// tracing
 	let command_str: &'static str = (&command).into();
-	let span = info_span!("handle_command", command = command_str);
+	let span = if command.is_frequent() {
+		debug_span!("handle_command", command = command_str)
+	} else {
+		info_span!("handle_command", command = command_str)
+	};
 	let _guard = span.enter();
 	info!(command=?&command, "handle_command()");
 	let start_instant = Instant::now();

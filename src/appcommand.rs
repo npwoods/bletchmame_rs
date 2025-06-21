@@ -1,3 +1,4 @@
+use std::str::FromStr;
 use std::sync::Arc;
 
 use itertools::Itertools;
@@ -58,6 +59,7 @@ pub enum AppCommand {
 
 	// MAME communication
 	MameSessionEnded,
+	#[strum(props(IsFrequent = "true"))]
 	MameStatusUpdate(Update),
 	ErrorMessageBox(String),
 
@@ -142,6 +144,14 @@ impl AppCommand {
 			let json = s.strip_prefix(MENU_PREFIX).expect("not a menu string");
 			serde_json::from_str(json).unwrap()
 		})
+	}
+
+	pub fn is_frequent(&self) -> bool {
+		self.get_str("IsFrequent")
+			.map(bool::from_str)
+			.transpose()
+			.unwrap()
+			.unwrap_or_default()
 	}
 }
 
