@@ -1,13 +1,17 @@
 use std::cell::Cell;
+use std::rc::Rc;
 
 use anyhow::Result;
 use i_slint_backend_qt::QtWidgetAccessor;
-use slint::Window;
 
-use crate::childwindow::ChildWindowImpl;
-use crate::childwindow::qt::qtwidget::QtWidget;
+use crate::backend::ChildWindow;
+use crate::backend::ChildWindowTrait;
+use crate::backend::qt::qtwidget::QtWidget;
 
-pub struct QtChildWindow {
+#[derive(Debug, Default)]
+pub struct QtBackendRuntime {}
+
+struct QtChildWindow {
 	qt_widget: QtWidget,
 	geometry: Cell<(i32, i32, i32, i32)>,
 }
@@ -18,16 +22,24 @@ enum ThisError {
 	CannotCreateChildWindow,
 }
 
-impl QtChildWindow {
-	pub fn new(parent: &Window) -> Result<Self> {
+impl QtBackendRuntime {
+	pub fn create_slint_backend() -> Box<dyn slint::platform::Platform> {
+		let slint_backend = i_slint_backend_qt::Backend::new();
+		Box::new(slint_backend) as Box<_>
+	}
+
+	pub fn create_child_window(&self, parent: &slint::Window) -> Result<ChildWindow> {
 		let parent = parent.qt_widget_ptr().ok_or(ThisError::CannotCreateChildWindow)?;
 		let qt_widget = QtWidget::new(parent);
 		let geometry = Cell::new((0, 0, 100, 100));
-		let result = Self { qt_widget, geometry };
+		let result = QtChildWindow { qt_widget, geometry };
 		result.internal_update(Some(false));
+		let result = Rc::new(result) as Rc<_>;
 		Ok(result)
 	}
+}
 
+impl QtChildWindow {
 	fn internal_update(&self, active: Option<bool>) {
 		if let Some(active) = active {
 			self.qt_widget.set_visible(active);
@@ -43,30 +55,15 @@ impl QtChildWindow {
 	}
 }
 
-impl ChildWindowImpl for QtChildWindow {
+impl ChildWindowTrait for QtChildWindow {
 	fn set_active(&self, active: bool) {
 		if active != self.qt_widget.is_visible() {
 			self.internal_update(Some(active));
 		}
 	}
 
-	fn update(&self, position: dpi::PhysicalPosition<u32>, size: dpi::PhysicalSize<u32>) {
-		let geometry = (
-			position.x.try_into().unwrap(),
-			position.y.try_into().unwrap(),
-			size.width.try_into().unwrap(),
-			size.width.try_into().unwrap(),
-		);
-		self.geometry.set(geometry);
-		self.internal_update(None);
-	}
-
 	fn text(&self) -> String {
 		self.qt_widget.win_id().to_string()
-	}
-
-	fn ensure_proper_focus(&self) {
-		// do nothing
 	}
 }
 

@@ -106,8 +106,11 @@ export component AppWindow inherits Window {
     callback issue-button-clicked(int);
 
     // mode - drives what is visible and what is not
+    in property <bool> has-started;
     function mode() -> string {
-        if (self.running-machine-desc != "") {
+        if !has-started {
+            "starting"
+        } else if (self.running-machine-desc != "") {
             "running"
         } else if (self.report-message != "") {
             "report"
