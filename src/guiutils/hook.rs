@@ -8,10 +8,11 @@ thread_local! {
 }
 
 /// creates a global attributes hook for setting up the Slint backend
+#[allow(dead_code)]
 pub fn create_window_attributes_hook(
 	global_hook: impl Fn(WindowAttributes) -> WindowAttributes + 'static,
-) -> Option<Box<dyn Fn(WindowAttributes) -> WindowAttributes>> {
-	let hook = move |attrs| {
+) -> impl Fn(WindowAttributes) -> WindowAttributes {
+	move |attrs| {
 		// invoke the global hook
 		let attrs = global_hook(attrs);
 
@@ -22,8 +23,7 @@ pub fn create_window_attributes_hook(
 				attrs
 			}
 		})
-	};
-	Some(Box::new(hook))
+	}
 }
 
 pub fn with_attributes_hook<T>(

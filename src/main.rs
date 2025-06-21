@@ -2,8 +2,8 @@
 mod appcommand;
 mod appstate;
 mod appwindow;
+mod backend;
 mod channel;
-mod childwindow;
 mod collections;
 mod debugstr;
 mod devimageconfig;
@@ -37,9 +37,8 @@ use structopt::StructOpt;
 use tracing_subscriber::EnvFilter;
 
 use crate::appwindow::AppArgs;
+use crate::backend::{BackendRuntime, SlintBackend};
 use crate::diagnostics::info_db_from_xml_file;
-use crate::guiutils::SlintBackend;
-use crate::guiutils::init_slint_backend;
 use crate::platform::platform_init;
 use crate::runtime::MameStderr;
 
@@ -122,18 +121,19 @@ fn main() -> ExitCode {
 
 	// set up the Slint back end
 	let backend_type = opts.slint_backend.unwrap_or_default();
-	init_slint_backend(backend_type).expect("slint backend setup failed");
+	let backend_runtime = BackendRuntime::new(backend_type).expect("slint backend setup failed");
 
 	// create the application window...
 	let args = AppArgs {
 		prefs_path,
 		mame_stderr,
 		mame_windowing,
+		backend_runtime,
 	};
 	let app_window = appwindow::create(args);
 
 	// ...and run run run!
-	app_window.run().unwrap();
+	let _ = app_window.run();
 	ExitCode::SUCCESS
 }
 

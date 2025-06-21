@@ -31,8 +31,9 @@ use tracing::info_span;
 
 use crate::appcommand::AppCommand;
 use crate::appstate::AppState;
+use crate::backend::BackendRuntime;
+use crate::backend::ChildWindow;
 use crate::channel::Channel;
-use crate::childwindow::ChildWindow;
 use crate::collections::add_items_to_existing_folder_collection;
 use crate::collections::add_items_to_new_folder_collection;
 use crate::collections::get_collection_name;
@@ -82,7 +83,6 @@ use crate::runtime::command::MovieFormat;
 use crate::selection::SelectionManager;
 use crate::status::InputClass;
 use crate::status::Status;
-use crate::threadlocalbubble::ThreadLocalBubble;
 use crate::ui::AboutDialog;
 use crate::ui::AppWindow;
 use crate::ui::ReportIssue;
@@ -95,11 +95,11 @@ const SAVE_STATE_FILE_TYPES: &[(Option<&str>, &str)] = &[(Some("MAME Saved State
 
 /// Arguments to the application (derivative from the command line); almost all of this
 /// are power user features or diagnostics
-#[derive(Debug)]
 pub struct AppArgs {
 	pub prefs_path: PathBuf,
 	pub mame_stderr: MameStderr,
 	pub mame_windowing: AppWindowing,
+	pub backend_runtime: BackendRuntime,
 }
 
 #[derive(Debug, Default, EnumString)]
@@ -117,19 +117,12 @@ pub enum AppWindowing {
 
 struct AppModel {
 	app_window_weak: Weak<AppWindow>,
+	backend_runtime: BackendRuntime,
 	modal_stack: ModalStack,
 	preferences: RefCell<Preferences>,
 	state: RefCell<AppState>,
 	status_changed_channel: Channel<Status>,
-	windowing: RuntimeWindowing,
-}
-
-#[allow(clippy::large_enum_variant)]
-enum RuntimeWindowing {
-	Child(ChildWindow),
-	Windowed,
-	WindowedMaximized,
-	Fullscreen,
+	child_window: RefCell<Option<ChildWindow>>,
 }
 
 impl AppModel {
@@ -247,12 +240,8 @@ impl AppModel {
 			app_window.set_running_machine_desc(state.running_machine_description().into());
 
 			// child window visibility
-			if let RuntimeWindowing::Child(child_window) = &self.windowing {
+			if let Some(child_window) = self.child_window.borrow().as_deref() {
 				child_window.set_active(running.is_some());
-
-				// ensure that if we're running the child window has focus, and if not, the
-				// app window has focus
-				child_window.ensure_proper_focus();
 			}
 
 			// report view
@@ -314,17 +303,6 @@ pub fn create(args: AppArgs) -> AppWindow {
 	// create the main "App" window
 	let app_window = AppWindow::new().expect("Failed to create main window");
 
-	// choose a MAME windowing mode
-	let windowing = match args.mame_windowing {
-		AppWindowing::Integrated => {
-			let child_window = ChildWindow::new(app_window.window()).expect("Failed to create child window");
-			RuntimeWindowing::Child(child_window)
-		}
-		AppWindowing::Windowed => RuntimeWindowing::Windowed,
-		AppWindowing::WindowedMaximized => RuntimeWindowing::WindowedMaximized,
-		AppWindowing::Fullscreen => RuntimeWindowing::Fullscreen,
-	};
-
 	// prepare the menu bar
 	app_window.set_menu_items_builtin_collections(ModelRc::new(VecModel::from(
 		BuiltinCollection::iter()
@@ -373,11 +351,12 @@ pub fn create(args: AppArgs) -> AppWindow {
 	// create the model
 	let model = AppModel {
 		app_window_weak: app_window.as_weak(),
+		backend_runtime: args.backend_runtime,
 		modal_stack,
 		preferences: RefCell::new(preferences),
 		state: RefCell::new(AppState::bogus()),
 		status_changed_channel: Channel::default(),
-		windowing,
+		child_window: RefCell::new(None),
 	};
 	let model = Rc::new(model);
 
@@ -409,18 +388,6 @@ pub fn create(args: AppArgs) -> AppWindow {
 	app_window.on_menu_item_command(move |command_string| {
 		if let Some(command) = AppCommand::decode_from_slint(command_string) {
 			handle_command(&model_clone, command);
-		}
-	});
-
-	// create a repeating future that will update the child window forever
-	let model_weak = Rc::downgrade(&model);
-	app_window.on_size_changed(move || {
-		if let Some(model) = model_weak.upgrade() {
-			if let RuntimeWindowing::Child(child_window) = &model.windowing {
-				// set the child window size
-				let top = model.app_window().invoke_menubar_height();
-				child_window.update(model.app_window().window(), top);
-			}
 		}
 	});
 
@@ -570,47 +537,47 @@ pub fn create(args: AppArgs) -> AppWindow {
 		handle_command(&model_clone, command);
 	});
 
-	// now create the "real initial" state, now that we have a model to work with
-	let paths = model.preferences.borrow().paths.clone();
-	let mame_windowing = match &model.windowing {
-		RuntimeWindowing::Child(child_window) => MameWindowing::Attached(child_window.text().into()),
-		RuntimeWindowing::Windowed => MameWindowing::Windowed,
-		RuntimeWindowing::WindowedMaximized => MameWindowing::WindowedMaximized,
-		RuntimeWindowing::Fullscreen => MameWindowing::Fullscreen,
-	};
-
-	let model_weak = Rc::downgrade(&model);
-	let state = AppState::new(prefs_path, paths, mame_windowing, args.mame_stderr, move |command| {
-		let model = model_weak.upgrade().unwrap();
-		handle_command(&model, command);
-	});
-
-	// on `winit`, ensure that if the focus changes we call `ChildWindow::ensure_proper_focus()`
-	let model_weak = Rc::downgrade(&model);
-	i_slint_backend_winit::WinitWindowAccessor::on_winit_window_event(app_window.window(), move |_, event| {
-		if let winit::event::WindowEvent::Focused(_) = event {
-			let model_bubble = ThreadLocalBubble::new(model_weak.clone());
-			invoke_from_event_loop(move || {
-				if let Some(model) = model_bubble.unwrap().upgrade() {
-					if let RuntimeWindowing::Child(child_window) = &model.windowing {
-						child_window.ensure_proper_focus();
-					}
-				}
-			})
-			.unwrap();
-		}
-		i_slint_backend_winit::WinitWindowEventResult::Propagate
-	});
-
 	// initial updates
 	update_ui_for_current_history_item(&model);
 	update_items_columns_model(&model);
 	update_items_model_for_current_prefs(&model);
 
-	// and lets do something with that state; specifically
-	// - load the InfoDB (if availble)
-	// - start the MAME session (and maybe an InfoDB build in parallel)
-	model.update_state(|_| state.activate());
+	// future to set up initial state
+	let model_clone = model.clone();
+	let mame_windowing = args.mame_windowing;
+	let fut = async move {
+		// create the child window
+		let app_window = model_clone.app_window();
+		let mame_windowing = match mame_windowing {
+			AppWindowing::Integrated => {
+				let parent = app_window.window();
+				let child_window = model.backend_runtime.create_child_window(parent).await.unwrap();
+				let child_window_text = child_window.text();
+				model_clone.child_window.replace(Some(child_window));
+				MameWindowing::Attached(child_window_text.into())
+			}
+			AppWindowing::Windowed => MameWindowing::Windowed,
+			AppWindowing::WindowedMaximized => MameWindowing::WindowedMaximized,
+			AppWindowing::Fullscreen => MameWindowing::Fullscreen,
+		};
+
+		// now create the "real initial" state, now that we have a model to work with
+		let paths = model.preferences.borrow().paths.clone();
+		let model_weak = Rc::downgrade(&model_clone);
+		let state = AppState::new(prefs_path, paths, mame_windowing, args.mame_stderr, move |command| {
+			let model = model_weak.upgrade().unwrap();
+			handle_command(&model, command);
+		});
+
+		// and lets do something with that state; specifically
+		// - load the InfoDB (if availble)
+		// - start the MAME session (and maybe an InfoDB build in parallel)
+		model.update_state(|_| state.activate());
+
+		// and we've started
+		app_window.set_has_started(true);
+	};
+	spawn_local(fut).unwrap();
 
 	// and we're done!
 	app_window
