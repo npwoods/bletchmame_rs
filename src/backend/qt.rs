@@ -1,17 +1,14 @@
 use std::cell::Cell;
-use std::rc::Rc;
 
 use anyhow::Result;
 use i_slint_backend_qt::QtWidgetAccessor;
 
-use crate::backend::ChildWindow;
-use crate::backend::ChildWindowTrait;
 use crate::backend::qt::qtwidget::QtWidget;
 
 #[derive(Debug, Default)]
 pub struct QtBackendRuntime {}
 
-struct QtChildWindow {
+pub struct QtChildWindow {
 	qt_widget: QtWidget,
 	geometry: Cell<(i32, i32, i32, i32)>,
 }
@@ -28,18 +25,27 @@ impl QtBackendRuntime {
 		Box::new(slint_backend) as Box<_>
 	}
 
-	pub fn create_child_window(&self, parent: &slint::Window) -> Result<ChildWindow> {
+	pub fn create_child_window(&self, parent: &slint::Window) -> Result<QtChildWindow> {
 		let parent = parent.qt_widget_ptr().ok_or(ThisError::CannotCreateChildWindow)?;
 		let qt_widget = QtWidget::new(parent);
 		let geometry = Cell::new((0, 0, 100, 100));
 		let result = QtChildWindow { qt_widget, geometry };
 		result.internal_update(Some(false));
-		let result = Rc::new(result) as Rc<_>;
 		Ok(result)
 	}
 }
 
 impl QtChildWindow {
+	pub fn set_active(&self, active: bool) {
+		if active != self.qt_widget.is_visible() {
+			self.internal_update(Some(active));
+		}
+	}
+
+	pub fn text(&self) -> String {
+		self.qt_widget.win_id().to_string()
+	}
+
 	fn internal_update(&self, active: Option<bool>) {
 		if let Some(active) = active {
 			self.qt_widget.set_visible(active);
@@ -52,18 +58,6 @@ impl QtChildWindow {
 			(-200, -200, 100, 100)
 		};
 		self.qt_widget.set_geometry(x, y, w, h);
-	}
-}
-
-impl ChildWindowTrait for QtChildWindow {
-	fn set_active(&self, active: bool) {
-		if active != self.qt_widget.is_visible() {
-			self.internal_update(Some(active));
-		}
-	}
-
-	fn text(&self) -> String {
-		self.qt_widget.win_id().to_string()
 	}
 }
 

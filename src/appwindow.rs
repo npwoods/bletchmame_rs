@@ -240,7 +240,7 @@ impl AppModel {
 			app_window.set_running_machine_desc(state.running_machine_description().into());
 
 			// child window visibility
-			if let Some(child_window) = self.child_window.borrow().as_deref() {
+			if let Some(child_window) = &*self.child_window.borrow() {
 				child_window.set_active(running.is_some());
 			}
 

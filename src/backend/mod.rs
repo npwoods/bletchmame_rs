@@ -10,9 +10,12 @@ use slint::Window;
 use strum::EnumString;
 
 use crate::backend::winit::WinitBackendRuntime;
+use crate::backend::winit::WinitChildWindow;
 
 #[cfg(feature = "slint-qt-backend")]
 use crate::backend::qt::QtBackendRuntime;
+#[cfg(feature = "slint-qt-backend")]
+use crate::backend::qt::QtChildWindow;
 
 #[derive(Debug, EnumString)]
 pub enum SlintBackend {
@@ -26,16 +29,17 @@ pub enum SlintBackend {
 
 pub enum BackendRuntime {
 	Winit(WinitBackendRuntime),
+
 	#[cfg(feature = "slint-qt-backend")]
 	Qt(QtBackendRuntime),
 }
 
-pub trait ChildWindowTrait {
-	fn set_active(&self, active: bool);
-	fn text(&self) -> String;
-}
+pub enum ChildWindow {
+	Winit(Rc<WinitChildWindow>),
 
-pub type ChildWindow = Rc<dyn ChildWindowTrait>;
+	#[cfg(feature = "slint-qt-backend")]
+	Qt(QtChildWindow),
+}
 
 impl BackendRuntime {
 	pub fn new(backend_type: SlintBackend) -> Result<Self> {
@@ -67,11 +71,32 @@ impl BackendRuntime {
 	}
 
 	pub async fn create_child_window(&self, parent: &Window) -> Result<ChildWindow> {
-		match self {
-			Self::Winit(backend) => backend.create_child_window(parent).await,
+		let child_window = match self {
+			Self::Winit(backend) => ChildWindow::Winit(backend.create_child_window(parent).await?),
 
 			#[cfg(feature = "slint-qt-backend")]
-			Self::Qt(backend) => backend.create_child_window(parent),
+			Self::Qt(backend) => ChildWindow::Qt(backend.create_child_window(parent)?),
+		};
+		Ok(child_window)
+	}
+}
+
+impl ChildWindow {
+	pub fn set_active(&self, active: bool) {
+		match self {
+			Self::Winit(child_window) => child_window.set_active(active),
+
+			#[cfg(feature = "slint-qt-backend")]
+			Self::Qt(child_window) => child_window.set_active(active),
+		}
+	}
+
+	pub fn text(&self) -> String {
+		match self {
+			Self::Winit(child_window) => child_window.text(),
+
+			#[cfg(feature = "slint-qt-backend")]
+			Self::Qt(child_window) => child_window.text(),
 		}
 	}
 }

@@ -18,9 +18,6 @@ use winit::window::Window;
 use winit::window::WindowAttributes;
 use winit::window::WindowId;
 
-use crate::backend::ChildWindow;
-use crate::backend::ChildWindowTrait;
-
 #[derive(Clone, Debug, Default)]
 pub struct WinitBackendRuntime(Rc<RefCell<WinitBackendRuntimeInner>>);
 
@@ -31,7 +28,7 @@ struct WinitBackendRuntimeInner {
 }
 
 #[derive(Debug)]
-struct WinitChildWindow {
+pub struct WinitChildWindow {
 	window: Window,
 	parent_window_id: WindowId,
 }
@@ -64,7 +61,7 @@ impl WinitBackendRuntime {
 		Ok(Box::new(slint_backend) as Box<_>)
 	}
 
-	pub async fn create_child_window(&self, parent: &slint::Window) -> Result<ChildWindow> {
+	pub async fn create_child_window(&self, parent: &slint::Window) -> Result<Rc<WinitChildWindow>> {
 		// prepare the window attributes
 		let raw_window_handle = parent.window_handle().window_handle()?.as_raw();
 		let size = parent.with_winit_window(|parent| parent.inner_size()).unwrap();
@@ -98,7 +95,7 @@ impl WinitBackendRuntime {
 		self.0.borrow_mut().live.push(result.clone());
 
 		// and return the result
-		Ok(result as Rc<_>)
+		Ok(result)
 	}
 
 	fn create_pending_child_windows(&self, event_loop: &ActiveEventLoop) {
@@ -208,6 +205,14 @@ impl WinitChildWindow {
 		Ok(result)
 	}
 
+	pub fn set_active(&self, active: bool) {
+		self.window.set_visible(active);
+	}
+
+	pub fn text(&self) -> String {
+		self.try_text().unwrap()
+	}
+
 	pub fn is_active(&self) -> bool {
 		self.window.is_visible().unwrap_or_default()
 	}
@@ -251,15 +256,5 @@ impl WinitChildWindow {
 
 			_ => Err(ThisError::UnknownRawHandleType.into()),
 		}
-	}
-}
-
-impl ChildWindowTrait for WinitChildWindow {
-	fn set_active(&self, active: bool) {
-		self.window.set_visible(active);
-	}
-
-	fn text(&self) -> String {
-		self.try_text().unwrap()
 	}
 }
