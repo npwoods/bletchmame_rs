@@ -403,6 +403,19 @@ pub fn create(args: AppArgs) -> AppWindow {
 		}
 	});
 
+	// scroll lock handler (do this in a future because the window might not be inited yet)
+	let model_clone = model.clone();
+	let fut = async move {
+		let model = model_clone.clone();
+		let app_window = model.app_window();
+		model
+			.backend_runtime
+			.install_scroll_lock_handler(app_window.window(), move || {
+				handle_command(&model_clone, AppCommand::ToggleMenuBar);
+			})
+	};
+	spawn_local(fut).unwrap();
+
 	// set up the collections view model
 	let collections_view_model = CollectionsViewModel::new(app_window.as_weak());
 	let collections_view_model = Rc::new(collections_view_model);
@@ -902,6 +915,14 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 		}
 		AppCommand::MameStatusUpdate(update) => {
 			model.update_state(|state| state.status_update(update));
+
+			// special check to restore the menu bar if we're not in the emulation
+			if model.state.borrow().status().is_none_or(|s| s.running.is_none()) {
+				let app_window = model.app_window();
+				if app_window.window().is_menu_bar_visible() == Some(false) {
+					app_window.window().set_menu_bar_visible(true);
+				}
+			}
 		}
 		AppCommand::ErrorMessageBox(message) => {
 			let model_clone = model.clone();
@@ -1161,6 +1182,17 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				}
 			};
 			spawn_local(fut).unwrap();
+		}
+		AppCommand::ToggleMenuBar => {
+			let running = model.state.borrow().status().is_some_and(|s| s.running.is_some());
+
+			if running {
+				let app_window = model.app_window();
+				if let Some(visible) = app_window.window().is_menu_bar_visible() {
+					let new_visible = !visible;
+					app_window.window().set_menu_bar_visible(new_visible);
+				}
+			}
 		}
 	};
 
