@@ -165,6 +165,11 @@ impl MameCommand {
 		Self("SEQ_POLL_STOP".into())
 	}
 
+	pub fn set_mouse_enabled(enabled: bool) -> Self {
+		let enabled = (enabled as u8).to_string();
+		build("SET_MOUSE_ENABLED", [enabled])
+	}
+
 	pub fn ping() -> Self {
 		Self("PING".into())
 	}

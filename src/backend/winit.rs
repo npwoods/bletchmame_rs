@@ -11,19 +11,23 @@ use tokio::sync::oneshot;
 use tokio::sync::oneshot::Sender;
 use tracing::debug;
 use tracing::info_span;
+use winit::event::ElementState;
 use winit::event::WindowEvent;
 use winit::event_loop::ActiveEventLoop;
+use winit::keyboard::Key;
+use winit::keyboard::NamedKey;
 use winit::window::Window;
 use winit::window::WindowAttributes;
 use winit::window::WindowId;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default)]
 pub struct WinitBackendRuntime(Rc<RefCell<WinitBackendRuntimeInner>>);
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 struct WinitBackendRuntimeInner {
 	pending: Vec<WinitPendingChildWindow>,
 	live: Vec<Rc<WinitChildWindow>>,
+	scroll_lock_handlers: Vec<(WindowId, Rc<dyn Fn()>)>,
 }
 
 #[derive(Debug)]
@@ -97,6 +101,13 @@ impl WinitBackendRuntime {
 		Ok(result)
 	}
 
+	pub fn install_scroll_lock_handler(&self, window: &slint::Window, callback: Rc<dyn Fn() + 'static>) {
+		let window_id = window
+			.with_winit_window(|window| window.id())
+			.expect("could not get WindowId");
+		self.0.borrow_mut().scroll_lock_handlers.push((window_id, callback));
+	}
+
 	fn create_pending_child_windows(&self, event_loop: &ActiveEventLoop) {
 		let mut state = self.0.borrow_mut();
 
@@ -158,11 +169,35 @@ impl CustomApplicationHandler for WinitBackendRuntime {
 				FindResult::None => {}
 			},
 
+			WindowEvent::KeyboardInput { event, .. } => {
+				if event.logical_key == Key::Named(NamedKey::ScrollLock) && event.state == ElementState::Released {
+					let callback = {
+						let state = self.0.borrow();
+						let window_id = state
+							.live
+							.iter()
+							.find(|x| x.window.id() == window_id)
+							.map(|x| &x.parent_window_id)
+							.unwrap_or(&window_id);
+						state
+							.scroll_lock_handlers
+							.iter()
+							.find(|(this_window_id, _)| window_id == this_window_id)
+							.map(|(_, callback)| callback)
+							.cloned()
+					};
+					if let Some(callback) = callback.as_deref() {
+						callback();
+					}
+				}
+			}
+
 			WindowEvent::Destroyed => {
 				let mut state = self.0.borrow_mut();
 				state
 					.live
 					.retain(|x| x.parent_window_id != window_id && x.window.id() != window_id);
+				state.scroll_lock_handlers.retain(|(x, _)| *x != window_id);
 			}
 			_ => {}
 		}

@@ -1,4 +1,5 @@
 use std::cell::Cell;
+use std::rc::Rc;
 
 use anyhow::Result;
 use i_slint_backend_qt::QtWidgetAccessor;
@@ -32,6 +33,10 @@ impl QtBackendRuntime {
 		let result = QtChildWindow { qt_widget, geometry };
 		result.internal_update(Some(false));
 		Ok(result)
+	}
+
+	pub fn install_scroll_lock_handler(&self, _window: &slint::Window, _callback: Rc<dyn Fn() + 'static>) {
+		// not yet implemented
 	}
 }
 
