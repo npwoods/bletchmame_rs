@@ -20,7 +20,7 @@ i-slint-core = { git = "https://github.com/npwoods/slint.git", rev = "d8b944e44c
 i-slint-common = { git = "https://github.com/npwoods/slint.git", rev = "d8b944e44c7749263374a22848e08a90ef6eb803" }
 i-slint-backend-winit = { git = "https://github.com/npwoods/slint.git", rev = "d8b944e44c7749263374a22848e08a90ef6eb803" }
 i-slint-backend-qt = { git = "https://github.com/npwoods/slint.git", rev = "d8b944e44c7749263374a22848e08a90ef6eb803", optional = true }
-muda = "0.16.0"
+muda = "=0.16.1"
 raw-window-handle = "0.6.2"
 rfd = "0.15.1"
 serde = { version = "1.0.219", features = ["rc"] }
@@ -56,7 +56,7 @@ byte-unit = "5.1.6"
 easy-ext = "1.0.2"
 qttypes = { version = "0.2.12", optional = true }
 cpp = "0.5.10"
-nu-utils = "0.104.0"
+nu-utils = "0.105.1"
 console = { version = "0.15.11", optional = true }
 zerocopy = { version = "0.8.25", features = ["derive"] }
 byteorder = "1.5.0"
