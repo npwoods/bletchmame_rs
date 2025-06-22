@@ -44,6 +44,9 @@ impl Status {
 			let sound_attenuation = running.sound_attenuation.or(status_running.sound_attenuation);
 			let is_recording = running.is_recording.unwrap_or(status_running.is_recording);
 			let polling_input_seq = running.polling_input_seq.unwrap_or(status_running.polling_input_seq);
+			let has_input_using_mouse = running
+				.has_input_using_mouse
+				.unwrap_or(status_running.has_input_using_mouse);
 
 			let images = running.images.map(|images| {
 				images
@@ -80,6 +83,7 @@ impl Status {
 				sound_attenuation,
 				is_recording,
 				polling_input_seq,
+				has_input_using_mouse,
 				images,
 				slots,
 				inputs,
@@ -117,6 +121,7 @@ pub struct Running {
 	pub sound_attenuation: Option<i32>,
 	pub is_recording: bool,
 	pub polling_input_seq: bool,
+	pub has_input_using_mouse: bool,
 	pub images: Arc<[Image]>,
 	pub slots: Arc<[Slot]>,
 	pub inputs: Arc<[Input]>,
@@ -186,6 +191,7 @@ struct RunningUpdate {
 	pub sound_attenuation: Option<i32>,
 	pub is_recording: Option<bool>,
 	pub polling_input_seq: Option<bool>,
+	pub has_input_using_mouse: Option<bool>,
 	pub images: Option<Vec<ImageUpdate>>,
 	pub slots: Option<Vec<Slot>>,
 	pub inputs: Option<Vec<Input>>,

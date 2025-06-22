@@ -1184,13 +1184,23 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			spawn_local(fut).unwrap();
 		}
 		AppCommand::ToggleMenuBar => {
-			let running = model.state.borrow().status().is_some_and(|s| s.running.is_some());
+			let has_input_using_mouse = model
+				.state
+				.borrow()
+				.status()
+				.and_then(|s| s.running.as_ref())
+				.map(|r| r.has_input_using_mouse);
 
-			if running {
+			if let Some(has_input_using_mouse) = has_input_using_mouse {
 				let app_window = model.app_window();
 				if let Some(visible) = app_window.window().is_menu_bar_visible() {
 					let new_visible = !visible;
 					app_window.window().set_menu_bar_visible(new_visible);
+
+					if has_input_using_mouse {
+						let command = MameCommand::set_mouse_enabled(!new_visible).into();
+						handle_command(model, command);
+					}
 				}
 			}
 		}

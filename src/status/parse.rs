@@ -71,16 +71,25 @@ impl State {
 		let phase = self.phase_stack.last().unwrap_or(&Phase::Root);
 		let new_phase = match (phase, evt.name().as_ref()) {
 			(Phase::Root, b"status") => {
-				let [romname, is_paused, app_build, app_version, polling_input_seq] = evt.find_attributes([
+				let [
+					romname,
+					is_paused,
+					app_build,
+					app_version,
+					polling_input_seq,
+					has_input_using_mouse,
+				] = evt.find_attributes([
 					b"romname",
 					b"paused",
 					b"app_build",
 					b"app_version",
 					b"polling_input_seq",
+					b"has_input_using_mouse",
 				])?;
 				let machine_name = romname.unwrap_or_default().to_string();
 				let is_paused = is_paused.map(|x| parse_mame_bool(x.as_ref())).transpose()?;
 				let polling_input_seq = polling_input_seq.map(|x| parse_mame_bool(x.as_ref())).transpose()?;
+				let has_input_using_mouse = has_input_using_mouse.map(|x| parse_mame_bool(x.as_ref())).transpose()?;
 				debug!(
 					machine_name=?machine_name,
 					is_paused=?is_paused,
@@ -94,6 +103,7 @@ impl State {
 				self.running.machine_name = machine_name;
 				self.running.is_paused = is_paused;
 				self.running.polling_input_seq = polling_input_seq;
+				self.running.has_input_using_mouse = has_input_using_mouse;
 				Some(Phase::Status)
 			}
 			(Phase::Status, b"video") => {
