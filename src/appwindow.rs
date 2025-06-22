@@ -240,7 +240,7 @@ impl AppModel {
 			app_window.set_running_machine_desc(state.running_machine_description().into());
 
 			// child window visibility
-			if let Some(child_window) = self.child_window.borrow().as_deref() {
+			if let Some(child_window) = &*self.child_window.borrow() {
 				child_window.set_active(running.is_some());
 			}
 
@@ -388,6 +388,18 @@ pub fn create(args: AppArgs) -> AppWindow {
 	app_window.on_menu_item_command(move |command_string| {
 		if let Some(command) = AppCommand::decode_from_slint(command_string) {
 			handle_command(&model_clone, command);
+		}
+	});
+
+	// create a repeating future that will update the child window forever
+	let model_weak = Rc::downgrade(&model);
+	app_window.on_size_changed(move || {
+		if let Some(model) = model_weak.upgrade().as_deref() {
+			if let Some(child_window) = model.child_window.borrow().as_ref() {
+				// set the child window size
+				let top = model.app_window().invoke_menubar_height();
+				child_window.update_bounds(model.app_window().window(), top);
+			}
 		}
 	});
 

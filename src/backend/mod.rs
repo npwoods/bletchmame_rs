@@ -6,13 +6,19 @@ mod winit;
 use std::rc::Rc;
 
 use anyhow::Result;
+use slint::PhysicalPosition;
+use slint::PhysicalSize;
 use slint::Window;
 use strum::EnumString;
+use tracing::debug;
 
 use crate::backend::winit::WinitBackendRuntime;
+use crate::backend::winit::WinitChildWindow;
 
 #[cfg(feature = "slint-qt-backend")]
 use crate::backend::qt::QtBackendRuntime;
+#[cfg(feature = "slint-qt-backend")]
+use crate::backend::qt::QtChildWindow;
 
 #[derive(Debug, EnumString)]
 pub enum SlintBackend {
@@ -26,16 +32,17 @@ pub enum SlintBackend {
 
 pub enum BackendRuntime {
 	Winit(WinitBackendRuntime),
+
 	#[cfg(feature = "slint-qt-backend")]
 	Qt(QtBackendRuntime),
 }
 
-pub trait ChildWindowTrait {
-	fn set_active(&self, active: bool);
-	fn text(&self) -> String;
-}
+pub enum ChildWindow {
+	Winit(Rc<WinitChildWindow>),
 
-pub type ChildWindow = Rc<dyn ChildWindowTrait>;
+	#[cfg(feature = "slint-qt-backend")]
+	Qt(QtChildWindow),
+}
 
 impl BackendRuntime {
 	pub fn new(backend_type: SlintBackend) -> Result<Self> {
@@ -67,11 +74,53 @@ impl BackendRuntime {
 	}
 
 	pub async fn create_child_window(&self, parent: &Window) -> Result<ChildWindow> {
-		match self {
-			Self::Winit(backend) => backend.create_child_window(parent).await,
+		let child_window = match self {
+			Self::Winit(backend) => ChildWindow::Winit(backend.create_child_window(parent).await?),
 
 			#[cfg(feature = "slint-qt-backend")]
-			Self::Qt(backend) => backend.create_child_window(parent),
+			Self::Qt(backend) => ChildWindow::Qt(backend.create_child_window(parent)?),
+		};
+		Ok(child_window)
+	}
+}
+
+impl ChildWindow {
+	pub fn set_active(&self, active: bool) {
+		match self {
+			Self::Winit(child_window) => child_window.set_active(active),
+
+			#[cfg(feature = "slint-qt-backend")]
+			Self::Qt(child_window) => child_window.set_active(active),
+		}
+	}
+
+	pub fn update_bounds(&self, container: &Window, top: f32) {
+		let position = PhysicalPosition {
+			x: 0,
+			y: (top * container.scale_factor()) as i32,
+		};
+		let size = container.size();
+		let size = PhysicalSize::new(size.width, size.height - (position.y as u32));
+		debug!(position=?position, size=?size, "ChildWindow::update_bounds()");
+
+		let position =
+			dpi::PhysicalPosition::<u32>::new(position.x.try_into().unwrap(), position.y.try_into().unwrap());
+		let size = dpi::PhysicalSize::<u32>::new(size.width, size.height);
+
+		match self {
+			Self::Winit(child_window) => child_window.set_position_and_size(position, size),
+
+			#[cfg(feature = "slint-qt-backend")]
+			Self::Qt(child_window) => child_window.set_position_and_size(position, size),
+		}
+	}
+
+	pub fn text(&self) -> String {
+		match self {
+			Self::Winit(child_window) => child_window.text(),
+
+			#[cfg(feature = "slint-qt-backend")]
+			Self::Qt(child_window) => child_window.text(),
 		}
 	}
 }

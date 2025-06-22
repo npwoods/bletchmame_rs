@@ -10,16 +10,12 @@ use raw_window_handle::RawWindowHandle;
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::Sender;
 use tracing::debug;
-use tracing::info;
 use tracing::info_span;
 use winit::event::WindowEvent;
 use winit::event_loop::ActiveEventLoop;
 use winit::window::Window;
 use winit::window::WindowAttributes;
 use winit::window::WindowId;
-
-use crate::backend::ChildWindow;
-use crate::backend::ChildWindowTrait;
 
 #[derive(Clone, Debug, Default)]
 pub struct WinitBackendRuntime(Rc<RefCell<WinitBackendRuntimeInner>>);
@@ -31,7 +27,7 @@ struct WinitBackendRuntimeInner {
 }
 
 #[derive(Debug)]
-struct WinitChildWindow {
+pub struct WinitChildWindow {
 	window: Window,
 	parent_window_id: WindowId,
 }
@@ -64,7 +60,7 @@ impl WinitBackendRuntime {
 		Ok(Box::new(slint_backend) as Box<_>)
 	}
 
-	pub async fn create_child_window(&self, parent: &slint::Window) -> Result<ChildWindow> {
+	pub async fn create_child_window(&self, parent: &slint::Window) -> Result<Rc<WinitChildWindow>> {
 		// prepare the window attributes
 		let raw_window_handle = parent.window_handle().window_handle()?.as_raw();
 		let size = parent.with_winit_window(|parent| parent.inner_size()).unwrap();
@@ -98,7 +94,7 @@ impl WinitBackendRuntime {
 		self.0.borrow_mut().live.push(result.clone());
 
 		// and return the result
-		Ok(result as Rc<_>)
+		Ok(result)
 	}
 
 	fn create_pending_child_windows(&self, event_loop: &ActiveEventLoop) {
@@ -148,13 +144,6 @@ impl CustomApplicationHandler for WinitBackendRuntime {
 		self.create_pending_child_windows(event_loop);
 
 		match event {
-			WindowEvent::Resized(physical_size) => {
-				if let FindResult::Parent(child_window) = self.find_child_window(&window_id) {
-					info!(physical_size=?physical_size, child_window=?child_window, "resizing child window");
-					let _ = child_window.window.request_inner_size(*physical_size);
-				}
-			}
-
 			WindowEvent::Focused(true) => match self.find_child_window(&window_id) {
 				FindResult::Parent(child_window) => {
 					if child_window.is_active() {
@@ -208,6 +197,19 @@ impl WinitChildWindow {
 		Ok(result)
 	}
 
+	pub fn set_active(&self, active: bool) {
+		self.window.set_visible(active);
+	}
+
+	pub fn set_position_and_size(&self, position: dpi::PhysicalPosition<u32>, size: dpi::PhysicalSize<u32>) {
+		self.window.set_outer_position(position);
+		let _ = self.window.request_inner_size(size);
+	}
+
+	pub fn text(&self) -> String {
+		self.try_text().unwrap()
+	}
+
 	pub fn is_active(&self) -> bool {
 		self.window.is_visible().unwrap_or_default()
 	}
@@ -251,15 +253,5 @@ impl WinitChildWindow {
 
 			_ => Err(ThisError::UnknownRawHandleType.into()),
 		}
-	}
-}
-
-impl ChildWindowTrait for WinitChildWindow {
-	fn set_active(&self, active: bool) {
-		self.window.set_visible(active);
-	}
-
-	fn text(&self) -> String {
-		self.try_text().unwrap()
 	}
 }
