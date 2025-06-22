@@ -6,8 +6,11 @@ mod winit;
 use std::rc::Rc;
 
 use anyhow::Result;
+use slint::PhysicalPosition;
+use slint::PhysicalSize;
 use slint::Window;
 use strum::EnumString;
+use tracing::debug;
 
 use crate::backend::winit::WinitBackendRuntime;
 use crate::backend::winit::WinitChildWindow;
@@ -88,6 +91,27 @@ impl ChildWindow {
 
 			#[cfg(feature = "slint-qt-backend")]
 			Self::Qt(child_window) => child_window.set_active(active),
+		}
+	}
+
+	pub fn update_bounds(&self, container: &Window, top: f32) {
+		let position = PhysicalPosition {
+			x: 0,
+			y: (top * container.scale_factor()) as i32,
+		};
+		let size = container.size();
+		let size = PhysicalSize::new(size.width, size.height - (position.y as u32));
+		debug!(position=?position, size=?size, "ChildWindow::update_bounds()");
+
+		let position =
+			dpi::PhysicalPosition::<u32>::new(position.x.try_into().unwrap(), position.y.try_into().unwrap());
+		let size = dpi::PhysicalSize::<u32>::new(size.width, size.height);
+
+		match self {
+			Self::Winit(child_window) => child_window.set_position_and_size(position, size),
+
+			#[cfg(feature = "slint-qt-backend")]
+			Self::Qt(child_window) => child_window.set_position_and_size(position, size),
 		}
 	}
 

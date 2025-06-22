@@ -42,6 +42,17 @@ impl QtChildWindow {
 		}
 	}
 
+	pub fn set_position_and_size(&self, position: dpi::PhysicalPosition<u32>, size: dpi::PhysicalSize<u32>) {
+		let geometry = (
+			position.x.try_into().unwrap(),
+			position.y.try_into().unwrap(),
+			size.width.try_into().unwrap(),
+			size.width.try_into().unwrap(),
+		);
+		self.geometry.set(geometry);
+		self.internal_update(None);
+	}
+
 	pub fn text(&self) -> String {
 		self.qt_widget.win_id().to_string()
 	}

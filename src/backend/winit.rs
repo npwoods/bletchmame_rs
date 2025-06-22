@@ -10,7 +10,6 @@ use raw_window_handle::RawWindowHandle;
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::Sender;
 use tracing::debug;
-use tracing::info;
 use tracing::info_span;
 use winit::event::WindowEvent;
 use winit::event_loop::ActiveEventLoop;
@@ -145,13 +144,6 @@ impl CustomApplicationHandler for WinitBackendRuntime {
 		self.create_pending_child_windows(event_loop);
 
 		match event {
-			WindowEvent::Resized(physical_size) => {
-				if let FindResult::Parent(child_window) = self.find_child_window(&window_id) {
-					info!(physical_size=?physical_size, child_window=?child_window, "resizing child window");
-					let _ = child_window.window.request_inner_size(*physical_size);
-				}
-			}
-
 			WindowEvent::Focused(true) => match self.find_child_window(&window_id) {
 				FindResult::Parent(child_window) => {
 					if child_window.is_active() {
@@ -207,6 +199,11 @@ impl WinitChildWindow {
 
 	pub fn set_active(&self, active: bool) {
 		self.window.set_visible(active);
+	}
+
+	pub fn set_position_and_size(&self, position: dpi::PhysicalPosition<u32>, size: dpi::PhysicalSize<u32>) {
+		self.window.set_outer_position(position);
+		let _ = self.window.request_inner_size(size);
 	}
 
 	pub fn text(&self) -> String {
