@@ -6,6 +6,7 @@ mod winit;
 use std::rc::Rc;
 
 use anyhow::Result;
+use muda::accelerator::Accelerator;
 use slint::PhysicalPosition;
 use slint::PhysicalSize;
 use slint::Window;
@@ -83,13 +84,12 @@ impl BackendRuntime {
 		Ok(child_window)
 	}
 
-	pub fn install_scroll_lock_handler(&self, window: &Window, callback: impl Fn() + 'static) {
-		let callback = Rc::new(callback);
+	pub fn install_muda_accelerator_handler(&self, window: &Window, callback: impl Fn(&Accelerator) -> bool + 'static) {
 		match self {
-			Self::Winit(backend) => backend.install_scroll_lock_handler(window, callback),
+			Self::Winit(backend) => backend.install_muda_accelerator_handler(window, callback),
 
 			#[cfg(feature = "slint-qt-backend")]
-			Self::Qt(backend) => backend.install_scroll_lock_handler(window, callback),
+			Self::Qt(backend) => todo!(),
 		}
 	}
 }

@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::convert::Infallible;
 use std::ops::ControlFlow;
@@ -405,14 +406,39 @@ pub fn create(args: AppArgs) -> AppWindow {
 
 	// scroll lock handler (do this in a future because the window might not be inited yet)
 	let model_clone = model.clone();
+	let app_window_weak = app_window.as_weak();
 	let fut = async move {
-		let model = model_clone.clone();
-		let app_window = model.app_window();
-		model
-			.backend_runtime
-			.install_scroll_lock_handler(app_window.window(), move || {
-				handle_command(&model_clone, AppCommand::ToggleMenuBar);
-			})
+		let app_window = app_window_weak.unwrap();
+		app_window.window().with_muda_menu(move |menubar| {
+			// build the accelerator map
+			let accelerator_command_map =
+				menubar.visit(HashMap::new(), |mut accelerator_command_map, sub_menu, item| {
+					if let Some(title) = item.text() {
+						let parent_title = sub_menu.map(|x| x.text());
+						let (command, accelerator) = menu_item_info(parent_title.as_deref(), &title);
+						if let Some(command) = command
+							&& let Some(accelerator) = accelerator
+						{
+							accelerator_command_map.insert(accelerator, command);
+						}
+					}
+					ControlFlow::<Infallible, _>::Continue(accelerator_command_map)
+				});
+			let accelerator_command_map = accelerator_command_map.continue_value().unwrap();
+
+			// and install the callback
+			let app_window = app_window_weak.unwrap();
+			let model = model_clone.clone();
+			model
+				.backend_runtime
+				.install_muda_accelerator_handler(app_window.window(), move |accelerator| {
+					let command = accelerator_command_map.get(accelerator);
+					if let Some(command) = command {
+						handle_command(&model_clone, command.clone());
+					}
+					command.is_some()
+				});
+		});
 	};
 	spawn_local(fut).unwrap();
 
