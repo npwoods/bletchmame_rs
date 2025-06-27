@@ -576,8 +576,8 @@ impl State {
 
 fn configure_dialog_title(description: &str, name: Option<&str>) -> String {
 	if let Some(name) = name {
-		format!("Configure {} ({})", description, name)
+		format!("Configure {description} ({name})")
 	} else {
-		format!("Configure {}", description)
+		format!("Configure {description}")
 	}
 }

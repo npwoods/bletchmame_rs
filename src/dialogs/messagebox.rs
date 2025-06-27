@@ -64,7 +64,7 @@ where
 
 	// get the values
 	let values = T::VARIANTS;
-	let value_texts = values.iter().map(|x| format!("{}", x).into()).collect::<Vec<_>>();
+	let value_texts = values.iter().map(|x| x.to_string().into()).collect::<Vec<_>>();
 
 	// determine accept/abort indexes
 	let accept_index = values.iter().position(|x| *x == T::accept()).unwrap();

@@ -558,7 +558,7 @@ fn validate_view_custom<'a, T>(
 {
 	for (index, obj) in view.iter().enumerate() {
 		if let Err(e) = validate_func(obj) {
-			let message = format!("{}[{}]: {}", type_name, index, e);
+			let message = format!("{type_name}[{index}]: {e}");
 			emit(Error::msg(message));
 		}
 	}

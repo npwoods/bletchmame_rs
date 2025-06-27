@@ -80,15 +80,9 @@ fn print_stats(info_db: &InfoDb, elapsed_time: Duration) {
 		"RAM Options:                       {:>width$}",
 		info_db.ram_options().len()
 	);
-	println!(
-		"String Table Length:               {:>width$} {}",
-		strings_size, strings_size_unit
-	);
+	println!("String Table Length:               {strings_size:>width$} {strings_size_unit}");
 	println!();
-	println!(
-		"Total Size:                        {:>width$} {}",
-		total_size, total_size_unit
-	);
+	println!("Total Size:                        {total_size:>width$} {total_size_unit}");
 	println!(
 		"Elapsed Time:                      {:>width$} secs",
 		elapsed_time.as_millis() as f32 / 1000.0
