@@ -272,7 +272,7 @@ impl PrefsCollection {
 					.find(machine_name.as_str())
 					.map(|x| x.description())
 					.unwrap_or(machine_name.as_str());
-				format!("Software for \"{}\"", machine_desc).into()
+				format!("Software for \"{machine_desc}\"").into()
 			}
 			PrefsCollection::Folder { name, items: _ } => Cow::Borrowed(name),
 		}

@@ -85,7 +85,7 @@ pub async fn dialog_rename_collection(
 	existing_names: Vec<String>,
 	old_name: String,
 ) -> Option<String> {
-	let title = format!("Rename Folder \"{}\"", old_name);
+	let title = format!("Rename Folder \"{old_name}\"");
 	dialog_name_collection(modal_stack, title, existing_names, old_name).await
 }
 

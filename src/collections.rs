@@ -94,7 +94,7 @@ pub fn toggle_builtin_collection(collections: &mut Vec<Rc<PrefsCollection>>, bui
 pub fn get_collection_name(collections: &[Rc<PrefsCollection>], index: usize) -> Cow<'_, str> {
 	match collections[index].as_ref() {
 		PrefsCollection::Folder { name, .. } => Cow::Borrowed(name),
-		PrefsCollection::Builtin(x) => Cow::Owned(format!("{}", x)),
+		PrefsCollection::Builtin(x) => Cow::Owned(x.to_string()),
 		PrefsCollection::MachineSoftware { machine_name } => Cow::Borrowed(machine_name),
 	}
 }

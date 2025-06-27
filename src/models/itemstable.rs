@@ -402,7 +402,7 @@ impl ItemsTableModel {
 				(run_info, None, true)
 			}
 			Item::Unrecognized { error, .. } => {
-				let title = format!("{}", error).into();
+				let title = error.to_string().into();
 				let run_info = RunInfo::Single(MenuDesc { command: None, title });
 				(run_info, None, false)
 			}
@@ -440,7 +440,7 @@ impl ItemsTableModel {
 
 		// remove from this folder
 		let remove_from_folder_desc = folder_name.map(|folder_name| {
-			let title = format!("Remove From \"{}\"", folder_name).into();
+			let title = format!("Remove From \"{folder_name}\"").into();
 			let command = Some(AppCommand::RemoveFromFolder(folder_name, items.clone()));
 			MenuDesc { command, title }
 		});
@@ -806,7 +806,7 @@ fn is_item_match(info_db: &InfoDb, prefs_item: &PrefsItem, item: &Item) -> bool 
 }
 
 fn run_item_text(text: &str) -> String {
-	format!("Run {}", text)
+	format!("Run {text}")
 }
 
 /// Rust friendly equivalent of ItemContextMenuInfo

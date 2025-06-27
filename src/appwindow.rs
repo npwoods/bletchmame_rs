@@ -1008,7 +1008,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			let model_clone = model.clone();
 			let old_name = get_collection_name(&model.preferences.borrow().collections, index).to_string();
 			let fut = async move {
-				let message = format!("Are you sure you want to delete \"{}\"", old_name);
+				let message = format!("Are you sure you want to delete \"{old_name}\"");
 				if dialog_message_box::<OkCancel>(model_clone.modal_stack.clone(), "Delete", message).await
 					== OkCancel::Ok
 				{

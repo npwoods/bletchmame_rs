@@ -12,7 +12,7 @@ fn main() -> std::io::Result<()> {
 	let icon_png = "ui/bletchmame.png";
 
 	// dependencies
-	println!("cargo::rerun-if-changed={}", icon_png);
+	println!("cargo::rerun-if-changed={icon_png}");
 
 	// set the experimental environment variable
 	unsafe {

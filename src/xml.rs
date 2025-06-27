@@ -78,7 +78,7 @@ where
 				Event::Text(bytes_text) => {
 					let string = cow_bytes_to_str(bytes_text.into_inner())?;
 					if self.known_depth == 0 && self.unknown_depth == 0 && !string.trim().is_empty() {
-						let msg = format!("Extraneous text \"{:?}\"", string);
+						let msg = format!("Extraneous text \"{string:?}\"");
 						return Err(Error::msg(msg));
 					}
 					if let Some(current_text) = &mut self.current_text {
