@@ -38,6 +38,7 @@ pub fn accel(text: &str) -> Option<Accelerator> {
 		"F11" => Code::F11,
 		"F12" => Code::F12,
 		"Pause" => Code::Pause,
+		"ScrLk" => Code::ScrollLock,
 		x => panic!("Unknown accelerator {x}"),
 	};
 	Some(Accelerator::new(mods, key))

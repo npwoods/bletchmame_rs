@@ -284,6 +284,13 @@ export component AppWindow inherits Window {
             }
 
             MenuItem {
+                title: @tr("MenuBar" => "Toggle Menu Bar");
+                activated => {
+                    menu-item-activated(parent.title, self.title);
+                }
+            }
+
+            MenuItem {
                 title: @tr("MenuBar" => "Sound");
                 activated => {
                     menu-item-activated(parent.title, self.title);

@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::convert::Infallible;
 use std::ops::ControlFlow;
@@ -405,14 +406,39 @@ pub fn create(args: AppArgs) -> AppWindow {
 
 	// scroll lock handler (do this in a future because the window might not be inited yet)
 	let model_clone = model.clone();
+	let app_window_weak = app_window.as_weak();
 	let fut = async move {
-		let model = model_clone.clone();
-		let app_window = model.app_window();
-		model
-			.backend_runtime
-			.install_scroll_lock_handler(app_window.window(), move || {
-				handle_command(&model_clone, AppCommand::ToggleMenuBar);
-			})
+		let app_window = app_window_weak.unwrap();
+		app_window.window().with_muda_menu(move |menubar| {
+			// build the accelerator map
+			let accelerator_command_map =
+				menubar.visit(HashMap::new(), |mut accelerator_command_map, sub_menu, item| {
+					if let Some(title) = item.text() {
+						let parent_title = sub_menu.map(|x| x.text());
+						let (command, accelerator) = menu_item_info(parent_title.as_deref(), &title);
+						if let Some(command) = command
+							&& let Some(accelerator) = accelerator
+						{
+							accelerator_command_map.insert(accelerator, command);
+						}
+					}
+					ControlFlow::<Infallible, _>::Continue(accelerator_command_map)
+				});
+			let accelerator_command_map = accelerator_command_map.continue_value().unwrap();
+
+			// and install the callback
+			let app_window = app_window_weak.unwrap();
+			let model = model_clone.clone();
+			model
+				.backend_runtime
+				.install_muda_accelerator_handler(app_window.window(), move |accelerator| {
+					let command = accelerator_command_map.get(accelerator);
+					if let Some(command) = command {
+						handle_command(&model_clone, command.clone());
+					}
+					command.is_some()
+				});
+		});
 	};
 	spawn_local(fut).unwrap();
 
@@ -634,6 +660,7 @@ fn menu_item_info(parent_title: Option<&str>, title: &str) -> (Option<AppCommand
 			(Some(AppCommand::OptionsThrottleRate(rate)), None)
 		}
 		(_, "Full Screen") => (Some(AppCommand::OptionsToggleFullScreen), Some("F11")),
+		(_, "Toggle Menu Bar") => (Some(AppCommand::OptionsToggleMenuBar), Some("ScrLk")),
 		(_, "Sound") => (Some(AppCommand::OptionsToggleSound), None),
 		(_, "Classic MAME Menu") => (Some(AppCommand::OptionsClassic), None),
 
@@ -839,6 +866,27 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			let is_fullscreen = window.is_fullscreen();
 			model.preferences.borrow_mut().is_fullscreen = !is_fullscreen;
 			window.set_fullscreen(!is_fullscreen);
+		}
+		AppCommand::OptionsToggleMenuBar => {
+			let has_input_using_mouse = model
+				.state
+				.borrow()
+				.status()
+				.and_then(|s| s.running.as_ref())
+				.map(|r| r.has_input_using_mouse);
+
+			if let Some(has_input_using_mouse) = has_input_using_mouse {
+				let app_window = model.app_window();
+				if let Some(visible) = app_window.window().is_menu_bar_visible() {
+					let new_visible = !visible;
+					app_window.window().set_menu_bar_visible(new_visible);
+
+					if has_input_using_mouse {
+						let command = MameCommand::set_mouse_enabled(!new_visible).into();
+						handle_command(model, command);
+					}
+				}
+			}
 		}
 		AppCommand::OptionsToggleSound => {
 			match model
@@ -1183,27 +1231,6 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			};
 			spawn_local(fut).unwrap();
 		}
-		AppCommand::ToggleMenuBar => {
-			let has_input_using_mouse = model
-				.state
-				.borrow()
-				.status()
-				.and_then(|s| s.running.as_ref())
-				.map(|r| r.has_input_using_mouse);
-
-			if let Some(has_input_using_mouse) = has_input_using_mouse {
-				let app_window = model.app_window();
-				if let Some(visible) = app_window.window().is_menu_bar_visible() {
-					let new_visible = !visible;
-					app_window.window().set_menu_bar_visible(new_visible);
-
-					if has_input_using_mouse {
-						let command = MameCommand::set_mouse_enabled(!new_visible).into();
-						handle_command(model, command);
-					}
-				}
-			}
-		}
 	};
 
 	// finish up
@@ -1273,6 +1300,7 @@ fn update_menus(model: &AppModel) {
 				Some(AppCommand::OptionsThrottleRate(x)) => (Some(is_running), Some(Some(x) == throttle_rate), None),
 				Some(AppCommand::OptionsToggleWarp) => (Some(is_running), Some(!is_throttled), None),
 				Some(AppCommand::OptionsToggleFullScreen) => (None, Some(is_fullscreen), None),
+				Some(AppCommand::OptionsToggleMenuBar) => (Some(is_running), None, None),
 				Some(AppCommand::OptionsToggleSound) => (Some(is_running), Some(is_sound_enabled), None),
 				Some(AppCommand::OptionsClassic) => (Some(is_running), None, None),
 				Some(AppCommand::SettingsInput(class)) => (Some(input_classes.contains(&class)), None, None),

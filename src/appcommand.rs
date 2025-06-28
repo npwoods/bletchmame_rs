@@ -42,6 +42,7 @@ pub enum AppCommand {
 	OptionsThrottleRate(f32),
 	OptionsToggleWarp,
 	OptionsToggleFullScreen,
+	OptionsToggleMenuBar,
 	OptionsToggleSound,
 	#[strum(props(MinimumMame = "0.274"))]
 	OptionsClassic,
@@ -122,7 +123,6 @@ pub enum AppCommand {
 		#[allow(clippy::type_complexity)]
 		selections: Vec<(String, Vec<(Arc<str>, u32, SeqType, String)>)>,
 	},
-	ToggleMenuBar,
 }
 
 const MENU_PREFIX: &str = "MENU_";

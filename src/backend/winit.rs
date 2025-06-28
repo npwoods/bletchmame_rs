@@ -1,10 +1,14 @@
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use anyhow::Result;
 use i_slint_backend_winit::CustomApplicationHandler;
 use i_slint_backend_winit::WinitWindowAccessor;
 use i_slint_backend_winit::WinitWindowEventResult;
+use muda::accelerator::Accelerator;
+use muda::accelerator::Code;
+use muda::accelerator::Modifiers;
 use raw_window_handle::HasWindowHandle;
 use raw_window_handle::RawWindowHandle;
 use tokio::sync::oneshot;
@@ -15,7 +19,9 @@ use winit::event::ElementState;
 use winit::event::WindowEvent;
 use winit::event_loop::ActiveEventLoop;
 use winit::keyboard::Key;
+use winit::keyboard::ModifiersState;
 use winit::keyboard::NamedKey;
+use winit::keyboard::SmolStr;
 use winit::window::Window;
 use winit::window::WindowAttributes;
 use winit::window::WindowId;
@@ -27,8 +33,11 @@ pub struct WinitBackendRuntime(Rc<RefCell<WinitBackendRuntimeInner>>);
 struct WinitBackendRuntimeInner {
 	pending: Vec<WinitPendingChildWindow>,
 	live: Vec<Rc<WinitChildWindow>>,
-	scroll_lock_handlers: Vec<(WindowId, Rc<dyn Fn()>)>,
+	muda_accelerator_callbacks: MudaAcceleratorMap,
+	modifiers_state: ModifiersState,
 }
+
+type MudaAcceleratorMap = HashMap<WindowId, Box<dyn Fn(&Accelerator) -> bool>>;
 
 #[derive(Debug)]
 pub struct WinitChildWindow {
@@ -101,11 +110,17 @@ impl WinitBackendRuntime {
 		Ok(result)
 	}
 
-	pub fn install_scroll_lock_handler(&self, window: &slint::Window, callback: Rc<dyn Fn() + 'static>) {
-		let window_id = window
-			.with_winit_window(|window| window.id())
-			.expect("could not get WindowId");
-		self.0.borrow_mut().scroll_lock_handlers.push((window_id, callback));
+	pub fn install_muda_accelerator_handler(
+		&self,
+		window: &slint::Window,
+		callback: impl Fn(&Accelerator) -> bool + 'static,
+	) {
+		let window_id = window.with_winit_window(|x| x.id()).unwrap();
+		let callback = Box::new(callback) as Box<_>;
+		self.0
+			.borrow_mut()
+			.muda_accelerator_callbacks
+			.insert(window_id, callback);
 	}
 
 	fn create_pending_child_windows(&self, event_loop: &ActiveEventLoop) {
@@ -155,41 +170,49 @@ impl CustomApplicationHandler for WinitBackendRuntime {
 		self.create_pending_child_windows(event_loop);
 
 		match event {
-			WindowEvent::Focused(true) => match self.find_child_window(&window_id) {
-				FindResult::Parent(child_window) => {
-					if child_window.is_active() {
-						child_window.fix_focus();
+			WindowEvent::Focused(true) => {
+				match self.find_child_window(&window_id) {
+					FindResult::Parent(child_window) => {
+						if child_window.is_active() {
+							child_window.fix_focus();
+						}
 					}
-				}
-				FindResult::Child(child_window) => {
-					if !child_window.is_active() {
-						child_window.fix_focus();
+					FindResult::Child(child_window) => {
+						if !child_window.is_active() {
+							child_window.fix_focus();
+						}
 					}
-				}
-				FindResult::None => {}
-			},
+					FindResult::None => {}
+				};
+				WinitWindowEventResult::Propagate
+			}
 
 			WindowEvent::KeyboardInput { event, .. } => {
-				if event.logical_key == Key::Named(NamedKey::ScrollLock) && event.state == ElementState::Released {
-					let callback = {
-						let state = self.0.borrow();
-						let window_id = state
-							.live
-							.iter()
-							.find(|x| x.window.id() == window_id)
-							.map(|x| &x.parent_window_id)
-							.unwrap_or(&window_id);
-						state
-							.scroll_lock_handlers
-							.iter()
-							.find(|(this_window_id, _)| window_id == this_window_id)
-							.map(|(_, callback)| callback)
-							.cloned()
-					};
-					if let Some(callback) = callback.as_deref() {
-						callback();
+				let state = self.0.borrow();
+				if event.state == ElementState::Pressed
+					&& let Some(accelerator) = muda_accelerator(&event.logical_key, &state.modifiers_state)
+				{
+					let window_id = state
+						.live
+						.iter()
+						.find(|x| x.window.id() == window_id)
+						.map(|x| &x.parent_window_id)
+						.unwrap_or(&window_id);
+					if let Some(callback) = state.muda_accelerator_callbacks.get(window_id)
+						&& callback(&accelerator)
+					{
+						WinitWindowEventResult::PreventDefault
+					} else {
+						WinitWindowEventResult::Propagate
 					}
+				} else {
+					WinitWindowEventResult::Propagate
 				}
+			}
+
+			WindowEvent::ModifiersChanged(modifiers) => {
+				self.0.borrow_mut().modifiers_state = modifiers.state();
+				WinitWindowEventResult::Propagate
 			}
 
 			WindowEvent::Destroyed => {
@@ -197,11 +220,11 @@ impl CustomApplicationHandler for WinitBackendRuntime {
 				state
 					.live
 					.retain(|x| x.parent_window_id != window_id && x.window.id() != window_id);
-				state.scroll_lock_handlers.retain(|(x, _)| *x != window_id);
+				state.muda_accelerator_callbacks.remove(&window_id);
+				WinitWindowEventResult::Propagate
 			}
-			_ => {}
+			_ => WinitWindowEventResult::Propagate,
 		}
-		WinitWindowEventResult::Propagate
 	}
 
 	fn resumed(&mut self, event_loop: &ActiveEventLoop) -> WinitWindowEventResult {
@@ -288,5 +311,39 @@ impl WinitChildWindow {
 
 			_ => Err(ThisError::UnknownRawHandleType.into()),
 		}
+	}
+}
+
+fn muda_accelerator(logical_key: &Key<SmolStr>, modifiers: &ModifiersState) -> Option<Accelerator> {
+	let mods = None;
+	let mods = apply_muda_modifier(mods, modifiers.control_key(), Modifiers::CONTROL);
+	let mods = apply_muda_modifier(mods, modifiers.shift_key(), Modifiers::SHIFT);
+	let mods = apply_muda_modifier(mods, modifiers.alt_key(), Modifiers::ALT);
+
+	match logical_key {
+		Key::Character(s) => {
+			if s.as_str() == "x" {
+				Some(Accelerator::new(mods, Code::KeyX))
+			} else {
+				None
+			}
+		}
+		Key::Named(NamedKey::F7) => Some(Accelerator::new(mods, Code::F7)),
+		Key::Named(NamedKey::F8) => Some(Accelerator::new(mods, Code::F8)),
+		Key::Named(NamedKey::F9) => Some(Accelerator::new(mods, Code::F9)),
+		Key::Named(NamedKey::F10) => Some(Accelerator::new(mods, Code::F10)),
+		Key::Named(NamedKey::F11) => Some(Accelerator::new(mods, Code::F11)),
+		Key::Named(NamedKey::F12) => Some(Accelerator::new(mods, Code::F12)),
+		Key::Named(NamedKey::Pause) => Some(Accelerator::new(mods, Code::Pause)),
+		Key::Named(NamedKey::ScrollLock) => Some(Accelerator::new(mods, Code::ScrollLock)),
+		_ => None,
+	}
+}
+
+fn apply_muda_modifier(mods: Option<Modifiers>, apply: bool, this_mod: Modifiers) -> Option<Modifiers> {
+	if apply {
+		Some(mods.unwrap_or_default() | this_mod)
+	} else {
+		mods
 	}
 }
