@@ -660,6 +660,7 @@ fn menu_item_info(parent_title: Option<&str>, title: &str) -> (Option<AppCommand
 			(Some(AppCommand::OptionsThrottleRate(rate)), None)
 		}
 		(_, "Full Screen") => (Some(AppCommand::OptionsToggleFullScreen), Some("F11")),
+		(_, "Toggle Menu Bar") => (Some(AppCommand::OptionsToggleMenuBar), Some("ScrLk")),
 		(_, "Sound") => (Some(AppCommand::OptionsToggleSound), None),
 		(_, "Classic MAME Menu") => (Some(AppCommand::OptionsClassic), None),
 
@@ -865,6 +866,27 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			let is_fullscreen = window.is_fullscreen();
 			model.preferences.borrow_mut().is_fullscreen = !is_fullscreen;
 			window.set_fullscreen(!is_fullscreen);
+		}
+		AppCommand::OptionsToggleMenuBar => {
+			let has_input_using_mouse = model
+				.state
+				.borrow()
+				.status()
+				.and_then(|s| s.running.as_ref())
+				.map(|r| r.has_input_using_mouse);
+
+			if let Some(has_input_using_mouse) = has_input_using_mouse {
+				let app_window = model.app_window();
+				if let Some(visible) = app_window.window().is_menu_bar_visible() {
+					let new_visible = !visible;
+					app_window.window().set_menu_bar_visible(new_visible);
+
+					if has_input_using_mouse {
+						let command = MameCommand::set_mouse_enabled(!new_visible).into();
+						handle_command(model, command);
+					}
+				}
+			}
 		}
 		AppCommand::OptionsToggleSound => {
 			match model
@@ -1209,27 +1231,6 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			};
 			spawn_local(fut).unwrap();
 		}
-		AppCommand::ToggleMenuBar => {
-			let has_input_using_mouse = model
-				.state
-				.borrow()
-				.status()
-				.and_then(|s| s.running.as_ref())
-				.map(|r| r.has_input_using_mouse);
-
-			if let Some(has_input_using_mouse) = has_input_using_mouse {
-				let app_window = model.app_window();
-				if let Some(visible) = app_window.window().is_menu_bar_visible() {
-					let new_visible = !visible;
-					app_window.window().set_menu_bar_visible(new_visible);
-
-					if has_input_using_mouse {
-						let command = MameCommand::set_mouse_enabled(!new_visible).into();
-						handle_command(model, command);
-					}
-				}
-			}
-		}
 	};
 
 	// finish up
@@ -1299,6 +1300,7 @@ fn update_menus(model: &AppModel) {
 				Some(AppCommand::OptionsThrottleRate(x)) => (Some(is_running), Some(Some(x) == throttle_rate), None),
 				Some(AppCommand::OptionsToggleWarp) => (Some(is_running), Some(!is_throttled), None),
 				Some(AppCommand::OptionsToggleFullScreen) => (None, Some(is_fullscreen), None),
+				Some(AppCommand::OptionsToggleMenuBar) => (Some(is_running), None, None),
 				Some(AppCommand::OptionsToggleSound) => (Some(is_running), Some(is_sound_enabled), None),
 				Some(AppCommand::OptionsClassic) => (Some(is_running), None, None),
 				Some(AppCommand::SettingsInput(class)) => (Some(input_classes.contains(&class)), None, None),
