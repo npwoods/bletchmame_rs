@@ -16,9 +16,10 @@ use slint::Weak;
 use slint::spawn_local;
 use strum::IntoEnumIterator;
 use strum::VariantArray;
+use tokio::sync::mpsc;
 use tracing::info;
 
-use crate::dialogs::SingleResult;
+use crate::dialogs::SenderExt;
 use crate::dialogs::file::choose_path_by_type_dialog;
 use crate::guiutils::modal::ModalStack;
 use crate::icon::Icon;
@@ -49,7 +50,7 @@ pub async fn dialog_paths(
 ) -> Option<PrefsPaths> {
 	// prepare the dialog
 	let modal = modal_stack.modal(|| PathsDialog::new().unwrap());
-	let single_result = SingleResult::default();
+	let (tx, mut rx) = mpsc::channel(1);
 	let state = State {
 		dialog_weak: modal.dialog().as_weak(),
 		paths: RefCell::new((*paths).clone()),
@@ -64,15 +65,15 @@ pub async fn dialog_paths(
 	modal.dialog().set_path_labels(path_labels);
 
 	// set up the "ok" button
-	let signaller = single_result.signaller();
+	let tx_clone = tx.clone();
 	modal.dialog().on_ok_clicked(move || {
-		signaller.signal(true);
+		tx_clone.signal(true);
 	});
 
 	// set up the "cancel" button
-	let signaller = single_result.signaller();
+	let tx_clone = tx.clone();
 	modal.dialog().on_cancel_clicked(move || {
-		signaller.signal(false);
+		tx_clone.signal(false);
 	});
 
 	// set up the "browse" button
@@ -91,9 +92,9 @@ pub async fn dialog_paths(
 	});
 
 	// set up the close handler
-	let signaller = single_result.signaller();
+	let tx_clone = tx.clone();
 	modal.window().on_close_requested(move || {
-		signaller.signal(false);
+		tx_clone.signal(false);
 		CloseRequestResponse::KeepWindowShown
 	});
 
@@ -140,7 +141,7 @@ pub async fn dialog_paths(
 	});
 
 	// present the modal dialog
-	let accepted = modal.run(async { single_result.wait().await }).await;
+	let accepted = modal.run(async { rx.recv().await.unwrap() }).await;
 
 	// if the user hit "ok", return
 	accepted.then(|| Rc::try_unwrap(state).unwrap().paths.into_inner())

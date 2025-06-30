@@ -13,11 +13,12 @@ use slint::SharedString;
 use slint::VecModel;
 use slint::Weak;
 use slint::spawn_local;
+use tokio::sync::mpsc;
 
 use crate::appcommand::AppCommand;
 use crate::devimageconfig::DevicesImagesConfig;
 use crate::devimageconfig::EntryDetails;
-use crate::dialogs::SingleResult;
+use crate::dialogs::SenderExt;
 use crate::dialogs::devimages::entry_popup_menu;
 use crate::dialogs::image::Format;
 use crate::dialogs::image::dialog_load_image;
@@ -71,7 +72,7 @@ pub async fn dialog_configure(
 ) -> Option<PrefsItem> {
 	// prepare the dialog
 	let modal = modal_stack.modal(|| ConfigureDialog::new().unwrap());
-	let single_result = SingleResult::default();
+	let (tx, mut rx) = mpsc::channel(1);
 
 	// get the state
 	let dialog_weak = modal.dialog().as_weak();
@@ -200,24 +201,24 @@ pub async fn dialog_configure(
 	}
 
 	// set up the close handler
-	let signaller = single_result.signaller();
+	let tx_clone = tx.clone();
 	modal.window().on_close_requested(move || {
-		signaller.signal(None);
+		tx_clone.signal(None);
 		CloseRequestResponse::KeepWindowShown
 	});
 
 	// set up the "ok" button
-	let signaller = single_result.signaller();
+	let tx_clone = tx.clone();
 	let state_clone = state.clone();
 	modal.dialog().on_ok_clicked(move || {
 		let result = state_clone.get_prefs_item();
-		signaller.signal(Some(result));
+		tx_clone.signal(Some(result));
 	});
 
 	// set up the "cancel" button
-	let signaller = single_result.signaller();
+	let tx_clone = tx.clone();
 	modal.dialog().on_cancel_clicked(move || {
-		signaller.signal(None);
+		tx_clone.signal(None);
 	});
 
 	// set up the "reset" button
@@ -227,7 +228,7 @@ pub async fn dialog_configure(
 	});
 
 	// present the modal dialog
-	modal.run(async { single_result.wait().await }).await
+	modal.run(async { rx.recv().await.unwrap() }).await
 }
 
 fn ram_size_display_text(ram_size: u64) -> String {

@@ -1,4 +1,3 @@
-use std::default::Default;
 use std::fmt::Display;
 
 use slint::CloseRequestResponse;
@@ -6,8 +5,9 @@ use slint::ModelRc;
 use slint::SharedString;
 use slint::VecModel;
 use strum::VariantArray;
+use tokio::sync::mpsc;
 
-use crate::dialogs::SingleResult;
+use crate::dialogs::SenderExt;
 use crate::guiutils::modal::ModalStack;
 use crate::ui::MessageBoxDialog;
 
@@ -86,7 +86,7 @@ async fn internal_dialog_message_box(
 ) -> usize {
 	// prepare the dialog
 	let modal = modal_stack.modal(|| MessageBoxDialog::new().unwrap());
-	let single_result = SingleResult::default();
+	let (tx, mut rx) = mpsc::channel(1);
 
 	// turn value_texts into a model
 	let value_texts = VecModel::from(value_texts);
@@ -98,19 +98,19 @@ async fn internal_dialog_message_box(
 	modal.dialog().set_button_texts(value_texts);
 
 	// set button callbacks
-	let signaller = single_result.signaller();
+	let tx_clone = tx.clone();
 	modal.dialog().on_button_clicked(move |index| {
 		let index = usize::try_from(index).unwrap();
-		signaller.signal(index)
+		tx_clone.signal(index)
 	});
 
 	// close requested callback
-	let signaller = single_result.signaller();
+	let tx_clone = tx.clone();
 	modal.window().on_close_requested(move || {
-		signaller.signal(abort_index);
+		tx_clone.signal(abort_index);
 		CloseRequestResponse::KeepWindowShown
 	});
 
 	// show the dialog and wait for completion
-	modal.run(async { single_result.wait().await }).await
+	modal.run(async { rx.recv().await.unwrap() }).await
 }

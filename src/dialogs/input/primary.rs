@@ -14,13 +14,14 @@ use slint::ModelRc;
 use slint::ModelTracker;
 use slint::Weak;
 use strum::VariantArray;
+use tokio::sync::mpsc;
 use tracing::info;
 use tracing::trace;
 use tracing::trace_span;
 
 use crate::appcommand::AppCommand;
 use crate::channel::Channel;
-use crate::dialogs::SingleResult;
+use crate::dialogs::SenderExt;
 use crate::dialogs::input::InputAxis;
 use crate::dialogs::input::InputDeviceClassExt;
 use crate::dialogs::input::InputDeviceClassSliceExt;
@@ -75,22 +76,22 @@ pub async fn dialog_input(
 ) {
 	// prepare the dialog
 	let modal = modal_stack.modal(|| InputDialog::new().unwrap());
-	let single_result = SingleResult::default();
+	let (tx, mut rx) = mpsc::channel(1);
 
 	// set the title
 	modal.dialog().set_dialog_title(class.title().into());
 
 	// set up the close handler
-	let signaller = single_result.signaller();
+	let tx_clone = tx.clone();
 	modal.window().on_close_requested(move || {
-		signaller.signal(());
+		tx_clone.signal(());
 		CloseRequestResponse::KeepWindowShown
 	});
 
 	// set up the "ok" button
-	let signaller = single_result.signaller();
+	let tx_clone = tx.clone();
 	modal.dialog().on_ok_clicked(move || {
-		signaller.signal(());
+		tx_clone.signal(());
 	});
 
 	// set up the context menu command handler
@@ -134,7 +135,7 @@ pub async fn dialog_input(
 	InputDialogModel::get_model(&model).update(inputs, input_device_classes);
 
 	// present the modal dialog
-	modal.run(async { single_result.wait().await }).await
+	modal.run(async { rx.recv().await.unwrap() }).await;
 }
 
 impl InputDialogModel {

@@ -1,28 +1,29 @@
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
+use tokio::sync::mpsc;
 
-use crate::dialogs::SingleResult;
+use crate::dialogs::SenderExt;
 use crate::guiutils::modal::ModalStack;
 use crate::ui::ConnectToSocketDialog;
 
 pub async fn dialog_connect_to_socket(modal_stack: ModalStack) -> Option<(String, u16)> {
 	// prepare the dialog
 	let modal = modal_stack.modal(|| ConnectToSocketDialog::new().unwrap());
-	let single_result = SingleResult::default();
+	let (tx, mut rx) = mpsc::channel(1);
 
 	// set up the accepted handler (when "OK" is clicked)
-	let signaller = single_result.signaller();
+	let tx_clone = tx.clone();
 	let dialog_weak = modal.dialog().as_weak();
 	modal.dialog().on_accepted(move || {
 		let dialog = dialog_weak.unwrap();
 		let result = get_results(&dialog).unwrap();
-		signaller.signal(Some(result));
+		tx_clone.signal(Some(result));
 	});
 
 	// set up the cancelled handler (when "Cancel" is clicked)
-	let signaller = single_result.signaller();
+	let tx_clone = tx.clone();
 	modal.dialog().on_cancelled(move || {
-		signaller.signal(None);
+		tx_clone.signal(None);
 	});
 
 	// set up the changed handler
@@ -32,9 +33,9 @@ pub async fn dialog_connect_to_socket(modal_stack: ModalStack) -> Option<(String
 	});
 
 	// set up the close handler
-	let signaller = single_result.signaller();
+	let tx_clone = tx.clone();
 	modal.window().on_close_requested(move || {
-		signaller.signal(None);
+		tx_clone.signal(None);
 		CloseRequestResponse::KeepWindowShown
 	});
 
@@ -44,7 +45,7 @@ pub async fn dialog_connect_to_socket(modal_stack: ModalStack) -> Option<(String
 	update_can_accept(modal.dialog());
 
 	// present the modal dialog
-	modal.run(async { single_result.wait().await }).await
+	modal.run(async { rx.recv().await.unwrap() }).await
 }
 
 fn update_can_accept(dialog: &ConnectToSocketDialog) {
