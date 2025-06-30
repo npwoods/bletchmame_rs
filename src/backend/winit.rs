@@ -190,6 +190,7 @@ impl CustomApplicationHandler for WinitBackendRuntime {
 			WindowEvent::KeyboardInput { event, .. } => {
 				let state = self.0.borrow();
 				if event.state == ElementState::Pressed
+					&& !event.repeat
 					&& let Some(accelerator) = muda_accelerator(&event.logical_key, &state.modifiers_state)
 				{
 					let window_id = state
