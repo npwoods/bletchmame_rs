@@ -8,10 +8,11 @@ use slint::CloseRequestResponse;
 use slint::ModelRc;
 use slint::SharedString;
 use slint::VecModel;
+use tokio::sync::mpsc;
 
 use crate::appcommand::AppCommand;
 use crate::channel::Channel;
-use crate::dialogs::SingleResult;
+use crate::dialogs::SenderExt;
 use crate::guiutils::modal::ModalStack;
 use crate::runtime::command::MameCommand;
 use crate::runtime::command::SeqType;
@@ -41,12 +42,12 @@ pub async fn dialog_seq_poll(
 ) {
 	// prepare the dialog
 	let modal = modal_stack.modal(|| SeqPollDialog::new().unwrap());
-	let single_result = SingleResult::default();
+	let (tx, mut rx) = mpsc::channel(1);
 
 	// set up the close handler
-	let signaller = single_result.signaller();
+	let tx_clone = tx.clone();
 	modal.window().on_close_requested(move || {
-		signaller.signal(None);
+		tx_clone.signal(None);
 		CloseRequestResponse::KeepWindowShown
 	});
 
@@ -106,19 +107,19 @@ pub async fn dialog_seq_poll(
 	modal.dialog().set_mouse_input_titles(mouse_input_titles);
 
 	// ...and also the corresponding callback
-	let signaller = single_result.signaller();
+	let tx_clone = tx.clone();
 	modal.dialog().on_mouse_input_selected(move |index| {
 		let index = usize::try_from(index).unwrap();
-		signaller.signal(Some(index));
+		tx_clone.signal(Some(index));
 	});
 
 	// subscribe to status changes
 	let polling_input_seq = Cell::new(false);
-	let signaller = single_result.signaller();
+	let tx_clone = tx.clone();
 	let _subscription = status_changed_channel.subscribe(move |status| {
 		let running = status.running.as_ref();
 		if running.is_none_or(|running| polling_input_seq.get() && !running.polling_input_seq) {
-			signaller.signal(None);
+			tx_clone.signal(None);
 		} else if running.is_some_and(|running| running.polling_input_seq) {
 			polling_input_seq.set(true);
 		}
@@ -129,7 +130,7 @@ pub async fn dialog_seq_poll(
 	invoke_command(command.into());
 
 	// present the modal dialog
-	let mouse_selection = modal.run(async { single_result.wait().await }).await;
+	let mouse_selection = modal.run(async { rx.recv().await.unwrap() }).await;
 
 	// invoke the command to stop polling
 	let command = MameCommand::seq_poll_stop();

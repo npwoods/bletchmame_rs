@@ -9,10 +9,11 @@ use slint::CloseRequestResponse;
 use slint::ModelRc;
 use slint::SharedString;
 use slint::VecModel;
+use tokio::sync::mpsc;
 use tracing::info;
 
 use crate::appcommand::AppCommand;
-use crate::dialogs::SingleResult;
+use crate::dialogs::SenderExt;
 use crate::guiutils::modal::ModalStack;
 use crate::runtime::command::MameCommand;
 use crate::runtime::command::SeqType;
@@ -28,7 +29,7 @@ pub async fn dialog_input_select_multiple(
 
 	// set up the modal
 	let modal = modal_stack.modal(|| InputSelectMultipleDialog::new().unwrap());
-	let single_result = SingleResult::default();
+	let (tx, mut rx) = mpsc::channel(1);
 
 	// set up entries
 	let entries = selections
@@ -51,29 +52,29 @@ pub async fn dialog_input_select_multiple(
 	});
 
 	// set up the close handler
-	let signaller = single_result.signaller();
+	let tx_clone = tx.clone();
 	modal.window().on_close_requested(move || {
-		signaller.signal(None);
+		tx_clone.signal(None);
 		CloseRequestResponse::KeepWindowShown
 	});
 
 	// set up the "cancel" button
-	let signaller = single_result.signaller();
+	let tx_clone = tx.clone();
 	modal.dialog().on_cancel_clicked(move || {
-		signaller.signal(None);
+		tx_clone.signal(None);
 	});
 
 	// set up the "ok" button
-	let signaller = single_result.signaller();
+	let tx_clone = tx.clone();
 	modal.dialog().on_ok_clicked(move || {
 		let selections = selections.as_ref();
 		let checked = checked.as_ref();
 		let result = Some(build_result(selections, checked));
-		signaller.signal(result);
+		tx_clone.signal(result);
 	});
 
 	// present the modal dialog
-	modal.run(async { single_result.wait().await }).await
+	modal.run(async { rx.recv().await.unwrap() }).await
 }
 
 #[allow(clippy::type_complexity)]

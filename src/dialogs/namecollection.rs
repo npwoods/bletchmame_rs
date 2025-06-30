@@ -1,11 +1,11 @@
 use std::borrow::Cow;
-use std::default::Default;
 
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
 use slint::SharedString;
+use tokio::sync::mpsc;
 
-use crate::dialogs::SingleResult;
+use crate::dialogs::SenderExt;
 use crate::guiutils::modal::ModalStack;
 use crate::ui::NameCollectionDialog;
 
@@ -17,30 +17,30 @@ async fn dialog_name_collection(
 ) -> Option<String> {
 	// prepare the dialog
 	let modal = modal_stack.modal(|| NameCollectionDialog::new().unwrap());
-	let single_result = SingleResult::default();
+	let (tx, mut rx) = mpsc::channel(1);
 
 	// set the title and default name
 	modal.dialog().set_title_text(title.into());
 	modal.dialog().invoke_set_text(default_name.into());
 
 	// set up the "ok" button
-	let signaller = single_result.signaller();
+	let tx_clone = tx.clone();
 	let dialog_weak = modal.dialog().as_weak();
 	modal.dialog().on_ok_clicked(move || {
 		let text = dialog_weak.unwrap().get_text().to_string();
-		signaller.signal(Some(text));
+		tx_clone.signal(Some(text));
 	});
 
 	// set up the "cancel" button
-	let signaller = single_result.signaller();
+	let tx_clone = tx.clone();
 	modal.dialog().on_cancel_clicked(move || {
-		signaller.signal(None);
+		tx_clone.signal(None);
 	});
 
 	// set up the close handler
-	let signaller = single_result.signaller();
+	let tx_clone = tx.clone();
 	modal.window().on_close_requested(move || {
-		signaller.signal(None);
+		tx_clone.signal(None);
 		CloseRequestResponse::KeepWindowShown
 	});
 
@@ -52,7 +52,7 @@ async fn dialog_name_collection(
 	});
 
 	// show the dialog and wait for completion
-	modal.run(async { single_result.wait().await }).await
+	modal.run(async { rx.recv().await.unwrap() }).await
 }
 
 pub async fn dialog_new_collection(modal_stack: ModalStack, existing_names: Vec<String>) -> Option<String> {

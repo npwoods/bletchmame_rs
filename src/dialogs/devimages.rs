@@ -2,12 +2,13 @@ use slint::CloseRequestResponse;
 use slint::ComponentHandle;
 use slint::LogicalPosition;
 use slint::ModelRc;
+use tokio::sync::mpsc;
 
 use crate::appcommand::AppCommand;
 use crate::channel::Channel;
 use crate::devimageconfig::DevicesImagesConfig;
 use crate::devimageconfig::EntryDetails;
-use crate::dialogs::SingleResult;
+use crate::dialogs::SenderExt;
 use crate::guiutils::modal::ModalStack;
 use crate::models::devimages::DevicesAndImagesModel;
 use crate::runtime::command::MameCommand;
@@ -24,7 +25,7 @@ pub async fn dialog_devices_and_images(
 ) {
 	// prepare the dialog
 	let modal = modal_stack.modal(|| DevicesAndImagesDialog::new().unwrap());
-	let single_result = SingleResult::default();
+	let (tx, mut rx) = mpsc::channel(1);
 
 	// set up the model
 	let model = DevicesAndImagesModel::new(diconfig);
@@ -37,9 +38,9 @@ pub async fn dialog_devices_and_images(
 	modal.dialog().set_state(state);
 
 	// set up the "ok" button
-	let signaller = single_result.signaller();
+	let tx_clone = tx.clone();
 	modal.dialog().on_ok_clicked(move || {
-		signaller.signal(());
+		tx_clone.signal(());
 	});
 
 	// set up the "apply changes" button
@@ -53,9 +54,9 @@ pub async fn dialog_devices_and_images(
 	});
 
 	// set up the close handler
-	let signaller = single_result.signaller();
+	let tx_clone = tx.clone();
 	modal.window().on_close_requested(move || {
-		signaller.signal(());
+		tx_clone.signal(());
 		CloseRequestResponse::KeepWindowShown
 	});
 
@@ -101,7 +102,7 @@ pub async fn dialog_devices_and_images(
 	});
 
 	// present the modal dialog
-	modal.run(async { single_result.wait().await }).await;
+	modal.run(async { rx.recv().await.unwrap() }).await;
 }
 
 /// Hackishly exposing as `pub` so that this can be shared with the configure machine dialog
