@@ -1097,23 +1097,35 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			})
 		}
 		AppCommand::LoadImageDialog { tag } => {
-			let state = model.state.borrow();
-			let image = state
-				.status()
-				.and_then(|s| s.running.as_ref())
-				.unwrap()
-				.images
-				.iter()
-				.find(|x| x.tag == tag)
-				.unwrap();
-			let format_iter = image.details.formats.iter().map(|f| Format {
-				description: &f.description,
-				extensions: &f.extensions,
-			});
-			if let Some(filename) = dialog_load_image(model.modal_stack.clone(), format_iter) {
-				let command = MameCommand::load_image(tag, &filename).into();
-				handle_command(model, command);
-			}
+			let formats = {
+				let state = model.state.borrow();
+				let image = state
+					.status()
+					.and_then(|s| s.running.as_ref())
+					.unwrap()
+					.images
+					.iter()
+					.find(|x| x.tag == tag)
+					.unwrap();
+				image
+					.details
+					.formats
+					.iter()
+					.map(|f| Format {
+						description: f.description.to_string(),
+						extensions: f.extensions.clone(),
+					})
+					.collect::<Vec<_>>()
+			};
+
+			let model_clone = model.clone();
+			let fut = async move {
+				if let Some(filename) = dialog_load_image(model_clone.modal_stack.clone(), &formats).await {
+					let command = MameCommand::load_image(tag, &filename).into();
+					handle_command(&model_clone, command);
+				}
+			};
+			spawn_local(fut).unwrap();
 		}
 		AppCommand::UnloadImage { tag } => {
 			model.issue_command(MameCommand::unload_image(&tag));

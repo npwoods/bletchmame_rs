@@ -8,6 +8,7 @@ use slint::CloseRequestResponse;
 use slint::ComponentHandle;
 use slint::PhysicalPosition;
 use slint::Window;
+use slint::WindowHandle;
 use winit::event::WindowEvent;
 use winit::window::WindowAttributes;
 
@@ -99,6 +100,10 @@ impl ModalStack {
 			reenable_parent,
 			dialog,
 		}
+	}
+
+	pub fn top(&self) -> WindowHandle {
+		self.0.borrow().last().unwrap().unwrap().window().window_handle()
 	}
 }
 
