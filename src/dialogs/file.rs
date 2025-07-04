@@ -4,13 +4,13 @@ use std::path::Path;
 
 use rfd::AsyncFileDialog;
 use rfd::FileHandle;
-use slint::ComponentHandle;
+use slint::WindowHandle;
 
 use crate::prefs::pathtype::PathType;
 use crate::prefs::pathtype::PickType;
 
 pub async fn choose_path_by_type_dialog(
-	parent: &impl ComponentHandle,
+	parent: WindowHandle,
 	path_type: PathType,
 	initial: Option<&Path>,
 ) -> Option<String> {
@@ -28,7 +28,7 @@ pub async fn choose_path_by_type_dialog(
 }
 
 pub async fn load_file_dialog(
-	parent: &impl ComponentHandle,
+	parent: WindowHandle,
 	title: &str,
 	file_types: &[(Option<&str>, &str)],
 	initial_dir: Option<&Path>,
@@ -42,7 +42,7 @@ pub async fn load_file_dialog(
 }
 
 pub async fn save_file_dialog(
-	parent: &impl ComponentHandle,
+	parent: WindowHandle,
 	title: &str,
 	file_types: &[(Option<&str>, &str)],
 	initial_dir: Option<&Path>,
@@ -55,8 +55,8 @@ pub async fn save_file_dialog(
 	dialog.save_file().await.map(string_from_filehandle_lossy)
 }
 
-fn create_file_dialog(parent: &impl ComponentHandle) -> AsyncFileDialog {
-	AsyncFileDialog::new().set_parent(&parent.window().window_handle())
+fn create_file_dialog(parent: WindowHandle) -> AsyncFileDialog {
+	AsyncFileDialog::new().set_parent(&parent)
 }
 
 fn set_file_dialog_file_types(mut dialog: AsyncFileDialog, file_types: &[(Option<&str>, &str)]) -> AsyncFileDialog {
