@@ -945,7 +945,11 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			});
 		}
 		AppCommand::SettingsReset => model.modify_prefs(|prefs| {
-			let prefs_path = model.state.borrow().prefs_path().to_str().map(|x| x.to_string());
+			let prefs_path = {
+				let state = model.state.borrow();
+				let _ = prefs.save_backup(state.prefs_path());
+				state.prefs_path().to_str().map(str::to_string)
+			};
 			*prefs = Preferences::fresh(prefs_path);
 		}),
 		AppCommand::HelpRefreshInfoDb => {

@@ -366,6 +366,12 @@ impl Preferences {
 		save_prefs(self, &path)
 	}
 
+	pub fn save_backup(&self, prefs_path: &Path) -> Result<()> {
+		ensure_directory(&prefs_path);
+		let path = prefs_filename(prefs_path, PREFS_BACKUP)?;
+		save_prefs(self, &path)
+	}
+
 	pub fn fresh(prefs_path: Option<String>) -> Self {
 		let json = include_str!("prefs_fresh.json");
 		let mut result = load_prefs_from_reader(json.as_bytes()).unwrap();
