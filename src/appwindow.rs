@@ -749,11 +749,10 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				let (initial_dir, initial_file) =
 					initial_dir_and_file_from_path(last_save_state.as_deref().map(Path::new));
 
+				let parent = model_clone.app_window().window().window_handle();
 				let title = "Load State";
 				let file_types = SAVE_STATE_FILE_TYPES;
-				if let Some(filename) =
-					load_file_dialog(&model_clone.app_window(), title, file_types, initial_dir, initial_file).await
-				{
+				if let Some(filename) = load_file_dialog(parent, title, file_types, initial_dir, initial_file).await {
 					model_clone.issue_command(MameCommand::state_load(&filename));
 					model_clone.update_state(|state| Some(state.set_last_save_state(Some(filename.into()))));
 				}
@@ -777,11 +776,10 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				};
 				let initial_file = initial_file.as_deref();
 
+				let parent = model_clone.app_window().window().window_handle();
 				let title = "Save State";
 				let file_types = SAVE_STATE_FILE_TYPES;
-				if let Some(filename) =
-					save_file_dialog(&model_clone.app_window(), title, file_types, initial_dir, initial_file).await
-				{
+				if let Some(filename) = save_file_dialog(parent, title, file_types, initial_dir, initial_file).await {
 					model_clone.issue_command(MameCommand::state_save(&filename));
 					model_clone.update_state(|state| Some(state.set_last_save_state(Some(filename.into()))));
 				}
@@ -792,11 +790,12 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			let model_clone = model.clone();
 			let fut = async move {
 				let model = model_clone.as_ref();
+				let parent = model_clone.app_window().window().window_handle();
 				let title = "Save Screenshot";
 				let file_types = [(None, "png")];
 				let initial_file = model.suggested_initial_save_filename("png");
 				if let Some(filename) =
-					save_file_dialog(&model.app_window(), title, &file_types, None, initial_file.as_deref()).await
+					save_file_dialog(parent, title, &file_types, None, initial_file.as_deref()).await
 				{
 					model.issue_command(MameCommand::save_snapshot(0, &filename));
 				}
@@ -821,12 +820,13 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				let model_clone = model.clone();
 				let fut = async move {
 					let model = model_clone.as_ref();
+					let parent = model.app_window().window().window_handle();
 					let title = "Record Movie";
 					let file_types = MovieFormat::iter().map(|x| x.to_string()).collect::<Vec<_>>();
 					let file_types = file_types.iter().map(|ext| (None, ext.as_str())).collect::<Vec<_>>();
 					let initial_file = model.suggested_initial_save_filename(&MovieFormat::default().to_string());
 					if let Some(filename) =
-						save_file_dialog(&model.app_window(), title, &file_types, None, initial_file.as_deref()).await
+						save_file_dialog(parent, title, &file_types, None, initial_file.as_deref()).await
 					{
 						let movie_format = MovieFormat::try_from(Path::new(&filename)).unwrap_or_default();
 						model.issue_command(MameCommand::begin_recording(&filename, movie_format));
@@ -1097,23 +1097,35 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			})
 		}
 		AppCommand::LoadImageDialog { tag } => {
-			let state = model.state.borrow();
-			let image = state
-				.status()
-				.and_then(|s| s.running.as_ref())
-				.unwrap()
-				.images
-				.iter()
-				.find(|x| x.tag == tag)
-				.unwrap();
-			let format_iter = image.details.formats.iter().map(|f| Format {
-				description: &f.description,
-				extensions: &f.extensions,
-			});
-			if let Some(filename) = dialog_load_image(model.modal_stack.clone(), format_iter) {
-				let command = MameCommand::load_image(tag, &filename).into();
-				handle_command(model, command);
-			}
+			let formats = {
+				let state = model.state.borrow();
+				let image = state
+					.status()
+					.and_then(|s| s.running.as_ref())
+					.unwrap()
+					.images
+					.iter()
+					.find(|x| x.tag == tag)
+					.unwrap();
+				image
+					.details
+					.formats
+					.iter()
+					.map(|f| Format {
+						description: f.description.to_string(),
+						extensions: f.extensions.clone(),
+					})
+					.collect::<Vec<_>>()
+			};
+
+			let model_clone = model.clone();
+			let fut = async move {
+				if let Some(filename) = dialog_load_image(model_clone.modal_stack.clone(), &formats).await {
+					let command = MameCommand::load_image(tag, &filename).into();
+					handle_command(&model_clone, command);
+				}
+			};
+			spawn_local(fut).unwrap();
 		}
 		AppCommand::UnloadImage { tag } => {
 			model.issue_command(MameCommand::unload_image(&tag));

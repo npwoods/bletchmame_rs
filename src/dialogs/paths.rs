@@ -197,7 +197,8 @@ async fn browse_clicked(state: Rc<State>) {
 	);
 
 	// show the file dialog
-	let Some(path) = choose_path_by_type_dialog(&dialog, path_type, resolved_existing_path).await else {
+	let parent = dialog.window().window_handle();
+	let Some(path) = choose_path_by_type_dialog(parent, path_type, resolved_existing_path).await else {
 		return;
 	};
 	let Ok(row) = usize::try_from(dialog.get_path_entry_index()) else {

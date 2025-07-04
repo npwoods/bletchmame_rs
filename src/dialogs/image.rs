@@ -1,24 +1,25 @@
-use rfd::FileDialog;
+use rfd::AsyncFileDialog;
 
 use crate::guiutils::modal::ModalStack;
 
 #[derive(Clone, Debug)]
-pub struct Format<'a> {
-	pub description: &'a str,
-	pub extensions: &'a [String],
+pub struct Format {
+	pub description: String,
+	pub extensions: Vec<String>,
 }
 
-pub fn dialog_load_image<'a>(
-	_modal_stack: ModalStack,
-	format_iter: impl Iterator<Item = Format<'a>> + Clone,
-) -> Option<String> {
-	let all_extensions = format_iter.clone().flat_map(|f| f.extensions).collect::<Vec<_>>();
+pub async fn dialog_load_image(modal_stack: ModalStack, formats: &[Format]) -> Option<String> {
+	let all_extensions = formats.iter().flat_map(|f| f.extensions.clone()).collect::<Vec<_>>();
 
-	let dialog = FileDialog::new();
+	let parent = modal_stack.top();
+	let dialog = AsyncFileDialog::new();
+	let dialog = dialog.set_parent(&parent);
 	let dialog = dialog.add_filter("All Formats", &all_extensions);
-	let dialog = format_iter.fold(dialog, |dialog, fmt| dialog.add_filter(fmt.description, fmt.extensions));
+	let dialog = formats.iter().fold(dialog, |dialog, fmt| {
+		dialog.add_filter(fmt.description.clone(), &fmt.extensions)
+	});
 
-	let filename = dialog.pick_file()?;
-	let filename = filename.into_os_string().into_string().unwrap();
+	let filename = dialog.pick_file().await?;
+	let filename = filename.file_name();
 	Some(filename)
 }

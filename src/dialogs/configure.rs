@@ -258,14 +258,17 @@ fn context_menu_command(state: &Rc<State>, command: AppCommand) {
 				(filename, extensions)
 			});
 
-			let formats = [Format {
-				description: "Image File",
-				extensions: &extensions,
-			}];
-			let format_iter = formats.iter().cloned();
-			if let Some(filename) = dialog_load_image(state.modal_stack.clone(), format_iter) {
-				state.set_image_filename(tag, Some(filename));
-			}
+			let state = state.clone();
+			let fut = async move {
+				let formats = [Format {
+					description: "Image File".to_string(),
+					extensions,
+				}];
+				if let Some(filename) = dialog_load_image(state.modal_stack.clone(), &formats).await {
+					state.set_image_filename(tag, Some(filename));
+				}
+			};
+			spawn_local(fut).unwrap();
 		}
 		AppCommand::ConnectToSocketDialog { tag } => {
 			let state = state.clone();
