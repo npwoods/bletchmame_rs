@@ -102,6 +102,9 @@ impl WinitBackendRuntime {
 		// and await the result
 		let child_window = receiver.await??;
 
+		// set inactive
+		child_window.set_active(false);
+
 		// wrap it up in an Rc and add it to "live"
 		let result = Rc::new(child_window);
 		self.0.borrow_mut().live.push(result.clone());
@@ -164,7 +167,7 @@ impl CustomApplicationHandler for WinitBackendRuntime {
 		// tracing
 		let span = info_span!("window_event");
 		let _guard = span.enter();
-		debug!(event=?event, "window_event");
+		debug!(event=?event, window_id=?window_id, "window_event");
 
 		// take this opportunity to create pending children, regardless of what is going on
 		self.create_pending_child_windows(event_loop);
@@ -258,6 +261,9 @@ impl WinitChildWindow {
 
 	pub fn set_active(&self, active: bool) {
 		self.window.set_visible(active);
+
+		#[cfg(target_family = "windows")]
+		winit::platform::windows::WindowExtWindows::set_enable(&self.window, active);
 	}
 
 	pub fn set_position_and_size(&self, position: dpi::PhysicalPosition<u32>, size: dpi::PhysicalSize<u32>) {
