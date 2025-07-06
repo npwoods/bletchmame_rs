@@ -20,11 +20,25 @@ impl MameCommand {
 		self.0.as_ref()
 	}
 
-	pub fn start(machine_name: &str, initial_loads: &[(impl AsRef<str>, impl AsRef<str>)]) -> Self {
+	pub fn start(
+		machine_name: &str,
+		ram_size: Option<u64>,
+		initial_loads: &[(impl AsRef<str>, impl AsRef<str>)],
+	) -> Self {
+		let ram_size_string = ram_size.as_ref().map(u64::to_string).unwrap_or_default();
+		let ram_size_args = ["-ramsize", ram_size_string.as_str()];
+		let ram_size_args = if ram_size.is_some() {
+			ram_size_args.as_slice()
+		} else {
+			Default::default()
+		};
+
 		let initial_loads = initial_loads
 			.iter()
 			.flat_map(|(tag, filename)| [tag.as_ref(), filename.as_ref()]);
-		let args = once(machine_name).chain(initial_loads);
+		let args = once(machine_name)
+			.chain(ram_size_args.iter().copied())
+			.chain(initial_loads);
 		build("START", args)
 	}
 
@@ -261,11 +275,13 @@ mod test {
 
 	use super::MameCommand;
 
+	const EMPTY: &[(&str, &str)] = &[];
+
 	#[rustfmt::skip]
 	#[test_case(0, MameCommand::stop(), "STOP")]
-	#[test_case(1, MameCommand::start("coco2b", &[("-ramsize", "")]), "START coco2b -ramsize \"\"")]
-	#[test_case(2, MameCommand::start("coco2b", &[("-ramsize", "64k")]), "START coco2b -ramsize 64k")]
-	#[test_case(3, MameCommand::start("coco2b", &[("ext:fdc:wd17xx:0", "foo.dsk")]), "START coco2b ext:fdc:wd17xx:0 foo.dsk")]
+	#[test_case(1, MameCommand::start("coco2b", None, EMPTY), "START coco2b")]
+	#[test_case(2, MameCommand::start("coco2b", Some(0x10000), EMPTY), "START coco2b -ramsize 65536")]
+	#[test_case(3, MameCommand::start("coco2b", None, &[("ext:fdc:wd17xx:0", "foo.dsk")]), "START coco2b ext:fdc:wd17xx:0 foo.dsk")]
 	#[test_case(4, MameCommand::load_image("ext:fdc:wd17xx:0", "foo bar.dsk"), "LOAD ext:fdc:wd17xx:0 \"foo bar.dsk\"")]
 	#[test_case(5, MameCommand::load_images(&[("ext:fdc:wd17xx:0", "foo bar.dsk")]), "LOAD ext:fdc:wd17xx:0 \"foo bar.dsk\"")]
 	#[test_case(6, MameCommand::seq_set(&[("foobar", 0x20, SeqType::Standard, "KEYCODE_X or KEYCODE_Y")]), "SEQ_SET foobar 32 standard \"KEYCODE_X or KEYCODE_Y\"")]

@@ -264,8 +264,9 @@ fn context_menu_command(state: &Rc<State>, command: AppCommand) {
 					description: "Image File".to_string(),
 					extensions,
 				}];
-				if let Some(filename) = dialog_load_image(state.modal_stack.clone(), &formats).await {
-					state.set_image_filename(tag, Some(filename));
+				if let Some(image_desc) = dialog_load_image(state.modal_stack.clone(), &formats).await {
+					let new_filename = Some(image_desc.encode().into());
+					state.set_image_filename(tag, new_filename);
 				}
 			};
 			spawn_local(fut).unwrap();
@@ -273,9 +274,9 @@ fn context_menu_command(state: &Rc<State>, command: AppCommand) {
 		AppCommand::ConnectToSocketDialog { tag } => {
 			let state = state.clone();
 			let fut = async move {
-				if let Some((hostname, port)) = dialog_connect_to_socket(state.modal_stack.clone()).await {
-					let filename = format!("socket.{hostname}:{port}");
-					state.set_image_filename(tag, Some(filename));
+				if let Some(image_desc) = dialog_connect_to_socket(state.modal_stack.clone()).await {
+					let new_filename = Some(image_desc.encode().into());
+					state.set_image_filename(tag, new_filename);
 				}
 			};
 			spawn_local(fut).unwrap();

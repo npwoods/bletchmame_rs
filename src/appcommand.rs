@@ -65,6 +65,11 @@ pub enum AppCommand {
 	ErrorMessageBox(String),
 
 	// Other
+	Start {
+		machine_name: String,
+		ram_size: Option<u64>,
+		initial_loads: Vec<(Arc<str>, Arc<str>)>,
+	},
 	IssueMameCommand(MameCommand),
 	Browse(PrefsCollection),
 	HistoryAdvance(isize),

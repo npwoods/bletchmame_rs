@@ -4,7 +4,6 @@ use std::cell::Cell;
 use std::cell::RefCell;
 use std::cmp::Reverse;
 use std::collections::HashMap;
-use std::iter::once;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Instant;
@@ -40,7 +39,6 @@ use crate::prefs::PrefsItem;
 use crate::prefs::PrefsMachineItem;
 use crate::prefs::PrefsSoftwareItem;
 use crate::prefs::SortOrder;
-use crate::runtime::command::MameCommand;
 use crate::selection::SelectionManager;
 use crate::software::Software;
 use crate::software::SoftwareList;
@@ -61,7 +59,6 @@ pub struct ItemsTableModel {
 
 	selection: SelectionManager,
 	empty_callback: Box<dyn Fn(Option<EmptyReason>) + 'static>,
-	ramsize_arg_string: Arc<str>,
 	notify: ModelNotify,
 }
 
@@ -86,7 +83,6 @@ impl ItemsTableModel {
 
 			selection,
 			empty_callback: Box::new(empty_callback),
-			ramsize_arg_string: "-ramsize".into(),
 			notify: ModelNotify::default(),
 		};
 		Rc::new(result)
@@ -336,26 +332,18 @@ impl ItemsTableModel {
 				ram_size,
 			} => {
 				let machine = machine_config.machine();
-				let ramsize_arg = (
-					self.ramsize_arg_string.clone(),
-					ram_size.as_ref().map(u64::to_string).unwrap_or_default(),
-				);
-				let initial_loads = once(ramsize_arg)
-					.chain(
-						machine_config
-							.changed_slots(None)
-							.into_iter()
-							.map(|(slot_name, slot_value)| {
-								(format!("&{slot_name}").into(), slot_value.unwrap_or_default())
-							}),
-					)
-					.chain(
-						images
-							.iter()
-							.map(|(tag, filename)| (tag.as_str().into(), filename.as_str().into())),
-					)
-					.collect::<Vec<_>>();
-				let command = has_mame_initialized.then(|| AppCommand::start_machine(&machine, &initial_loads));
+				let slot_args = machine_config
+					.changed_slots(None)
+					.into_iter()
+					.map(|(slot_name, slot_value)| {
+						(format!("&{slot_name}").into(), slot_value.unwrap_or_default().into())
+					});
+				let image_args = images
+					.iter()
+					.map(|(tag, filename)| (tag.as_str().into(), Arc::from(filename.as_str())));
+				let initial_loads = slot_args.chain(image_args).collect::<Vec<_>>();
+				let command =
+					has_mame_initialized.then(|| AppCommand::start_machine(&machine, *ram_size, initial_loads));
 				let title = run_item_text(machine.description()).into();
 				let browse_target =
 					(!machine.machine_software_lists().is_empty()).then(|| PrefsCollection::MachineSoftware {
@@ -390,8 +378,8 @@ impl ItemsTableModel {
 							})
 							.collect::<std::result::Result<Vec<_>, ()>>();
 
-						parts_with_devices.ok().map(|initial_loads| {
-							let command = Some(AppCommand::start_machine(&machine, &initial_loads));
+						parts_with_devices.ok().map(|initial_loads: Vec<(Arc<str>, Arc<str>)>| {
+							let command = Some(AppCommand::start_machine(&machine, None, initial_loads));
 							let title = machine.description().into();
 							MenuDesc { command, title }
 						})
@@ -900,9 +888,16 @@ impl MenuDesc {
 
 #[ext]
 impl AppCommand {
-	pub fn start_machine(machine: &Machine, initial_loads: &[(impl AsRef<str>, impl AsRef<str>)]) -> Self {
-		let name = machine.name();
-		assert!(machine.runnable(), "should not get here; {name:?} is not runnable");
-		MameCommand::start(name, initial_loads).into()
+	pub fn start_machine(machine: &Machine, ram_size: Option<u64>, initial_loads: Vec<(Arc<str>, Arc<str>)>) -> Self {
+		let machine_name = machine.name().into();
+		assert!(
+			machine.runnable(),
+			"should not get here; {machine_name:?} is not runnable"
+		);
+		AppCommand::Start {
+			machine_name,
+			ram_size,
+			initial_loads,
+		}
 	}
 }
