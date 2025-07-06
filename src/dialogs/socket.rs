@@ -4,9 +4,10 @@ use tokio::sync::mpsc;
 
 use crate::dialogs::SenderExt;
 use crate::guiutils::modal::ModalStack;
+use crate::imagedesc::ImageDesc;
 use crate::ui::ConnectToSocketDialog;
 
-pub async fn dialog_connect_to_socket(modal_stack: ModalStack) -> Option<(String, u16)> {
+pub async fn dialog_connect_to_socket(modal_stack: ModalStack) -> Option<ImageDesc<String>> {
 	// prepare the dialog
 	let modal = modal_stack.modal(|| ConnectToSocketDialog::new().unwrap());
 	let (tx, mut rx) = mpsc::channel(1);
@@ -53,10 +54,13 @@ fn update_can_accept(dialog: &ConnectToSocketDialog) {
 	dialog.set_can_accept(is_enabled);
 }
 
-fn get_results(dialog: &ConnectToSocketDialog) -> Option<(String, u16)> {
+fn get_results(dialog: &ConnectToSocketDialog) -> Option<ImageDesc<String>> {
 	let host_text = dialog.get_host_text();
 	let port_text = dialog.get_port_text();
 	let port = port_text.parse().ok()?;
 	let is_valid = hostname_validator::is_valid(&host_text);
-	is_valid.then(|| (host_text.into(), port))
+	is_valid.then(|| ImageDesc::Socket {
+		hostname: host_text.into(),
+		port,
+	})
 }

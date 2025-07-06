@@ -12,6 +12,7 @@ mod dialogs;
 mod guiutils;
 mod history;
 mod icon;
+mod imagedesc;
 mod info;
 mod job;
 mod mconfig;

@@ -1,6 +1,7 @@
 use rfd::AsyncFileDialog;
 
 use crate::guiutils::modal::ModalStack;
+use crate::imagedesc::ImageDesc;
 
 #[derive(Clone, Debug)]
 pub struct Format {
@@ -8,7 +9,7 @@ pub struct Format {
 	pub extensions: Vec<String>,
 }
 
-pub async fn dialog_load_image(modal_stack: ModalStack, formats: &[Format]) -> Option<String> {
+pub async fn dialog_load_image(modal_stack: ModalStack, formats: &[Format]) -> Option<ImageDesc<String>> {
 	let all_extensions = formats.iter().flat_map(|f| f.extensions.clone()).collect::<Vec<_>>();
 
 	let parent = modal_stack.top();
@@ -21,5 +22,5 @@ pub async fn dialog_load_image(modal_stack: ModalStack, formats: &[Format]) -> O
 
 	let filename = dialog.pick_file().await?;
 	let filename = filename.file_name();
-	Some(filename)
+	Some(ImageDesc::File(filename))
 }
