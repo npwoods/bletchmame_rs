@@ -981,6 +981,14 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			let fut = dialog_message_box::<OkOnly>(model_clone.modal_stack.clone(), "Error", message);
 			spawn_local(fut).unwrap();
 		}
+		AppCommand::Start {
+			machine_name,
+			ram_size,
+			initial_loads,
+		} => {
+			let command = MameCommand::start(&machine_name, ram_size, &initial_loads).into();
+			handle_command(model, command);
+		}
 		AppCommand::IssueMameCommand(command) => {
 			model.issue_command(command);
 		}
