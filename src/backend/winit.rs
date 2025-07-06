@@ -103,7 +103,7 @@ impl WinitBackendRuntime {
 		let child_window = receiver.await??;
 
 		// set inactive
-		child_window.set_active(false);
+		child_window.do_set_active(false);
 
 		// wrap it up in an Rc and add it to "live"
 		let result = Rc::new(child_window);
@@ -260,10 +260,18 @@ impl WinitChildWindow {
 	}
 
 	pub fn set_active(&self, active: bool) {
+		if active != self.is_active() {
+			self.do_set_active(active);
+		}
+	}
+
+	fn do_set_active(&self, active: bool) {
 		self.window.set_visible(active);
 
 		#[cfg(target_family = "windows")]
 		winit::platform::windows::WindowExtWindows::set_enable(&self.window, active);
+
+		self.fix_focus();
 	}
 
 	pub fn set_position_and_size(&self, position: dpi::PhysicalPosition<u32>, size: dpi::PhysicalSize<u32>) {
