@@ -59,8 +59,5 @@ fn get_results(dialog: &ConnectToSocketDialog) -> Option<ImageDesc<String>> {
 	let port_text = dialog.get_port_text();
 	let port = port_text.parse().ok()?;
 	let is_valid = hostname_validator::is_valid(&host_text);
-	is_valid.then(|| ImageDesc::Socket {
-		hostname: host_text.into(),
-		port,
-	})
+	is_valid.then(|| ImageDesc::socket(host_text.into(), port))
 }

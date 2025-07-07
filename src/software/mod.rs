@@ -146,3 +146,7 @@ fn load_software_list(paths: &[String], name: &str, string_dispenser: &StringDis
 		.next()
 		.ok_or(err)
 }
+
+pub fn is_valid_software_list_name(s: &str) -> bool {
+	s.chars().all(|c| c.is_ascii_digit() || c.is_ascii_lowercase())
+}

@@ -3,10 +3,12 @@ use std::sync::Arc;
 
 use anyhow::Error;
 use anyhow::Result;
+use tracing::error;
 
 use crate::software::Software;
 use crate::software::SoftwareList;
 use crate::software::SoftwarePart;
+use crate::software::is_valid_software_list_name;
 use crate::software::strings::StringDispenser;
 use crate::xml::XmlElement;
 use crate::xml::XmlEvent;
@@ -64,8 +66,16 @@ impl<'a> State<'a> {
 			}
 			(Phase::SoftwareList, b"software") => {
 				let [name] = evt.find_attributes([b"name"])?;
-				let name = self.string_dispenser.get(&name.unwrap_or_default());
+				let Some(name) = name else {
+					error!("handle_start(): Missing name attribute");
+					return Ok(None);
+				};
+				if !is_valid_software_list_name(name.as_ref()) {
+					error!("handle_start(): Invalid software name {}", name.as_ref());
+					return Ok(None);
+				}
 
+				let name = self.string_dispenser.get(&name);
 				let software = Software {
 					name,
 					description: self.empty_str.clone(),
