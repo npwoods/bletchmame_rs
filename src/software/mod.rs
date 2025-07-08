@@ -148,5 +148,26 @@ fn load_software_list(paths: &[String], name: &str, string_dispenser: &StringDis
 }
 
 pub fn is_valid_software_list_name(s: &str) -> bool {
-	s.chars().all(|c| c.is_ascii_digit() || c.is_ascii_lowercase())
+	!s.is_empty()
+		&& s.chars()
+			.all(|c| c.is_ascii_digit() || c.is_ascii_lowercase() || c == '_')
+}
+
+#[cfg(test)]
+mod test {
+	use test_case::test_case;
+
+	#[test_case(0, "", false)]
+	#[test_case(1, "abcde", true)]
+	#[test_case(2, "Abcde", false)]
+	#[test_case(3, "ABCDE", false)]
+	#[test_case(4, "abcde_fghij", true)]
+	#[test_case(5, "abcde fghij", false)]
+	#[test_case(6, "foo.img", false)]
+	#[test_case(7, "/foo/bar.img", false)]
+	#[test_case(8, "C:\\foo\\bar.img", false)]
+	fn is_valid_software_list_name(_index: usize, s: &str, expected: bool) {
+		let actual = super::is_valid_software_list_name(s);
+		assert_eq!(expected, actual);
+	}
 }
