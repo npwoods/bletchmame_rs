@@ -9,7 +9,7 @@ pub struct Format {
 	pub extensions: Vec<String>,
 }
 
-pub async fn dialog_load_image(modal_stack: ModalStack, formats: &[Format]) -> Option<ImageDesc<String>> {
+pub async fn dialog_load_image(modal_stack: ModalStack, formats: &[Format]) -> Option<ImageDesc> {
 	let all_extensions = formats.iter().flat_map(|f| f.extensions.clone()).collect::<Vec<_>>();
 
 	let parent = modal_stack.top();

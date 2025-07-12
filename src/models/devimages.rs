@@ -1,7 +1,5 @@
 use std::any::Any;
-use std::borrow::Cow;
 use std::cell::RefCell;
-use std::path::Path;
 
 use slint::Model;
 use slint::ModelNotify;
@@ -12,6 +10,7 @@ use slint::VecModel;
 
 use crate::devimageconfig::DevicesImagesConfig;
 use crate::devimageconfig::EntryDetails;
+use crate::imagedesc::ImageDesc;
 use crate::ui::DeviceAndImageEntry;
 
 pub struct DevicesAndImagesModel {
@@ -111,13 +110,13 @@ impl Model for DevicesAndImagesModel {
 				let current_option_index = current_option_index.try_into().unwrap();
 				(options, current_option_index, "".into())
 			}
-			EntryDetails::Image { filename } => {
-				let filename = filename.map(|x| match Path::new(x).file_name() {
-					Some(x) => x.to_string_lossy(),
-					None => Cow::Borrowed(x),
-				});
-				let filename = filename.unwrap_or_default().as_ref().into();
-				(Vec::default(), -1, filename)
+			EntryDetails::Image { image_desc } => {
+				let display_name = image_desc
+					.map(ImageDesc::display_name)
+					.unwrap_or_default()
+					.as_ref()
+					.into();
+				(Vec::default(), -1, display_name)
 			}
 		};
 

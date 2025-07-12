@@ -14,6 +14,7 @@ use crate::prefs::PrefsCollection;
 use crate::prefs::PrefsItem;
 use crate::prefs::SortOrder;
 use crate::prefs::pathtype::PathType;
+use crate::runtime::MameStartArgs;
 use crate::runtime::command::MameCommand;
 use crate::runtime::command::SeqType;
 use crate::status::InputClass;
@@ -65,11 +66,7 @@ pub enum AppCommand {
 	ErrorMessageBox(String),
 
 	// Other
-	Start {
-		machine_name: String,
-		ram_size: Option<u64>,
-		initial_loads: Vec<(Arc<str>, Arc<str>)>,
-	},
+	Start(MameStartArgs),
 	IssueMameCommand(MameCommand),
 	Browse(PrefsCollection),
 	HistoryAdvance(isize),

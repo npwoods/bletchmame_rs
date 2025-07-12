@@ -6,6 +6,7 @@ use anyhow::Error;
 use anyhow::Result;
 use tracing::debug;
 
+use crate::imagedesc::ImageDesc;
 use crate::parse::normalize_tag;
 use crate::parse::parse_mame_bool;
 use crate::runtime::command::SeqType;
@@ -149,13 +150,18 @@ impl State {
 				Some(Phase::StatusInputDevices)
 			}
 			(Phase::StatusImages, b"image") => {
-				let [tag, filename] = evt.find_attributes([b"tag", b"filename"])?;
+				let [tag, filename, loaded_through_softlist] =
+					evt.find_attributes([b"tag", b"filename", b"loaded_through_softlist"])?;
 				let tag = tag.ok_or(ThisError::MissingMandatoryAttribute("tag"))?;
 				let tag = normalize_tag(tag).to_string();
-				let filename = filename.map(|x| x.into_owned());
+				let loaded_through_softlist = loaded_through_softlist.map(parse_mame_bool).transpose()?;
+				let image_desc = filename
+					.map(|desc| ImageDesc::from_mame_image_desc(desc, loaded_through_softlist))
+					.transpose()?;
+
 				let image = ImageUpdate {
 					tag,
-					filename,
+					image_desc,
 					details: None,
 				};
 				self.running.images.as_mut().unwrap().push(image);

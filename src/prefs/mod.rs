@@ -32,6 +32,7 @@ use tracing::info;
 
 use crate::history::History;
 use crate::icon::Icon;
+use crate::imagedesc::ImageDesc;
 use crate::info::InfoDb;
 use crate::prefs::pathtype::PathType;
 use crate::prefs::pathtype::PickType;
@@ -320,7 +321,7 @@ pub struct PrefsMachineItem {
 	pub slots: Vec<(String, Option<String>)>,
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
-	pub images: HashMap<String, String>,
+	pub images: HashMap<String, ImageDesc>,
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub ram_size: Option<u64>,

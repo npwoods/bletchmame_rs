@@ -10,7 +10,6 @@ use std::rc::Rc;
 use std::str::FromStr;
 use std::time::Instant;
 
-use itertools::Itertools;
 use muda::accelerator::Accelerator;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
@@ -69,7 +68,6 @@ use crate::guiutils::menuing::MenuItemUpdate;
 use crate::guiutils::menuing::accel;
 use crate::guiutils::modal::ModalStack;
 use crate::history::History;
-use crate::imagedesc::ImageDesc;
 use crate::models::collectionsview::CollectionsViewModel;
 use crate::models::itemstable::EmptyReason;
 use crate::models::itemstable::ItemsTableModel;
@@ -983,31 +981,19 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			let fut = dialog_message_box::<OkOnly>(model_clone.modal_stack.clone(), "Error", message);
 			spawn_local(fut).unwrap();
 		}
-		AppCommand::Start {
-			machine_name,
-			ram_size,
-			initial_loads,
-		} => {
-			let validation_errors = initial_loads
-				.iter()
-				.map(|x| {
-					let image_desc = ImageDesc::try_from(x.1.as_ref())?;
-					image_desc.validate()
-				})
-				.filter_map(|x| x.err())
-				.map(|e| e.to_string())
-				.join("\n");
-			if validation_errors.is_empty() {
-				let command = MameCommand::start(&machine_name, ram_size, &initial_loads).into();
+		AppCommand::Start(start_args) => match start_args.preflight() {
+			Ok(_) => {
+				let command = MameCommand::start(&start_args).into();
 				handle_command(model, command);
-			} else {
-				let validation_errors = format!(
-					"The emulation could not be started due to the following problems:\n\n{validation_errors}",
-				);
-				let fut = dialog_message_box::<OkOnly>(model.modal_stack.clone(), "Error", validation_errors);
+			}
+			Err(errors) => {
+				let message = errors.into_iter().map(|e| e.to_string()).collect::<String>();
+				let message =
+					format!("The emulation could not be started due to the following problems:\n\n{message}",);
+				let fut = dialog_message_box::<OkOnly>(model.modal_stack.clone(), "Error", message);
 				spawn_local(fut).unwrap();
 			}
-		}
+		},
 		AppCommand::IssueMameCommand(command) => {
 			model.issue_command(command);
 		}
@@ -1148,8 +1134,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			let model_clone = model.clone();
 			let fut = async move {
 				if let Some(image_desc) = dialog_load_image(model_clone.modal_stack.clone(), &formats).await {
-					let filename = image_desc.encode();
-					let command = MameCommand::load_image(tag, &filename).into();
+					let command = MameCommand::load_image(tag, &image_desc).into();
 					handle_command(&model_clone, command);
 				}
 			};
@@ -1162,8 +1147,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			let model_clone = model.clone();
 			let fut = async move {
 				if let Some(image_desc) = dialog_connect_to_socket(model_clone.modal_stack.clone()).await {
-					let filename = image_desc.encode();
-					let command = MameCommand::load_image(tag, &filename).into();
+					let command = MameCommand::load_image(tag, &image_desc).into();
 					handle_command(&model_clone, command);
 				}
 			};

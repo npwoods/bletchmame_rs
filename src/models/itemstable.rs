@@ -10,7 +10,6 @@ use std::time::Instant;
 
 use anyhow::Error;
 use anyhow::Result;
-use easy_ext::ext;
 use itertools::Either;
 use itertools::Itertools;
 use levenshtein::levenshtein;
@@ -28,8 +27,8 @@ use tracing::info_span;
 use unicase::UniCase;
 
 use crate::appcommand::AppCommand;
+use crate::imagedesc::ImageDesc;
 use crate::info::InfoDb;
-use crate::info::Machine;
 use crate::info::View;
 use crate::mconfig::MachineConfig;
 use crate::prefs::BuiltinCollection;
@@ -39,6 +38,7 @@ use crate::prefs::PrefsItem;
 use crate::prefs::PrefsMachineItem;
 use crate::prefs::PrefsSoftwareItem;
 use crate::prefs::SortOrder;
+use crate::runtime::MameStartArgs;
 use crate::selection::SelectionManager;
 use crate::software::Software;
 use crate::software::SoftwareList;
@@ -332,18 +332,29 @@ impl ItemsTableModel {
 				ram_size,
 			} => {
 				let machine = machine_config.machine();
-				let slot_args = machine_config
+				assert!(machine.runnable());
+				let machine_name = machine.name().into();
+				let ram_size = *ram_size;
+
+				let slots = machine_config
 					.changed_slots(None)
 					.into_iter()
 					.map(|(slot_name, slot_value)| {
 						(format!("&{slot_name}").into(), slot_value.unwrap_or_default().into())
-					});
-				let image_args = images
+					})
+					.collect::<Vec<_>>();
+				let images = images
 					.iter()
-					.map(|(tag, filename)| (tag.as_str().into(), Arc::from(filename.as_str())));
-				let initial_loads = slot_args.chain(image_args).collect::<Vec<_>>();
-				let command =
-					has_mame_initialized.then(|| AppCommand::start_machine(&machine, *ram_size, initial_loads));
+					.map(|(tag, image_desc)| (tag.as_str().into(), image_desc.clone()))
+					.collect::<Vec<_>>();
+
+				let start_args = MameStartArgs {
+					machine_name,
+					ram_size,
+					slots,
+					images,
+				};
+				let command = has_mame_initialized.then_some(AppCommand::Start(start_args));
 				let title = run_item_text(machine.description()).into();
 				let browse_target =
 					(!machine.machine_software_lists().is_empty()).then(|| PrefsCollection::MachineSoftware {
@@ -363,6 +374,7 @@ impl ItemsTableModel {
 					.filter_map(|&index| {
 						// get the machine out of the InfoDB
 						let machine = info_db.machines().get(index).unwrap();
+						assert!(machine.runnable());
 
 						// identify all parts of the software
 						let parts_with_devices = software
@@ -373,13 +385,21 @@ impl ItemsTableModel {
 									.devices()
 									.iter()
 									.find(|dev| dev.interfaces().any(|x| x == part.interface.as_ref()))
-									.map(|dev| (Arc::<str>::from(dev.tag()), software.name.clone()))
+									.map(|dev| {
+										(Arc::<str>::from(dev.tag()), ImageDesc::Software(software.name.clone()))
+									})
 									.ok_or(())
 							})
 							.collect::<std::result::Result<Vec<_>, ()>>();
 
-						parts_with_devices.ok().map(|initial_loads: Vec<(Arc<str>, Arc<str>)>| {
-							let command = Some(AppCommand::start_machine(&machine, None, initial_loads));
+						parts_with_devices.ok().map(|images| {
+							let start_args = MameStartArgs {
+								machine_name: machine.name().into(),
+								ram_size: None,
+								slots: [].into(),
+								images,
+							};
+							let command = Some(AppCommand::Start(start_args));
 							let title = machine.description().into();
 							MenuDesc { command, title }
 						})
@@ -596,7 +616,7 @@ enum Item {
 	Machine {
 		// Commentary:  `MachineConfig` has its own `InfoDb`; maybe we need a lighter `MachineConfigPartial`?
 		machine_config: MachineConfig,
-		images: HashMap<String, String>,
+		images: HashMap<String, ImageDesc>,
 		ram_size: Option<u64>,
 	},
 	Software {
@@ -883,21 +903,5 @@ impl MenuDesc {
 				.unwrap_or_default(),
 			self.title,
 		)
-	}
-}
-
-#[ext]
-impl AppCommand {
-	pub fn start_machine(machine: &Machine, ram_size: Option<u64>, initial_loads: Vec<(Arc<str>, Arc<str>)>) -> Self {
-		let machine_name = machine.name().into();
-		assert!(
-			machine.runnable(),
-			"should not get here; {machine_name:?} is not runnable"
-		);
-		AppCommand::Start {
-			machine_name,
-			ram_size,
-			initial_loads,
-		}
 	}
 }

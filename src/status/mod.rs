@@ -16,6 +16,7 @@ use strum::EnumString;
 use tracing::debug;
 
 use crate::debugstr::DebugString;
+use crate::imagedesc::ImageDesc;
 use crate::info::InfoDb;
 use crate::status::parse::parse_update;
 use crate::status::validate::validate_status;
@@ -61,7 +62,7 @@ impl Status {
 
 						let new_status_image = Image {
 							tag: update_image.tag,
-							filename: update_image.filename,
+							image_desc: update_image.image_desc,
 							details,
 						};
 						Some(new_status_image)
@@ -131,7 +132,7 @@ pub struct Running {
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub struct Image {
 	pub tag: String,
-	pub filename: Option<String>,
+	pub image_desc: Option<ImageDesc>,
 	pub details: ImageDetails,
 }
 
@@ -201,7 +202,7 @@ struct RunningUpdate {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
 struct ImageUpdate {
 	pub tag: String,
-	pub filename: Option<String>,
+	pub image_desc: Option<ImageDesc>,
 	pub details: Option<ImageDetails>,
 }
 
