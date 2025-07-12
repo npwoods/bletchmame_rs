@@ -366,20 +366,22 @@ function emit_status(light, out)
 
 	-- abstractions to hide some differences between MAME 0.227 and
 	-- previous versions, similar to get_device_tag
-	local get_item_code, get_image_filename
+	local get_item_code, get_image_filename, get_loaded_through_softlist
 	local get_speed_percent, get_effective_frameskip, get_is_recording
 	if type(machine_video().speed_percent) == "function" then
-		get_item_code			= function(item) return item:code() end
-		get_image_filename		= function(image) return image:filename() end
-		get_speed_percent		= function() return machine_video():speed_percent() end
-		get_effective_frameskip	= function() return machine_video():effective_frameskip() end
-		get_is_recording		= function() return machine_video():is_recording() end
+		get_item_code				= function(item) return item:code() end
+		get_image_filename			= function(image) return image:filename() end
+		get_loaded_through_softlist	= function(image) return image:loaded_through_softlist() end
+		get_speed_percent			= function() return machine_video():speed_percent() end
+		get_effective_frameskip		= function() return machine_video():effective_frameskip() end
+		get_is_recording			= function() return machine_video():is_recording() end
 	else
-		get_item_code			= function(item) return item.code end
-		get_image_filename		= function(image) return image.filename end
-		get_speed_percent		= function() return machine_video().speed_percent end
-		get_effective_frameskip	= function() return machine_video().effective_frameskip end
-		get_is_recording		= function() return machine_video().is_recording end
+		get_item_code				= function(item) return item.code end
+		get_image_filename			= function(image) return image.filename end
+		get_loaded_through_softlist	= function(image) return image.loaded_through_softlist end
+		get_speed_percent			= function() return machine_video().speed_percent end
+		get_effective_frameskip		= function() return machine_video().effective_frameskip end
+		get_is_recording			= function() return machine_video().is_recording end
 	end
 
 	-- we don't always want to send details
@@ -482,6 +484,7 @@ function emit_status(light, out)
 			if filename == nil then
 				filename = ""
 			end
+			local loaded_through_softlist = get_loaded_through_softlist(image)
 
 			-- basic image properties
 			emit(string.format("\t\t<image tag=\"%s\"", xml_encode(get_device_tag(image.device))))
@@ -489,6 +492,9 @@ function emit_status(light, out)
 			-- filename
 			if filename ~= nil and filename ~= "" then
 				emit("\t\t\tfilename=\"" .. xml_encode(filename) .. "\"")
+			end
+			if loaded_through_softlist ~= nil then
+				emit("\t\t\tloaded_through_softlist=\"" .. string_from_bool(loaded_through_softlist) .. "\"")
 			end
 			emit("\t\t>")
 			if emit_details then

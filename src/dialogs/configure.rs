@@ -24,6 +24,7 @@ use crate::dialogs::image::Format;
 use crate::dialogs::image::dialog_load_image;
 use crate::dialogs::socket::dialog_connect_to_socket;
 use crate::guiutils::modal::ModalStack;
+use crate::imagedesc::ImageDesc;
 use crate::info::InfoDb;
 use crate::info::View;
 use crate::mconfig::MachineConfig;
@@ -47,7 +48,7 @@ struct State {
 enum CoreState {
 	Machine {
 		dimodel: ModelRc<DeviceAndImageEntry>,
-		images: RefCell<HashMap<String, String>>,
+		images: RefCell<HashMap<String, ImageDesc>>,
 		ram_size: Option<u64>,
 	},
 	MachineError {
@@ -241,21 +242,21 @@ fn context_menu_command(state: &Rc<State>, command: AppCommand) {
 	// this dialog interprets commands differently than core BletchMAME
 	match command {
 		AppCommand::LoadImageDialog { tag } => {
-			let (_filename, extensions) = state.with_diconfig(|config| {
-				let filename = (0..config.entry_count())
+			let (_image_desc, extensions) = state.with_diconfig(|config| {
+				let image_desc = (0..config.entry_count())
 					.filter_map(|index| {
 						let entry = config.entry(index).unwrap();
-						let EntryDetails::Image { filename } = &entry.details else {
+						let EntryDetails::Image { image_desc } = &entry.details else {
 							return None;
 						};
-						(entry.tag == tag).then(|| filename.map(|x| x.to_string()))
+						(entry.tag == tag).then(|| image_desc.cloned())
 					})
 					.next()
 					.unwrap();
 
 				let (_, device) = config.machine_config().unwrap().lookup_device_tag(&tag).unwrap();
 				let extensions = device.extensions().map(str::to_string).collect::<Vec<_>>();
-				(filename, extensions)
+				(image_desc, extensions)
 			});
 
 			let state = state.clone();
@@ -265,8 +266,8 @@ fn context_menu_command(state: &Rc<State>, command: AppCommand) {
 					extensions,
 				}];
 				if let Some(image_desc) = dialog_load_image(state.modal_stack.clone(), &formats).await {
-					let new_filename = Some(image_desc.encode().into());
-					state.set_image_filename(tag, new_filename);
+					let image_desc = Some(image_desc);
+					state.set_image_imagedesc(tag, image_desc);
 				}
 			};
 			spawn_local(fut).unwrap();
@@ -275,14 +276,14 @@ fn context_menu_command(state: &Rc<State>, command: AppCommand) {
 			let state = state.clone();
 			let fut = async move {
 				if let Some(image_desc) = dialog_connect_to_socket(state.modal_stack.clone()).await {
-					let new_filename = Some(image_desc.encode().into());
-					state.set_image_filename(tag, new_filename);
+					let image_desc = Some(image_desc);
+					state.set_image_imagedesc(tag, image_desc);
 				}
 			};
 			spawn_local(fut).unwrap();
 		}
 		AppCommand::UnloadImage { tag } => {
-			state.set_image_filename(tag, None);
+			state.set_image_imagedesc(tag, None);
 		}
 		_ => unreachable!(),
 	}
@@ -395,7 +396,7 @@ impl State {
 				let slots = diconfig.changed_slots(false);
 				let images = diconfig
 					.images()
-					.filter_map(|(tag, filename)| filename.map(|filename| (tag.to_string(), filename.to_string())))
+					.filter_map(|(tag, filename)| filename.map(|image_desc| (tag.to_string(), image_desc.clone())))
 					.collect::<HashMap<_, _>>();
 				let ram_sizes_index = dialog.get_ram_sizes_index();
 				let ram_size = usize::try_from(ram_sizes_index - 1)
@@ -456,12 +457,12 @@ impl State {
 		self.update_images();
 	}
 
-	pub fn set_image_filename(&self, tag: String, new_filename: Option<String>) {
+	pub fn set_image_imagedesc(&self, tag: String, image_desc: Option<ImageDesc>) {
 		let CoreState::Machine { images, .. } = &self.core else {
 			unreachable!()
 		};
-		if let Some(new_filename) = new_filename {
-			images.borrow_mut().insert(tag, new_filename);
+		if let Some(image_desc) = image_desc {
+			images.borrow_mut().insert(tag, image_desc);
 		} else {
 			images.borrow_mut().remove(&tag);
 		}

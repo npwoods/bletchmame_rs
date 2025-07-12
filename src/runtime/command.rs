@@ -3,6 +3,7 @@ use std::ffi::OsStr;
 use std::iter::once;
 use std::path::Path;
 
+use itertools::Either;
 use itertools::Itertools;
 use serde::Deserialize;
 use serde::Serialize;
@@ -12,6 +13,9 @@ use strum::EnumString;
 use strum::IntoStaticStr;
 use strum::VariantArray;
 
+use crate::imagedesc::ImageDesc;
+use crate::runtime::MameStartArgs;
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MameCommand(Cow<'static, str>);
 
@@ -20,25 +24,32 @@ impl MameCommand {
 		self.0.as_ref()
 	}
 
-	pub fn start(
-		machine_name: &str,
-		ram_size: Option<u64>,
-		initial_loads: &[(impl AsRef<str>, impl AsRef<str>)],
-	) -> Self {
-		let ram_size_string = ram_size.as_ref().map(u64::to_string).unwrap_or_default();
-		let ram_size_args = ["-ramsize", ram_size_string.as_str()];
-		let ram_size_args = if ram_size.is_some() {
-			ram_size_args.as_slice()
+	pub fn start(start_args: &MameStartArgs) -> Self {
+		// RAM size
+		let ram_size_args_iter = if let Some(ram_size) = start_args.ram_size {
+			let args = [Cow::Borrowed("-ramsize"), ram_size.to_string().into()];
+			Either::Left(args.into_iter())
 		} else {
-			Default::default()
+			Either::Right([].into_iter())
 		};
 
-		let initial_loads = initial_loads
+		// slots
+		let slot_args_iter = start_args
+			.slots
 			.iter()
-			.flat_map(|(tag, filename)| [tag.as_ref(), filename.as_ref()]);
-		let args = once(machine_name)
-			.chain(ram_size_args.iter().copied())
-			.chain(initial_loads);
+			.flat_map(|(tag, value)| [Cow::Borrowed(tag.as_ref()), value.as_ref().into()]);
+
+		// images
+		let image_args_iter = start_args
+			.images
+			.iter()
+			.flat_map(|(tag, image_desc)| [Cow::Borrowed(tag.as_ref()), image_desc.as_mame_image_desc()]);
+
+		// and assemble everything
+		let args = once(Cow::Borrowed(start_args.machine_name.as_str()))
+			.chain(ram_size_args_iter)
+			.chain(slot_args_iter)
+			.chain(image_args_iter);
 		build("START", args)
 	}
 
@@ -84,14 +95,14 @@ impl MameCommand {
 		build("SET_ATTENUATION", [attenuation.as_str()])
 	}
 
-	pub fn load_image(tag: impl AsRef<str>, filename: impl AsRef<str>) -> Self {
-		Self::load_images(&[(tag, filename)])
+	pub fn load_image(tag: impl AsRef<str>, image_desc: &ImageDesc) -> Self {
+		Self::load_images(&[(tag, image_desc)])
 	}
 
-	pub fn load_images(loads: &[(impl AsRef<str>, impl AsRef<str>)]) -> Self {
+	pub fn load_images(loads: &[(impl AsRef<str>, &ImageDesc)]) -> Self {
 		let args = loads
 			.iter()
-			.flat_map(|(tag, filename)| [tag.as_ref(), filename.as_ref()]);
+			.flat_map(|(tag, image_desc)| [Cow::Borrowed(tag.as_ref()), image_desc.as_mame_image_desc()]);
 		build("LOAD", args)
 	}
 
@@ -269,21 +280,46 @@ fn quote_if_needed(s: Cow<'_, str>) -> Cow<'_, str> {
 
 #[cfg(test)]
 mod test {
+	use easy_ext::ext;
 	use test_case::test_case;
 
-	use crate::runtime::command::SeqType;
+	use crate::imagedesc::ImageDesc;
 
 	use super::MameCommand;
+	use super::MameStartArgs;
+	use super::SeqType;
 
 	const EMPTY: &[(&str, &str)] = &[];
 
+	#[ext]
+	impl MameCommand {
+		fn start_ex(machine_name: &str, ram_size: Option<u64>, images: &[(&str, &str)]) -> Self {
+			let machine_name = machine_name.into();
+			let images = images
+				.iter()
+				.map(|(tag, filename)| {
+					let tag = (*tag).into();
+					let image_desc = ImageDesc::File(filename.to_string());
+					(tag, image_desc)
+				})
+				.collect::<Vec<_>>();
+			let start_args = MameStartArgs {
+				machine_name,
+				ram_size,
+				slots: [].into(),
+				images,
+			};
+			MameCommand::start(&start_args)
+		}
+	}
+
 	#[rustfmt::skip]
 	#[test_case(0, MameCommand::stop(), "STOP")]
-	#[test_case(1, MameCommand::start("coco2b", None, EMPTY), "START coco2b")]
-	#[test_case(2, MameCommand::start("coco2b", Some(0x10000), EMPTY), "START coco2b -ramsize 65536")]
-	#[test_case(3, MameCommand::start("coco2b", None, &[("ext:fdc:wd17xx:0", "foo.dsk")]), "START coco2b ext:fdc:wd17xx:0 foo.dsk")]
-	#[test_case(4, MameCommand::load_image("ext:fdc:wd17xx:0", "foo bar.dsk"), "LOAD ext:fdc:wd17xx:0 \"foo bar.dsk\"")]
-	#[test_case(5, MameCommand::load_images(&[("ext:fdc:wd17xx:0", "foo bar.dsk")]), "LOAD ext:fdc:wd17xx:0 \"foo bar.dsk\"")]
+	#[test_case(1, MameCommand::start_ex("coco2b", None, EMPTY), "START coco2b")]
+	#[test_case(2, MameCommand::start_ex("coco2b", Some(0x10000), EMPTY), "START coco2b -ramsize 65536")]
+	#[test_case(3, MameCommand::start_ex("coco2b", None, &[("ext:fdc:wd17xx:0", "foo.dsk")]), "START coco2b ext:fdc:wd17xx:0 foo.dsk")]
+	#[test_case(4, MameCommand::load_image("ext:fdc:wd17xx:0", &ImageDesc::File("foo bar.dsk".to_string())), "LOAD ext:fdc:wd17xx:0 \"foo bar.dsk\"")]
+	#[test_case(5, MameCommand::load_images(&[("ext:fdc:wd17xx:0", &ImageDesc::File("foo bar.dsk".to_string()))]), "LOAD ext:fdc:wd17xx:0 \"foo bar.dsk\"")]
 	#[test_case(6, MameCommand::seq_set(&[("foobar", 0x20, SeqType::Standard, "KEYCODE_X or KEYCODE_Y")]), "SEQ_SET foobar 32 standard \"KEYCODE_X or KEYCODE_Y\"")]
 	fn command_test(_index: usize, command: MameCommand, expected: &str) {
 		let actual = command.text();

@@ -7,7 +7,7 @@ use crate::guiutils::modal::ModalStack;
 use crate::imagedesc::ImageDesc;
 use crate::ui::ConnectToSocketDialog;
 
-pub async fn dialog_connect_to_socket(modal_stack: ModalStack) -> Option<ImageDesc<String>> {
+pub async fn dialog_connect_to_socket(modal_stack: ModalStack) -> Option<ImageDesc> {
 	// prepare the dialog
 	let modal = modal_stack.modal(|| ConnectToSocketDialog::new().unwrap());
 	let (tx, mut rx) = mpsc::channel(1);
@@ -54,10 +54,9 @@ fn update_can_accept(dialog: &ConnectToSocketDialog) {
 	dialog.set_can_accept(is_enabled);
 }
 
-fn get_results(dialog: &ConnectToSocketDialog) -> Option<ImageDesc<String>> {
+fn get_results(dialog: &ConnectToSocketDialog) -> Option<ImageDesc> {
 	let host_text = dialog.get_host_text();
 	let port_text = dialog.get_port_text();
 	let port = port_text.parse().ok()?;
-	let is_valid = hostname_validator::is_valid(&host_text);
-	is_valid.then(|| ImageDesc::socket(host_text.into(), port))
+	ImageDesc::socket(host_text, port).ok()
 }

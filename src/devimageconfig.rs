@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::iter::once;
 use std::rc::Rc;
 
+use crate::imagedesc::ImageDesc;
 use crate::info::InfoDb;
 use crate::info::Machine;
 use crate::info::View;
@@ -37,7 +38,7 @@ struct InternalEntry {
 #[derive(Debug, PartialEq)]
 enum InternalEntryDetails {
 	Slot { current_option_index: Option<usize> },
-	Image { filename: Option<String> },
+	Image { image_desc: Option<ImageDesc> },
 }
 
 #[derive(Debug)]
@@ -55,7 +56,7 @@ pub enum EntryDetails<'a> {
 		current_option_index: usize,
 	},
 	Image {
-		filename: Option<&'a str>,
+		image_desc: Option<&'a ImageDesc>,
 	},
 }
 
@@ -135,9 +136,9 @@ impl DevicesImagesConfig {
 					current_option_index,
 				}
 			}
-			InternalEntryDetails::Image { filename } => {
-				let filename = filename.as_deref();
-				EntryDetails::Image { filename }
+			InternalEntryDetails::Image { image_desc } => {
+				let image_desc = image_desc.as_ref();
+				EntryDetails::Image { image_desc }
 			}
 		};
 
@@ -182,8 +183,8 @@ impl DevicesImagesConfig {
 			.entries
 			.iter()
 			.filter_map(|entry| {
-				if let InternalEntryDetails::Image { filename } = &entry.details {
-					Some((entry.tag.as_str(), filename.as_deref()))
+				if let InternalEntryDetails::Image { image_desc } = &entry.details {
+					Some((entry.tag.as_str(), image_desc.as_ref()))
 				} else {
 					None
 				}
@@ -213,16 +214,16 @@ impl DevicesImagesConfig {
 		)
 	}
 
-	pub fn images(&self) -> impl Iterator<Item = (&'_ str, Option<&'_ str>)> {
+	pub fn images(&self) -> impl Iterator<Item = (&'_ str, Option<&'_ ImageDesc>)> {
 		self.core.as_ref().unwrap().entries.iter().filter_map(|entry| {
-			let InternalEntryDetails::Image { filename } = &entry.details else {
+			let InternalEntryDetails::Image { image_desc } = &entry.details else {
 				return None;
 			};
-			Some((entry.tag.as_str(), filename.as_deref()))
+			Some((entry.tag.as_str(), image_desc.as_ref()))
 		})
 	}
 
-	pub fn set_images_from_slots(&self, mut image_func: impl FnMut(&str) -> Option<String>) -> Self {
+	pub fn set_images_from_slots(&self, mut image_func: impl FnMut(&str) -> Option<ImageDesc>) -> Self {
 		let info_db = self.info_db.clone();
 		let Some(core) = self.core.as_ref() else {
 			return Self::new(info_db);
@@ -253,14 +254,14 @@ impl DevicesImagesConfig {
 			});
 			device_tag_iter
 				.map(|tag| {
-					let filename = image_func(&tag);
-					(tag, filename)
+					let image_desc = image_func(&tag);
+					(tag, image_desc)
 				})
 				.collect::<Vec<_>>()
 		};
 		let images = images
 			.iter()
-			.map(|(tag, filename)| (tag.as_str(), filename.as_deref()))
+			.map(|(tag, image_desc)| (tag.as_str(), image_desc.as_ref()))
 			.collect::<Vec<_>>();
 
 		let machine_configs = core.machine_configs.clone();
@@ -351,7 +352,7 @@ fn internal_update_status(
 	let images = running
 		.images
 		.iter()
-		.map(|x| (x.tag.as_str(), x.filename.as_deref()))
+		.map(|x| (x.tag.as_str(), x.image_desc.as_ref()))
 		.collect::<Vec<_>>();
 	diconfig_from_machine_configs_and_images(info_db, machine_configs, images)
 }
@@ -359,7 +360,7 @@ fn internal_update_status(
 fn diconfig_from_machine_configs_and_images(
 	info_db: Rc<InfoDb>,
 	machine_configs: MachineConfigPair,
-	images: Vec<(&'_ str, Option<&'_ str>)>,
+	images: Vec<(&'_ str, Option<&'_ ImageDesc>)>,
 ) -> DevicesImagesConfig {
 	// identify all images
 	let mut images = images.into_iter().map(Some).collect::<Vec<_>>();
@@ -389,7 +390,7 @@ fn diconfig_from_machine_configs_and_images(
 				.filter_map(|x| {
 					x.take_if(|(tag, _)| tag.starts_with(&tag_prefix) && tag[tag_prefix.len()..].find(':').is_none())
 				})
-				.map(|(tag, filename)| internal_entry_image_from_status(tag, filename, &tag_prefix, indent));
+				.map(|(tag, image_desc)| internal_entry_image_from_status(tag, image_desc, &tag_prefix, indent));
 			entries.extend(image_entry_iter);
 		});
 
@@ -415,14 +416,14 @@ fn diconfig_from_machine_configs_and_images(
 
 fn internal_entry_image_from_status(
 	tag: &str,
-	filename: Option<&str>,
+	image_desc: Option<&ImageDesc>,
 	tag_prefix: &str,
 	indent: usize,
 ) -> InternalEntry {
 	let tag = tag.to_string();
 	let subtag_start = tag_prefix.len();
-	let filename = filename.map(|x| x.to_string());
-	let details = InternalEntryDetails::Image { filename };
+	let image_desc = image_desc.cloned();
+	let details = InternalEntryDetails::Image { image_desc };
 	InternalEntry {
 		tag,
 		subtag_start,
