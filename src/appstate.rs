@@ -3,6 +3,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::mpsc::Sender;
@@ -14,6 +15,7 @@ use slint::invoke_from_event_loop;
 use throttle::Throttle;
 
 use crate::appcommand::AppCommand;
+use crate::console::Console;
 use crate::info::InfoDb;
 use crate::job::Job;
 use crate::prefs::PreflightProblem;
@@ -80,6 +82,7 @@ struct Fixed {
 	prefs_path: PathBuf,
 	mame_windowing: MameWindowing,
 	mame_stderr: MameStderr,
+	console: Arc<Mutex<Option<Console>>>,
 	callback: CommandCallback,
 }
 
@@ -115,11 +118,13 @@ impl AppState {
 		mame_stderr: MameStderr,
 		callback: impl Fn(AppCommand) + 'static,
 	) -> Self {
+		let console = Arc::new(Mutex::new(None));
 		let callback = Rc::from(callback);
 		let fixed = Fixed {
 			prefs_path,
 			mame_windowing,
 			mame_stderr,
+			console,
 			callback,
 		};
 		let fixed = Rc::new(fixed);
@@ -168,6 +173,7 @@ impl AppState {
 					self.paths.as_ref(),
 					&self.fixed.mame_windowing,
 					self.fixed.mame_stderr,
+					self.fixed.console.clone(),
 					self.fixed.callback.clone(),
 				);
 				let command_sender = Some(Arc::new(command_sender));
@@ -709,6 +715,14 @@ impl AppState {
 			last_save_state,
 			..self.clone()
 		}
+	}
+
+	pub fn show_console(&self) -> Result<()> {
+		let mut console = self.fixed.console.lock().unwrap();
+		if console.as_mut().is_none_or(|console| !console.is_running()) {
+			*console = Some(Console::new()?);
+		}
+		Ok(())
 	}
 }
 

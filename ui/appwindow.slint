@@ -304,8 +304,17 @@ export component AppWindow inherits Window {
                 }
             }
 
+            MenuSeparator { }
+
             MenuItem {
                 title: @tr("MenuBar" => "Classic MAME Menu");
+                activated => {
+                    menu-item-activated(parent.title, self.title);
+                }
+            }
+
+            MenuItem {
+                title: @tr("MenuBar" => "Console");
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }

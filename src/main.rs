@@ -5,6 +5,7 @@ mod appwindow;
 mod backend;
 mod channel;
 mod collections;
+mod console;
 mod debugstr;
 mod devimageconfig;
 mod diagnostics;
@@ -38,7 +39,8 @@ use structopt::StructOpt;
 use tracing_subscriber::EnvFilter;
 
 use crate::appwindow::AppArgs;
-use crate::backend::{BackendRuntime, SlintBackend};
+use crate::backend::BackendRuntime;
+use crate::backend::SlintBackend;
 use crate::diagnostics::info_db_from_xml_file;
 use crate::platform::platform_init;
 use crate::runtime::MameStderr;
@@ -58,6 +60,10 @@ struct Opt {
 
 	#[cfg_attr(feature = "slint-qt-backend", structopt(long))]
 	slint_backend: Option<SlintBackend>,
+
+	#[cfg(target_os = "windows")]
+	#[structopt(long)]
+	echo_console: Option<String>,
 
 	#[cfg_attr(feature = "diagnostics", structopt(long))]
 	process_listxml: bool,
@@ -94,6 +100,16 @@ fn main() -> ExitCode {
 	};
 	if let Some(path) = process_listxml {
 		return info_db_from_xml_file(path);
+	}
+
+	// echo console?
+	#[cfg(target_os = "windows")]
+	if let Some(pipe_name) = opts.echo_console.as_deref() {
+		return if crate::platform::win_echo_console_main(pipe_name).is_ok() {
+			ExitCode::SUCCESS
+		} else {
+			ExitCode::FAILURE
+		};
 	}
 
 	// identify the preferences directory

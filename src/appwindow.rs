@@ -663,6 +663,7 @@ fn menu_item_info(parent_title: Option<&str>, title: &str) -> (Option<AppCommand
 		(_, "Toggle Menu Bar") => (Some(AppCommand::OptionsToggleMenuBar), Some("ScrLk")),
 		(_, "Sound") => (Some(AppCommand::OptionsToggleSound), None),
 		(_, "Classic MAME Menu") => (Some(AppCommand::OptionsClassic), None),
+		(_, "Console") => (Some(AppCommand::OptionsConsole), None),
 
 		// Settings menu
 		(_, "Joysticks and Controllers...") => (Some(AppCommand::SettingsInput(InputClass::Controller)), None),
@@ -913,6 +914,9 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 		}
 		AppCommand::OptionsClassic => {
 			model.issue_command(MameCommand::classic_menu());
+		}
+		AppCommand::OptionsConsole => {
+			let _ = model.state.borrow().show_console();
 		}
 		AppCommand::SettingsInput(class) => {
 			let status_update_channel = model.status_changed_channel.clone();

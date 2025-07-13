@@ -1,5 +1,11 @@
 use std::any::Any;
 use std::ffi::c_void;
+use std::fs::File;
+use std::io::BufRead;
+use std::io::BufReader;
+use std::io::Write;
+use std::os::windows::io::FromRawHandle;
+use std::os::windows::io::RawHandle;
 use std::os::windows::process::CommandExt;
 use std::process::Command;
 
@@ -13,10 +19,30 @@ use raw_window_handle::Win32WindowHandle;
 use slint::Window;
 use tracing::info;
 use win32job::Job;
+use windows::Win32::Foundation::GENERIC_READ;
+use windows::Win32::Foundation::GENERIC_WRITE;
 use windows::Win32::Foundation::HANDLE;
 use windows::Win32::Foundation::HWND;
+use windows::Win32::Storage::FileSystem::CreateFileW;
+use windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_NORMAL;
+use windows::Win32::Storage::FileSystem::FILE_SHARE_READ;
+use windows::Win32::Storage::FileSystem::FILE_SHARE_WRITE;
+use windows::Win32::Storage::FileSystem::OPEN_EXISTING;
+use windows::Win32::Storage::FileSystem::PIPE_ACCESS_DUPLEX;
 use windows::Win32::System::Console::ATTACH_PARENT_PROCESS;
+use windows::Win32::System::Console::AllocConsole;
 use windows::Win32::System::Console::AttachConsole;
+use windows::Win32::System::Console::CONSOLE_MODE;
+use windows::Win32::System::Console::ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+use windows::Win32::System::Console::FreeConsole;
+use windows::Win32::System::Console::GetConsoleMode;
+use windows::Win32::System::Console::SetConsoleMode;
+use windows::Win32::System::Pipes::ConnectNamedPipe;
+use windows::Win32::System::Pipes::CreateNamedPipeW;
+use windows::Win32::System::Pipes::PIPE_READMODE_MESSAGE;
+use windows::Win32::System::Pipes::PIPE_TYPE_MESSAGE;
+use windows::Win32::System::Pipes::PIPE_WAIT;
+use windows::Win32::System::Threading::CREATE_NEW_CONSOLE;
 use windows::Win32::System::Threading::CREATE_NO_WINDOW;
 use windows::Win32::UI::WindowsAndMessaging::GetMenu;
 use windows::Win32::UI::WindowsAndMessaging::GetPropW;
@@ -52,6 +78,11 @@ pub impl Command {
 		if flag {
 			self.creation_flags(CREATE_NO_WINDOW.0);
 		};
+		self
+	}
+
+	fn create_new_console(&mut self) -> &mut Self {
+		self.creation_flags(CREATE_NEW_CONSOLE.0);
 		self
 	}
 }
@@ -119,5 +150,72 @@ fn get_win32_window_handle(window: &Window) -> Result<Win32WindowHandle> {
 	} else {
 		let message = "RawWindowHandle is not RawWindowHandle::Win32";
 		Err(Error::msg(message))
+	}
+}
+
+/// Windows specific "echo console" - this is simpler on other platforms
+pub fn win_echo_console_main(pipe_name: &str) -> Result<()> {
+	let mut output = unsafe {
+		FreeConsole()?;
+		AllocConsole()?;
+
+		let output = CreateFileW(
+			PCWSTR("CONOUT$\0".encode_utf16().collect::<Vec<u16>>().as_ptr()),
+			GENERIC_READ.0 | GENERIC_WRITE.0,
+			FILE_SHARE_WRITE | FILE_SHARE_READ,
+			None,
+			OPEN_EXISTING,
+			FILE_ATTRIBUTE_NORMAL,
+			None,
+		)?;
+
+		// enable ANSI
+		let mut mode = CONSOLE_MODE::default();
+		GetConsoleMode(output, &mut mode)?;
+		SetConsoleMode(output, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING)?;
+
+		// return the file
+		File::from_raw_handle(output.0 as _)
+	};
+
+	let input = File::open(pipe_name)?;
+	let input = BufReader::new(input);
+	for line in input.lines() {
+		let line = line?;
+		writeln!(output, "{line}")?;
+	}
+	Ok(())
+}
+
+#[derive(Debug)]
+pub struct WinNamedPipe(HANDLE);
+
+impl WinNamedPipe {
+	pub fn new(name: &str) -> Result<Self> {
+		let name_wide: Vec<u16> = name.encode_utf16().chain(std::iter::once(0)).collect();
+		let handle = unsafe {
+			CreateNamedPipeW(
+				PCWSTR(name_wide.as_ptr()),
+				PIPE_ACCESS_DUPLEX,
+				PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT,
+				1,    // max instances
+				1024, // out buffer size
+				1024, // in buffer size
+				0,    // default timeout
+				None, // default security
+			)
+		};
+		if handle.is_invalid() {
+			let message = "CreateNamedPipeW() failed";
+			return Err(Error::msg(message));
+		}
+		Ok(Self(handle))
+	}
+
+	pub fn connect(self) -> Result<File> {
+		unsafe {
+			ConnectNamedPipe(self.0, None)?;
+			Ok(File::from_raw_handle(self.0.0 as RawHandle))
+		}
 	}
 }

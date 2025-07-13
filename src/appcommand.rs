@@ -47,6 +47,7 @@ pub enum AppCommand {
 	OptionsToggleSound,
 	#[strum(props(MinimumMame = "0.274"))]
 	OptionsClassic,
+	OptionsConsole,
 
 	// Settings menu
 	SettingsInput(InputClass),

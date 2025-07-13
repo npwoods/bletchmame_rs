@@ -17,6 +17,11 @@ pub impl Command {
 	fn create_no_window(&mut self, _flag: bool) -> &mut Self {
 		self
 	}
+
+	#[allow(dead_code)]
+	fn create_new_console(&mut self) -> &mut Self {
+		self
+	}
 }
 
 #[ext(OtherWindowAttributesExt)]
