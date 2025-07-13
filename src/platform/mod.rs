@@ -8,9 +8,11 @@ mod windows;
 #[rustfmt::skip]
 pub use {
     windows::win_platform_init as platform_init,
+    windows::win_echo_console_main,
     windows::WinCommandExt as CommandExt,
     windows::WinWindowAttributesExt as WindowAttributesExt,
-    windows::WinWindowExt as WindowExt
+    windows::WinWindowExt as WindowExt,
+    windows::WinNamedPipe
 };
 
 // declarations for non-Windows platforms
