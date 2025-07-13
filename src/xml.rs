@@ -77,14 +77,24 @@ where
 				}
 				Event::Text(bytes_text) => {
 					let string = cow_bytes_to_str(bytes_text.into_inner())?;
-					if self.known_depth == 0 && self.unknown_depth == 0 && !string.trim().is_empty() {
-						let msg = format!("Extraneous text \"{string:?}\"");
-						return Err(Error::msg(msg));
-					}
-					if let Some(current_text) = &mut self.current_text {
-						current_text.push_str(&string);
-					}
-					Some(XmlEvent::Null)
+					self.internal_text(string)?
+				}
+				Event::GeneralRef(bytes_ref) => {
+					let bytes: &[u8] = bytes_ref.as_ref();
+					let string = match bytes {
+						b"amp" => "&".into(),
+						b"lt" => "<".into(),
+						b"gt" => ">".into(),
+						b"quot" => "\"".into(),
+						_ => {
+							let ch = bytes_ref.resolve_char_ref()?.ok_or_else(|| {
+								let message = format!("Unknown bytes_ref {bytes_ref:?}");
+								Error::msg(message)
+							})?;
+							Cow::Owned(ch.to_string())
+						}
+					};
+					self.internal_text(string)?
 				}
 				_ => Some(XmlEvent::Null),
 			}
@@ -125,6 +135,17 @@ where
 
 		// and return!
 		Ok(event)
+	}
+
+	fn internal_text<'a>(&mut self, string: Cow<'a, str>) -> Result<Option<XmlEvent<'a>>> {
+		if self.known_depth == 0 && self.unknown_depth == 0 && !string.trim().is_empty() {
+			let msg = format!("Extraneous text \"{string:?}\"");
+			return Err(Error::msg(msg));
+		}
+		if let Some(current_text) = &mut self.current_text {
+			current_text.push_str(&string);
+		}
+		Ok(Some(XmlEvent::Null))
 	}
 
 	pub fn start_unknown_tag(&mut self) {
