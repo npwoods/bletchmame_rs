@@ -51,6 +51,7 @@ use crate::dialogs::file::load_file_dialog;
 use crate::dialogs::file::save_file_dialog;
 use crate::dialogs::image::Format;
 use crate::dialogs::image::dialog_load_image;
+use crate::dialogs::importmameini::dialog_import_mame_ini;
 use crate::dialogs::input::multi::dialog_input_select_multiple;
 use crate::dialogs::input::primary::dialog_input;
 use crate::dialogs::input::xy::dialog_input_xy;
@@ -689,6 +690,7 @@ fn menu_item_info(parent_title: Option<&str>, title: &str) -> (Option<AppCommand
 			(Some(AppCommand::SettingsToggleBuiltinCollection(col)), None)
 		}
 		(_, "Reset Settings To Default") => (Some(AppCommand::SettingsReset), None),
+		(_, "Import MAME INI...") => (Some(AppCommand::SettingsImportMameIni), None),
 
 		// Help menu
 		(_, "Refresh MAME machine info...") => (Some(AppCommand::HelpRefreshInfoDb), None),
@@ -971,6 +973,20 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			};
 			*prefs = Preferences::fresh(prefs_path);
 		}),
+		AppCommand::SettingsImportMameIni => {
+			let model_clone = model.clone();
+			let paths = model.preferences.borrow().paths.clone();
+			let fut = async move {
+				match dialog_import_mame_ini(model_clone.modal_stack.clone(), paths).await {
+					Ok(None) => {}
+					Ok(Some(import)) => model_clone.modify_prefs(|prefs| import.apply(prefs)),
+					Err(e) => {
+						dialog_message_box::<OkOnly>(model_clone.modal_stack.clone(), "Error", e.to_string()).await;
+					}
+				}
+			};
+			spawn_local(fut).unwrap();
+		}
 		AppCommand::HelpRefreshInfoDb => {
 			model.update_state(|state| state.infodb_rebuild());
 		}
