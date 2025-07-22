@@ -35,6 +35,7 @@ use std::process::ExitCode;
 use appwindow::AppWindowing;
 use dirs::config_local_dir;
 use slint::ComponentHandle;
+use slint::run_event_loop;
 use structopt::StructOpt;
 use tracing_subscriber::EnvFilter;
 
@@ -150,7 +151,8 @@ fn main() -> ExitCode {
 	let app_window = appwindow::create(args);
 
 	// ...and run run run!
-	let _ = app_window.run();
+	run_event_loop().unwrap();
+	let _ = app_window.hide();
 	ExitCode::SUCCESS
 }
 

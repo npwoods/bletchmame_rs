@@ -6,15 +6,20 @@ mod winit;
 use std::rc::Rc;
 
 use anyhow::Result;
+use easy_ext::ext;
+use i_slint_backend_winit::WinitWindowAccessor;
 use muda::accelerator::Accelerator;
 use slint::PhysicalPosition;
 use slint::PhysicalSize;
 use slint::Window;
 use strum::EnumString;
 use tracing::debug;
+use tracing::warn;
 
+use crate::backend::winit::SlintWindowExt;
 use crate::backend::winit::WinitBackendRuntime;
 use crate::backend::winit::WinitChildWindow;
+use crate::backend::winit::WinitWindowExt;
 
 #[cfg(feature = "slint-qt-backend")]
 use crate::backend::qt::QtBackendRuntime;
@@ -144,5 +149,27 @@ impl Default for SlintBackend {
 		let result = Self::Winit;
 
 		result
+	}
+}
+
+#[ext(WindowExt)]
+pub impl Window {
+	fn fullscreen_display(&self) -> Option<String> {
+		self.with_winit_window(|window| window.fullscreen_display()).flatten()
+	}
+
+	fn set_fullscreen_with_display(&self, fullscreen: bool, display: Option<&str>) {
+		let result = if fullscreen && let Some(display) = display {
+			SlintWindowExt::set_fullscreen_with_display(self, display)
+		} else {
+			Ok(false)
+		};
+
+		if result.is_err() {
+			warn!(result=?result, "Failed to set fullscreen");
+		}
+		if result.is_ok_and(|x| x) {
+			self.set_fullscreen(fullscreen);
+		}
 	}
 }
