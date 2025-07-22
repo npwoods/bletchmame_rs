@@ -333,11 +333,6 @@ pub fn create(args: AppArgs) -> AppWindow {
 	})
 	.unwrap();
 
-	// this is necessary to make the menu bar visible in full screen mode (as per https://github.com/slint-ui/slint/issues/8793)
-	i_slint_backend_winit::WinitWindowAccessor::with_winit_window(app_window.window(), |window| {
-		window.set_transparent(false)
-	});
-
 	// get preferences
 	let prefs_path = args.prefs_path;
 	let preferences = Preferences::load(&prefs_path)
