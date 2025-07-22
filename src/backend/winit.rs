@@ -74,6 +74,10 @@ impl WinitBackendRuntime {
 	pub fn create_slint_backend(&self) -> Result<Box<dyn slint::platform::Platform>> {
 		let slint_backend = i_slint_backend_winit::Backend::builder()
 			.with_custom_application_handler(self.clone())
+			.with_window_attributes_hook(|attr| {
+				// this is necessary to make the menu bar visible in full screen mode (as per https://github.com/slint-ui/slint/issues/8793)
+				attr.with_transparent(false)
+			})
 			.build()?;
 		Ok(Box::new(slint_backend) as Box<_>)
 	}
