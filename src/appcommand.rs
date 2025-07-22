@@ -54,6 +54,7 @@ pub enum AppCommand {
 	SettingsPaths(Option<PathType>),
 	SettingsToggleBuiltinCollection(BuiltinCollection),
 	SettingsReset,
+	SettingsImportMameIni,
 
 	// Help menu
 	HelpRefreshInfoDb,

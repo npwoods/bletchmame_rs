@@ -5,6 +5,7 @@ pub mod configure;
 pub mod devimages;
 pub mod file;
 pub mod image;
+pub mod importmameini;
 pub mod input;
 pub mod messagebox;
 pub mod namecollection;

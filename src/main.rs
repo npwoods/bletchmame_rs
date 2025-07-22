@@ -14,6 +14,7 @@ mod guiutils;
 mod history;
 mod icon;
 mod imagedesc;
+mod importmameini;
 mod info;
 mod job;
 mod mconfig;

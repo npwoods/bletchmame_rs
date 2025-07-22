@@ -1,0 +1,79 @@
+import { VerticalBox, GridBox, HorizontalBox, StandardButton, ComboBox, ListView } from "std-widgets.slint";
+
+export struct ImportMameIniDialogEntry {
+    path-type: string,
+    path: string,
+    current-disposition: string,
+    dispositions: [string]
+}
+
+export component ImportMameIniDialog inherits Window {
+    title: "Import MAME INI";
+    icon: @image-url("bletchmame.png");
+    preferred-width: 600px;
+    preferred-height: 500px;
+
+    // properties
+    in property <length> splitter_1: 120px;
+    in property <length> splitter_2: root.width - 150px;
+    in property <[ImportMameIniDialogEntry]> entries;
+    in property <string> message-text;
+
+    // callbacks
+    callback ok-clicked();
+    callback cancel-clicked();
+
+    // widgets
+    VerticalBox {
+        Text {
+            text: @tr("The following settings from the specified MAME INI file can be imported to BletchMAME:");
+        }
+
+        ListView {
+            for entry in entries: Rectangle {
+                height: 30px;
+                width: parent.width;
+                Text {
+                    x: 0px;
+                    text: entry.path-type;
+                }
+
+                Text {
+                    x: splitter_1;
+                    text: entry.path;
+                }
+
+                ComboBox {
+                    x: splitter_2;
+                    model: entry.dispositions;
+                    current-value: entry.current-disposition;
+                    enabled: entry.dispositions.length > 1;
+                }
+            }
+        }
+
+        Text {
+            text: message-text;
+        }
+
+        HorizontalBox {
+            alignment: end;
+            StandardButton {
+                kind: ok;
+                horizontal-stretch: 0;
+                enabled: false;
+                clicked => {
+                    root.ok-clicked();
+                }
+            }
+
+            StandardButton {
+                kind: cancel;
+                horizontal-stretch: 0;
+                clicked => {
+                    root.cancel-clicked();
+                }
+            }
+        }
+    }
+}

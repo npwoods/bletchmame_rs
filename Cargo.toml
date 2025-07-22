@@ -60,6 +60,7 @@ console = { version = "0.16.0", optional = true }
 zerocopy = { version = "0.8.25", features = ["derive"] }
 byteorder = "1.5.0"
 uuid = { version = "1.17.0", features = ["v4"] }
+path-absolutize = "3.1.1"
 
 [target.'cfg(target_os = "windows")'.dependencies.windows]
 version = "0.61.1"
