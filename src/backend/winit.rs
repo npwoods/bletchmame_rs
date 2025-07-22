@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use anyhow::Result;
+use easy_ext::ext;
 use i_slint_backend_winit::CustomApplicationHandler;
 use i_slint_backend_winit::WinitWindowAccessor;
 use i_slint_backend_winit::WinitWindowEventResult;
@@ -22,6 +23,8 @@ use winit::keyboard::Key;
 use winit::keyboard::ModifiersState;
 use winit::keyboard::NamedKey;
 use winit::keyboard::SmolStr;
+use winit::monitor::MonitorHandle;
+use winit::window::Fullscreen;
 use winit::window::Window;
 use winit::window::WindowAttributes;
 use winit::window::WindowId;
@@ -56,6 +59,8 @@ struct WinitPendingChildWindow {
 enum ThisError {
 	#[error("unknown raw handle type")]
 	UnknownRawHandleType,
+	#[error("cannot find display \"{0}\"")]
+	CannotFindDisplay(String),
 }
 
 #[derive(Debug)]
@@ -360,5 +365,33 @@ fn apply_muda_modifier(mods: Option<Modifiers>, apply: bool, this_mod: Modifiers
 		Some(mods.unwrap_or_default() | this_mod)
 	} else {
 		mods
+	}
+}
+
+#[ext(WinitWindowExt)]
+pub impl Window {
+	fn fullscreen_display(&self) -> Option<String> {
+		let monitor = match self.fullscreen() {
+			None => None,
+			Some(Fullscreen::Exclusive(video_mode)) => Some(video_mode.monitor()),
+			Some(Fullscreen::Borderless(monitor)) => monitor,
+		};
+		monitor.as_ref().and_then(MonitorHandle::name)
+	}
+}
+
+#[ext(SlintWindowExt)]
+pub impl slint::Window {
+	fn set_fullscreen_with_display(&self, display: &str) -> Result<bool> {
+		self.with_winit_window(|window| {
+			let monitor = window
+				.available_monitors()
+				.find(|m| m.name().as_deref() == Some(display))
+				.ok_or_else(|| ThisError::CannotFindDisplay(display.into()))?;
+			let fullscreen = Some(Fullscreen::Borderless(Some(monitor)));
+			window.set_fullscreen(fullscreen);
+			Ok(true)
+		})
+		.unwrap_or(Ok(false))
 	}
 }

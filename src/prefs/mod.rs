@@ -52,6 +52,9 @@ pub struct Preferences {
 	#[serde(default)]
 	pub is_fullscreen: bool,
 
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub fullscreen_display: Option<String>,
+
 	#[serde(default)]
 	pub items_columns: Vec<PrefsColumn>,
 

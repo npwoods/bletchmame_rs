@@ -34,6 +34,7 @@ use crate::appcommand::AppCommand;
 use crate::appstate::AppState;
 use crate::backend::BackendRuntime;
 use crate::backend::ChildWindow;
+use crate::backend::WindowExt as WindowExt_1;
 use crate::channel::Channel;
 use crate::collections::add_items_to_existing_folder_collection;
 use crate::collections::add_items_to_new_folder_collection;
@@ -71,7 +72,7 @@ use crate::history::History;
 use crate::models::collectionsview::CollectionsViewModel;
 use crate::models::itemstable::EmptyReason;
 use crate::models::itemstable::ItemsTableModel;
-use crate::platform::WindowExt;
+use crate::platform::WindowExt as WindowExt_2;
 use crate::prefs::BuiltinCollection;
 use crate::prefs::Preferences;
 use crate::prefs::PrefsCollection;
@@ -344,7 +345,6 @@ pub fn create(args: AppArgs) -> AppWindow {
 		let physical_size = LogicalSize::from(*window_size).to_physical(app_window.window().scale_factor());
 		app_window.window().set_size(physical_size);
 	}
-	app_window.window().set_fullscreen(preferences.is_fullscreen);
 
 	// create the window stack
 	let modal_stack = ModalStack::new(&app_window);
@@ -360,6 +360,18 @@ pub fn create(args: AppArgs) -> AppWindow {
 		child_window: RefCell::new(None),
 	};
 	let model = Rc::new(model);
+
+	// set full screen
+	let model_clone = model.clone();
+	let fut = async move {
+		let prefs = model_clone.preferences.borrow();
+		let app_window = model_clone.app_window();
+		app_window
+			.window()
+			.set_fullscreen_with_display(prefs.is_fullscreen, prefs.fullscreen_display.as_deref());
+		app_window.show().unwrap();
+	};
+	spawn_local(fut).unwrap();
 
 	// attach the menu bar (either natively or with an approximation using Slint); looking forward to Slint having first class menuing support
 	let model_clone = model.clone();
@@ -864,9 +876,12 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 		AppCommand::OptionsToggleFullScreen => {
 			let app_window = model.app_window();
 			let window = app_window.window();
-			let is_fullscreen = window.is_fullscreen();
-			model.preferences.borrow_mut().is_fullscreen = !is_fullscreen;
-			window.set_fullscreen(!is_fullscreen);
+			let new_fullscreen = !window.is_fullscreen();
+
+			window.set_fullscreen(new_fullscreen);
+			let mut prefs = model.preferences.borrow_mut();
+			prefs.is_fullscreen = new_fullscreen;
+			prefs.fullscreen_display = window.fullscreen_display();
 		}
 		AppCommand::OptionsToggleMenuBar => {
 			let has_input_using_mouse = model
