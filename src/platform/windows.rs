@@ -89,9 +89,11 @@ pub impl Command {
 
 #[ext(WinWindowAttributesExt)]
 pub impl WindowAttributes {
-	fn with_owner_window(self, owner: &Window) -> Self {
-		let win32_window = get_win32_window_handle(owner).unwrap();
-		WindowAttributesExtWindows::with_owner_window(self, win32_window.hwnd.into())
+	fn with_owner_window_handle(self, owner: &RawWindowHandle) -> Self {
+		let RawWindowHandle::Win32(owner) = owner else {
+			unreachable!();
+		};
+		self.with_owner_window(owner.hwnd.into())
 	}
 }
 

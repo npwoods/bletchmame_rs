@@ -6,7 +6,7 @@ use i_slint_backend_qt::QtWidgetAccessor;
 
 use crate::backend::qt::qtwidget::QtWidget;
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct QtBackendRuntime {}
 
 pub struct QtChildWindow {
