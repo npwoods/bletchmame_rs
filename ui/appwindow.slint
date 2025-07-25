@@ -456,13 +456,13 @@ export component AppWindow inherits Window {
 
     item-context-menu := ContextMenuArea {
         Menu {
-            if item-context-menu-info.run-desc.command != "": MenuItem {
+            if !item-context-menu-info.run-desc.command.is-empty: MenuItem {
                 title: item-context-menu-info.run-desc.title;
                 activated => {
                     menu-item-command(item-context-menu-info.run-desc.command);
                 }
             }
-            if item-context-menu-info.run-desc.command == "": Menu {
+            if item-context-menu-info.run-subdescs.length > 0: Menu {
                 title: item-context-menu-info.run-desc.title;
                 for subdesc in item-context-menu-info.run-subdescs: MenuItem {
                     title: subdesc.title;
@@ -471,7 +471,7 @@ export component AppWindow inherits Window {
                     }
                 }
             }
-            if item-context-menu-info.configure-command != "": MenuItem {
+            if !item-context-menu-info.configure-command.is-empty: MenuItem {
                 title: @tr("ItemContextMenu" => "Configure...");
                 activated => {
                     menu-item-command(item-context-menu-info.configure-command);
@@ -479,13 +479,13 @@ export component AppWindow inherits Window {
             }
             MenuSeparator { }
 
-            if item-context-menu-info.browse-command != "": MenuItem {
+            if !item-context-menu-info.browse-command.is-empty: MenuItem {
                 title: @tr("ItemContextMenu" => "Browse Software");
                 activated => {
                     menu-item-command(item-context-menu-info.browse-command);
                 }
             }
-            Menu {
+            if item-context-menu-info.add-to-existing-folder-descs.length > 0 || !item-context-menu-info.new-folder-command.is-empty: Menu {
                 title: @tr("ItemContextMenu" => "Add To Folder");
                 for desc in item-context-menu-info.add-to-existing-folder-descs: MenuItem {
                     title: desc.title;
@@ -495,15 +495,14 @@ export component AppWindow inherits Window {
                 }
                 MenuSeparator { }
 
-                MenuItem {
+                if !item-context-menu-info.new-folder-command.is-empty: MenuItem {
                     title: @tr("ItemContextMenu" => "New Folder...");
                     activated => {
                         menu-item-command(item-context-menu-info.new-folder-command);
                     }
                 }
             }
-
-            MenuItem {
+            if !item-context-menu-info.remove-from-folder-desc.command.is-empty: MenuItem {
                 title: item-context-menu-info.remove-from-folder-desc.title;
                 activated => {
                     menu-item-command(item-context-menu-info.remove-from-folder-desc.command);
