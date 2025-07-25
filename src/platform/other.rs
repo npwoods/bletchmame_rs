@@ -5,6 +5,7 @@ use std::process::Command;
 
 use anyhow::Result;
 use easy_ext::ext;
+use raw_window_handle::RawWindowHandle;
 use slint::Window;
 use winit::window::WindowAttributes;
 
@@ -26,7 +27,7 @@ pub impl Command {
 
 #[ext(OtherWindowAttributesExt)]
 pub impl WindowAttributes {
-	fn with_owner_window(self, _owner: &Window) -> Self {
+	fn with_owner_window_handle(self, _owner: &RawWindowHandle) -> Self {
 		self
 	}
 }

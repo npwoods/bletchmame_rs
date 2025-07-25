@@ -2,7 +2,6 @@
 //!
 //! actual platform specific logic should be in `platform`
 mod component;
-mod hook;
 pub mod menuing;
 pub mod modal;
 

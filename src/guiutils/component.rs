@@ -14,7 +14,6 @@ struct Wrap<T>(T);
 
 trait ComponentWrapTrait {
 	fn window(&self) -> &Window;
-	fn as_weak(&self) -> WeakComponentWrap;
 }
 
 trait WeakComponentWrapTrait {
@@ -24,10 +23,6 @@ trait WeakComponentWrapTrait {
 impl ComponentWrap {
 	pub fn window(&self) -> &Window {
 		self.0.window()
-	}
-
-	pub fn as_weak(&self) -> WeakComponentWrap {
-		self.0.as_weak()
 	}
 
 	pub fn clone_strong(&self) -> Self {
@@ -84,10 +79,6 @@ where
 {
 	fn window(&self) -> &Window {
 		self.0.window()
-	}
-
-	fn as_weak(&self) -> WeakComponentWrap {
-		self.0.as_weak().into()
 	}
 }
 

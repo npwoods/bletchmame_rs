@@ -29,6 +29,8 @@ use winit::window::Window;
 use winit::window::WindowAttributes;
 use winit::window::WindowId;
 
+use crate::platform::WindowAttributesExt;
+
 #[derive(Clone, Default)]
 pub struct WinitBackendRuntime(Rc<RefCell<WinitBackendRuntimeInner>>);
 
@@ -38,6 +40,7 @@ struct WinitBackendRuntimeInner {
 	live: Vec<Rc<WinitChildWindow>>,
 	muda_accelerator_callbacks: MudaAcceleratorMap,
 	modifiers_state: ModifiersState,
+	modal_parent_raw_handle: Option<RawWindowHandle>,
 }
 
 type MudaAcceleratorMap = HashMap<WindowId, Box<dyn Fn(&Accelerator) -> bool>>;
@@ -72,11 +75,19 @@ enum FindResult {
 
 impl WinitBackendRuntime {
 	pub fn create_slint_backend(&self) -> Result<Box<dyn slint::platform::Platform>> {
+		let self_clone = self.clone();
 		let slint_backend = i_slint_backend_winit::Backend::builder()
 			.with_custom_application_handler(self.clone())
-			.with_window_attributes_hook(|attr| {
+			.with_window_attributes_hook(move |attr| {
 				// this is necessary to make the menu bar visible in full screen mode (as per https://github.com/slint-ui/slint/issues/8793)
-				attr.with_transparent(false)
+				let attr = attr.with_transparent(false);
+
+				// specify an owner if possible
+				if let Some(modal_parent_raw_handle) = self_clone.0.borrow().modal_parent_raw_handle.as_ref() {
+					attr.with_owner_window_handle(modal_parent_raw_handle)
+				} else {
+					attr
+				}
 			})
 			.build()?;
 		Ok(Box::new(slint_backend) as Box<_>)
@@ -133,6 +144,16 @@ impl WinitBackendRuntime {
 			.borrow_mut()
 			.muda_accelerator_callbacks
 			.insert(window_id, callback);
+	}
+
+	pub fn with_modal_parent<R>(&self, window: &slint::Window, callback: impl FnOnce() -> R) -> R {
+		let modal_parent_raw_handle = window
+			.with_winit_window(|window| window.window_handle().ok().map(|x| x.as_raw()))
+			.flatten();
+		self.0.borrow_mut().modal_parent_raw_handle = modal_parent_raw_handle;
+		let result = callback();
+		self.0.borrow_mut().modal_parent_raw_handle = None;
+		result
 	}
 
 	fn create_pending_child_windows(&self, event_loop: &ActiveEventLoop) {

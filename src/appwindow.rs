@@ -348,7 +348,7 @@ pub fn create(args: AppArgs) -> AppWindow {
 	}
 
 	// create the window stack
-	let modal_stack = ModalStack::new(&app_window);
+	let modal_stack = ModalStack::new(args.backend_runtime.clone(), &app_window);
 
 	// create the model
 	let model = AppModel {

@@ -10,16 +10,17 @@ use slint::PhysicalPosition;
 use slint::Window;
 use slint::WindowHandle;
 use winit::event::WindowEvent;
-use winit::window::WindowAttributes;
 
+use crate::backend::BackendRuntime;
 use crate::guiutils::component::ComponentWrap;
 use crate::guiutils::component::WeakComponentWrap;
-use crate::guiutils::hook::with_attributes_hook;
-use crate::platform::WindowAttributesExt;
 use crate::platform::WindowExt;
 
 #[derive(Clone)]
-pub struct ModalStack(Rc<RefCell<Vec<WeakComponentWrap>>>);
+pub struct ModalStack {
+	backend_runtime: BackendRuntime,
+	stack: Rc<RefCell<Vec<WeakComponentWrap>>>,
+}
 
 pub struct Modal<D> {
 	modal_stack: ModalStack,
@@ -29,32 +30,27 @@ pub struct Modal<D> {
 }
 
 impl ModalStack {
-	pub fn new(window: &(impl ComponentHandle + Sized + 'static)) -> Self {
+	pub fn new(backend_runtime: BackendRuntime, window: &(impl ComponentHandle + Sized + 'static)) -> Self {
 		let vec: Vec<WeakComponentWrap> = vec![WeakComponentWrap::from(window)];
-		Self(Rc::new(RefCell::new(vec)))
+		let stack = Rc::new(RefCell::new(vec));
+		Self { backend_runtime, stack }
 	}
 
 	pub fn modal<D>(&self, func: impl FnOnce() -> D) -> Modal<D>
 	where
 		D: ComponentHandle + 'static,
 	{
-		let modal_stack_pos = self.0.borrow().len();
-		let parent = self.0.borrow().last().unwrap().unwrap();
+		let modal_stack_pos = self.stack.borrow().len();
+		let parent = self.stack.borrow().last().unwrap().unwrap();
 
 		// disable the parent
 		parent.window().set_enabled_for_modal(false);
 
-		// set up a hook
-		let parent_weak = parent.as_weak();
-		let hook = move |window_attributes| {
-			set_window_attributes_for_modal_parent(window_attributes, parent_weak.unwrap().window())
-		};
-
 		// invoke the func
-		let dialog = with_attributes_hook(func, hook);
+		let dialog = self.backend_runtime.with_modal_parent(parent.window(), func);
 
 		// add this dialog to the stack
-		self.0.borrow_mut().push(dialog.as_weak().into());
+		self.stack.borrow_mut().push(dialog.as_weak().into());
 
 		// position the new dialog
 		let new_dialog_position = {
@@ -103,7 +99,7 @@ impl ModalStack {
 	}
 
 	pub fn top(&self) -> WindowHandle {
-		self.0.borrow().last().unwrap().unwrap().window().window_handle()
+		self.stack.borrow().last().unwrap().unwrap().window().window_handle()
 	}
 }
 
@@ -152,16 +148,8 @@ where
 impl<D> Drop for Modal<D> {
 	fn drop(&mut self) {
 		// truncate the modal stack
-		self.modal_stack.0.borrow_mut().truncate(self.modal_stack_pos);
+		self.modal_stack.stack.borrow_mut().truncate(self.modal_stack_pos);
 	}
-}
-
-fn set_window_attributes_for_modal_parent(
-	mut window_attributes: WindowAttributes,
-	parent: &Window,
-) -> WindowAttributes {
-	window_attributes = window_attributes.with_owner_window(parent);
-	window_attributes
 }
 
 fn reenable_modal_parent(parent: &ComponentWrap) {

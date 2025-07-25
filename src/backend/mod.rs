@@ -36,6 +36,7 @@ pub enum SlintBackend {
 	Qt,
 }
 
+#[derive(Clone)]
 pub enum BackendRuntime {
 	Winit(WinitBackendRuntime),
 
@@ -95,6 +96,15 @@ impl BackendRuntime {
 
 			#[cfg(feature = "slint-qt-backend")]
 			Self::Qt(backend) => todo!(),
+		}
+	}
+
+	pub fn with_modal_parent<R>(&self, window: &Window, callback: impl FnOnce() -> R) -> R {
+		match self {
+			Self::Winit(backend) => backend.with_modal_parent(window, callback),
+
+			#[cfg(feature = "slint-qt-backend")]
+			Self::Qt(_) => callback(),
 		}
 	}
 }
