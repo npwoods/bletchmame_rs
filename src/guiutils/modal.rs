@@ -2,36 +2,41 @@ use std::cell::RefCell;
 use std::future::Future;
 use std::rc::Rc;
 
-use i_slint_backend_winit::WinitWindowAccessor;
-use i_slint_backend_winit::WinitWindowEventResult;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
 use slint::PhysicalPosition;
 use slint::Window;
 use slint::WindowHandle;
-use winit::event::WindowEvent;
 
 use crate::backend::BackendRuntime;
-use crate::guiutils::component::ComponentWrap;
-use crate::guiutils::component::WeakComponentWrap;
 use crate::platform::WindowExt;
 
 #[derive(Clone)]
 pub struct ModalStack {
 	backend_runtime: BackendRuntime,
-	stack: Rc<RefCell<Vec<WeakComponentWrap>>>,
+	stack: Rc<RefCell<Vec<ModalStackEntry>>>,
 }
 
 pub struct Modal<D> {
-	modal_stack: ModalStack,
-	modal_stack_pos: usize,
-	reenable_parent: Rc<dyn Fn() + 'static>,
+	bookmark: ModalStackBookmark,
 	dialog: D,
+}
+
+#[derive(Clone)]
+struct ModalStackBookmark {
+	modal_stack: ModalStack,
+	position: usize,
+}
+
+struct ModalStackEntry(Box<dyn Fn() -> Box<dyn WindowOwner>>);
+
+trait WindowOwner {
+	fn window(&self) -> &'_ Window;
 }
 
 impl ModalStack {
 	pub fn new(backend_runtime: BackendRuntime, window: &(impl ComponentHandle + Sized + 'static)) -> Self {
-		let vec: Vec<WeakComponentWrap> = vec![WeakComponentWrap::from(window)];
+		let vec = vec![ModalStackEntry::new(window)];
 		let stack = Rc::new(RefCell::new(vec));
 		Self { backend_runtime, stack }
 	}
@@ -41,21 +46,25 @@ impl ModalStack {
 		D: ComponentHandle + 'static,
 	{
 		let modal_stack_pos = self.stack.borrow().len();
-		let parent = self.stack.borrow().last().unwrap().unwrap();
 
-		// disable the parent
-		parent.window().set_enabled_for_modal(false);
+		let (dialog, parent_size, parent_position) = self.stack.borrow().last().unwrap().with_window(move |parent| {
+			// disable the parent
+			parent.set_enabled_for_modal(false);
 
-		// invoke the func
-		let dialog = self.backend_runtime.with_modal_parent(parent.window(), func);
+			// invoke the func
+			let dialog = self.backend_runtime.with_modal_parent(parent, func);
+
+			// return the dialog, along with size/position
+			let parent_size = parent.size();
+			let parent_position = parent.position();
+			(dialog, parent_size, parent_position)
+		});
 
 		// add this dialog to the stack
-		self.stack.borrow_mut().push(dialog.as_weak().into());
+		self.stack.borrow_mut().push(ModalStackEntry::new(&dialog));
 
 		// position the new dialog
 		let new_dialog_position = {
-			let parent_size = parent.window().size();
-			let parent_position = parent.window().position();
 			let dialog_size = dialog.window().size();
 			let x = parent_position.x
 				+ (i32::try_from(parent_size.width).unwrap() - i32::try_from(dialog_size.width).unwrap()) / 2;
@@ -65,41 +74,22 @@ impl ModalStack {
 		};
 		dialog.window().set_position(new_dialog_position);
 
-		// keep the window on top
-		let dialog_weak = dialog.as_weak();
-		parent.window().on_winit_window_event(move |_, evt| {
-			let dialog = matches!(evt, WindowEvent::Focused(true))
-				.then(|| dialog_weak.upgrade())
-				.flatten();
-			if let Some(dialog) = dialog {
-				dialog.window().with_winit_window(|window| window.focus_window());
-				WinitWindowEventResult::PreventDefault
-			} else {
-				WinitWindowEventResult::Propagate
-			}
-		});
-
 		// set up a bogus callback because the default callback won't do the right thing
 		dialog
 			.window()
 			.on_close_requested(move || panic!("Need to override on_close_requested"));
 
-		// create a callback to reenable the parent
-		let parent = parent.clone_strong();
-		let reenable_parent = move || reenable_modal_parent(&parent);
-		let reenable_parent = Rc::from(reenable_parent);
-
 		// and return
-		Modal {
-			modal_stack: self.clone(),
-			modal_stack_pos,
-			reenable_parent,
-			dialog,
-		}
+		let bookmark = ModalStackBookmark::new(self.clone(), modal_stack_pos);
+		Modal { bookmark, dialog }
 	}
 
 	pub fn top(&self) -> WindowHandle {
-		self.stack.borrow().last().unwrap().unwrap().window().window_handle()
+		self.stack
+			.borrow()
+			.last()
+			.unwrap()
+			.with_window(|window: &Window| window.window_handle())
 	}
 }
 
@@ -117,9 +107,9 @@ where
 
 	pub fn launch(self) {
 		// stow a callback to reenable the parent here
-		let reenable_parent_clone = self.reenable_parent.clone();
+		let bookmark_clone = self.bookmark.clone();
 		self.window().on_close_requested(move || {
-			reenable_parent_clone();
+			bookmark_clone.reenable_parent();
 			CloseRequestResponse::HideWindow
 		});
 
@@ -135,7 +125,7 @@ where
 		let result = fut.await;
 
 		// before we hide the dialog, reenable the parent
-		(self.reenable_parent)();
+		self.bookmark.reenable_parent();
 
 		// hide the dialog
 		self.dialog.hide().unwrap();
@@ -145,16 +135,66 @@ where
 	}
 }
 
-impl<D> Drop for Modal<D> {
-	fn drop(&mut self) {
-		// truncate the modal stack
-		self.modal_stack.stack.borrow_mut().truncate(self.modal_stack_pos);
+impl ModalStackBookmark {
+	pub fn new(modal_stack: ModalStack, position: usize) -> Self {
+		Self { modal_stack, position }
+	}
+
+	pub fn reenable_parent(&self) {
+		let parent_pos = self.position - 1;
+		self.modal_stack.stack.borrow()[parent_pos].with_window(|window| window.set_enabled_for_modal(true));
 	}
 }
 
-fn reenable_modal_parent(parent: &ComponentWrap) {
-	parent.window().set_enabled_for_modal(true);
-	parent
-		.window()
-		.on_winit_window_event(|_, _| WinitWindowEventResult::Propagate);
+impl Drop for ModalStackBookmark {
+	fn drop(&mut self) {
+		// truncate the modal stack
+		self.modal_stack.stack.borrow_mut().truncate(self.position);
+	}
+}
+
+impl ModalStackEntry {
+	pub fn new<C>(component: &C) -> Self
+	where
+		C: ComponentHandle + 'static,
+	{
+		struct MyWindowOwner<C>(C);
+
+		impl<C> WindowOwner for MyWindowOwner<C>
+		where
+			C: ComponentHandle + 'static,
+		{
+			fn window(&self) -> &'_ Window {
+				self.0.window()
+			}
+		}
+
+		let component_weak = component.as_weak();
+		let func = move || Box::new(MyWindowOwner(component_weak.unwrap())) as Box<dyn WindowOwner>;
+		Self(Box::new(func) as Box<_>)
+	}
+
+	pub fn with_window<'a, R>(&'a self, callback: impl FnOnce(&Window) -> R) -> R
+	where
+		R: 'a,
+	{
+		let window_owner = (self.0)();
+		let window = window_owner.window();
+		callback(window)
+		/*
+		let result = Rc::new(RefCell::new(None));
+		let result_clone = result.clone();
+
+		self.0(Box::new(move |window| {
+			let callback_result = callback(window);
+			result_clone.replace(Some(callback_result));
+		}));
+
+		Rc::try_unwrap(result)
+			.unwrap_or_else(|_| unreachable!("Rc::try_unwrap() failed"))
+			.borrow_mut()
+			.take()
+			.unwrap()
+			 */
+	}
 }
