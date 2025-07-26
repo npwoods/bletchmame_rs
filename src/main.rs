@@ -32,11 +32,13 @@ mod xml;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::rc::Rc;
 
 use appwindow::AppWindowing;
 use dirs::config_local_dir;
 use slint::ComponentHandle;
 use slint::run_event_loop;
+use slint::spawn_local;
 use structopt::StructOpt;
 use tracing_subscriber::EnvFilter;
 
@@ -46,6 +48,7 @@ use crate::backend::SlintBackend;
 use crate::diagnostics::info_db_from_xml_file;
 use crate::platform::platform_init;
 use crate::runtime::MameStderr;
+use crate::ui::AppWindow;
 
 mod ui {
 	slint::include_modules!();
@@ -142,14 +145,20 @@ fn main() -> ExitCode {
 	let backend_type = opts.slint_backend.unwrap_or_default();
 	let backend_runtime = BackendRuntime::new(backend_type).expect("slint backend setup failed");
 
-	// create the application window...
+	// run the application window...
 	let args = AppArgs {
 		prefs_path,
 		mame_stderr,
 		mame_windowing,
 		backend_runtime,
 	};
-	let app_window = appwindow::create(args);
+	let app_window = AppWindow::new().expect("Failed to create main window");
+	let app_window = Rc::new(app_window);
+	let app_window_clone = app_window.clone();
+	let fut = async move {
+		appwindow::start(&app_window_clone, args).await;
+	};
+	spawn_local(fut).unwrap();
 
 	// ...and run run run!
 	run_event_loop().unwrap();

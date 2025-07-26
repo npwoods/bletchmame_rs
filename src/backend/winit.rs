@@ -93,6 +93,11 @@ impl WinitBackendRuntime {
 		Ok(Box::new(slint_backend) as Box<_>)
 	}
 
+	pub async fn wait_for_window_ready(&self, window: &slint::Window) -> Result<()> {
+		let _ = window.winit_window().await?;
+		Ok(())
+	}
+
 	pub async fn create_child_window(&self, parent: &slint::Window) -> Result<Rc<WinitChildWindow>> {
 		// prepare the window attributes
 		let raw_window_handle = parent.window_handle().window_handle()?.as_raw();

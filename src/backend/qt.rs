@@ -26,6 +26,10 @@ impl QtBackendRuntime {
 		Box::new(slint_backend) as Box<_>
 	}
 
+	pub async fn wait_for_window_ready(&self, _window: &slint::Window) -> Result<()> {
+		Ok(())
+	}
+
 	pub fn create_child_window(&self, parent: &slint::Window) -> Result<QtChildWindow> {
 		let parent = parent.qt_widget_ptr().ok_or(ThisError::CannotCreateChildWindow)?;
 		let qt_widget = QtWidget::new(parent);
