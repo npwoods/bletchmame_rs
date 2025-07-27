@@ -20,11 +20,11 @@ use slint::SharedString;
 use slint::TableColumn;
 use slint::VecModel;
 use slint::Weak;
-use slint::invoke_from_event_loop;
 use slint::quit_event_loop;
 use slint::spawn_local;
 use strum::EnumString;
 use strum::IntoEnumIterator;
+use tokio::time::Duration;
 use tracing::debug;
 use tracing::debug_span;
 use tracing::info;
@@ -302,37 +302,30 @@ impl AppModel {
 	}
 }
 
-pub fn create(args: AppArgs) -> AppWindow {
-	// create the main "App" window
-	let app_window = AppWindow::new().expect("Failed to create main window");
-
-	// prepare the menu bar
+pub async fn start(app_window: &AppWindow, args: AppArgs) {
+	// prepare the menu bar; we explicitly want to do this before `wait_for_window_ready()`
 	app_window.set_menu_items_builtin_collections(ModelRc::new(VecModel::from(
 		BuiltinCollection::iter()
 			.map(|x| SharedString::from(x.to_string()))
 			.collect::<Vec<_>>(),
 	)));
-	let app_window_weak = app_window.as_weak();
-	invoke_from_event_loop(move || {
-		// need to invoke from event loop so this can happen after menu rebuild
-		app_window_weak.unwrap().window().with_muda_menu(|menu_bar| {
-			let _ = menu_bar.visit((), |_, sub_menu, item| {
-				if let Some(title) = item.text() {
-					let parent_title = sub_menu.map(|x| x.text());
-					let (command, accelerator) = menu_item_info(parent_title.as_deref(), &title);
 
-					if command.is_none() {
-						item.set_enabled(false);
-					}
-					if let Some(accelerator) = accelerator {
-						item.set_accelerator(Some(accelerator)).unwrap();
-					}
-				}
-				ControlFlow::<Infallible>::Continue(())
-			});
-		});
-	})
-	.unwrap();
+	// wait for app_window to be ready
+	args.backend_runtime
+		.wait_for_window_ready(app_window.window())
+		.await
+		.unwrap();
+
+	// if we have muda, we have to hack the menu to have enabled and accelerators
+	let has_muda = app_window.window().with_muda_menu(|_| ()).is_some();
+	if has_muda {
+		let app_window_weak = app_window.as_weak();
+		let fut = async move {
+			let app_window = app_window_weak.unwrap();
+			hack_muda_menu(&app_window).await;
+		};
+		spawn_local(fut).unwrap();
+	};
 
 	// get preferences
 	let prefs_path = args.prefs_path;
@@ -348,7 +341,7 @@ pub fn create(args: AppArgs) -> AppWindow {
 	}
 
 	// create the window stack
-	let modal_stack = ModalStack::new(args.backend_runtime.clone(), &app_window);
+	let modal_stack = ModalStack::new(args.backend_runtime.clone(), app_window);
 
 	// create the model
 	let model = AppModel {
@@ -363,16 +356,12 @@ pub fn create(args: AppArgs) -> AppWindow {
 	let model = Rc::new(model);
 
 	// set full screen
-	let model_clone = model.clone();
-	let fut = async move {
-		let prefs = model_clone.preferences.borrow();
-		let app_window = model_clone.app_window();
+	{
+		let prefs = model.preferences.borrow();
 		app_window
 			.window()
 			.set_fullscreen_with_display(prefs.is_fullscreen, prefs.fullscreen_display.as_deref());
-		app_window.show().unwrap();
-	};
-	spawn_local(fut).unwrap();
+	}
 
 	// attach the menu bar (either natively or with an approximation using Slint); looking forward to Slint having first class menuing support
 	let model_clone = model.clone();
@@ -418,42 +407,34 @@ pub fn create(args: AppArgs) -> AppWindow {
 	});
 
 	// scroll lock handler (do this in a future because the window might not be inited yet)
-	let model_clone = model.clone();
-	let app_window_weak = app_window.as_weak();
-	let fut = async move {
-		let app_window = app_window_weak.unwrap();
-		app_window.window().with_muda_menu(move |menubar| {
-			// build the accelerator map
-			let accelerator_command_map =
-				menubar.visit(HashMap::new(), |mut accelerator_command_map, sub_menu, item| {
-					if let Some(title) = item.text() {
-						let parent_title = sub_menu.map(|x| x.text());
-						let (command, accelerator) = menu_item_info(parent_title.as_deref(), &title);
-						if let Some(command) = command
-							&& let Some(accelerator) = accelerator
-						{
-							accelerator_command_map.insert(accelerator, command);
-						}
-					}
-					ControlFlow::<Infallible, _>::Continue(accelerator_command_map)
-				});
-			let accelerator_command_map = accelerator_command_map.continue_value().unwrap();
-
-			// and install the callback
-			let app_window = app_window_weak.unwrap();
-			let model = model_clone.clone();
-			model
-				.backend_runtime
-				.install_muda_accelerator_handler(app_window.window(), move |accelerator| {
-					let command = accelerator_command_map.get(accelerator);
-					if let Some(command) = command {
-						handle_command(&model_clone, command.clone());
-					}
-					command.is_some()
-				});
+	app_window.window().with_muda_menu(|menubar| {
+		// build the accelerator map
+		let accelerator_command_map = menubar.visit(HashMap::new(), |mut accelerator_command_map, sub_menu, item| {
+			if let Some(title) = item.text() {
+				let parent_title = sub_menu.map(|x| x.text());
+				let (command, accelerator) = menu_item_info(parent_title.as_deref(), &title);
+				if let Some(command) = command
+					&& let Some(accelerator) = accelerator
+				{
+					accelerator_command_map.insert(accelerator, command);
+				}
+			}
+			ControlFlow::<Infallible, _>::Continue(accelerator_command_map)
 		});
-	};
-	spawn_local(fut).unwrap();
+		let accelerator_command_map = accelerator_command_map.continue_value().unwrap();
+
+		// and install the callback
+		let model_clone = model.clone();
+		model
+			.backend_runtime
+			.install_muda_accelerator_handler(app_window.window(), move |accelerator| {
+				let command = accelerator_command_map.get(accelerator);
+				if let Some(command) = command {
+					handle_command(&model_clone, command.clone());
+				}
+				command.is_some()
+			});
+	});
 
 	// set up the collections view model
 	let collections_view_model = CollectionsViewModel::new(app_window.as_weak());
@@ -462,7 +443,7 @@ pub fn create(args: AppArgs) -> AppWindow {
 
 	// set up items view model
 	let selection = SelectionManager::new(
-		&app_window,
+		app_window,
 		AppWindow::get_items_view_selected_index,
 		AppWindow::invoke_items_view_select,
 	);
@@ -606,45 +587,77 @@ pub fn create(args: AppArgs) -> AppWindow {
 	update_items_columns_model(&model);
 	update_items_model_for_current_prefs(&model);
 
-	// future to set up initial state
-	let model_clone = model.clone();
-	let mame_windowing = args.mame_windowing;
-	let fut = async move {
-		// create the child window
-		let app_window = model_clone.app_window();
-		let mame_windowing = match mame_windowing {
-			AppWindowing::Integrated => {
-				let parent = app_window.window();
-				let child_window = model.backend_runtime.create_child_window(parent).await.unwrap();
-				let child_window_text = child_window.text();
-				model_clone.child_window.replace(Some(child_window));
-				MameWindowing::Attached(child_window_text.into())
-			}
-			AppWindowing::Windowed => MameWindowing::Windowed,
-			AppWindowing::WindowedMaximized => MameWindowing::WindowedMaximized,
-			AppWindowing::Fullscreen => MameWindowing::Fullscreen,
-		};
-
-		// now create the "real initial" state, now that we have a model to work with
-		let paths = model.preferences.borrow().paths.clone();
-		let model_weak = Rc::downgrade(&model_clone);
-		let state = AppState::new(prefs_path, paths, mame_windowing, args.mame_stderr, move |command| {
-			let model = model_weak.upgrade().unwrap();
-			handle_command(&model, command);
-		});
-
-		// and lets do something with that state; specifically
-		// - load the InfoDB (if availble)
-		// - start the MAME session (and maybe an InfoDB build in parallel)
-		model.update_state(|_| state.activate());
-
-		// and we've started
-		app_window.set_has_started(true);
+	// create the child window
+	let mame_windowing = match args.mame_windowing {
+		AppWindowing::Integrated => {
+			let parent = app_window.window();
+			let child_window = model.backend_runtime.create_child_window(parent).await.unwrap();
+			let child_window_text = child_window.text();
+			model.child_window.replace(Some(child_window));
+			MameWindowing::Attached(child_window_text.into())
+		}
+		AppWindowing::Windowed => MameWindowing::Windowed,
+		AppWindowing::WindowedMaximized => MameWindowing::WindowedMaximized,
+		AppWindowing::Fullscreen => MameWindowing::Fullscreen,
 	};
-	spawn_local(fut).unwrap();
 
-	// and we're done!
-	app_window
+	// now create the "real initial" state, now that we have a model to work with
+	let paths = model.preferences.borrow().paths.clone();
+	let model_weak = Rc::downgrade(&model);
+	let state = AppState::new(prefs_path, paths, mame_windowing, args.mame_stderr, move |command| {
+		let model = model_weak.upgrade().unwrap();
+		handle_command(&model, command);
+	});
+
+	// and lets do something with that state; specifically
+	// - load the InfoDB (if availble)
+	// - start the MAME session (and maybe an InfoDB build in parallel)
+	model.update_state(|_| state.activate());
+
+	// and we've started
+	app_window.set_has_started(true);
+
+	// and show the window and we're done!
+	app_window.show().unwrap();
+}
+
+/// Hacks to get around the fact that Slint does not yet support menu accelerators yet
+async fn hack_muda_menu(app_window: &AppWindow) {
+	// wait for the "All Software" menu item to be created
+	let all_software_string = BuiltinCollection::AllSoftware.to_string();
+	while app_window
+		.window()
+		.with_muda_menu(|menu_bar| {
+			menu_bar.visit((), |_, _, item| {
+				if item.text().as_deref() == Some(&all_software_string) {
+					ControlFlow::Break(())
+				} else {
+					ControlFlow::Continue(())
+				}
+			})
+		})
+		.is_some_and(|x| x.is_continue())
+	{
+		tokio::time::sleep(Duration::from_millis(10)).await;
+	}
+
+	// and update the menu (hopefully it doesn't get nuked later)
+	app_window.window().with_muda_menu(|menu_bar| {
+		let _ = menu_bar.visit((), |_, sub_menu, item| {
+			if let Some(title) = item.text() {
+				let parent_title = sub_menu.map(|x| x.text());
+				let (command, accelerator) = menu_item_info(parent_title.as_deref(), &title);
+
+				if command.is_none() {
+					item.set_enabled(false);
+				}
+				if let Some(accelerator) = accelerator {
+					item.set_accelerator(Some(accelerator)).unwrap();
+				}
+			}
+			ControlFlow::<Infallible>::Continue(())
+		});
+	});
 }
 
 fn menu_item_info(parent_title: Option<&str>, title: &str) -> (Option<AppCommand>, Option<Accelerator>) {

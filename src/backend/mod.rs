@@ -80,6 +80,15 @@ impl BackendRuntime {
 		Ok(backend_runtime)
 	}
 
+	pub async fn wait_for_window_ready(&self, window: &Window) -> Result<()> {
+		match self {
+			Self::Winit(backend) => backend.wait_for_window_ready(window).await,
+
+			#[cfg(feature = "slint-qt-backend")]
+			Self::Qt(backend) => backend.wait_for_window_ready(window).await,
+		}
+	}
+
 	pub async fn create_child_window(&self, parent: &Window) -> Result<ChildWindow> {
 		let child_window = match self {
 			Self::Winit(backend) => ChildWindow::Winit(backend.create_child_window(parent).await?),
