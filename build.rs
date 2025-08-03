@@ -19,10 +19,18 @@ fn main() -> std::io::Result<()> {
 		env::set_var("SLINT_ENABLE_EXPERIMENTAL_FEATURES", "1");
 	}
 
+	// build library paths
+	let slint_material_components_dir = slint_material_components::import_path()
+		.get("slint")
+		.unwrap()
+		.join("..");
+	let mut library_paths = vivi_ui::import_paths();
+	library_paths.insert("slint".into(), slint_material_components_dir);
+
 	// build Slint stuff
 	slint_build::compile_with_config(
 		"ui/main.slint",
-		slint_build::CompilerConfiguration::new().with_library_paths(vivi_ui::import_paths()),
+		slint_build::CompilerConfiguration::new().with_library_paths(library_paths),
 	)
 	.unwrap();
 

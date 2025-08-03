@@ -1,5 +1,6 @@
 import { HorizontalBox, VerticalBox, Button, StandardListView, StandardTableView, LineEdit, ListView, ScrollView, GridBox, Spinner } from "std-widgets.slint";
-import { MagicListView, MagicListViewItem, Icons, FilledButton } from "@vivi/magic.slint";
+import { MagicListView, MagicListViewItem } from "@vivi/magic.slint";
+import { FilledIconButton, SearchBar } from "@slint/material.slint";
 
 struct CollectionContextMenuInfo {
     move-up-command: string,
@@ -555,31 +556,35 @@ export component AppWindow inherits Window {
                     horizontal-stretch: 1;
                     vertical-stretch: 0;
                     preferred-width: 100%;
-                    FilledButton {
-                        prefix_icon: Icons.arrow_back;
+                    FilledIconButton {
+                        horizontal-stretch: 0;
+                        icon: @image-url("icons/arrow-back.svg");
                         enabled: history-can-go-back;
                         clicked => {
                             history-advance-clicked(-1)
                         }
                     }
 
-                    FilledButton {
-                        prefix_icon: Icons.book;
+                    FilledIconButton {
+                        horizontal-stretch: 0;
+                        icon: @image-url("icons/book.svg");
                         enabled: bookmark-collection-enabled;
                         clicked => {
                             bookmark-collection-clicked();
                         }
                     }
 
-                    FilledButton {
-                        prefix_icon: Icons.arrow_forward;
+                    FilledIconButton {
+                        horizontal-stretch: 0;
+                        icon: @image-url("icons/arrow-forward.svg");
                         enabled: history-can-go-forward;
                         clicked => {
                             history-advance-clicked(+1)
                         }
                     }
 
-                    LineEdit {
+                    SearchBar {
+                        horizontal-stretch: 1;
                         text <=> items-search-text;
                         edited(text) => {
                             items-search-text-changed(text)
