@@ -552,7 +552,7 @@ impl State {
 			let software_entry = dispenser.get(software_list).ok().and_then(|(_, x)| {
 				x.software
 					.iter()
-					.flat_map(|x| (x.name.as_ref() == software).then(|| x.clone()))
+					.flat_map(|x| (x.name == software).then(|| x.clone()))
 					.next()
 			});
 			if let Some(software_entry) = software_entry.as_deref() {

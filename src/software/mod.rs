@@ -11,6 +11,7 @@ use std::thread::scope;
 
 use anyhow::Error;
 use anyhow::Result;
+use smol_str::SmolStr;
 
 use crate::info;
 use crate::info::InfoDb;
@@ -20,26 +21,26 @@ use crate::software::process::process_xml;
 mod process;
 
 pub struct SoftwareList {
-	pub name: Arc<str>,
-	pub description: Arc<str>,
+	pub name: SmolStr,
+	pub description: SmolStr,
 	pub software: Vec<Arc<Software>>,
 }
 
 #[derive(Debug)]
 pub struct Software {
-	pub name: Arc<str>,
-	pub description: Arc<str>,
-	pub year: Arc<str>,
-	pub publisher: Arc<str>,
+	pub name: SmolStr,
+	pub description: SmolStr,
+	pub year: SmolStr,
+	pub publisher: SmolStr,
 	pub parts: Vec<SoftwarePart>,
 }
 
 #[derive(Debug)]
 pub struct SoftwarePart {
 	#[allow(dead_code)]
-	pub name: Arc<str>,
+	pub name: SmolStr,
 
-	pub interface: Arc<str>,
+	pub interface: SmolStr,
 }
 
 impl SoftwareList {

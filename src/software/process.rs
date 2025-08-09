@@ -186,12 +186,7 @@ mod test {
 	pub fn software(_index: usize, xml: &str, name: &str, expected: (&str, &str, &str)) {
 		let reader = BufReader::new(xml.as_bytes());
 		let software_list = process_xml(reader).unwrap();
-		let software = software_list
-			.software
-			.iter()
-			.find(|x| x.name.as_ref() == name)
-			.unwrap()
-			.as_ref();
+		let software = software_list.software.iter().find(|x| x.name == name).unwrap().as_ref();
 		let actual = (
 			software.description.as_ref(),
 			software.year.as_ref(),

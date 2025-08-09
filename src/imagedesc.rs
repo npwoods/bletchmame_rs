@@ -1,20 +1,20 @@
 use std::borrow::Cow;
 use std::path::Path;
 use std::str::FromStr;
-use std::sync::Arc;
 
 use anyhow::Result;
 use serde::Deserialize;
 use serde::Serialize;
 use serde::de::Visitor;
 use serde::de::value::MapAccessDeserializer;
+use smol_str::SmolStr;
 
 use crate::software::is_valid_software_list_name;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ImageDesc {
 	File(String),
-	Software(Arc<str>),
+	Software(SmolStr),
 	Socket { hostname: String, port: u16 },
 }
 
@@ -126,7 +126,7 @@ fn socket(hostname: impl Into<String>, port: u16) -> Result<ImageDesc, ThisError
 #[serde(rename_all = "camelCase")]
 enum ImageDescAlt {
 	File { filename: String },
-	Software { name: Arc<str> },
+	Software { name: SmolStr },
 	Socket { hostname: String, port: u16 },
 }
 
