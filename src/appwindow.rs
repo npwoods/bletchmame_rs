@@ -397,12 +397,12 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	// create a repeating future that will update the child window forever
 	let model_weak = Rc::downgrade(&model);
 	app_window.on_size_changed(move || {
-		if let Some(model) = model_weak.upgrade().as_deref() {
-			if let Some(child_window) = model.child_window.borrow().as_ref() {
-				// set the child window size
-				let top = model.app_window().invoke_menubar_height();
-				child_window.update_bounds(model.app_window().window(), top);
-			}
+		if let Some(model) = model_weak.upgrade().as_deref()
+			&& let Some(child_window) = model.child_window.borrow().as_ref()
+		{
+			// set the child window size
+			let top = model.app_window().invoke_menubar_height();
+			child_window.update_bounds(model.app_window().window(), top);
 		}
 	});
 

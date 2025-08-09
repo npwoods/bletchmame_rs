@@ -55,11 +55,11 @@ impl ImageDesc {
 	}
 
 	pub fn validate(&self) -> Result<()> {
-		if let Self::File(filename) = self {
-			if !Path::new(filename).is_file() {
-				let error = ThisError::FileNotFound(filename.to_string());
-				return Err(error.into());
-			}
+		if let Self::File(filename) = self
+			&& !Path::new(filename).is_file()
+		{
+			let error = ThisError::FileNotFound(filename.to_string());
+			return Err(error.into());
 		}
 		Ok(())
 	}

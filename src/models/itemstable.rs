@@ -111,41 +111,41 @@ impl ItemsTableModel {
 			self.info_db.replace(info_db);
 			must_refresh_items = true;
 		}
-		if let Some(software_list_paths) = software_list_paths {
-			if software_list_paths != self.software_list_paths.borrow().as_slice() {
-				self.software_list_paths.replace(software_list_paths.to_vec());
-				must_refresh_items = true;
-			}
+		if let Some(software_list_paths) = software_list_paths
+			&& software_list_paths != self.software_list_paths.borrow().as_slice()
+		{
+			self.software_list_paths.replace(software_list_paths.to_vec());
+			must_refresh_items = true;
 		}
-		if let Some(collection) = collection {
-			if Some(collection.as_ref()) != self.current_collection.borrow().as_deref() {
-				self.current_collection.replace(Some(collection));
-				must_refresh_items = true;
-			}
+		if let Some(collection) = collection
+			&& Some(collection.as_ref()) != self.current_collection.borrow().as_deref()
+		{
+			self.current_collection.replace(Some(collection));
+			must_refresh_items = true;
 		}
 
 		// update the state that forces the map to refresh
 		let mut must_refresh_map = must_refresh_items;
-		if let Some(search) = search {
-			if search != self.search.borrow().as_str() {
-				self.search.replace(search.to_string());
-				must_refresh_map = true;
-			}
+		if let Some(search) = search
+			&& search != self.search.borrow().as_str()
+		{
+			self.search.replace(search.to_string());
+			must_refresh_map = true;
 		}
-		if let Some(sorting) = sorting {
-			if sorting != self.sorting.get() {
-				self.sorting.set(sorting);
-				must_refresh_map = true;
-			}
+		if let Some(sorting) = sorting
+			&& sorting != self.sorting.get()
+		{
+			self.sorting.set(sorting);
+			must_refresh_map = true;
 		}
 
 		// update the state that forces Slint model notifications
 		let mut must_notify = must_refresh_map;
-		if let Some(column_types) = column_types {
-			if column_types.as_ref() != self.column_types.borrow().as_ref() {
-				self.column_types.replace(column_types);
-				must_notify = true;
-			}
+		if let Some(column_types) = column_types
+			&& column_types.as_ref() != self.column_types.borrow().as_ref()
+		{
+			self.column_types.replace(column_types);
+			must_notify = true;
 		}
 
 		// gauge whether we need to update the selection
