@@ -727,6 +727,7 @@ dependencies = [
  "slint-build",
  "slint-material-components",
  "smallvec",
+ "smol_str 0.3.2",
  "structopt",
  "strum",
  "strum_macros",
