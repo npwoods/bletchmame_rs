@@ -385,9 +385,7 @@ impl ItemsTableModel {
 									.devices()
 									.iter()
 									.find(|dev| dev.interfaces().any(|x| x == part.interface))
-									.map(|dev| {
-										(Arc::<str>::from(dev.tag()), ImageDesc::Software(software.name.clone()))
-									})
+									.map(|dev| (dev.tag().into(), ImageDesc::Software(software.name.clone())))
 									.ok_or(())
 							})
 							.collect::<std::result::Result<Vec<_>, ()>>();

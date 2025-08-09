@@ -37,7 +37,7 @@ impl MameCommand {
 		let slot_args_iter = start_args
 			.slots
 			.iter()
-			.flat_map(|(tag, value)| [Cow::Borrowed(tag.as_ref()), value.as_ref().into()]);
+			.flat_map(|(tag, value)| [Cow::Borrowed(tag.as_ref()), value.as_str().into()]);
 
 		// images
 		let image_args_iter = start_args
