@@ -1,5 +1,4 @@
 use std::io::BufRead;
-use std::sync::Arc;
 
 use anyhow::Error;
 use anyhow::Result;
@@ -9,7 +8,6 @@ use crate::software::Software;
 use crate::software::SoftwareList;
 use crate::software::SoftwarePart;
 use crate::software::is_valid_software_list_name;
-use crate::software::strings::StringDispenser;
 use crate::xml::XmlElement;
 use crate::xml::XmlEvent;
 use crate::xml::XmlReader;
@@ -30,25 +28,19 @@ const TEXT_CAPTURE_PHASES: &[Phase] = &[
 	Phase::SoftwarePublisher,
 ];
 
-struct State<'a> {
+struct State {
 	phase_stack: Vec<Phase>,
-	string_dispenser: &'a StringDispenser,
-	empty_str: Arc<str>,
 	software_list: SoftwareList,
 	current_software: Option<Software>,
 }
 
-impl<'a> State<'a> {
-	pub fn new(string_dispenser: &'a StringDispenser) -> Self {
-		let empty_str = string_dispenser.get("");
-
+impl State {
+	pub fn new() -> Self {
 		Self {
 			phase_stack: Vec::with_capacity(32),
-			string_dispenser,
-			empty_str: empty_str.clone(),
 			software_list: SoftwareList {
-				name: empty_str.clone(),
-				description: empty_str.clone(),
+				name: Default::default(),
+				description: Default::default(),
 				software: Vec::new(),
 			},
 			current_software: None,
@@ -60,8 +52,8 @@ impl<'a> State<'a> {
 		let new_phase = match (phase, evt.name().as_ref()) {
 			(Phase::Root, b"softwarelist") => {
 				let [name, description] = evt.find_attributes([b"name", b"description"])?;
-				self.software_list.name = self.string_dispenser.get(&name.unwrap_or_default());
-				self.software_list.description = self.string_dispenser.get(&description.unwrap_or_default());
+				self.software_list.name = name.unwrap_or_default().into();
+				self.software_list.description = description.unwrap_or_default().into();
 				Some(Phase::SoftwareList)
 			}
 			(Phase::SoftwareList, b"software") => {
@@ -75,12 +67,12 @@ impl<'a> State<'a> {
 					return Ok(None);
 				}
 
-				let name = self.string_dispenser.get(&name);
+				let name = name.into();
 				let software = Software {
 					name,
-					description: self.empty_str.clone(),
-					year: self.empty_str.clone(),
-					publisher: self.empty_str.clone(),
+					description: Default::default(),
+					year: Default::default(),
+					publisher: Default::default(),
 					parts: Vec::new(),
 				};
 				self.current_software = Some(software);
@@ -111,15 +103,15 @@ impl<'a> State<'a> {
 			}
 
 			Phase::SoftwareDescription => {
-				let description = self.string_dispenser.get(&text.unwrap());
+				let description = text.unwrap().into();
 				self.current_software.as_mut().unwrap().description = description;
 			}
 			Phase::SoftwareYear => {
-				let year = self.string_dispenser.get(&text.unwrap());
+				let year = text.unwrap().into();
 				self.current_software.as_mut().unwrap().year = year;
 			}
 			Phase::SoftwarePublisher => {
-				let publisher = self.string_dispenser.get(&text.unwrap());
+				let publisher = text.unwrap().into();
 				self.current_software.as_mut().unwrap().publisher = publisher;
 			}
 			_ => {}
@@ -136,8 +128,8 @@ fn softlistxml_err(reader: &XmlReader<impl BufRead>, e: impl Into<Error>) -> Err
 	e.into().context(message)
 }
 
-pub fn process_xml(reader: impl BufRead, string_dispenser: &StringDispenser) -> Result<SoftwareList> {
-	let mut state = State::new(string_dispenser);
+pub fn process_xml(reader: impl BufRead) -> Result<SoftwareList> {
+	let mut state = State::new();
 	let mut reader = XmlReader::from_reader(reader, true);
 	let mut buf = Vec::with_capacity(1024);
 
@@ -176,16 +168,13 @@ mod test {
 
 	use test_case::test_case;
 
-	use crate::software::strings::StringDispenser;
-
 	use super::process_xml;
 
 	#[test_case(0, include_str!("test_data/softlist_coco_cart.xml"), ("coco_cart", "Tandy Radio Shack Color Computer cartridges", 112))]
 	#[test_case(1, include_str!("test_data/softlist_msx1_cart.xml"), ("msx1_cart", "MSX1 cartridges", 1230))]
 	pub fn general(_index: usize, xml: &str, expected: (&str, &str, usize)) {
 		let reader = BufReader::new(xml.as_bytes());
-		let string_dispenser = StringDispenser::default();
-		let software_list = process_xml(reader, &string_dispenser);
+		let software_list = process_xml(reader);
 		let actual = software_list
 			.as_ref()
 			.map(|x| (x.name.as_ref(), x.description.as_ref(), x.software.len()))
@@ -196,8 +185,7 @@ mod test {
 	#[test_case(0, include_str!("test_data/softlist_coco_cart.xml"), "clowns", ("Clowns & Balloons", "1982", "Tandy"))]
 	pub fn software(_index: usize, xml: &str, name: &str, expected: (&str, &str, &str)) {
 		let reader = BufReader::new(xml.as_bytes());
-		let string_dispenser = StringDispenser::default();
-		let software_list = process_xml(reader, &string_dispenser).unwrap();
+		let software_list = process_xml(reader).unwrap();
 		let software = software_list
 			.software
 			.iter()
