@@ -12,13 +12,13 @@ tracing = { version = "0.1.41", features = [
     "release_max_level_info",
 ] }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-slint = { git = "https://github.com/npwoods/slint.git", rev = "bf11915c356efc50e44978f5c15f9ec196889513", features = [
+slint = { git = "https://github.com/npwoods/slint.git", rev = "8c2cf97e5662e066e68e8bad809d393ded9fe535", features = [
     "raw-window-handle-06",
 ] }
-i-slint-core = { git = "https://github.com/npwoods/slint.git", rev = "bf11915c356efc50e44978f5c15f9ec196889513" }
-i-slint-common = { git = "https://github.com/npwoods/slint.git", rev = "bf11915c356efc50e44978f5c15f9ec196889513" }
-i-slint-backend-winit = { git = "https://github.com/npwoods/slint.git", rev = "bf11915c356efc50e44978f5c15f9ec196889513" }
-i-slint-backend-qt = { git = "https://github.com/npwoods/slint.git", rev = "bf11915c356efc50e44978f5c15f9ec196889513", optional = true }
+i-slint-core = { git = "https://github.com/npwoods/slint.git", rev = "8c2cf97e5662e066e68e8bad809d393ded9fe535" }
+i-slint-common = { git = "https://github.com/npwoods/slint.git", rev = "8c2cf97e5662e066e68e8bad809d393ded9fe535" }
+i-slint-backend-winit = { git = "https://github.com/npwoods/slint.git", rev = "8c2cf97e5662e066e68e8bad809d393ded9fe535" }
+i-slint-backend-qt = { git = "https://github.com/npwoods/slint.git", rev = "8c2cf97e5662e066e68e8bad809d393ded9fe535", optional = true }
 muda = "0.17.1"
 raw-window-handle = "0.6.2"
 rfd = "0.15.1"
@@ -90,7 +90,7 @@ tempdir = "0.3.7"
 [build-dependencies]
 cpp_build = "0.5.10"
 ico = "0.4.0"
-slint-build = { git = "https://github.com/npwoods/slint.git", rev = "bf11915c356efc50e44978f5c15f9ec196889513" }
+slint-build = { git = "https://github.com/npwoods/slint.git", rev = "8c2cf97e5662e066e68e8bad809d393ded9fe535" }
 vivi_ui = { git = "https://seed.radicle.garden/z3oxAZSLcyXgpa7fcvgtueF49jHpH.git", rev = "92a0987cf92647290353826bf05113a65fca25a9" }
 slint-material-components = { git = "https://github.com/slint-ui/material-components.git", rev = "8cdf7cd4b4af54484d74c5077bd9ce0c876fc637" }
 winresource = "0.1.20"
