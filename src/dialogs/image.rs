@@ -21,6 +21,6 @@ pub async fn dialog_load_image(modal_stack: ModalStack, formats: &[Format]) -> O
 		dialog.add_filter(fmt.description.clone(), &fmt.extensions)
 	});
 
-	let filename = dialog.pick_file().await?.path().to_str()?.to_string();
+	let filename = dialog.pick_file().await?.path().to_str()?.into();
 	Some(ImageDesc::File(filename))
 }

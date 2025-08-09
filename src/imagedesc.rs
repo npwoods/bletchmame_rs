@@ -13,9 +13,9 @@ use crate::software::is_valid_software_list_name;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ImageDesc {
-	File(String),
+	File(SmolStr),
 	Software(SmolStr),
-	Socket { hostname: String, port: u16 },
+	Socket { hostname: SmolStr, port: u16 },
 }
 
 #[derive(thiserror::Error, Debug, PartialEq)]
@@ -25,22 +25,22 @@ enum ThisError {
 	#[error("cannot parse socket string: {0}")]
 	CannotParseSocketString(String),
 	#[error("invalid host name: {0}")]
-	InvalidHostName(String),
+	InvalidHostName(SmolStr),
 	#[error("cannot parse portnumber")]
 	CannotParsePortNumber,
 	#[error("file not found: {0}")]
 	FileNotFound(String),
 	#[error("invalid software name: {0}")]
-	InvalidSoftwareName(String),
+	InvalidSoftwareName(SmolStr),
 }
 
 impl ImageDesc {
-	pub fn socket(hostname: impl Into<String>, port: u16) -> Result<Self> {
+	pub fn socket(hostname: impl Into<SmolStr>, port: u16) -> Result<Self> {
 		Ok(socket(hostname, port)?)
 	}
 
 	pub fn from_mame_image_desc(
-		desc: impl Into<String> + AsRef<str>,
+		desc: impl Into<SmolStr> + AsRef<str>,
 		loaded_through_softlist: Option<bool>,
 	) -> Result<Self> {
 		Ok(from_mame_image_desc(desc, loaded_through_softlist)?)
@@ -74,7 +74,7 @@ impl ImageDesc {
 }
 
 fn from_mame_image_desc(
-	desc: impl Into<String> + AsRef<str>,
+	desc: impl Into<SmolStr> + AsRef<str>,
 	loaded_through_softlist: Option<bool>,
 ) -> std::result::Result<ImageDesc, ThisError> {
 	// sanity check
@@ -112,7 +112,7 @@ fn from_mame_image_desc(
 	}
 }
 
-fn socket(hostname: impl Into<String>, port: u16) -> Result<ImageDesc, ThisError> {
+fn socket(hostname: impl Into<SmolStr>, port: u16) -> Result<ImageDesc, ThisError> {
 	let hostname = hostname.into();
 	if !hostname_validator::is_valid(&hostname) {
 		return Err(ThisError::InvalidHostName(hostname));
@@ -125,9 +125,9 @@ fn socket(hostname: impl Into<String>, port: u16) -> Result<ImageDesc, ThisError
 #[serde(tag = "type")]
 #[serde(rename_all = "camelCase")]
 enum ImageDescAlt {
-	File { filename: String },
+	File { filename: SmolStr },
 	Software { name: SmolStr },
-	Socket { hostname: String, port: u16 },
+	Socket { hostname: SmolStr, port: u16 },
 }
 
 impl Serialize for ImageDesc {

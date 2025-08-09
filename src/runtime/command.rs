@@ -299,7 +299,7 @@ mod test {
 				.iter()
 				.map(|(tag, filename)| {
 					let tag = (*tag).into();
-					let image_desc = ImageDesc::File(filename.to_string());
+					let image_desc = ImageDesc::File((*filename).into());
 					(tag, image_desc)
 				})
 				.collect::<Vec<_>>();
@@ -318,8 +318,8 @@ mod test {
 	#[test_case(1, MameCommand::start_ex("coco2b", None, EMPTY), "START coco2b")]
 	#[test_case(2, MameCommand::start_ex("coco2b", Some(0x10000), EMPTY), "START coco2b -ramsize 65536")]
 	#[test_case(3, MameCommand::start_ex("coco2b", None, &[("ext:fdc:wd17xx:0", "foo.dsk")]), "START coco2b ext:fdc:wd17xx:0 foo.dsk")]
-	#[test_case(4, MameCommand::load_image("ext:fdc:wd17xx:0", &ImageDesc::File("foo bar.dsk".to_string())), "LOAD ext:fdc:wd17xx:0 \"foo bar.dsk\"")]
-	#[test_case(5, MameCommand::load_images(&[("ext:fdc:wd17xx:0", &ImageDesc::File("foo bar.dsk".to_string()))]), "LOAD ext:fdc:wd17xx:0 \"foo bar.dsk\"")]
+	#[test_case(4, MameCommand::load_image("ext:fdc:wd17xx:0", &ImageDesc::File("foo bar.dsk".into())), "LOAD ext:fdc:wd17xx:0 \"foo bar.dsk\"")]
+	#[test_case(5, MameCommand::load_images(&[("ext:fdc:wd17xx:0", &ImageDesc::File("foo bar.dsk".into()))]), "LOAD ext:fdc:wd17xx:0 \"foo bar.dsk\"")]
 	#[test_case(6, MameCommand::seq_set(&[("foobar", 0x20, SeqType::Standard, "KEYCODE_X or KEYCODE_Y")]), "SEQ_SET foobar 32 standard \"KEYCODE_X or KEYCODE_Y\"")]
 	fn command_test(_index: usize, command: MameCommand, expected: &str) {
 		let actual = command.text();
