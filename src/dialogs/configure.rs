@@ -13,6 +13,7 @@ use slint::SharedString;
 use slint::VecModel;
 use slint::Weak;
 use slint::spawn_local;
+use smol_str::SmolStr;
 use tokio::sync::mpsc;
 
 use crate::appcommand::AppCommand;
@@ -255,14 +256,14 @@ fn context_menu_command(state: &Rc<State>, command: AppCommand) {
 					.unwrap();
 
 				let (_, device) = config.machine_config().unwrap().lookup_device_tag(&tag).unwrap();
-				let extensions = device.extensions().map(str::to_string).collect::<Vec<_>>();
+				let extensions = device.extensions().map(SmolStr::from).collect::<Vec<_>>();
 				(image_desc, extensions)
 			});
 
 			let state = state.clone();
 			let fut = async move {
 				let formats = [Format {
-					description: "Image File".to_string(),
+					description: "Image File".into(),
 					extensions,
 				}];
 				if let Some(image_desc) = dialog_load_image(state.modal_stack.clone(), &formats).await {
@@ -551,7 +552,7 @@ impl State {
 			let software_entry = dispenser.get(software_list).ok().and_then(|(_, x)| {
 				x.software
 					.iter()
-					.flat_map(|x| (x.name.as_ref() == software).then(|| x.clone()))
+					.flat_map(|x| (x.name == software).then(|| x.clone()))
 					.next()
 			});
 			if let Some(software_entry) = software_entry.as_deref() {

@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use anyhow::Error;
 use anyhow::Result;
+use smol_str::SmolStr;
 use tracing::debug;
 
 use crate::imagedesc::ImageDesc;
@@ -58,7 +59,7 @@ struct State {
 #[derive(Debug)]
 enum PhaseSpecificState {
 	Formats(Vec<ImageFormat>),
-	Slot(Option<String>),
+	Slot(Option<SmolStr>),
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -87,7 +88,7 @@ impl State {
 					b"polling_input_seq",
 					b"has_input_using_mouse",
 				])?;
-				let machine_name = romname.unwrap_or_default().to_string();
+				let machine_name = romname.unwrap_or_default().into();
 				let is_paused = is_paused.map(|x| parse_mame_bool(x.as_ref())).transpose()?;
 				let polling_input_seq = polling_input_seq.map(|x| parse_mame_bool(x.as_ref())).transpose()?;
 				let has_input_using_mouse = has_input_using_mouse.map(|x| parse_mame_bool(x.as_ref())).transpose()?;
@@ -153,7 +154,7 @@ impl State {
 				let [tag, filename, loaded_through_softlist] =
 					evt.find_attributes([b"tag", b"filename", b"loaded_through_softlist"])?;
 				let tag = tag.ok_or(ThisError::MissingMandatoryAttribute("tag"))?;
-				let tag = normalize_tag(tag).to_string();
+				let tag = normalize_tag(tag).into();
 				let loaded_through_softlist = loaded_through_softlist.map(parse_mame_bool).transpose()?;
 				let image_desc = filename
 					.map(|desc| ImageDesc::from_mame_image_desc(desc, loaded_through_softlist))
@@ -178,7 +179,7 @@ impl State {
 					])?;
 				let instance_name = instance_name
 					.ok_or(ThisError::MissingMandatoryAttribute("instance_name"))?
-					.to_string();
+					.into();
 				let is_readable =
 					parse_mame_bool(is_readable.ok_or(ThisError::MissingMandatoryAttribute("is_readable"))?)?;
 				let is_writeable =
@@ -202,10 +203,10 @@ impl State {
 			}
 			(Phase::ImageDetails, b"format") => {
 				let [name, description] = evt.find_attributes([b"name", b"description"])?;
-				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?.to_string();
+				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?.into();
 				let description = description
 					.ok_or(ThisError::MissingMandatoryAttribute("description"))?
-					.to_string();
+					.into();
 
 				let format = ImageFormat {
 					name,
@@ -224,12 +225,12 @@ impl State {
 				let [name, fixed, has_selectable_options, current_option] =
 					evt.find_attributes([b"name", b"fixed", b"has_selectable_options", b"current_option"])?;
 				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?;
-				let name = normalize_tag(name).to_string();
+				let name = normalize_tag(name).into();
 				let fixed = parse_mame_bool(fixed.ok_or(ThisError::MissingMandatoryAttribute("fixed"))?)?;
 				let has_selectable_options = parse_mame_bool(
 					has_selectable_options.ok_or(ThisError::MissingMandatoryAttribute("has_selectable_options"))?,
 				)?;
-				let current_option = current_option.map(|x| x.to_string());
+				let current_option = current_option.map(|x| x.into());
 				let slot = Slot {
 					name,
 					fixed,
@@ -244,7 +245,7 @@ impl State {
 			(Phase::Slot, b"option") => {
 				// parse attributes
 				let [name, selectable] = evt.find_attributes([b"name", b"selectable"])?;
-				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?.into_owned();
+				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?.into();
 				let selectable =
 					parse_mame_bool(selectable.ok_or(ThisError::MissingMandatoryAttribute("selectable"))?)?;
 
@@ -297,7 +298,7 @@ impl State {
 					.parse()?;
 				let player = player.ok_or(ThisError::MissingMandatoryAttribute("player"))?.parse()?;
 				let is_analog = parse_mame_bool(is_analog.ok_or(ThisError::MissingMandatoryAttribute("is_analog"))?)?;
-				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?.into_owned();
+				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?.into();
 				let first_keyboard_code = first_keyboard_code.map(|x| x.parse()).transpose()?;
 
 				let input = Input {
@@ -351,8 +352,8 @@ impl State {
 			}
 			(Phase::InputDeviceClass, b"device") => {
 				let [name, id, devindex] = evt.find_attributes([b"name", b"id", b"devindex"])?;
-				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?.into_owned();
-				let id = id.ok_or(ThisError::MissingMandatoryAttribute("id"))?.into_owned();
+				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?.into();
+				let id = id.ok_or(ThisError::MissingMandatoryAttribute("id"))?.into();
 				let devindex = devindex.ok_or(ThisError::MissingMandatoryAttribute("devindex"))?;
 				let devindex = devindex.parse()?;
 
@@ -369,10 +370,10 @@ impl State {
 			}
 			(Phase::InputDevice, b"item") => {
 				let [name, token, code] = evt.find_attributes([b"name", b"token", b"code"])?;
-				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?.into_owned();
+				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?.into();
 				let token = token.as_deref().ok_or(ThisError::MissingMandatoryAttribute("token"))?;
 				let token = token.try_into().unwrap();
-				let code = code.ok_or(ThisError::MissingMandatoryAttribute("code"))?.into_owned();
+				let code = code.ok_or(ThisError::MissingMandatoryAttribute("code"))?.into();
 				let item = InputDeviceItem { name, token, code };
 
 				let input_device_classes = self.running.input_device_classes.as_mut().unwrap();
@@ -407,7 +408,7 @@ impl State {
 					unreachable!()
 				};
 				let extensions = &mut formats.last_mut().unwrap().extensions;
-				extensions.push(text.unwrap());
+				extensions.push(text.unwrap().into());
 			}
 			_ => {}
 		};
@@ -546,7 +547,7 @@ mod test {
 			.as_deref()
 			.unwrap()
 			.iter()
-			.find(|x| x.port_tag.as_ref() == port_tag && x.mask == mask)
+			.find(|x| x.port_tag == port_tag && x.mask == mask)
 			.expect("could not find specified port_tag and mask");
 		let actual = (
 			input.class,

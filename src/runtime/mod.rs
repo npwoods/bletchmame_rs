@@ -3,11 +3,11 @@ pub mod command;
 pub mod session;
 
 use std::rc::Rc;
-use std::sync::Arc;
 
 use anyhow::Error;
 use serde::Deserialize;
 use serde::Serialize;
+use smol_str::SmolStr;
 use strum::EnumString;
 
 use crate::imagedesc::ImageDesc;
@@ -33,8 +33,8 @@ pub enum MameStderr {
 pub struct MameStartArgs {
 	pub machine_name: String,
 	pub ram_size: Option<u64>,
-	pub slots: Vec<(Arc<str>, Arc<str>)>,
-	pub images: Vec<(Arc<str>, ImageDesc)>,
+	pub slots: Vec<(SmolStr, SmolStr)>,
+	pub images: Vec<(SmolStr, ImageDesc)>,
 }
 
 impl MameStartArgs {

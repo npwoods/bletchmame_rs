@@ -346,7 +346,7 @@ fn build_restore_defaults_command(inputs: &[Input], clusters: &[InputCluster]) -
 	let seqs = clusters
 		.iter()
 		.flat_map(|cluster| input_cluster_input_seqs(inputs, cluster))
-		.map(|(input, _, seq_type)| (input.port_tag.as_ref(), input.mask, seq_type, "*"))
+		.map(|(input, _, seq_type)| (&input.port_tag, input.mask, seq_type, "*"))
 		.collect::<Vec<_>>();
 
 	let command = MameCommand::seq_set(&seqs);

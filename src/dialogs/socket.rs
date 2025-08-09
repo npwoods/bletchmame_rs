@@ -58,5 +58,5 @@ fn get_results(dialog: &ConnectToSocketDialog) -> Option<ImageDesc> {
 	let host_text = dialog.get_host_text();
 	let port_text = dialog.get_port_text();
 	let port = port_text.parse().ok()?;
-	ImageDesc::socket(host_text, port).ok()
+	ImageDesc::socket(host_text.as_str(), port).ok()
 }

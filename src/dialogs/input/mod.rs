@@ -98,7 +98,7 @@ pub impl AppCommand {
 	}
 
 	fn seq_clear(input: &Input, seq_type: SeqType) -> Self {
-		let seqs = &[(input.port_tag.as_ref(), input.mask, seq_type, "")];
+		let seqs = &[(&input.port_tag, input.mask, seq_type, "")];
 		MameCommand::seq_set(seqs).into()
 	}
 
@@ -114,54 +114,12 @@ pub impl AppCommand {
 		y_increment_tokens: &str,
 	) -> AppCommand {
 		let seqs = [
-			x_input.map(|x_input| {
-				(
-					x_input.port_tag.as_ref(),
-					x_input.mask,
-					SeqType::Standard,
-					x_standard_tokens,
-				)
-			}),
-			x_input.map(|x_input| {
-				(
-					x_input.port_tag.as_ref(),
-					x_input.mask,
-					SeqType::Decrement,
-					x_decrement_tokens,
-				)
-			}),
-			x_input.map(|x_input| {
-				(
-					x_input.port_tag.as_ref(),
-					x_input.mask,
-					SeqType::Increment,
-					x_increment_tokens,
-				)
-			}),
-			y_input.map(|y_input| {
-				(
-					y_input.port_tag.as_ref(),
-					y_input.mask,
-					SeqType::Standard,
-					y_standard_tokens,
-				)
-			}),
-			y_input.map(|y_input| {
-				(
-					y_input.port_tag.as_ref(),
-					y_input.mask,
-					SeqType::Decrement,
-					y_decrement_tokens,
-				)
-			}),
-			y_input.map(|y_input| {
-				(
-					y_input.port_tag.as_ref(),
-					y_input.mask,
-					SeqType::Increment,
-					y_increment_tokens,
-				)
-			}),
+			x_input.map(|x_input| (&x_input.port_tag, x_input.mask, SeqType::Standard, x_standard_tokens)),
+			x_input.map(|x_input| (&x_input.port_tag, x_input.mask, SeqType::Decrement, x_decrement_tokens)),
+			x_input.map(|x_input| (&x_input.port_tag, x_input.mask, SeqType::Increment, x_increment_tokens)),
+			y_input.map(|y_input| (&y_input.port_tag, y_input.mask, SeqType::Standard, y_standard_tokens)),
+			y_input.map(|y_input| (&y_input.port_tag, y_input.mask, SeqType::Decrement, y_decrement_tokens)),
+			y_input.map(|y_input| (&y_input.port_tag, y_input.mask, SeqType::Increment, y_increment_tokens)),
 		];
 		let seqs = seqs.into_iter().flatten().collect::<Vec<_>>();
 		MameCommand::seq_set(seqs.as_slice()).into()
@@ -256,10 +214,10 @@ fn build_context_menu<'a>(
 		let selections = quick_items
 			.iter()
 			.map(|(title, seqs)| {
-				let title = title.to_string();
+				let title = title.as_ref().into();
 				let seqs = seqs
 					.iter()
-					.map(|(port_tag, mask, seq_type, code)| ((*port_tag).clone(), *mask, *seq_type, code.to_string()))
+					.map(|(port_tag, mask, seq_type, code)| ((*port_tag).clone(), *mask, *seq_type, (*code).into()))
 					.collect::<Vec<_>>();
 				(title, seqs)
 			})

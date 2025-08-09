@@ -384,10 +384,8 @@ impl ItemsTableModel {
 								machine
 									.devices()
 									.iter()
-									.find(|dev| dev.interfaces().any(|x| x == part.interface.as_ref()))
-									.map(|dev| {
-										(Arc::<str>::from(dev.tag()), ImageDesc::Software(software.name.clone()))
-									})
+									.find(|dev| dev.interfaces().any(|x| x == part.interface))
+									.map(|dev| (dev.tag().into(), ImageDesc::Software(software.name.clone())))
 									.ok_or(())
 							})
 							.collect::<std::result::Result<Vec<_>, ()>>();
@@ -568,7 +566,7 @@ fn software_folder_item(dispenser: &mut SoftwareListDispenser, item: &PrefsSoftw
 	let software = software_list
 		.software
 		.iter()
-		.find(|x| x.name.as_ref() == item.software)
+		.find(|x| x.name.as_str() == item.software)
 		.ok_or_else(|| ThisError::UnknownSoftware(item.software.clone()))?
 		.clone();
 
@@ -792,11 +790,11 @@ fn column_text<'a>(_info_db: &'a InfoDb, item: &'a Item, column: ColumnType) -> 
 			software,
 			..
 		} => match column {
-			ColumnType::Name => software.name.as_ref().into(),
+			ColumnType::Name => software.name.as_str().into(),
 			ColumnType::SourceFile => format!("{}.xml", &software_list.name).into(),
-			ColumnType::Description => software.description.as_ref().into(),
-			ColumnType::Year => software.year.as_ref().into(),
-			ColumnType::Provider => software.publisher.as_ref().into(),
+			ColumnType::Description => software.description.as_str().into(),
+			ColumnType::Year => software.year.as_str().into(),
+			ColumnType::Provider => software.publisher.as_str().into(),
 		},
 		Item::Unrecognized { item, .. } => {
 			let PrefsItem::Software(item) = item else { todo!() };

@@ -11,6 +11,7 @@ use anyhow::Result;
 use itertools::Itertools;
 use serde::Deserialize;
 use serde::Serialize;
+use smol_str::SmolStr;
 use strum::EnumProperty;
 use strum::EnumString;
 use tracing::debug;
@@ -114,7 +115,7 @@ impl Debug for Status {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Running {
-	pub machine_name: String,
+	pub machine_name: SmolStr,
 	pub is_paused: bool,
 	pub is_throttled: bool,
 	pub throttle_rate: f32,
@@ -131,14 +132,14 @@ pub struct Running {
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub struct Image {
-	pub tag: String,
+	pub tag: SmolStr,
 	pub image_desc: Option<ImageDesc>,
 	pub details: ImageDetails,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub struct ImageDetails {
-	pub instance_name: String,
+	pub instance_name: SmolStr,
 	pub is_readable: bool,
 	pub is_writeable: bool,
 	pub is_creatable: bool,
@@ -148,9 +149,9 @@ pub struct ImageDetails {
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Hash, Eq)]
 pub struct ImageFormat {
-	pub name: String,
-	pub description: String,
-	pub extensions: Vec<String>,
+	pub name: SmolStr,
+	pub description: SmolStr,
+	pub extensions: Vec<SmolStr>,
 }
 
 #[derive(Clone, Deserialize, Serialize, PartialEq)]
@@ -184,7 +185,7 @@ impl Debug for Update {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
 struct RunningUpdate {
-	pub machine_name: String,
+	pub machine_name: SmolStr,
 	pub is_paused: Option<bool>,
 	pub is_throttled: Option<bool>,
 	pub throttle_rate: Option<f32>,
@@ -201,14 +202,14 @@ struct RunningUpdate {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
 struct ImageUpdate {
-	pub tag: String,
+	pub tag: SmolStr,
 	pub image_desc: Option<ImageDesc>,
 	pub details: Option<ImageDetails>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
 pub struct Slot {
-	pub name: String,
+	pub name: SmolStr,
 	pub fixed: bool,
 	pub has_selectable_options: bool,
 	pub options: Vec<SlotOption>,
@@ -217,24 +218,24 @@ pub struct Slot {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
 pub struct SlotOption {
-	pub name: String,
+	pub name: SmolStr,
 	pub selectable: bool,
 }
 
 #[derive(Clone, Deserialize, Serialize, PartialEq, Default)]
 pub struct Input {
-	pub port_tag: Arc<str>,
+	pub port_tag: SmolStr,
 	pub mask: u32,
 	pub class: Option<InputClass>,
 	pub group: u8,
 	pub input_type: u32,
 	pub player: u8,
 	pub is_analog: bool,
-	pub name: String,
+	pub name: SmolStr,
 	pub first_keyboard_code: Option<u32>,
-	pub seq_standard_tokens: Option<String>,
-	pub seq_increment_tokens: Option<String>,
-	pub seq_decrement_tokens: Option<String>,
+	pub seq_standard_tokens: Option<SmolStr>,
+	pub seq_increment_tokens: Option<SmolStr>,
+	pub seq_decrement_tokens: Option<SmolStr>,
 }
 
 impl Debug for Input {
@@ -301,22 +302,22 @@ pub enum InputDeviceClassName {
 	Lightgun,
 	Mouse,
 	#[strum(default)]
-	Other(String),
+	Other(SmolStr),
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
 pub struct InputDevice {
-	pub name: String,
-	pub id: String,
+	pub name: SmolStr,
+	pub id: SmolStr,
 	pub devindex: u32,
 	pub items: Vec<InputDeviceItem>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct InputDeviceItem {
-	pub name: String,
+	pub name: SmolStr,
 	pub token: InputDeviceToken,
-	pub code: String,
+	pub code: SmolStr,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, EnumString)]
@@ -327,7 +328,7 @@ pub enum InputDeviceToken {
 	ZAxis,
 	RZAxis,
 	#[strum(default)]
-	Other(String),
+	Other(SmolStr),
 }
 
 impl InputDeviceToken {
@@ -347,7 +348,7 @@ pub enum ValidationError {
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum UpdateXmlProblem {
 	#[error("Machine {0} not found in InfoDb")]
-	UnknownMachine(String),
+	UnknownMachine(SmolStr),
 }
 
 fn collect_or_clone_existing<T>(update: Option<Vec<T>>, existing: &Arc<[T]>) -> Arc<[T]>
