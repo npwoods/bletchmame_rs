@@ -55,7 +55,7 @@ pub async fn dialog_seq_poll(
 	let input = inputs
 		.as_ref()
 		.iter()
-		.find(|x| x.port_tag.as_ref() == port_tag.as_ref() && x.mask == mask)
+		.find(|x| x.port_tag == port_tag.as_ref() && x.mask == mask)
 		.unwrap();
 	let target_name = input.name.as_str();
 	let target_name_suffix = seq_type.suffix();

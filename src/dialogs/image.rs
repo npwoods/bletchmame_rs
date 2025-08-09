@@ -1,12 +1,13 @@
 use rfd::AsyncFileDialog;
+use smol_str::SmolStr;
 
 use crate::guiutils::modal::ModalStack;
 use crate::imagedesc::ImageDesc;
 
 #[derive(Clone, Debug)]
 pub struct Format {
-	pub description: String,
-	pub extensions: Vec<String>,
+	pub description: SmolStr,
+	pub extensions: Vec<SmolStr>,
 }
 
 pub async fn dialog_load_image(modal_stack: ModalStack, formats: &[Format]) -> Option<ImageDesc> {

@@ -1,10 +1,10 @@
 use std::str::FromStr;
-use std::sync::Arc;
 
 use itertools::Itertools;
 use serde::Deserialize;
 use serde::Serialize;
 use slint::SharedString;
+use smol_str::SmolStr;
 use strum::EnumProperty;
 use strum::IntoStaticStr;
 
@@ -114,18 +114,18 @@ pub enum AppCommand {
 		index: usize,
 	},
 	SeqPollDialog {
-		port_tag: Arc<str>,
+		port_tag: SmolStr,
 		mask: u32,
 		seq_type: SeqType,
 		poll_type: SeqPollDialogType,
 	},
 	InputXyDialog {
-		x_input: Option<(Arc<str>, u32)>,
-		y_input: Option<(Arc<str>, u32)>,
+		x_input: Option<(SmolStr, u32)>,
+		y_input: Option<(SmolStr, u32)>,
 	},
 	InputSelectMultipleDialog {
 		#[allow(clippy::type_complexity)]
-		selections: Vec<(String, Vec<(Arc<str>, u32, SeqType, String)>)>,
+		selections: Vec<(SmolStr, Vec<(SmolStr, u32, SeqType, SmolStr)>)>,
 	},
 }
 

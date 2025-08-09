@@ -1173,7 +1173,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 					.formats
 					.iter()
 					.map(|f| Format {
-						description: f.description.to_string(),
+						description: f.description.clone(),
 						extensions: f.extensions.clone(),
 					})
 					.collect::<Vec<_>>()

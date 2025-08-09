@@ -7,6 +7,7 @@ use slint::CloseRequestResponse;
 use slint::ComponentHandle;
 use slint::LogicalPosition;
 use slint::Weak;
+use smol_str::SmolStr;
 use strum::VariantArray;
 use tokio::sync::mpsc;
 
@@ -32,8 +33,8 @@ use crate::ui::InputXyDialog;
 
 struct Model {
 	dialog_weak: Weak<InputXyDialog>,
-	x_input: Option<(Arc<str>, u32)>,
-	y_input: Option<(Arc<str>, u32)>,
+	x_input: Option<(SmolStr, u32)>,
+	y_input: Option<(SmolStr, u32)>,
 	state: RefCell<State>,
 }
 
@@ -45,8 +46,8 @@ struct State {
 
 pub async fn dialog_input_xy(
 	modal_stack: ModalStack,
-	x_input: Option<(Arc<str>, u32)>,
-	y_input: Option<(Arc<str>, u32)>,
+	x_input: Option<(SmolStr, u32)>,
+	y_input: Option<(SmolStr, u32)>,
 	inputs: Arc<[Input]>,
 	input_device_classes: Arc<[InputDeviceClass]>,
 	status_changed_channel: Channel<Status>,
@@ -117,8 +118,8 @@ pub async fn dialog_input_xy(
 impl Model {
 	pub fn new(
 		dialog_weak: Weak<InputXyDialog>,
-		x_input: Option<(Arc<str>, u32)>,
-		y_input: Option<(Arc<str>, u32)>,
+		x_input: Option<(SmolStr, u32)>,
+		y_input: Option<(SmolStr, u32)>,
 	) -> Self {
 		Self {
 			dialog_weak,
@@ -239,7 +240,7 @@ fn aggregate_name<'a>(x_input: Option<&'a Input>, y_input: Option<&'a Input>) ->
 		.unwrap_or("<<UNKNOWN>>")
 }
 
-fn lookup_input<'a>(inputs: &'a [Input], this_input: &Option<(Arc<str>, u32)>) -> Option<&'a Input> {
+fn lookup_input<'a>(inputs: &'a [Input], this_input: &Option<(impl AsRef<str>, u32)>) -> Option<&'a Input> {
 	this_input.as_ref().and_then(|(port_tag, mask)| {
 		let target = (port_tag.as_ref(), mask);
 		inputs.iter().find(|x| target == (x.port_tag.as_ref(), mask))
@@ -279,7 +280,7 @@ fn set_all_seqs_command(x_input: Option<&Input>, y_input: Option<&Input>, tokens
 		.into_iter()
 		.flatten()
 		.flat_map(|input| SeqType::VARIANTS.iter().map(move |seq_type| (input, *seq_type)))
-		.map(|(input, seq_type)| (input.port_tag.as_ref(), input.mask, seq_type, tokens))
+		.map(|(input, seq_type)| (&input.port_tag, input.mask, seq_type, tokens))
 		.collect::<Vec<_>>();
 	MameCommand::seq_set(&seqs).into()
 }

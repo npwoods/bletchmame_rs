@@ -1,14 +1,13 @@
 use std::cell::Cell;
 use std::fmt::Debug;
 use std::rc::Rc;
-use std::sync::Arc;
 
 use itertools::Itertools;
 use more_asserts::assert_ge;
 use slint::CloseRequestResponse;
 use slint::ModelRc;
-use slint::SharedString;
 use slint::VecModel;
+use smol_str::SmolStr;
 use tokio::sync::mpsc;
 use tracing::info;
 
@@ -21,7 +20,7 @@ use crate::ui::InputSelectMultipleDialog;
 
 pub async fn dialog_input_select_multiple(
 	modal_stack: ModalStack,
-	selections: impl AsRef<[(String, Vec<(Arc<str>, u32, SeqType, String)>)]> + Debug + 'static,
+	selections: impl AsRef<[(SmolStr, Vec<(SmolStr, u32, SeqType, SmolStr)>)]> + Debug + 'static,
 ) -> Option<AppCommand> {
 	// the sanity checks
 	assert_ge!(selections.as_ref().len(), 2);
@@ -35,7 +34,7 @@ pub async fn dialog_input_select_multiple(
 	let entries = selections
 		.as_ref()
 		.iter()
-		.map(|(text, _)| SharedString::from(text))
+		.map(|(text, _)| text.as_str().into())
 		.collect::<Vec<_>>();
 	let entries = VecModel::from(entries);
 	let entries = ModelRc::new(entries);
@@ -78,13 +77,13 @@ pub async fn dialog_input_select_multiple(
 }
 
 #[allow(clippy::type_complexity)]
-fn build_result(selections: &[(String, Vec<(Arc<str>, u32, SeqType, String)>)], checked: &[Cell<bool>]) -> AppCommand {
+fn build_result(selections: &[(SmolStr, Vec<(SmolStr, u32, SeqType, SmolStr)>)], checked: &[Cell<bool>]) -> AppCommand {
 	let seqs = selections
 		.iter()
 		.zip(checked.iter())
 		.filter_map(|((_, vec), checked)| checked.get().then_some(vec.as_slice()))
 		.flatten()
-		.map(|(port_tag, mask, seq_type, codes)| ((port_tag.as_ref(), *mask, *seq_type), codes.as_str()))
+		.map(|(port_tag, mask, seq_type, codes)| ((port_tag.clone(), *mask, *seq_type), codes.as_str()))
 		.into_group_map()
 		.into_iter()
 		.map(|(k, codes)| (k, codes.iter().join(" or ")))
