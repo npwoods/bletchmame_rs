@@ -106,7 +106,7 @@ impl DevicesImagesConfig {
 		self.core.as_ref().map(|x| x.entries.len()).unwrap_or_default()
 	}
 
-	pub fn entry(&self, index: usize) -> Option<Entry> {
+	pub fn entry(&self, index: usize) -> Option<Entry<'_>> {
 		let core = self.core.as_ref()?;
 		let internal_entry = core.entries.get(index)?;
 
