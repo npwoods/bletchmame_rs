@@ -3,7 +3,7 @@ import { VerticalBox, GridBox, HorizontalBox, StandardButton, ComboBox, ListView
 export struct ImportMameIniDialogEntry {
     path-type: string,
     path: string,
-    current-disposition: string,
+    current-disposition-index: int,
     dispositions: [string]
 }
 
@@ -14,10 +14,11 @@ export component ImportMameIniDialog inherits Window {
     preferred-height: 500px;
 
     // properties
-    in property <length> splitter_1: 120px;
-    in property <length> splitter_2: root.width - 150px;
-    in property <[ImportMameIniDialogEntry]> entries;
+    in property <length> splitter-1: 120px;
+    in property <length> splitter-2: root.width - 150px;
+    in-out property <[ImportMameIniDialogEntry]> entries;
     in property <string> message-text;
+    in property <bool> ok-enabled;
 
     // callbacks
     callback ok-clicked();
@@ -30,7 +31,7 @@ export component ImportMameIniDialog inherits Window {
         }
 
         ListView {
-            for entry in entries: Rectangle {
+            for entry[idx] in entries: Rectangle {
                 height: 30px;
                 width: parent.width;
                 Text {
@@ -39,15 +40,18 @@ export component ImportMameIniDialog inherits Window {
                 }
 
                 Text {
-                    x: splitter_1;
+                    x: splitter-1;
                     text: entry.path;
                 }
 
                 ComboBox {
-                    x: splitter_2;
+                    x: splitter-2;
                     model: entry.dispositions;
-                    current-value: entry.current-disposition;
+                    current-index: entry.current-disposition-index;
                     enabled: entry.dispositions.length > 1;
+                    selected(_) => {
+                        root.entries[idx].current-disposition-index = self.current-index;
+                    }
                 }
             }
         }
@@ -61,7 +65,7 @@ export component ImportMameIniDialog inherits Window {
             StandardButton {
                 kind: ok;
                 horizontal-stretch: 0;
-                enabled: false;
+                enabled: ok-enabled;
                 clicked => {
                     root.ok-clicked();
                 }
