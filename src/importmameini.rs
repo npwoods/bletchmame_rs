@@ -4,6 +4,7 @@ use std::fs::File;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::path::Path;
+use std::rc::Rc;
 
 use anyhow::Error;
 use anyhow::Result;
@@ -15,12 +16,18 @@ use crate::prefs::Preferences;
 use crate::prefs::PrefsPaths;
 use crate::prefs::pathtype::PathType;
 
-pub struct ImportMameIni(Vec<(ImportMameIniOption, Cell<Disposition>)>);
+pub struct ImportMameIni(Vec<ImportMameIniOptionState>);
 
 #[derive(Debug, PartialEq)]
 pub struct ImportMameIniOption {
 	pub path_type: PathType,
 	pub value: String,
+}
+
+pub struct ImportMameIniOptionState {
+	pub opt: ImportMameIniOption,
+	pub dispositions: &'static [Disposition],
+	pub current_disposition_index: Cell<usize>,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, EnumString, strum::Display)]
@@ -53,20 +60,61 @@ impl ImportMameIni {
 		let entries = read_mame_ini(reader, absolutize_path)?
 			.into_iter()
 			.map(|opt| {
-				let disposition = default_disposition(&opt, prefs_paths);
-				let disposition = Cell::new(disposition);
-				(opt, disposition)
+				let dispositions = get_dispositions(&opt, prefs_paths);
+				let current_disposition_index = Cell::new(dispositions.len() - 1);
+				ImportMameIniOptionState {
+					opt,
+					dispositions,
+					current_disposition_index,
+				}
 			})
 			.collect::<Vec<_>>();
 		Ok(Self(entries))
 	}
 
-	pub fn entries(&self) -> &'_ [(ImportMameIniOption, Cell<Disposition>)] {
-		&self.0
+	pub fn entries(&self) -> &'_ [ImportMameIniOptionState] {
+		self.0.as_slice()
 	}
 
-	pub fn apply(&self, _prefs: &mut Preferences) {
-		todo!()
+	pub fn can_apply(&self) -> bool {
+		self.entries()
+			.iter()
+			.any(|opt_state| opt_state.disposition().will_alter())
+	}
+
+	pub fn apply(&self, prefs: &mut Preferences) {
+		let mut pref_paths = prefs.paths.as_ref().clone();
+
+		for entry in self.entries() {
+			let old_paths = match entry.disposition() {
+				Disposition::Supplement => Some(pref_paths.by_type(entry.opt.path_type)),
+				Disposition::Replace => Some(Default::default()),
+				Disposition::Ignore | Disposition::AlreadyPresent => None,
+			};
+
+			if let Some(old_paths) = old_paths {
+				let mut new_paths = old_paths.to_vec();
+				new_paths.push(entry.opt.value.clone());
+				pref_paths.set_by_type(entry.opt.path_type, new_paths.into_iter());
+			}
+		}
+
+		prefs.paths = Rc::new(pref_paths);
+	}
+}
+
+impl Disposition {
+	fn will_alter(&self) -> bool {
+		match self {
+			Disposition::Ignore | Disposition::AlreadyPresent => false,
+			Disposition::Supplement | Disposition::Replace => true,
+		}
+	}
+}
+
+impl ImportMameIniOptionState {
+	fn disposition(&self) -> Disposition {
+		self.dispositions[self.current_disposition_index.get()]
 	}
 }
 
@@ -125,7 +173,7 @@ fn trim_and_strip_quotes(s: &str) -> &'_ str {
 	s.strip_prefix('\"').and_then(|s| s.strip_suffix('\"')).unwrap_or(s)
 }
 
-fn default_disposition(opt: &ImportMameIniOption, prefs_paths: &PrefsPaths) -> Disposition {
+fn get_dispositions(opt: &ImportMameIniOption, prefs_paths: &PrefsPaths) -> &'static [Disposition] {
 	let opt_path = Path::new(&opt.value);
 
 	let mut path_iter = prefs_paths
@@ -133,11 +181,11 @@ fn default_disposition(opt: &ImportMameIniOption, prefs_paths: &PrefsPaths) -> D
 		.iter()
 		.filter_map(|path| Path::new(path).absolutize().ok());
 	if path_iter.any(|this_path| this_path.as_ref() == opt_path) {
-		Disposition::AlreadyPresent
+		&[Disposition::AlreadyPresent]
 	} else if opt.path_type.is_multi() {
-		Disposition::Supplement
+		&[Disposition::Ignore, Disposition::Supplement]
 	} else {
-		Disposition::Replace
+		&[Disposition::Ignore, Disposition::Replace]
 	}
 }
 
