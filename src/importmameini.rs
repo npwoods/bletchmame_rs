@@ -37,9 +37,20 @@ pub enum Disposition {
 
 impl ImportMameIni {
 	pub fn read_mame_ini(path: impl AsRef<Path>, prefs_paths: &PrefsPaths) -> Result<Self> {
+		let path = path.as_ref();
+
+		let parent = path.parent().unwrap_or(Path::new("."));
+		let absolutize_path = |path: &str| {
+			Path::new(path)
+				.absolutize_from(parent)
+				.ok()
+				.and_then(|p| p.into_owned().into_os_string().into_string().ok())
+				.unwrap_or_else(|| path.to_string())
+		};
+
 		let file = File::open(path)?;
 		let reader = BufReader::new(file);
-		let entries = read_mame_ini(reader)?
+		let entries = read_mame_ini(reader, absolutize_path)?
 			.into_iter()
 			.map(|opt| {
 				let disposition = default_disposition(&opt, prefs_paths);
@@ -59,7 +70,7 @@ impl ImportMameIni {
 	}
 }
 
-fn read_mame_ini(reader: impl BufRead) -> Result<Vec<ImportMameIniOption>> {
+fn read_mame_ini(reader: impl BufRead, absolutize_path: impl Fn(&str) -> String) -> Result<Vec<ImportMameIniOption>> {
 	let arg_map = PathType::VARIANTS
 		.iter()
 		.filter_map(|&path_type| {
@@ -84,7 +95,7 @@ fn read_mame_ini(reader: impl BufRead) -> Result<Vec<ImportMameIniOption>> {
 								.map(str::trim)
 								.filter(|value| !value.is_empty())
 								.map(|value| {
-									let value = value.to_string();
+									let value = absolutize_path(value);
 									let ini_option = ImportMameIniOption { path_type, value };
 									Ok(ini_option)
 								})
@@ -115,20 +126,19 @@ fn trim_and_strip_quotes(s: &str) -> &'_ str {
 }
 
 fn default_disposition(opt: &ImportMameIniOption, prefs_paths: &PrefsPaths) -> Disposition {
-	let paths = prefs_paths.by_type(opt.path_type);
-	if paths.iter().any(|this_path| paths_equal(this_path, &opt.value)) {
+	let opt_path = Path::new(&opt.value);
+
+	let mut path_iter = prefs_paths
+		.by_type(opt.path_type)
+		.iter()
+		.filter_map(|path| Path::new(path).absolutize().ok());
+	if path_iter.any(|this_path| this_path.as_ref() == opt_path) {
 		Disposition::AlreadyPresent
 	} else if opt.path_type.is_multi() {
 		Disposition::Supplement
 	} else {
 		Disposition::Replace
 	}
-}
-
-fn paths_equal(a: &str, b: &str) -> bool {
-	let a_abs = Path::new(a).absolutize().ok();
-	let b_abs = Path::new(b).absolutize().ok();
-	Option::zip(a_abs, b_abs).is_some_and(|(a_abs, b_abs)| a_abs == b_abs)
 }
 
 #[cfg(test)]
@@ -165,7 +175,7 @@ mod test {
 
 		let cursor = Cursor::new(ini_str);
 		let reader = BufReader::new(cursor);
-		let actual = read_mame_ini(reader).unwrap();
+		let actual = read_mame_ini(reader, |x| x.to_string()).unwrap();
 		assert_eq!(expected, actual);
 	}
 
