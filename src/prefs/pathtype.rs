@@ -42,6 +42,8 @@ pub enum PathType {
 	Cfg,
 	#[strum(to_string = "NVRAM", props(MameArgument = "-nvram_directory"))]
 	Nvram,
+	#[strum(to_string = "Cheats", props(MameArgument = "-cheatpath"))]
+	Cheats,
 	#[strum(to_string = "Snapshots")]
 	Snapshots,
 }
@@ -66,6 +68,7 @@ impl PathType {
 			| Self::Plugins
 			| Self::Cfg
 			| Self::Nvram
+			| Self::Cheats
 			| Self::Snapshots => PickType::Dir,
 		}
 	}
