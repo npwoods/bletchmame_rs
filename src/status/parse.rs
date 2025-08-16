@@ -11,6 +11,9 @@ use crate::imagedesc::ImageDesc;
 use crate::parse::normalize_tag;
 use crate::parse::parse_mame_bool;
 use crate::runtime::command::SeqType;
+use crate::status::Cheat;
+use crate::status::CheatParameter;
+use crate::status::CheatParameterItem;
 use crate::status::ImageDetails;
 use crate::status::ImageFormat;
 use crate::status::ImageUpdate;
@@ -31,10 +34,13 @@ use crate::xml::XmlReader;
 enum Phase {
 	Root,
 	Status,
+	StatusCheats,
 	StatusImages,
 	StatusSlots,
 	StatusInputs,
 	StatusInputDevices,
+	Cheat,
+	CheatParameter,
 	Image,
 	ImageDetails,
 	ImageDetailsFormat,
@@ -66,6 +72,8 @@ enum PhaseSpecificState {
 enum ThisError {
 	#[error("Missing mandatory attribute {0} when parsing status XML")]
 	MissingMandatoryAttribute(&'static str),
+	#[error("Multiple tags of type {0}")]
+	InvalidMultipleTags(&'static str),
 }
 
 impl State {
@@ -134,6 +142,10 @@ impl State {
 				self.running.sound_attenuation = attenuation.or(self.running.sound_attenuation);
 				None
 			}
+			(Phase::Status, b"cheats") => {
+				self.running.cheats = Some(Vec::new());
+				Some(Phase::StatusCheats)
+			}
 			(Phase::Status, b"images") => {
 				self.running.images = Some(Vec::new());
 				Some(Phase::StatusImages)
@@ -149,6 +161,53 @@ impl State {
 			(Phase::Status, b"input_devices") => {
 				self.running.input_device_classes = Some(Vec::new());
 				Some(Phase::StatusInputDevices)
+			}
+			(Phase::StatusCheats, b"cheat") => {
+				let [
+					id,
+					enabled,
+					description,
+					has_run_script,
+					has_on_script,
+					has_off_script,
+					has_changed_script,
+					comment,
+				] = evt.find_attributes([
+					b"id",
+					b"enabled",
+					b"description",
+					b"has_run_script",
+					b"has_on_script",
+					b"has_off_script",
+					b"has_changed_script",
+					b"comment",
+				])?;
+				let id = id.ok_or(ThisError::MissingMandatoryAttribute("id"))?.into();
+				let enabled = parse_mame_bool(enabled.ok_or(ThisError::MissingMandatoryAttribute("enabled"))?)?;
+				let description = description.unwrap_or_default().into();
+				let has_run_script = has_run_script.as_deref();
+				let has_run_script = has_run_script.map(parse_mame_bool).transpose()?.unwrap_or_default();
+				let has_on_script = has_on_script.as_deref();
+				let has_on_script = has_on_script.map(parse_mame_bool).transpose()?.unwrap_or_default();
+				let has_off_script = has_off_script.as_deref();
+				let has_off_script = has_off_script.map(parse_mame_bool).transpose()?.unwrap_or_default();
+				let has_changed_script: Option<&str> = has_changed_script.as_deref();
+				let has_changed_script = has_changed_script.map(parse_mame_bool).transpose()?.unwrap_or_default();
+				let comment = comment.unwrap_or_default().into();
+
+				let cheat = Cheat {
+					id,
+					enabled,
+					description,
+					has_run_script,
+					has_on_script,
+					has_off_script,
+					has_changed_script,
+					comment,
+					parameter: None,
+				};
+				self.running.cheats.as_mut().unwrap().push(cheat);
+				Some(Phase::Cheat)
 			}
 			(Phase::StatusImages, b"image") => {
 				let [tag, filename, loaded_through_softlist] =
@@ -167,6 +226,43 @@ impl State {
 				};
 				self.running.images.as_mut().unwrap().push(image);
 				Some(Phase::Image)
+			}
+			(Phase::Cheat, b"parameter") => {
+				let current_cheat = self.running.cheats.as_mut().unwrap().last_mut().unwrap();
+				if current_cheat.parameter.is_some() {
+					return Err(ThisError::InvalidMultipleTags("parameter").into());
+				}
+
+				let [value, minimum, maximum, step] =
+					evt.find_attributes([b"value", b"minimum", b"maximum", b"step"])?;
+				let value = value.unwrap_or_default().into();
+				let minimum = minimum
+					.ok_or(ThisError::MissingMandatoryAttribute("minimum"))?
+					.parse()?;
+				let maximum = maximum
+					.ok_or(ThisError::MissingMandatoryAttribute("maximum"))?
+					.parse()?;
+				let step = step.ok_or(ThisError::MissingMandatoryAttribute("step"))?.parse()?;
+
+				let parameter = CheatParameter {
+					value,
+					minimum,
+					maximum,
+					step,
+					items: Default::default(),
+				};
+				current_cheat.parameter = Some(parameter);
+				Some(Phase::CheatParameter)
+			}
+			(Phase::CheatParameter, b"item") => {
+				let [value, text] = evt.find_attributes([b"value", b"text"])?;
+				let value = value.ok_or(ThisError::MissingMandatoryAttribute("value"))?.parse()?;
+				let text = text.ok_or(ThisError::MissingMandatoryAttribute("text"))?.into();
+
+				let item = CheatParameterItem { value, text };
+				let current_cheat = self.running.cheats.as_mut().unwrap().last_mut().unwrap();
+				current_cheat.parameter.as_mut().unwrap().items.push(item);
+				None
 			}
 			(Phase::Image, b"details") => {
 				let [instance_name, is_readable, is_writeable, is_creatable, must_be_loaded] =

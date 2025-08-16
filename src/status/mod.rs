@@ -70,6 +70,8 @@ impl Status {
 					})
 					.collect()
 			});
+
+			let cheats = collect_or_clone_existing(running.cheats, &status_running.cheats);
 			let images = collect_or_clone_existing(images, &status_running.images);
 			let slots = collect_or_clone_existing(running.slots, &status_running.slots);
 			let inputs = collect_or_clone_existing(running.inputs, &status_running.inputs);
@@ -86,6 +88,7 @@ impl Status {
 				is_recording,
 				polling_input_seq,
 				has_input_using_mouse,
+				cheats,
 				images,
 				slots,
 				inputs,
@@ -124,10 +127,39 @@ pub struct Running {
 	pub is_recording: bool,
 	pub polling_input_seq: bool,
 	pub has_input_using_mouse: bool,
+	pub cheats: Arc<[Cheat]>,
 	pub images: Arc<[Image]>,
 	pub slots: Arc<[Slot]>,
 	pub inputs: Arc<[Input]>,
 	pub input_device_classes: Arc<[InputDeviceClass]>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+pub struct Cheat {
+	pub id: SmolStr,
+	pub enabled: bool,
+	pub description: SmolStr,
+	pub has_run_script: bool,
+	pub has_on_script: bool,
+	pub has_off_script: bool,
+	pub has_changed_script: bool,
+	pub comment: SmolStr,
+	pub parameter: Option<CheatParameter>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+pub struct CheatParameter {
+	pub value: SmolStr,
+	pub minimum: u64,
+	pub maximum: u64,
+	pub step: u64,
+	pub items: Vec<CheatParameterItem>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+pub struct CheatParameterItem {
+	pub value: u64,
+	pub text: SmolStr,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
@@ -194,6 +226,7 @@ struct RunningUpdate {
 	pub is_recording: Option<bool>,
 	pub polling_input_seq: Option<bool>,
 	pub has_input_using_mouse: Option<bool>,
+	pub cheats: Option<Vec<Cheat>>,
 	pub images: Option<Vec<ImageUpdate>>,
 	pub slots: Option<Vec<Slot>>,
 	pub inputs: Option<Vec<Input>>,
