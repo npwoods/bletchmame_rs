@@ -1,0 +1,101 @@
+import { GridBox, VerticalBox, HorizontalBox, Button, StandardButton, ScrollView, CheckBox, Slider, ComboBox } from "std-widgets.slint";
+
+export struct CheatsDialogEntry {
+    cheat-type: string,
+    cheat-enabled: bool,
+    description: string,
+    comment: string,
+    value: int,
+    minimum: int,
+    maximum: int,
+    step: int,
+    items: [string],
+}
+
+export component CheatsDialog inherits Window {
+    title: "Cheats";
+    icon: @image-url("bletchmame.png");
+    preferred-width: 600px;
+    preferred-height: 500px;
+
+    // properties
+    in property <[CheatsDialogEntry]> entries;
+    in property <length> splitter-position: 200px;
+
+    // callbacks
+    callback ok-clicked();
+
+    // control hierarchy
+    VerticalBox {
+        ScrollView {
+            VerticalBox {
+                padding: 3px;
+                vertical-stretch: 0;
+                for entry[index] in root.entries: HorizontalLayout {
+                    vertical-stretch: 0;
+                    if entry.cheat-type == "text": Text {
+                        text: entry.description;
+                        vertical-alignment: center;
+                    }
+                    if entry.cheat-type == "one-shot": Button {
+                        text: entry.description;
+                        enabled: false;
+                    }
+                    if entry.cheat-type == "on-off": CheckBox {
+                        text: entry.description;
+                        checked: entry.cheat-enabled;
+                        enabled: false;
+                    }
+                    if entry.cheat-type == "one-shot-parameter": Button {
+                        text: entry.description;
+                        enabled: false;
+                    }
+                    if entry.cheat-type == "value-parameter": HorizontalLayout {
+                        Text {
+                            text: entry.description;
+                            vertical-alignment: center;
+                            width: splitter-position;
+                        }
+
+                        Slider {
+                            value: entry.value;
+                            minimum: entry.minimum;
+                            maximum: entry.maximum;
+                            step: entry.step;
+                            enabled: false;
+                        }
+                    }
+                    if entry.cheat-type == "item-list-parameter": HorizontalLayout {
+                        Text {
+                            text: entry.description;
+                            vertical-alignment: center;
+                            width: splitter-position;
+                        }
+
+                        ComboBox {
+                            model: entry.items;
+                            enabled: false;
+                        }
+                    }
+                }
+            }
+        }
+
+        HorizontalBox {
+            alignment: end;
+            Button {
+                text: "Reload Cheats File";
+                horizontal-stretch: 0;
+                enabled: false;
+            }
+
+            StandardButton {
+                kind: ok;
+                horizontal-stretch: 0;
+                clicked => {
+                    root.ok-clicked();
+                }
+            }
+        }
+    }
+}

@@ -44,6 +44,7 @@ use crate::collections::get_folder_collections;
 use crate::collections::remove_items_from_folder_collection;
 use crate::collections::toggle_builtin_collection;
 use crate::devimageconfig::DevicesImagesConfig;
+use crate::dialogs::cheats::dialog_cheats;
 use crate::dialogs::configure::dialog_configure;
 use crate::dialogs::devimages::dialog_devices_and_images;
 use crate::dialogs::file::initial_dir_and_file_from_path;
@@ -688,6 +689,7 @@ fn menu_item_info(parent_title: Option<&str>, title: &str) -> (Option<AppCommand
 		(_, "Full Screen") => (Some(AppCommand::OptionsToggleFullScreen), Some("F11")),
 		(_, "Toggle Menu Bar") => (Some(AppCommand::OptionsToggleMenuBar), Some("ScrLk")),
 		(_, "Sound") => (Some(AppCommand::OptionsToggleSound), None),
+		(_, "Cheats...") => (Some(AppCommand::OptionsCheats), None),
 		(_, "Classic MAME Menu") => (Some(AppCommand::OptionsClassic), None),
 		(_, "Console") => (Some(AppCommand::OptionsConsole), None),
 
@@ -941,6 +943,23 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				}
 				_ => {}
 			}
+		}
+		AppCommand::OptionsCheats => {
+			let status_update_channel = model.status_changed_channel.clone();
+			let model_clone = model.clone();
+			let invoke_command = move |command| handle_command(&model_clone, command);
+			let cheats = model
+				.state
+				.borrow()
+				.status()
+				.unwrap()
+				.running
+				.as_ref()
+				.unwrap()
+				.cheats
+				.clone();
+			let fut = dialog_cheats(model.modal_stack.clone(), cheats, status_update_channel, invoke_command);
+			spawn_local(fut).unwrap();
 		}
 		AppCommand::OptionsClassic => {
 			model.issue_command(MameCommand::classic_menu());
@@ -1355,6 +1374,7 @@ fn update_menus(model: &AppModel) {
 		.iter()
 		.filter_map(|x| x.class)
 		.collect::<HashSet<_>>();
+	let has_cheats = running.as_ref().map(|r| !r.cheats.is_empty()).unwrap_or_default();
 
 	// update the menu bar
 	model.app_window().window().with_muda_menu(|menu_bar| {
@@ -1378,6 +1398,7 @@ fn update_menus(model: &AppModel) {
 				Some(AppCommand::OptionsToggleFullScreen) => (None, Some(is_fullscreen), None),
 				Some(AppCommand::OptionsToggleMenuBar) => (Some(is_running), None, None),
 				Some(AppCommand::OptionsToggleSound) => (Some(is_running), Some(is_sound_enabled), None),
+				Some(AppCommand::OptionsCheats) => (Some(has_cheats), None, None),
 				Some(AppCommand::OptionsClassic) => (Some(is_running), None, None),
 				Some(AppCommand::SettingsInput(class)) => (Some(input_classes.contains(&class)), None, None),
 				Some(AppCommand::HelpRefreshInfoDb) => (Some(can_refresh_info_db), None, None),

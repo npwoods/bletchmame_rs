@@ -1,6 +1,7 @@
 use easy_ext::ext;
 use tokio::sync::mpsc::Sender;
 
+pub mod cheats;
 pub mod configure;
 pub mod devimages;
 pub mod file;

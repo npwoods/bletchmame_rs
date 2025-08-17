@@ -45,6 +45,7 @@ pub enum AppCommand {
 	OptionsToggleFullScreen,
 	OptionsToggleMenuBar,
 	OptionsToggleSound,
+	OptionsCheats,
 	#[strum(props(MinimumMame = "0.274"))]
 	OptionsClassic,
 	OptionsConsole,
