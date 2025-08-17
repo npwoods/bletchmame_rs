@@ -93,6 +93,9 @@ pub struct PrefsPaths {
 	pub nvram: Option<String>,
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub cheats: Option<String>,
+
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub snapshots: Vec<String>,
 }
 
@@ -157,6 +160,7 @@ fn access_paths(path_type: PathType) -> (fn(&PrefsPaths) -> &[String], PathsStor
 		PathType::Plugins => ((|x| &x.plugins), PathsStore::Multiple(|x| &mut x.plugins)),
 		PathType::Cfg => ((|x| x.cfg.as_slice()), PathsStore::Single(|x| &mut x.cfg)),
 		PathType::Nvram => ((|x| x.nvram.as_slice()), PathsStore::Single(|x| &mut x.nvram)),
+		PathType::Cheats => ((|x| x.cheats.as_slice()), PathsStore::Single(|x| &mut x.cheats)),
 		PathType::Snapshots => ((|x| &x.snapshots), PathsStore::Multiple(|x| &mut x.snapshots)),
 	}
 }

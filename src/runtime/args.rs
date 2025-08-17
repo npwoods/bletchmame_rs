@@ -95,6 +95,7 @@ mod test {
 			software_lists: vec!["/mydir/mame/hash".into()],
 			cfg: Some("/mydir/mame/cfg".into()),
 			nvram: Some("/mydir/mame/nvram".into()),
+			cheats: Some("/mydir/mame/cheats".into()),
 			snapshots: vec!["/mydir/mame/snapshots".into()],
 		};
 		let result = MameArguments::new(&prefs_paths, &windowing);
