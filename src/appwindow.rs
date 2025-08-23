@@ -24,7 +24,6 @@ use slint::quit_event_loop;
 use slint::spawn_local;
 use strum::EnumString;
 use strum::IntoEnumIterator;
-use tokio::time::Duration;
 use tracing::debug;
 use tracing::debug_span;
 use tracing::info;
@@ -90,6 +89,7 @@ use crate::status::Status;
 use crate::ui::AboutDialog;
 use crate::ui::AppWindow;
 use crate::ui::ReportIssue;
+use crate::version::MameVersion;
 
 const SOUND_ATTENUATION_OFF: i32 = -32;
 const SOUND_ATTENUATION_ON: i32 = 0;
@@ -317,17 +317,6 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		.await
 		.unwrap();
 
-	// if we have muda, we have to hack the menu to have enabled and accelerators
-	let has_muda = app_window.window().with_muda_menu(|_| ()).is_some();
-	if has_muda {
-		let app_window_weak = app_window.as_weak();
-		let fut = async move {
-			let app_window = app_window_weak.unwrap();
-			hack_muda_menu(&app_window).await;
-		};
-		spawn_local(fut).unwrap();
-	};
-
 	// get preferences
 	let prefs_path = args.prefs_path;
 	let preferences = Preferences::load(&prefs_path)
@@ -393,6 +382,18 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		if let Some(command) = AppCommand::decode_from_slint(command_string) {
 			handle_command(&model_clone, command);
 		}
+	});
+	let model_clone = model.clone();
+	app_window.on_minimum_mame(move |major, minor| {
+		let major = major.try_into().unwrap();
+		let minor = minor.try_into().unwrap();
+		let version = MameVersion::new(major, minor);
+		model_clone
+			.state
+			.borrow()
+			.status()
+			.map(|status| status.running.is_some() && status.build >= version)
+			.unwrap_or(false)
 	});
 
 	// create a repeating future that will update the child window forever
@@ -620,42 +621,6 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 
 	// and show the window and we're done!
 	app_window.show().unwrap();
-}
-
-/// Hacks to get around the fact that Slint does not yet support menu accelerators yet
-async fn hack_muda_menu(app_window: &AppWindow) {
-	// wait for the "All Software" menu item to be created
-	let all_software_string = BuiltinCollection::AllSoftware.to_string();
-	while app_window
-		.window()
-		.with_muda_menu(|menu_bar| {
-			menu_bar.visit((), |_, _, item| {
-				if item.text().as_deref() == Some(&all_software_string) {
-					ControlFlow::Break(())
-				} else {
-					ControlFlow::Continue(())
-				}
-			})
-		})
-		.is_some_and(|x| x.is_continue())
-	{
-		tokio::time::sleep(Duration::from_millis(10)).await;
-	}
-
-	// and update the menu (hopefully it doesn't get nuked later)
-	app_window.window().with_muda_menu(|menu_bar| {
-		let _ = menu_bar.visit((), |_, sub_menu, item| {
-			if let Some(title) = item.text() {
-				let parent_title = sub_menu.map(|x| x.text());
-				let (command, _) = menu_item_info(parent_title.as_deref(), &title);
-
-				if command.is_none() {
-					item.set_enabled(false);
-				}
-			}
-			ControlFlow::<Infallible>::Continue(())
-		});
-	});
 }
 
 fn menu_item_info(parent_title: Option<&str>, title: &str) -> (Option<AppCommand>, Option<Accelerator>) {
@@ -1334,7 +1299,6 @@ async fn show_paths_dialog(model: Rc<AppModel>, path_type: Option<PathType>) {
 fn update_menus(model: &AppModel) {
 	// calculate properties
 	let state = model.state.borrow();
-	let build = state.status().map(|s| &s.build);
 	let running = state.status().and_then(|s| s.running.as_ref());
 	let has_mame_executable = model.preferences.borrow().paths.mame_executable.is_some();
 	let is_running = running.is_some();
@@ -1369,42 +1333,44 @@ fn update_menus(model: &AppModel) {
 	let has_cheats = running.as_ref().map(|r| !r.cheats.is_empty()).unwrap_or_default();
 
 	// update the menu bar
-	model.app_window().window().with_muda_menu(|menu_bar| {
+	let app_window = model.app_window();
+	app_window.set_has_last_save_state(has_last_save_state);
+	app_window.set_has_cheats(has_cheats);
+	app_window.set_can_refresh_info_db(can_refresh_info_db);
+	app_window.set_has_input_class_controller(input_classes.contains(&InputClass::Controller));
+	app_window.set_has_input_class_keyboard(input_classes.contains(&InputClass::Keyboard));
+	app_window.set_has_input_class_misc(input_classes.contains(&InputClass::Misc));
+	app_window.set_has_input_class_config(input_classes.contains(&InputClass::Config));
+	app_window.set_has_input_class_dipswitch(input_classes.contains(&InputClass::DipSwitch));
+	app_window.window().with_muda_menu(|menu_bar| {
 		menu_bar.update(|parent_title, title| {
 			let (command, _) = menu_item_info(parent_title, title);
-			let (enabled, checked, text) = match command {
-				Some(AppCommand::FileStop) => (Some(is_running), None, None),
-				Some(AppCommand::FilePause) => (Some(is_running), Some(is_paused), None),
-				Some(AppCommand::FileDevicesAndImages) => (Some(is_running), None, None),
-				Some(AppCommand::FileQuickLoadState) => (Some(has_last_save_state), None, None),
-				Some(AppCommand::FileQuickSaveState) => (Some(has_last_save_state), None, None),
-				Some(AppCommand::FileLoadState) => (Some(is_running), None, None),
-				Some(AppCommand::FileSaveState) => (Some(is_running), None, None),
-				Some(AppCommand::FileSaveScreenshot) => (Some(is_running), None, None),
-				Some(AppCommand::FileRecordMovie) => (Some(is_running), None, Some(recording_message.into())),
-				Some(AppCommand::FileDebugger) => (Some(is_running), None, None),
-				Some(AppCommand::FileResetSoft) => (Some(is_running), None, None),
-				Some(AppCommand::FileResetHard) => (Some(is_running), None, None),
-				Some(AppCommand::OptionsThrottleRate(x)) => (Some(is_running), Some(Some(x) == throttle_rate), None),
-				Some(AppCommand::OptionsToggleWarp) => (Some(is_running), Some(!is_throttled), None),
-				Some(AppCommand::OptionsToggleFullScreen) => (None, Some(is_fullscreen), None),
-				Some(AppCommand::OptionsToggleMenuBar) => (Some(is_running), None, None),
-				Some(AppCommand::OptionsToggleSound) => (Some(is_running), Some(is_sound_enabled), None),
-				Some(AppCommand::OptionsCheats) => (Some(has_cheats), None, None),
-				Some(AppCommand::OptionsClassic) => (Some(is_running), None, None),
-				Some(AppCommand::SettingsInput(class)) => (Some(input_classes.contains(&class)), None, None),
-				Some(AppCommand::HelpRefreshInfoDb) => (Some(can_refresh_info_db), None, None),
-				_ => (None, None, None),
+			let (checked, text) = match command {
+				Some(AppCommand::FileStop) => (None, None),
+				Some(AppCommand::FilePause) => (Some(is_paused), None),
+				Some(AppCommand::FileDevicesAndImages) => (None, None),
+				Some(AppCommand::FileQuickLoadState) => (None, None),
+				Some(AppCommand::FileQuickSaveState) => (None, None),
+				Some(AppCommand::FileLoadState) => (None, None),
+				Some(AppCommand::FileSaveState) => (None, None),
+				Some(AppCommand::FileSaveScreenshot) => (None, None),
+				Some(AppCommand::FileRecordMovie) => (None, Some(recording_message.into())),
+				Some(AppCommand::FileDebugger) => (None, None),
+				Some(AppCommand::FileResetSoft) => (None, None),
+				Some(AppCommand::FileResetHard) => (None, None),
+				Some(AppCommand::OptionsThrottleRate(x)) => (Some(Some(x) == throttle_rate), None),
+				Some(AppCommand::OptionsToggleWarp) => (Some(!is_throttled), None),
+				Some(AppCommand::OptionsToggleFullScreen) => (Some(is_fullscreen), None),
+				Some(AppCommand::OptionsToggleMenuBar) => (None, None),
+				Some(AppCommand::OptionsToggleSound) => (Some(is_sound_enabled), None),
+				Some(AppCommand::OptionsCheats) => (None, None),
+				Some(AppCommand::OptionsClassic) => (None, None),
+				Some(AppCommand::SettingsInput(_)) => (None, None),
+				Some(AppCommand::HelpRefreshInfoDb) => (None, None),
+				_ => (None, None),
 			};
 
-			// factor in the minimum MAME version when deteriming enabled, if available
-			let enabled = enabled.map(|e| {
-				e && command
-					.as_ref()
-					.and_then(AppCommand::minimum_mame_version)
-					.is_none_or(|a| build.is_some_and(|b| b >= &a))
-			});
-			MenuItemUpdate { enabled, checked, text }
+			MenuItemUpdate { checked, text }
 		})
 	});
 }

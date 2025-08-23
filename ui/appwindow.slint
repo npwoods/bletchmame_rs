@@ -46,8 +46,17 @@ export component AppWindow inherits Window {
 
     // the menu bar
     in property <bool> menubar-visible: true;
+    in property <bool> has-last-save-state;
+    in property <bool> has-cheats;
+    in property <bool> can-refresh-info-db;
+    in property <bool> has-input-class-controller;
+    in property <bool> has-input-class-keyboard;
+    in property <bool> has-input-class-misc;
+    in property <bool> has-input-class-config;
+    in property <bool> has-input-class-dipswitch;
     callback menu-item-activated(string, string);
     callback menu-item-command(string);
+    pure callback minimum-mame(int, int) -> bool;
     in property <[string]> menu-items-builtin-collections;
     public function menubar-height() -> length {
         return hbox.absolute-position.y;
@@ -128,6 +137,7 @@ export component AppWindow inherits Window {
             title: @tr("MenuBar" => "File");
             MenuItem {
                 title: @tr("MenuBar" => "Stop");
+                enabled: mode() == "running";
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }
@@ -135,6 +145,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Pause");
+                enabled: mode() == "running";
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }
@@ -144,6 +155,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Devices and Images...");
+                enabled: mode() == "running";
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }
@@ -151,6 +163,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Quick Load State");
+                enabled: has-last-save-state;
                 muda-accelerator: "F7";
                 activated => {
                     menu-item-activated(parent.title, self.title);
@@ -159,6 +172,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Quick Save State");
+                enabled: has-last-save-state;
                 muda-accelerator: "Shift+F7";
                 activated => {
                     menu-item-activated(parent.title, self.title);
@@ -167,6 +181,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Load State...");
+                enabled: mode() == "running";
                 muda-accelerator: "Ctrl+F7";
                 activated => {
                     menu-item-activated(parent.title, self.title);
@@ -175,6 +190,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Save State...");
+                enabled: mode() == "running";
                 muda-accelerator: "Ctrl+Shift+F7";
                 activated => {
                     menu-item-activated(parent.title, self.title);
@@ -185,6 +201,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Save Screenshot...");
+                enabled: mode() == "running";
                 muda-accelerator: "F12";
                 activated => {
                     menu-item-activated(parent.title, self.title);
@@ -193,6 +210,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Record Movie...");
+                enabled: minimum-mame(0, 221);  // recording movies by specifying absolute paths was introduced in MAME 0.221
                 muda-accelerator: "Shift+F12";
                 activated => {
                     menu-item-activated(parent.title, self.title);
@@ -203,6 +221,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Debugger...");
+                enabled: mode() == "running";
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }
@@ -210,6 +229,7 @@ export component AppWindow inherits Window {
 
             Menu {
                 title: @tr("MenuBar" => "Reset");
+                enabled: mode() == "running";
                 MenuItem {
                     title: @tr("MenuBar" => "Soft Reset");
                     activated => {
@@ -227,6 +247,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Exit");
+                enabled: true;
                 muda-accelerator: "Ctrl+Shift+KeyX";
                 activated => {
                     menu-item-activated(parent.title, self.title);
@@ -238,6 +259,7 @@ export component AppWindow inherits Window {
             title: @tr("MenuBar" => "Options");
             Menu {
                 title: @tr("MenuBar" => "Throttle");
+                enabled: mode() == "running";
                 for rate in [1000, 500, 200, 100, 50, 20, 10]: MenuItem {
                     title: rate + "%";
                     activated => {
@@ -273,6 +295,7 @@ export component AppWindow inherits Window {
 
             Menu {
                 title: @tr("MenuBar" => "Frame Skip");
+                enabled: mode() == "running";
                 MenuItem {
                     title: "Auto";
                     activated => {
@@ -290,6 +313,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Full Screen");
+                enabled: true;
                 muda-accelerator: "F11";
                 activated => {
                     menu-item-activated(parent.title, self.title);
@@ -298,6 +322,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Toggle Menu Bar");
+                enabled: mode() == "running";
                 muda-accelerator: "ScrollLock";
                 activated => {
                     menu-item-activated(parent.title, self.title);
@@ -306,6 +331,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Sound");
+                enabled: mode() == "running";
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }
@@ -313,6 +339,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Cheats...");
+                enabled: has-cheats;
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }
@@ -322,6 +349,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Classic MAME Menu");
+                enabled: minimum-mame(0, 274);
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }
@@ -329,6 +357,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Console");
+                enabled: true;
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }
@@ -339,6 +368,7 @@ export component AppWindow inherits Window {
             title: @tr("MenuBar" => "Settings");
             MenuItem {
                 title: @tr("MenuBar" => "Joysticks and Controllers...");
+                enabled: has-input-class-controller;
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }
@@ -346,6 +376,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Keyboard...");
+                enabled: has-input-class-keyboard;
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }
@@ -353,6 +384,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Miscellaneous Input...");
+                enabled: has-input-class-misc;
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }
@@ -360,6 +392,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Configuration...");
+                enabled: has-input-class-config;
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }
@@ -367,6 +400,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "DIP Switches...");
+                enabled: has-input-class-dipswitch;
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }
@@ -376,6 +410,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Paths...");
+                enabled: true;
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }
@@ -383,6 +418,7 @@ export component AppWindow inherits Window {
 
             Menu {
                 title: @tr("MenuBar" => "Builtin Collections");
+                enabled: true;
                 for title in menu-items-builtin-collections: MenuItem {
                     title: title;
                     activated => {
@@ -393,6 +429,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Reset Settings To Default");
+                enabled: true;
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }
@@ -400,6 +437,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Import MAME INI...");
+                enabled: true;
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }
@@ -410,6 +448,7 @@ export component AppWindow inherits Window {
             title: @tr("MenuBar" => "Help");
             MenuItem {
                 title: @tr("MenuBar" => "Refresh MAME machine info...");
+                enabled: can-refresh-info-db;
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }
@@ -417,6 +456,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "BletchMAME web site...");
+                enabled: true;
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }
@@ -424,6 +464,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "About...");
+                enabled: true;
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }

@@ -1,6 +1,5 @@
 use std::str::FromStr;
 
-use itertools::Itertools;
 use serde::Deserialize;
 use serde::Serialize;
 use slint::SharedString;
@@ -19,7 +18,6 @@ use crate::runtime::command::MameCommand;
 use crate::runtime::command::SeqType;
 use crate::status::InputClass;
 use crate::status::Update;
-use crate::version::MameVersion;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, EnumProperty, IntoStaticStr)]
 pub enum AppCommand {
@@ -32,8 +30,7 @@ pub enum AppCommand {
 	FileLoadState,
 	FileSaveState,
 	FileSaveScreenshot,
-	#[strum(props(MinimumMame = "0.221"))]
-	FileRecordMovie, // recording movies by specifying absolute paths was introduced in MAME 0.221
+	FileRecordMovie,
 	FileDebugger,
 	FileResetSoft,
 	FileResetHard,
@@ -46,7 +43,6 @@ pub enum AppCommand {
 	OptionsToggleMenuBar,
 	OptionsToggleSound,
 	OptionsCheats,
-	#[strum(props(MinimumMame = "0.274"))]
 	OptionsClassic,
 	OptionsConsole,
 
@@ -133,14 +129,6 @@ pub enum AppCommand {
 const MENU_PREFIX: &str = "MENU_";
 
 impl AppCommand {
-	pub fn minimum_mame_version(&self) -> Option<MameVersion> {
-		let s = self.get_str("MinimumMame")?;
-		let Some((Ok(major), Ok(minor))) = s.split('.').map(|s| s.parse()).collect_tuple() else {
-			panic!("Failed to parse {s}");
-		};
-		Some(MameVersion::new(major, minor))
-	}
-
 	pub fn encode_for_slint(&self) -> SharedString {
 		format!("{}{}", MENU_PREFIX, serde_json::to_string(self).unwrap()).into()
 	}
