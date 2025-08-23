@@ -2,8 +2,6 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::convert::Infallible;
-use std::ops::ControlFlow;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -64,15 +62,12 @@ use crate::dialogs::paths::dialog_paths;
 use crate::dialogs::seqpoll::dialog_seq_poll;
 use crate::dialogs::socket::dialog_connect_to_socket;
 use crate::guiutils::is_context_menu_event;
-use crate::guiutils::menuing::MenuExt;
-use crate::guiutils::menuing::MenuItemKindExt;
 use crate::guiutils::menuing::accel;
 use crate::guiutils::modal::ModalStack;
 use crate::history::History;
 use crate::models::collectionsview::CollectionsViewModel;
 use crate::models::itemstable::EmptyReason;
 use crate::models::itemstable::ItemsTableModel;
-use crate::platform::WindowExt as WindowExt_2;
 use crate::prefs::BuiltinCollection;
 use crate::prefs::Preferences;
 use crate::prefs::PrefsCollection;
@@ -391,35 +386,38 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		}
 	});
 
-	// scroll lock handler (do this in a future because the window might not be inited yet)
-	app_window.window().with_muda_menu(|menubar| {
-		// build the accelerator map
-		let accelerator_command_map = menubar.visit(HashMap::new(), |mut accelerator_command_map, sub_menu, item| {
-			if let Some(title) = item.text() {
-				let parent_title = sub_menu.map(|x| x.text());
-				let (command, accelerator) = menu_item_info(parent_title.as_deref(), &title);
-				if let Some(command) = command
-					&& let Some(accelerator) = accelerator
-				{
-					accelerator_command_map.insert(accelerator, command);
-				}
+	// set up the accelerator map
+	let accelerator_command_map = [
+		("Pause", Some(AppCommand::FilePause)),
+		("F7", Some(AppCommand::FileQuickLoadState)),
+		("Shift+F7", Some(AppCommand::FileQuickLoadState)),
+		("Ctrl+F7", Some(AppCommand::FileLoadState)),
+		("Ctrl+Shift+F7", Some(AppCommand::FileLoadState)),
+		("F12", Some(AppCommand::FileSaveScreenshot)),
+		("Shift+F12", Some(AppCommand::FileRecordMovie)),
+		("Ctrl+Alt+X", Some(AppCommand::FileExit)),
+		("F9", None),
+		("F8", None),
+		("F10", Some(AppCommand::OptionsToggleWarp)),
+		("F11", Some(AppCommand::OptionsToggleFullScreen)),
+		("ScrLk", Some(AppCommand::OptionsToggleMenuBar)),
+	];
+	let accelerator_command_map =
+		HashMap::<Accelerator, AppCommand>::from_iter(accelerator_command_map.into_iter().filter_map(
+			|(accelerator, command)| {
+				accel(accelerator).and_then(|accelerator| command.map(|command| (accelerator, command)))
+			},
+		));
+	let model_clone = model.clone();
+	model
+		.backend_runtime
+		.install_muda_accelerator_handler(app_window.window(), move |accelerator| {
+			let command = accelerator_command_map.get(accelerator);
+			if let Some(command) = command {
+				handle_command(&model_clone, command.clone());
 			}
-			ControlFlow::<Infallible, _>::Continue(accelerator_command_map)
+			command.is_some()
 		});
-		let accelerator_command_map = accelerator_command_map.continue_value().unwrap();
-
-		// and install the callback
-		let model_clone = model.clone();
-		model
-			.backend_runtime
-			.install_muda_accelerator_handler(app_window.window(), move |accelerator| {
-				let command = accelerator_command_map.get(accelerator);
-				if let Some(command) = command {
-					handle_command(&model_clone, command.clone());
-				}
-				command.is_some()
-			});
-	});
 
 	// set up the collections view model
 	let collections_view_model = CollectionsViewModel::new(app_window.as_weak());

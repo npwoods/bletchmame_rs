@@ -1,10 +1,4 @@
 //! Helpers for Menu handling; which Slint does not handle yet
-use std::ops::ControlFlow;
-
-use easy_ext::ext;
-use muda::Menu;
-use muda::MenuItemKind;
-use muda::Submenu;
 use muda::accelerator::Accelerator;
 use muda::accelerator::Code;
 use muda::accelerator::Modifiers;
@@ -40,49 +34,6 @@ pub fn accel(text: &str) -> Option<Accelerator> {
 		x => panic!("Unknown accelerator {x}"),
 	};
 	Some(Accelerator::new(mods, key))
-}
-
-/// Extension for muda menus
-#[ext(MenuExt)]
-pub impl Menu {
-	fn visit<B, C>(
-		&self,
-		init: C,
-		func: impl Fn(C, Option<&Submenu>, &MenuItemKind) -> ControlFlow<B, C>,
-	) -> ControlFlow<B, C> {
-		visit_menu_items(&self.items(), init, None, &func)
-	}
-}
-
-#[ext(MenuItemKindExt)]
-pub impl MenuItemKind {
-	fn text(&self) -> Option<String> {
-		match self {
-			MenuItemKind::MenuItem(menu_item) => Some(menu_item.text()),
-			MenuItemKind::Check(check_menu_item) => Some(check_menu_item.text()),
-			_ => None,
-		}
-	}
-}
-
-fn visit_menu_items<B, C>(
-	items: &[MenuItemKind],
-	init: C,
-	sub_menu: Option<&Submenu>,
-	func: &impl Fn(C, Option<&Submenu>, &MenuItemKind) -> ControlFlow<B, C>,
-) -> ControlFlow<B, C> {
-	items
-		.iter()
-		.try_fold(init, |state, item| match func(state, sub_menu, item) {
-			ControlFlow::Break(x) => ControlFlow::Break(x),
-			ControlFlow::Continue(x) => {
-				if let MenuItemKind::Submenu(sub_menu) = item {
-					visit_menu_items(&sub_menu.items(), x, Some(sub_menu), func)
-				} else {
-					ControlFlow::Continue(x)
-				}
-			}
-		})
 }
 
 #[cfg(test)]

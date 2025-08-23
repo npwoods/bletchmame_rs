@@ -90,10 +90,6 @@ pub impl WindowAttributes {
 
 #[ext(WinWindowExt)]
 pub impl Window {
-	fn with_muda_menu<T>(&self, callback: impl FnOnce(&::muda::Menu) -> T) -> Option<T> {
-		i_slint_backend_winit::WinitWindowAccessor::with_muda_menu(self, callback)
-	}
-
 	fn set_enabled_for_modal(&self, enabled: bool) {
 		self.with_winit_window(|window| {
 			info!(window.id=?window.id(), window.title=?window.title(), enabled=?enabled, "Window::set_enabled_for_modal");

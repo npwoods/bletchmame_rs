@@ -37,8 +37,4 @@ pub impl Window {
 	fn set_enabled_for_modal(&self, _enabled: bool) {
 		// do nothing for now
 	}
-
-	fn with_muda_menu<T>(&self, _callback: impl FnOnce(&::muda::Menu) -> T) -> Option<T> {
-		None
-	}
 }
