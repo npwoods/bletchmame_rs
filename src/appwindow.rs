@@ -2,8 +2,6 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::convert::Infallible;
-use std::ops::ControlFlow;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -24,7 +22,6 @@ use slint::quit_event_loop;
 use slint::spawn_local;
 use strum::EnumString;
 use strum::IntoEnumIterator;
-use tokio::time::Duration;
 use tracing::debug;
 use tracing::debug_span;
 use tracing::info;
@@ -65,16 +62,12 @@ use crate::dialogs::paths::dialog_paths;
 use crate::dialogs::seqpoll::dialog_seq_poll;
 use crate::dialogs::socket::dialog_connect_to_socket;
 use crate::guiutils::is_context_menu_event;
-use crate::guiutils::menuing::MenuExt;
-use crate::guiutils::menuing::MenuItemKindExt;
-use crate::guiutils::menuing::MenuItemUpdate;
 use crate::guiutils::menuing::accel;
 use crate::guiutils::modal::ModalStack;
 use crate::history::History;
 use crate::models::collectionsview::CollectionsViewModel;
 use crate::models::itemstable::EmptyReason;
 use crate::models::itemstable::ItemsTableModel;
-use crate::platform::WindowExt as WindowExt_2;
 use crate::prefs::BuiltinCollection;
 use crate::prefs::Preferences;
 use crate::prefs::PrefsCollection;
@@ -90,6 +83,7 @@ use crate::status::Status;
 use crate::ui::AboutDialog;
 use crate::ui::AppWindow;
 use crate::ui::ReportIssue;
+use crate::version::MameVersion;
 
 const SOUND_ATTENUATION_OFF: i32 = -32;
 const SOUND_ATTENUATION_ON: i32 = 0;
@@ -317,17 +311,6 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		.await
 		.unwrap();
 
-	// if we have muda, we have to hack the menu to have enabled and accelerators
-	let has_muda = app_window.window().with_muda_menu(|_| ()).is_some();
-	if has_muda {
-		let app_window_weak = app_window.as_weak();
-		let fut = async move {
-			let app_window = app_window_weak.unwrap();
-			hack_muda_menu(&app_window).await;
-		};
-		spawn_local(fut).unwrap();
-	};
-
 	// get preferences
 	let prefs_path = args.prefs_path;
 	let preferences = Preferences::load(&prefs_path)
@@ -367,24 +350,8 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	// attach the menu bar (either natively or with an approximation using Slint); looking forward to Slint having first class menuing support
 	let model_clone = model.clone();
 	app_window.on_menu_item_activated(move |parent_title, title| {
-		// hack to work around Muda automatically changing the check mark value
-		model_clone.app_window().window().with_muda_menu(|menu_bar| {
-			let _ = menu_bar.visit((), |_, sub_menu, item| {
-				if sub_menu.is_some_and(|x| x.text().as_str() == parent_title.as_str())
-					&& item.text().is_some_and(|x| x.as_str() == title.as_str())
-				{
-					if let Some(item) = item.as_check_menuitem() {
-						item.set_checked(!item.is_checked());
-					}
-					ControlFlow::Break(())
-				} else {
-					ControlFlow::Continue(())
-				}
-			});
-		});
-
 		// dispatch the command
-		if let (Some(command), _) = menu_item_info(Some(&parent_title), &title) {
+		if let Some(command) = menu_item_command(Some(&parent_title), &title) {
 			handle_command(&model_clone, command);
 		}
 	});
@@ -393,6 +360,18 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		if let Some(command) = AppCommand::decode_from_slint(command_string) {
 			handle_command(&model_clone, command);
 		}
+	});
+	let model_clone = model.clone();
+	app_window.on_minimum_mame(move |major, minor| {
+		let major = major.try_into().unwrap();
+		let minor = minor.try_into().unwrap();
+		let version = MameVersion::new(major, minor);
+		model_clone
+			.state
+			.borrow()
+			.status()
+			.map(|status| status.running.is_some() && status.build >= version)
+			.unwrap_or(false)
 	});
 
 	// create a repeating future that will update the child window forever
@@ -407,35 +386,38 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		}
 	});
 
-	// scroll lock handler (do this in a future because the window might not be inited yet)
-	app_window.window().with_muda_menu(|menubar| {
-		// build the accelerator map
-		let accelerator_command_map = menubar.visit(HashMap::new(), |mut accelerator_command_map, sub_menu, item| {
-			if let Some(title) = item.text() {
-				let parent_title = sub_menu.map(|x| x.text());
-				let (command, accelerator) = menu_item_info(parent_title.as_deref(), &title);
-				if let Some(command) = command
-					&& let Some(accelerator) = accelerator
-				{
-					accelerator_command_map.insert(accelerator, command);
-				}
+	// set up the accelerator map
+	let accelerator_command_map = [
+		("Pause", Some(AppCommand::FilePause)),
+		("F7", Some(AppCommand::FileQuickLoadState)),
+		("Shift+F7", Some(AppCommand::FileQuickLoadState)),
+		("Ctrl+F7", Some(AppCommand::FileLoadState)),
+		("Ctrl+Shift+F7", Some(AppCommand::FileLoadState)),
+		("F12", Some(AppCommand::FileSaveScreenshot)),
+		("Shift+F12", Some(AppCommand::FileRecordMovie)),
+		("Ctrl+Alt+X", Some(AppCommand::FileExit)),
+		("F9", None),
+		("F8", None),
+		("F10", Some(AppCommand::OptionsToggleWarp)),
+		("F11", Some(AppCommand::OptionsToggleFullScreen)),
+		("ScrLk", Some(AppCommand::OptionsToggleMenuBar)),
+	];
+	let accelerator_command_map =
+		HashMap::<Accelerator, AppCommand>::from_iter(accelerator_command_map.into_iter().filter_map(
+			|(accelerator, command)| {
+				accel(accelerator).and_then(|accelerator| command.map(|command| (accelerator, command)))
+			},
+		));
+	let model_clone = model.clone();
+	model
+		.backend_runtime
+		.install_muda_accelerator_handler(app_window.window(), move |accelerator| {
+			let command = accelerator_command_map.get(accelerator);
+			if let Some(command) = command {
+				handle_command(&model_clone, command.clone());
 			}
-			ControlFlow::<Infallible, _>::Continue(accelerator_command_map)
+			command.is_some()
 		});
-		let accelerator_command_map = accelerator_command_map.continue_value().unwrap();
-
-		// and install the callback
-		let model_clone = model.clone();
-		model
-			.backend_runtime
-			.install_muda_accelerator_handler(app_window.window(), move |accelerator| {
-				let command = accelerator_command_map.get(accelerator);
-				if let Some(command) = command {
-					handle_command(&model_clone, command.clone());
-				}
-				command.is_some()
-			});
-	});
 
 	// set up the collections view model
 	let collections_view_model = CollectionsViewModel::new(app_window.as_weak());
@@ -622,101 +604,63 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	app_window.show().unwrap();
 }
 
-/// Hacks to get around the fact that Slint does not yet support menu accelerators yet
-async fn hack_muda_menu(app_window: &AppWindow) {
-	// wait for the "All Software" menu item to be created
-	let all_software_string = BuiltinCollection::AllSoftware.to_string();
-	while app_window
-		.window()
-		.with_muda_menu(|menu_bar| {
-			menu_bar.visit((), |_, _, item| {
-				if item.text().as_deref() == Some(&all_software_string) {
-					ControlFlow::Break(())
-				} else {
-					ControlFlow::Continue(())
-				}
-			})
-		})
-		.is_some_and(|x| x.is_continue())
-	{
-		tokio::time::sleep(Duration::from_millis(10)).await;
-	}
-
-	// and update the menu (hopefully it doesn't get nuked later)
-	app_window.window().with_muda_menu(|menu_bar| {
-		let _ = menu_bar.visit((), |_, sub_menu, item| {
-			if let Some(title) = item.text() {
-				let parent_title = sub_menu.map(|x| x.text());
-				let (command, accelerator) = menu_item_info(parent_title.as_deref(), &title);
-
-				if command.is_none() {
-					item.set_enabled(false);
-				}
-				if let Some(accelerator) = accelerator {
-					item.set_accelerator(Some(accelerator)).unwrap();
-				}
-			}
-			ControlFlow::<Infallible>::Continue(())
-		});
-	});
-}
-
-fn menu_item_info(parent_title: Option<&str>, title: &str) -> (Option<AppCommand>, Option<Accelerator>) {
-	let (command, accelerator) = match (parent_title, title) {
+fn menu_item_command(parent_title: Option<&str>, title: &str) -> Option<AppCommand> {
+	let command = match (parent_title, title) {
 		// File menu
-		(_, "Stop") => (Some(AppCommand::FileStop), None),
-		(_, "Pause") => (Some(AppCommand::FilePause), Some("Pause")),
-		(_, "Devices and Images...") => (Some(AppCommand::FileDevicesAndImages), None),
-		(_, "Quick Load State") => (Some(AppCommand::FileQuickLoadState), Some("F7")),
-		(_, "Quick Save State") => (Some(AppCommand::FileQuickLoadState), Some("Shift+F7")),
-		(_, "Load State...") => (Some(AppCommand::FileLoadState), Some("Ctrl+F7")),
-		(_, "Save State...") => (Some(AppCommand::FileLoadState), Some("Ctrl+Shift+F7")),
-		(_, "Save Screenshot...") => (Some(AppCommand::FileSaveScreenshot), Some("F12")),
-		(_, "Record Movie...") => (Some(AppCommand::FileRecordMovie), Some("Shift+F12")),
-		(_, "Debugger...") => (Some(AppCommand::FileDebugger), None),
-		(_, "Soft Reset") => (Some(AppCommand::FileResetSoft), None),
-		(_, "Hard Reset") => (Some(AppCommand::FileResetHard), None),
-		(_, "Exit") => (Some(AppCommand::FileExit), Some("Ctrl+Alt+X")),
+		(_, "Stop") => Some(AppCommand::FileStop),
+		(_, "Pause") => Some(AppCommand::FilePause),
+		(_, "Devices and Images...") => Some(AppCommand::FileDevicesAndImages),
+		(_, "Quick Load State") => Some(AppCommand::FileQuickLoadState),
+		(_, "Quick Save State") => Some(AppCommand::FileQuickLoadState),
+		(_, "Load State...") => Some(AppCommand::FileLoadState),
+		(_, "Save State...") => Some(AppCommand::FileLoadState),
+		(_, "Save Screenshot...") => Some(AppCommand::FileSaveScreenshot),
+		(_, "Record Movie...") => Some(AppCommand::FileRecordMovie),
+		(_, "Stop Recording") => Some(AppCommand::FileRecordMovie),
+		(_, "Debugger...") => Some(AppCommand::FileDebugger),
+		(_, "Soft Reset") => Some(AppCommand::FileResetSoft),
+		(_, "Hard Reset") => Some(AppCommand::FileResetHard),
+		(_, "Exit") => Some(AppCommand::FileExit),
 
 		// Options menu
-		(Some("Throttle"), "Increase Speed") => (None, Some("F9")),
-		(Some("Throttle"), "Decrease Speed") => (None, Some("F8")),
-		(Some("Throttle"), "Warp mode") => (Some(AppCommand::OptionsToggleWarp), Some("F10")),
+		(Some("Throttle"), "Increase Speed") => None,
+		(Some("Throttle"), "Decrease Speed") => None,
+		(Some("Throttle"), "Warp mode") => Some(AppCommand::OptionsToggleWarp),
 		(Some("Throttle"), rate) => {
 			let rate = rate.strip_suffix('%').unwrap().parse().unwrap();
-			(Some(AppCommand::OptionsThrottleRate(rate)), None)
+			Some(AppCommand::OptionsThrottleRate(rate))
 		}
-		(_, "Full Screen") => (Some(AppCommand::OptionsToggleFullScreen), Some("F11")),
-		(_, "Toggle Menu Bar") => (Some(AppCommand::OptionsToggleMenuBar), Some("ScrLk")),
-		(_, "Sound") => (Some(AppCommand::OptionsToggleSound), None),
-		(_, "Cheats...") => (Some(AppCommand::OptionsCheats), None),
-		(_, "Classic MAME Menu") => (Some(AppCommand::OptionsClassic), None),
-		(_, "Console") => (Some(AppCommand::OptionsConsole), None),
+		(_, "Full Screen") => Some(AppCommand::OptionsToggleFullScreen),
+		(_, "Toggle Menu Bar") => Some(AppCommand::OptionsToggleMenuBar),
+		(_, "Sound") => Some(AppCommand::OptionsToggleSound),
+		(_, "Cheats...") => Some(AppCommand::OptionsCheats),
+		(_, "Classic MAME Menu") => Some(AppCommand::OptionsClassic),
+		(_, "Console") => Some(AppCommand::OptionsConsole),
 
 		// Settings menu
-		(_, "Joysticks and Controllers...") => (Some(AppCommand::SettingsInput(InputClass::Controller)), None),
-		(_, "Keyboard...") => (Some(AppCommand::SettingsInput(InputClass::Keyboard)), None),
-		(_, "Miscellaneous Input...") => (Some(AppCommand::SettingsInput(InputClass::Misc)), None),
-		(_, "Configuration...") => (Some(AppCommand::SettingsInput(InputClass::Config)), None),
-		(_, "DIP Switches...") => (Some(AppCommand::SettingsInput(InputClass::DipSwitch)), None),
-		(_, "Paths...") => (Some(AppCommand::SettingsPaths(None)), None),
+		(_, "Joysticks and Controllers...") => Some(AppCommand::SettingsInput(InputClass::Controller)),
+		(_, "Keyboard...") => Some(AppCommand::SettingsInput(InputClass::Keyboard)),
+		(_, "Miscellaneous Input...") => Some(AppCommand::SettingsInput(InputClass::Misc)),
+		(_, "Configuration...") => Some(AppCommand::SettingsInput(InputClass::Config)),
+		(_, "DIP Switches...") => Some(AppCommand::SettingsInput(InputClass::DipSwitch)),
+		(_, "Paths...") => Some(AppCommand::SettingsPaths(None)),
 		(Some("Builtin Collections"), col) => {
 			let col = BuiltinCollection::from_str(col).unwrap();
-			(Some(AppCommand::SettingsToggleBuiltinCollection(col)), None)
+			Some(AppCommand::SettingsToggleBuiltinCollection(col))
 		}
-		(_, "Reset Settings To Default") => (Some(AppCommand::SettingsReset), None),
-		(_, "Import MAME INI...") => (Some(AppCommand::SettingsImportMameIni), None),
+		(_, "Reset Settings To Default") => Some(AppCommand::SettingsReset),
+		(_, "Import MAME INI...") => Some(AppCommand::SettingsImportMameIni),
 
 		// Help menu
-		(_, "Refresh MAME machine info...") => (Some(AppCommand::HelpRefreshInfoDb), None),
-		(_, "BletchMAME web site...") => (Some(AppCommand::HelpWebSite), None),
-		(_, "About...") => (Some(AppCommand::HelpAbout), None),
+		(_, "Refresh MAME machine info...") => Some(AppCommand::HelpRefreshInfoDb),
+		(_, "BletchMAME web site...") => Some(AppCommand::HelpWebSite),
+		(_, "About...") => Some(AppCommand::HelpAbout),
 
 		// Anything else
-		(_, _) => (None, None),
+		(_, _) => None,
 	};
-	debug!(parent_title=?parent_title, title=?title, command=?command, accelerator=?accelerator, "menu_item_info");
-	(command, accelerator.and_then(accel))
+	debug!(parent_title=?parent_title, title=?title, command=?command, "menu_item_command");
+	command
 }
 
 fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
@@ -910,14 +854,12 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 
 			if let Some(has_input_using_mouse) = has_input_using_mouse {
 				let app_window = model.app_window();
-				if let Some(visible) = app_window.window().is_menu_bar_visible() {
-					let new_visible = !visible;
-					app_window.window().set_menu_bar_visible(new_visible);
+				let new_visible = !app_window.get_menubar_visible();
+				app_window.set_menubar_visible(new_visible);
 
-					if has_input_using_mouse {
-						let command = MameCommand::set_mouse_enabled(!new_visible).into();
-						handle_command(model, command);
-					}
+				if has_input_using_mouse {
+					let command = MameCommand::set_mouse_enabled(!new_visible).into();
+					handle_command(model, command);
 				}
 			}
 		}
@@ -1037,10 +979,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 
 			// special check to restore the menu bar if we're not in the emulation
 			if model.state.borrow().status().is_none_or(|s| s.running.is_none()) {
-				let app_window = model.app_window();
-				if app_window.window().is_menu_bar_visible() == Some(false) {
-					app_window.window().set_menu_bar_visible(true);
-				}
+				model.app_window().set_menubar_visible(true);
 			}
 		}
 		AppCommand::ErrorMessageBox(message) => {
@@ -1342,7 +1281,6 @@ async fn show_paths_dialog(model: Rc<AppModel>, path_type: Option<PathType>) {
 fn update_menus(model: &AppModel) {
 	// calculate properties
 	let state = model.state.borrow();
-	let build = state.status().map(|s| &s.build);
 	let running = state.status().and_then(|s| s.running.as_ref());
 	let has_mame_executable = model.preferences.borrow().paths.mame_executable.is_some();
 	let is_running = running.is_some();
@@ -1362,11 +1300,6 @@ fn update_menus(model: &AppModel) {
 	let can_refresh_info_db = has_mame_executable && !state.is_building_infodb();
 	let is_fullscreen = model.app_window().window().is_fullscreen();
 	let is_recording = running.as_ref().map(|r| r.is_recording).unwrap_or_default();
-	let recording_message = if is_recording {
-		"Stop Recording"
-	} else {
-		"Record Movie..."
-	};
 	let has_last_save_state = is_running && state.last_save_state().is_some();
 	let input_classes = running
 		.map(|x| x.inputs.as_ref())
@@ -1377,44 +1310,21 @@ fn update_menus(model: &AppModel) {
 	let has_cheats = running.as_ref().map(|r| !r.cheats.is_empty()).unwrap_or_default();
 
 	// update the menu bar
-	model.app_window().window().with_muda_menu(|menu_bar| {
-		menu_bar.update(|parent_title, title| {
-			let (command, _) = menu_item_info(parent_title, title);
-			let (enabled, checked, text) = match command {
-				Some(AppCommand::FileStop) => (Some(is_running), None, None),
-				Some(AppCommand::FilePause) => (Some(is_running), Some(is_paused), None),
-				Some(AppCommand::FileDevicesAndImages) => (Some(is_running), None, None),
-				Some(AppCommand::FileQuickLoadState) => (Some(has_last_save_state), None, None),
-				Some(AppCommand::FileQuickSaveState) => (Some(has_last_save_state), None, None),
-				Some(AppCommand::FileLoadState) => (Some(is_running), None, None),
-				Some(AppCommand::FileSaveState) => (Some(is_running), None, None),
-				Some(AppCommand::FileSaveScreenshot) => (Some(is_running), None, None),
-				Some(AppCommand::FileRecordMovie) => (Some(is_running), None, Some(recording_message.into())),
-				Some(AppCommand::FileDebugger) => (Some(is_running), None, None),
-				Some(AppCommand::FileResetSoft) => (Some(is_running), None, None),
-				Some(AppCommand::FileResetHard) => (Some(is_running), None, None),
-				Some(AppCommand::OptionsThrottleRate(x)) => (Some(is_running), Some(Some(x) == throttle_rate), None),
-				Some(AppCommand::OptionsToggleWarp) => (Some(is_running), Some(!is_throttled), None),
-				Some(AppCommand::OptionsToggleFullScreen) => (None, Some(is_fullscreen), None),
-				Some(AppCommand::OptionsToggleMenuBar) => (Some(is_running), None, None),
-				Some(AppCommand::OptionsToggleSound) => (Some(is_running), Some(is_sound_enabled), None),
-				Some(AppCommand::OptionsCheats) => (Some(has_cheats), None, None),
-				Some(AppCommand::OptionsClassic) => (Some(is_running), None, None),
-				Some(AppCommand::SettingsInput(class)) => (Some(input_classes.contains(&class)), None, None),
-				Some(AppCommand::HelpRefreshInfoDb) => (Some(can_refresh_info_db), None, None),
-				_ => (None, None, None),
-			};
-
-			// factor in the minimum MAME version when deteriming enabled, if available
-			let enabled = enabled.map(|e| {
-				e && command
-					.as_ref()
-					.and_then(AppCommand::minimum_mame_version)
-					.is_none_or(|a| build.is_some_and(|b| b >= &a))
-			});
-			MenuItemUpdate { enabled, checked, text }
-		})
-	});
+	let app_window = model.app_window();
+	app_window.set_is_paused(is_paused);
+	app_window.set_is_recording(is_recording);
+	app_window.set_is_throttled(is_throttled);
+	app_window.set_is_fullscreen(is_fullscreen);
+	app_window.set_is_sound_enabled(is_sound_enabled);
+	app_window.set_current_throttle_rate(throttle_rate.map(|x| (x * 100.0) as i32).unwrap_or(-1));
+	app_window.set_has_last_save_state(has_last_save_state);
+	app_window.set_has_cheats(has_cheats);
+	app_window.set_can_refresh_info_db(can_refresh_info_db);
+	app_window.set_has_input_class_controller(input_classes.contains(&InputClass::Controller));
+	app_window.set_has_input_class_keyboard(input_classes.contains(&InputClass::Keyboard));
+	app_window.set_has_input_class_misc(input_classes.contains(&InputClass::Misc));
+	app_window.set_has_input_class_config(input_classes.contains(&InputClass::Config));
+	app_window.set_has_input_class_dipswitch(input_classes.contains(&InputClass::DipSwitch));
 }
 
 /// updates all UI elements (except items and items columns models) to reflect the current history item

@@ -1,5 +1,4 @@
 use std::any::Any;
-use std::ffi::c_void;
 use std::fs::File;
 use std::io::BufRead;
 use std::io::BufReader;
@@ -13,16 +12,13 @@ use anyhow::Error;
 use anyhow::Result;
 use easy_ext::ext;
 use i_slint_backend_winit::WinitWindowAccessor;
-use raw_window_handle::HasWindowHandle;
 use raw_window_handle::RawWindowHandle;
-use raw_window_handle::Win32WindowHandle;
 use slint::Window;
 use tracing::info;
 use win32job::Job;
 use windows::Win32::Foundation::GENERIC_READ;
 use windows::Win32::Foundation::GENERIC_WRITE;
 use windows::Win32::Foundation::HANDLE;
-use windows::Win32::Foundation::HWND;
 use windows::Win32::Storage::FileSystem::CreateFileW;
 use windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_NORMAL;
 use windows::Win32::Storage::FileSystem::FILE_SHARE_READ;
@@ -44,11 +40,6 @@ use windows::Win32::System::Pipes::PIPE_TYPE_MESSAGE;
 use windows::Win32::System::Pipes::PIPE_WAIT;
 use windows::Win32::System::Threading::CREATE_NEW_CONSOLE;
 use windows::Win32::System::Threading::CREATE_NO_WINDOW;
-use windows::Win32::UI::WindowsAndMessaging::GetMenu;
-use windows::Win32::UI::WindowsAndMessaging::GetPropW;
-use windows::Win32::UI::WindowsAndMessaging::HMENU;
-use windows::Win32::UI::WindowsAndMessaging::SetMenu;
-use windows::Win32::UI::WindowsAndMessaging::SetPropW;
 use windows::core::PCWSTR;
 use winit::platform::windows::WindowAttributesExtWindows;
 use winit::platform::windows::WindowExtWindows;
@@ -99,59 +90,11 @@ pub impl WindowAttributes {
 
 #[ext(WinWindowExt)]
 pub impl Window {
-	fn with_muda_menu<T>(&self, callback: impl FnOnce(&::muda::Menu) -> T) -> Option<T> {
-		i_slint_backend_winit::WinitWindowAccessor::with_muda_menu(self, callback)
-	}
-
 	fn set_enabled_for_modal(&self, enabled: bool) {
 		self.with_winit_window(|window| {
 			info!(window.id=?window.id(), window.title=?window.title(), enabled=?enabled, "Window::set_enabled_for_modal");
 			window.set_enable(enabled);
 		});
-	}
-
-	fn is_menu_bar_visible(&self) -> Option<bool> {
-		// access the HWND
-		let win32_window_handle = get_win32_window_handle(self).ok()?;
-		let hwnd = HWND(win32_window_handle.hwnd.get() as usize as *mut c_void);
-
-		// do we have a menu?
-		let hmenu = unsafe { GetMenu(hwnd) };
-		Some(!hmenu.is_invalid())
-	}
-
-	fn set_menu_bar_visible(&self, visible: bool) {
-		// access the HWND
-		let win32_window_handle = get_win32_window_handle(self).unwrap();
-		let hwnd = HWND(win32_window_handle.hwnd.get() as usize as *mut c_void);
-
-		// do we have a menu?
-		let old_hmenu = unsafe { GetMenu(hwnd) };
-
-		// are we changing anything?
-		if old_hmenu.is_invalid() == visible {
-			// this is the property name
-			let prop_name = "bletchmame_menu_bar\0".encode_utf16().collect::<Vec<_>>();
-			let prop_name = PCWSTR(prop_name.as_ptr());
-
-			// toggle the menu state
-			let new_hmenu = if visible {
-				unsafe { Some(HMENU(GetPropW(hwnd, prop_name).0)) }
-			} else {
-				unsafe { SetPropW(hwnd, prop_name, Some(HANDLE(old_hmenu.0))).unwrap() };
-				None
-			};
-			unsafe { SetMenu(hwnd, new_hmenu).unwrap() };
-		}
-	}
-}
-
-fn get_win32_window_handle(window: &Window) -> Result<Win32WindowHandle> {
-	if let RawWindowHandle::Win32(win32_window) = window.window_handle().window_handle().unwrap().as_raw() {
-		Ok(win32_window)
-	} else {
-		let message = "RawWindowHandle is not RawWindowHandle::Win32";
-		Err(Error::msg(message))
 	}
 }
 

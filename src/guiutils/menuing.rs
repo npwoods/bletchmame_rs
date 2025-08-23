@@ -1,12 +1,4 @@
 //! Helpers for Menu handling; which Slint does not handle yet
-use std::borrow::Cow;
-use std::convert::Infallible;
-use std::ops::ControlFlow;
-
-use easy_ext::ext;
-use muda::Menu;
-use muda::MenuItemKind;
-use muda::Submenu;
 use muda::accelerator::Accelerator;
 use muda::accelerator::Code;
 use muda::accelerator::Modifiers;
@@ -42,103 +34,6 @@ pub fn accel(text: &str) -> Option<Accelerator> {
 		x => panic!("Unknown accelerator {x}"),
 	};
 	Some(Accelerator::new(mods, key))
-}
-
-#[derive(Debug, Default)]
-pub struct MenuItemUpdate {
-	pub enabled: Option<bool>,
-	pub checked: Option<bool>,
-	pub text: Option<Cow<'static, str>>,
-}
-
-/// Extension for muda menus
-#[ext(MenuExt)]
-pub impl Menu {
-	fn update(&self, callback: impl Fn(Option<&str>, &str) -> MenuItemUpdate) {
-		let _ = self.visit((), |_, sub_menu, item| {
-			if let Some(title) = item.text() {
-				let parent_title = sub_menu.map(|x| x.text());
-				let update = callback(parent_title.as_deref(), &title);
-				if let Some(enabled) = update.enabled {
-					item.set_enabled(enabled);
-				}
-				if let Some(checked) = update.checked {
-					item.set_checked(checked);
-				}
-				if let Some(text) = update.text {
-					item.set_text(&text);
-				}
-			}
-			ControlFlow::<Infallible>::Continue(())
-		});
-	}
-
-	fn visit<B, C>(
-		&self,
-		init: C,
-		func: impl Fn(C, Option<&Submenu>, &MenuItemKind) -> ControlFlow<B, C>,
-	) -> ControlFlow<B, C> {
-		visit_menu_items(&self.items(), init, None, &func)
-	}
-}
-
-#[ext(MenuItemKindExt)]
-pub impl MenuItemKind {
-	fn text(&self) -> Option<String> {
-		match self {
-			MenuItemKind::MenuItem(menu_item) => Some(menu_item.text()),
-			MenuItemKind::Check(check_menu_item) => Some(check_menu_item.text()),
-			_ => None,
-		}
-	}
-
-	fn set_text(&self, text: impl AsRef<str>) {
-		match self {
-			MenuItemKind::MenuItem(menu_item) => menu_item.set_text(text),
-			MenuItemKind::Check(check_menu_item) => check_menu_item.set_text(text),
-			_ => todo!(),
-		}
-	}
-
-	fn set_enabled(&self, enabled: bool) {
-		match self {
-			MenuItemKind::MenuItem(menu_item) => menu_item.set_enabled(enabled),
-			MenuItemKind::Check(check_menu_item) => check_menu_item.set_enabled(enabled),
-			_ => todo!(),
-		}
-	}
-
-	fn set_accelerator(&self, accelerator: Option<Accelerator>) -> muda::Result<()> {
-		match self {
-			MenuItemKind::MenuItem(menu_item) => menu_item.set_accelerator(accelerator),
-			MenuItemKind::Check(check_menu_item) => check_menu_item.set_accelerator(accelerator),
-			_ => todo!(),
-		}
-	}
-
-	fn set_checked(&self, checked: bool) {
-		self.as_check_menuitem_unchecked().set_checked(checked);
-	}
-}
-
-fn visit_menu_items<B, C>(
-	items: &[MenuItemKind],
-	init: C,
-	sub_menu: Option<&Submenu>,
-	func: &impl Fn(C, Option<&Submenu>, &MenuItemKind) -> ControlFlow<B, C>,
-) -> ControlFlow<B, C> {
-	items
-		.iter()
-		.try_fold(init, |state, item| match func(state, sub_menu, item) {
-			ControlFlow::Break(x) => ControlFlow::Break(x),
-			ControlFlow::Continue(x) => {
-				if let MenuItemKind::Submenu(sub_menu) = item {
-					visit_menu_items(&sub_menu.items(), x, Some(sub_menu), func)
-				} else {
-					ControlFlow::Continue(x)
-				}
-			}
-		})
 }
 
 #[cfg(test)]
