@@ -46,7 +46,6 @@ pub fn accel(text: &str) -> Option<Accelerator> {
 
 #[derive(Debug, Default)]
 pub struct MenuItemUpdate {
-	pub checked: Option<bool>,
 	pub text: Option<Cow<'static, str>>,
 }
 
@@ -58,9 +57,6 @@ pub impl Menu {
 			if let Some(title) = item.text() {
 				let parent_title = sub_menu.map(|x| x.text());
 				let update = callback(parent_title.as_deref(), &title);
-				if let Some(checked) = update.checked {
-					item.set_checked(checked);
-				}
 				if let Some(text) = update.text {
 					item.set_text(&text);
 				}
@@ -94,10 +90,6 @@ pub impl MenuItemKind {
 			MenuItemKind::Check(check_menu_item) => check_menu_item.set_text(text),
 			_ => todo!(),
 		}
-	}
-
-	fn set_checked(&self, checked: bool) {
-		self.as_check_menuitem_unchecked().set_checked(checked);
 	}
 }
 

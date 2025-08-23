@@ -46,6 +46,11 @@ export component AppWindow inherits Window {
 
     // the menu bar
     in property <bool> menubar-visible: true;
+    in property <bool> is-paused;
+    in property <bool> is-throttled;
+    in property <bool> is-fullscreen;
+    in property <bool> is-sound-enabled;
+    in property <int> current-throttle-rate;
     in property <bool> has-last-save-state;
     in property <bool> has-cheats;
     in property <bool> can-refresh-info-db;
@@ -262,6 +267,8 @@ export component AppWindow inherits Window {
                 enabled: mode() == "running";
                 for rate in [1000, 500, 200, 100, 50, 20, 10]: MenuItem {
                     title: rate + "%";
+                    checkable: true;
+                    checked: rate == current-throttle-rate;
                     activated => {
                         menu-item-activated(parent.title, self.title);
                     }
@@ -286,6 +293,8 @@ export component AppWindow inherits Window {
 
                 MenuItem {
                     title: @tr("MenuBar" => "Warp mode");
+                    checkable: true;
+                    checked: !is-throttled;
                     muda-accelerator: "F10";
                     activated => {
                         menu-item-activated(parent.title, self.title);
@@ -314,6 +323,8 @@ export component AppWindow inherits Window {
             MenuItem {
                 title: @tr("MenuBar" => "Full Screen");
                 enabled: true;
+                checkable: true;
+                checked: is-fullscreen;
                 muda-accelerator: "F11";
                 activated => {
                     menu-item-activated(parent.title, self.title);
@@ -332,6 +343,8 @@ export component AppWindow inherits Window {
             MenuItem {
                 title: @tr("MenuBar" => "Sound");
                 enabled: mode() == "running";
+                checkable: true;
+                checked: is-sound-enabled;
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }

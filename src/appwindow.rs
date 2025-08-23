@@ -356,22 +356,6 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	// attach the menu bar (either natively or with an approximation using Slint); looking forward to Slint having first class menuing support
 	let model_clone = model.clone();
 	app_window.on_menu_item_activated(move |parent_title, title| {
-		// hack to work around Muda automatically changing the check mark value
-		model_clone.app_window().window().with_muda_menu(|menu_bar| {
-			let _ = menu_bar.visit((), |_, sub_menu, item| {
-				if sub_menu.is_some_and(|x| x.text().as_str() == parent_title.as_str())
-					&& item.text().is_some_and(|x| x.as_str() == title.as_str())
-				{
-					if let Some(item) = item.as_check_menuitem() {
-						item.set_checked(!item.is_checked());
-					}
-					ControlFlow::Break(())
-				} else {
-					ControlFlow::Continue(())
-				}
-			});
-		});
-
 		// dispatch the command
 		if let (Some(command), _) = menu_item_info(Some(&parent_title), &title) {
 			handle_command(&model_clone, command);
@@ -1334,6 +1318,11 @@ fn update_menus(model: &AppModel) {
 
 	// update the menu bar
 	let app_window = model.app_window();
+	app_window.set_is_paused(is_paused);
+	app_window.set_is_throttled(is_throttled);
+	app_window.set_is_fullscreen(is_fullscreen);
+	app_window.set_is_sound_enabled(is_sound_enabled);
+	app_window.set_current_throttle_rate(throttle_rate.map(|x| (x * 100.0) as i32).unwrap_or(-1));
 	app_window.set_has_last_save_state(has_last_save_state);
 	app_window.set_has_cheats(has_cheats);
 	app_window.set_can_refresh_info_db(can_refresh_info_db);
@@ -1345,32 +1334,12 @@ fn update_menus(model: &AppModel) {
 	app_window.window().with_muda_menu(|menu_bar| {
 		menu_bar.update(|parent_title, title| {
 			let (command, _) = menu_item_info(parent_title, title);
-			let (checked, text) = match command {
-				Some(AppCommand::FileStop) => (None, None),
-				Some(AppCommand::FilePause) => (Some(is_paused), None),
-				Some(AppCommand::FileDevicesAndImages) => (None, None),
-				Some(AppCommand::FileQuickLoadState) => (None, None),
-				Some(AppCommand::FileQuickSaveState) => (None, None),
-				Some(AppCommand::FileLoadState) => (None, None),
-				Some(AppCommand::FileSaveState) => (None, None),
-				Some(AppCommand::FileSaveScreenshot) => (None, None),
-				Some(AppCommand::FileRecordMovie) => (None, Some(recording_message.into())),
-				Some(AppCommand::FileDebugger) => (None, None),
-				Some(AppCommand::FileResetSoft) => (None, None),
-				Some(AppCommand::FileResetHard) => (None, None),
-				Some(AppCommand::OptionsThrottleRate(x)) => (Some(Some(x) == throttle_rate), None),
-				Some(AppCommand::OptionsToggleWarp) => (Some(!is_throttled), None),
-				Some(AppCommand::OptionsToggleFullScreen) => (Some(is_fullscreen), None),
-				Some(AppCommand::OptionsToggleMenuBar) => (None, None),
-				Some(AppCommand::OptionsToggleSound) => (Some(is_sound_enabled), None),
-				Some(AppCommand::OptionsCheats) => (None, None),
-				Some(AppCommand::OptionsClassic) => (None, None),
-				Some(AppCommand::SettingsInput(_)) => (None, None),
-				Some(AppCommand::HelpRefreshInfoDb) => (None, None),
-				_ => (None, None),
+			let text = match command {
+				Some(AppCommand::FileRecordMovie) => Some(recording_message.into()),
+				_ => None,
 			};
 
-			MenuItemUpdate { checked, text }
+			MenuItemUpdate { text }
 		})
 	});
 }
