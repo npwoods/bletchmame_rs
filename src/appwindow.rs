@@ -910,14 +910,12 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 
 			if let Some(has_input_using_mouse) = has_input_using_mouse {
 				let app_window = model.app_window();
-				if let Some(visible) = app_window.window().is_menu_bar_visible() {
-					let new_visible = !visible;
-					app_window.window().set_menu_bar_visible(new_visible);
+				let new_visible = !app_window.get_menubar_visible();
+				app_window.set_menubar_visible(new_visible);
 
-					if has_input_using_mouse {
-						let command = MameCommand::set_mouse_enabled(!new_visible).into();
-						handle_command(model, command);
-					}
+				if has_input_using_mouse {
+					let command = MameCommand::set_mouse_enabled(!new_visible).into();
+					handle_command(model, command);
 				}
 			}
 		}
@@ -1037,10 +1035,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 
 			// special check to restore the menu bar if we're not in the emulation
 			if model.state.borrow().status().is_none_or(|s| s.running.is_none()) {
-				let app_window = model.app_window();
-				if app_window.window().is_menu_bar_visible() == Some(false) {
-					app_window.window().set_menu_bar_visible(true);
-				}
+				model.app_window().set_menubar_visible(true);
 			}
 		}
 		AppCommand::ErrorMessageBox(message) => {

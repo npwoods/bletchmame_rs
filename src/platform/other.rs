@@ -41,12 +41,4 @@ pub impl Window {
 	fn with_muda_menu<T>(&self, _callback: impl FnOnce(&::muda::Menu) -> T) -> Option<T> {
 		None
 	}
-
-	fn is_menu_bar_visible(&self) -> Option<bool> {
-		None
-	}
-
-	fn set_menu_bar_visible(&self, _visible: bool) {
-		todo!();
-	}
 }

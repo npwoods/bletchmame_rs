@@ -45,6 +45,7 @@ export component AppWindow inherits Window {
     in property <string> running-machine-desc;
 
     // the menu bar
+    in property <bool> menubar-visible: true;
     callback menu-item-activated(string, string);
     callback menu-item-command(string);
     in property <[string]> menu-items-builtin-collections;
@@ -122,7 +123,7 @@ export component AppWindow inherits Window {
 
 
     // Slint's crude menu bar
-    MenuBar {
+    if menubar-visible: MenuBar {
         Menu {
             title: @tr("MenuBar" => "File");
             MenuItem {
@@ -417,7 +418,6 @@ export component AppWindow inherits Window {
             }
         }
     }
-
     collection-context-menu := ContextMenuArea {
         Menu {
             if collection-context-menu-info.move-up-command != "": MenuItem {
