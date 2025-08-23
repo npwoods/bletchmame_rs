@@ -5,8 +5,8 @@ use std::rc::Rc;
 use anyhow::Result;
 use easy_ext::ext;
 use i_slint_backend_winit::CustomApplicationHandler;
+use i_slint_backend_winit::EventResult;
 use i_slint_backend_winit::WinitWindowAccessor;
-use i_slint_backend_winit::WinitWindowEventResult;
 use muda::accelerator::Accelerator;
 use muda::accelerator::Code;
 use muda::accelerator::Modifiers;
@@ -198,7 +198,7 @@ impl CustomApplicationHandler for WinitBackendRuntime {
 		_winit_window: Option<&Window>,
 		_slint_window: Option<&slint::Window>,
 		event: &WindowEvent,
-	) -> WinitWindowEventResult {
+	) -> EventResult {
 		// tracing
 		let span = info_span!("window_event");
 		let _guard = span.enter();
@@ -222,7 +222,7 @@ impl CustomApplicationHandler for WinitBackendRuntime {
 					}
 					FindResult::None => {}
 				};
-				WinitWindowEventResult::Propagate
+				EventResult::Propagate
 			}
 
 			WindowEvent::KeyboardInput { event, .. } => {
@@ -240,18 +240,18 @@ impl CustomApplicationHandler for WinitBackendRuntime {
 					if let Some(callback) = state.muda_accelerator_callbacks.get(window_id)
 						&& callback(&accelerator)
 					{
-						WinitWindowEventResult::PreventDefault
+						EventResult::PreventDefault
 					} else {
-						WinitWindowEventResult::Propagate
+						EventResult::Propagate
 					}
 				} else {
-					WinitWindowEventResult::Propagate
+					EventResult::Propagate
 				}
 			}
 
 			WindowEvent::ModifiersChanged(modifiers) => {
 				self.0.borrow_mut().modifiers_state = modifiers.state();
-				WinitWindowEventResult::Propagate
+				EventResult::Propagate
 			}
 
 			WindowEvent::Destroyed => {
@@ -260,15 +260,15 @@ impl CustomApplicationHandler for WinitBackendRuntime {
 					.live
 					.retain(|x| x.parent_window_id != window_id && x.window.id() != window_id);
 				state.muda_accelerator_callbacks.remove(&window_id);
-				WinitWindowEventResult::Propagate
+				EventResult::Propagate
 			}
-			_ => WinitWindowEventResult::Propagate,
+			_ => EventResult::Propagate,
 		}
 	}
 
-	fn resumed(&mut self, event_loop: &ActiveEventLoop) -> WinitWindowEventResult {
+	fn resumed(&mut self, event_loop: &ActiveEventLoop) -> EventResult {
 		self.create_pending_child_windows(event_loop);
-		WinitWindowEventResult::Propagate
+		EventResult::Propagate
 	}
 }
 
