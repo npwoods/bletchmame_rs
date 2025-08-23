@@ -151,6 +151,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Quick Load State");
+                muda-accelerator: "F7";
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }
@@ -158,6 +159,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Quick Save State");
+                muda-accelerator: "Shift+F7";
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }
@@ -165,6 +167,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Load State...");
+                muda-accelerator: "Ctrl+F7";
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }
@@ -172,6 +175,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Save State...");
+                muda-accelerator: "Ctrl+Shift+F7";
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }
@@ -181,6 +185,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Save Screenshot...");
+                muda-accelerator: "F12";
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }
@@ -188,6 +193,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Record Movie...");
+                muda-accelerator: "Shift+F12";
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }
@@ -221,6 +227,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Exit");
+                muda-accelerator: "Ctrl+Shift+KeyX";
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }
@@ -241,6 +248,7 @@ export component AppWindow inherits Window {
 
                 MenuItem {
                     title: @tr("MenuBar" => "Increase Speed");
+                    muda-accelerator: "F9";
                     activated => {
                         menu-item-activated(parent.title, self.title);
                     }
@@ -248,6 +256,7 @@ export component AppWindow inherits Window {
 
                 MenuItem {
                     title: @tr("MenuBar" => "Decrease Speed");
+                    muda-accelerator: "F8";
                     activated => {
                         menu-item-activated(parent.title, self.title);
                     }
@@ -255,6 +264,7 @@ export component AppWindow inherits Window {
 
                 MenuItem {
                     title: @tr("MenuBar" => "Warp mode");
+                    muda-accelerator: "F10";
                     activated => {
                         menu-item-activated(parent.title, self.title);
                     }
@@ -280,6 +290,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Full Screen");
+                muda-accelerator: "F11";
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }
@@ -287,6 +298,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Toggle Menu Bar");
+                muda-accelerator: "ScrollLock";
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }

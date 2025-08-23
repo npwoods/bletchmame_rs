@@ -647,13 +647,10 @@ async fn hack_muda_menu(app_window: &AppWindow) {
 		let _ = menu_bar.visit((), |_, sub_menu, item| {
 			if let Some(title) = item.text() {
 				let parent_title = sub_menu.map(|x| x.text());
-				let (command, accelerator) = menu_item_info(parent_title.as_deref(), &title);
+				let (command, _) = menu_item_info(parent_title.as_deref(), &title);
 
 				if command.is_none() {
 					item.set_enabled(false);
-				}
-				if let Some(accelerator) = accelerator {
-					item.set_accelerator(Some(accelerator)).unwrap();
 				}
 			}
 			ControlFlow::<Infallible>::Continue(())

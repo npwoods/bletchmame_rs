@@ -108,14 +108,6 @@ pub impl MenuItemKind {
 		}
 	}
 
-	fn set_accelerator(&self, accelerator: Option<Accelerator>) -> muda::Result<()> {
-		match self {
-			MenuItemKind::MenuItem(menu_item) => menu_item.set_accelerator(accelerator),
-			MenuItemKind::Check(check_menu_item) => check_menu_item.set_accelerator(accelerator),
-			_ => todo!(),
-		}
-	}
-
 	fn set_checked(&self, checked: bool) {
 		self.as_check_menuitem_unchecked().set_checked(checked);
 	}
