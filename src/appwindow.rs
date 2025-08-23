@@ -66,7 +66,6 @@ use crate::dialogs::socket::dialog_connect_to_socket;
 use crate::guiutils::is_context_menu_event;
 use crate::guiutils::menuing::MenuExt;
 use crate::guiutils::menuing::MenuItemKindExt;
-use crate::guiutils::menuing::MenuItemUpdate;
 use crate::guiutils::menuing::accel;
 use crate::guiutils::modal::ModalStack;
 use crate::history::History;
@@ -619,6 +618,7 @@ fn menu_item_info(parent_title: Option<&str>, title: &str) -> (Option<AppCommand
 		(_, "Save State...") => (Some(AppCommand::FileLoadState), Some("Ctrl+Shift+F7")),
 		(_, "Save Screenshot...") => (Some(AppCommand::FileSaveScreenshot), Some("F12")),
 		(_, "Record Movie...") => (Some(AppCommand::FileRecordMovie), Some("Shift+F12")),
+		(_, "Stop Recording") => (Some(AppCommand::FileRecordMovie), Some("Shift+F12")),
 		(_, "Debugger...") => (Some(AppCommand::FileDebugger), None),
 		(_, "Soft Reset") => (Some(AppCommand::FileResetSoft), None),
 		(_, "Hard Reset") => (Some(AppCommand::FileResetHard), None),
@@ -1302,11 +1302,6 @@ fn update_menus(model: &AppModel) {
 	let can_refresh_info_db = has_mame_executable && !state.is_building_infodb();
 	let is_fullscreen = model.app_window().window().is_fullscreen();
 	let is_recording = running.as_ref().map(|r| r.is_recording).unwrap_or_default();
-	let recording_message = if is_recording {
-		"Stop Recording"
-	} else {
-		"Record Movie..."
-	};
 	let has_last_save_state = is_running && state.last_save_state().is_some();
 	let input_classes = running
 		.map(|x| x.inputs.as_ref())
@@ -1319,6 +1314,7 @@ fn update_menus(model: &AppModel) {
 	// update the menu bar
 	let app_window = model.app_window();
 	app_window.set_is_paused(is_paused);
+	app_window.set_is_recording(is_recording);
 	app_window.set_is_throttled(is_throttled);
 	app_window.set_is_fullscreen(is_fullscreen);
 	app_window.set_is_sound_enabled(is_sound_enabled);
@@ -1331,17 +1327,6 @@ fn update_menus(model: &AppModel) {
 	app_window.set_has_input_class_misc(input_classes.contains(&InputClass::Misc));
 	app_window.set_has_input_class_config(input_classes.contains(&InputClass::Config));
 	app_window.set_has_input_class_dipswitch(input_classes.contains(&InputClass::DipSwitch));
-	app_window.window().with_muda_menu(|menu_bar| {
-		menu_bar.update(|parent_title, title| {
-			let (command, _) = menu_item_info(parent_title, title);
-			let text = match command {
-				Some(AppCommand::FileRecordMovie) => Some(recording_message.into()),
-				_ => None,
-			};
-
-			MenuItemUpdate { text }
-		})
-	});
 }
 
 /// updates all UI elements (except items and items columns models) to reflect the current history item

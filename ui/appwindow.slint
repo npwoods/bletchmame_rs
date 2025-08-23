@@ -47,6 +47,7 @@ export component AppWindow inherits Window {
     // the menu bar
     in property <bool> menubar-visible: true;
     in property <bool> is-paused;
+    in property <bool> is-recording;
     in property <bool> is-throttled;
     in property <bool> is-fullscreen;
     in property <bool> is-sound-enabled;
@@ -214,7 +215,7 @@ export component AppWindow inherits Window {
             }
 
             MenuItem {
-                title: @tr("MenuBar" => "Record Movie...");
+                title: is-recording ? @tr("MenuBar" => "Stop Recording") : @tr("MenuBar" => "Record Movie...");
                 enabled: minimum-mame(0, 221);  // recording movies by specifying absolute paths was introduced in MAME 0.221
                 muda-accelerator: "Shift+F12";
                 activated => {

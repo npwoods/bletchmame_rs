@@ -1,6 +1,4 @@
 //! Helpers for Menu handling; which Slint does not handle yet
-use std::borrow::Cow;
-use std::convert::Infallible;
 use std::ops::ControlFlow;
 
 use easy_ext::ext;
@@ -44,27 +42,9 @@ pub fn accel(text: &str) -> Option<Accelerator> {
 	Some(Accelerator::new(mods, key))
 }
 
-#[derive(Debug, Default)]
-pub struct MenuItemUpdate {
-	pub text: Option<Cow<'static, str>>,
-}
-
 /// Extension for muda menus
 #[ext(MenuExt)]
 pub impl Menu {
-	fn update(&self, callback: impl Fn(Option<&str>, &str) -> MenuItemUpdate) {
-		let _ = self.visit((), |_, sub_menu, item| {
-			if let Some(title) = item.text() {
-				let parent_title = sub_menu.map(|x| x.text());
-				let update = callback(parent_title.as_deref(), &title);
-				if let Some(text) = update.text {
-					item.set_text(&text);
-				}
-			}
-			ControlFlow::<Infallible>::Continue(())
-		});
-	}
-
 	fn visit<B, C>(
 		&self,
 		init: C,
@@ -81,14 +61,6 @@ pub impl MenuItemKind {
 			MenuItemKind::MenuItem(menu_item) => Some(menu_item.text()),
 			MenuItemKind::Check(check_menu_item) => Some(check_menu_item.text()),
 			_ => None,
-		}
-	}
-
-	fn set_text(&self, text: impl AsRef<str>) {
-		match self {
-			MenuItemKind::MenuItem(menu_item) => menu_item.set_text(text),
-			MenuItemKind::Check(check_menu_item) => check_menu_item.set_text(text),
-			_ => todo!(),
 		}
 	}
 }
