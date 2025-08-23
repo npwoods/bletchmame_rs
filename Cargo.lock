@@ -5178,7 +5178,7 @@ dependencies = [
 [[package]]
 name = "slint-material-components"
 version = "0.1.0"
-source = "git+https://github.com/slint-ui/material-components.git?rev=8cdf7cd4b4af54484d74c5077bd9ce0c876fc637#8cdf7cd4b4af54484d74c5077bd9ce0c876fc637"
+source = "git+https://github.com/slint-ui/material-components.git?rev=5a0767ba1288308b6304666b1a12f7e26bf7f00c#5a0767ba1288308b6304666b1a12f7e26bf7f00c"
 
 [[package]]
 name = "slotmap"
