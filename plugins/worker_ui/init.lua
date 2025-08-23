@@ -444,7 +444,7 @@ function emit_status(light, out)
 				local cheat = _G.emu.plugin.cheat.get(id)
 				emit(string.format("\t\t<cheat id=\"%s\" enabled=\"%s\" description=\"%s\"",
 					tostring(id),
-					string_from_bool(cheat.enabled),
+					string_from_bool(cheat.get_enabled()),
 					xml_encode(desc)))
 				if (cheat.script) then
 					emit(string.format("\t\t\thas_run_script=\"%s\" has_on_script=\"%s\" has_off_script=\"%s\" has_change_script=\"%s\"",

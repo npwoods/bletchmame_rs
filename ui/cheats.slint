@@ -5,6 +5,7 @@ export struct CheatsDialogEntry {
     cheat-enabled: bool,
     description: string,
     comment: string,
+    has-changed-script: bool,
     value: int,
     minimum: int,
     maximum: int,
@@ -24,31 +25,51 @@ export component CheatsDialog inherits Window {
 
     // callbacks
     callback ok-clicked();
+    callback set-cheat-state(index: int, enabled: bool);
+    callback set-cheat-state-parameter(index: int, enabled: bool, parameter-index: int);
+
+    // context menu control
+    in-out property <int> context-menu-current-index;
+    context-menu := ContextMenuArea {
+        Menu {
+            for item[index] in entries[context-menu-current-index].items: MenuItem {
+                title: item;
+                activated => {
+                    root.set-cheat-state-parameter(context-menu-current-index, true, index);
+                }
+            }
+        }
+    }
 
     // control hierarchy
     VerticalBox {
         ScrollView {
             VerticalBox {
                 padding: 3px;
-                vertical-stretch: 0;
                 for entry[index] in root.entries: HorizontalLayout {
-                    vertical-stretch: 0;
                     if entry.cheat-type == "text": Text {
                         text: entry.description;
                         vertical-alignment: center;
                     }
                     if entry.cheat-type == "one-shot": Button {
                         text: entry.description;
-                        enabled: false;
+                        clicked => {
+                            root.set-cheat-state(index, true);
+                        }
                     }
                     if entry.cheat-type == "on-off": CheckBox {
                         text: entry.description;
                         checked: entry.cheat-enabled;
-                        enabled: false;
+                        toggled => {
+                            root.set-cheat-state(index, self.checked);
+                        }
                     }
                     if entry.cheat-type == "one-shot-parameter": Button {
                         text: entry.description;
-                        enabled: false;
+                        clicked => {
+                            context-menu-current-index = index;
+                            context-menu.show({ x: self.absolute-position.x, y: self.absolute-position.y + self.height });
+                        }
                     }
                     if entry.cheat-type == "value-parameter": HorizontalLayout {
                         Text {
@@ -62,7 +83,11 @@ export component CheatsDialog inherits Window {
                             minimum: entry.minimum;
                             maximum: entry.maximum;
                             step: entry.step;
-                            enabled: false;
+                            changed(value) => {
+                                if entry.has-changed-script {
+                                    root.set-cheat-state-parameter(index, true, value);
+                                }
+                            }
                         }
                     }
                     if entry.cheat-type == "item-list-parameter": HorizontalLayout {
@@ -74,21 +99,20 @@ export component CheatsDialog inherits Window {
 
                         ComboBox {
                             model: entry.items;
-                            enabled: false;
+                            vertical-stretch: 0;
                         }
                     }
+                }
+
+                // soak up remaining space
+                Rectangle {
+                    vertical-stretch: 1;
                 }
             }
         }
 
         HorizontalBox {
             alignment: end;
-            Button {
-                text: "Reload Cheats File";
-                horizontal-stretch: 0;
-                enabled: false;
-            }
-
             StandardButton {
                 kind: ok;
                 horizontal-stretch: 0;

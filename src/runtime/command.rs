@@ -144,6 +144,13 @@ impl MameCommand {
 		Self("END_RECORDING".into())
 	}
 
+	pub fn set_cheat_state(cheat_id: &str, enabled: bool, parameter: Option<u64>) -> Self {
+		let enabled = (enabled as u8).to_string();
+		let parameter = parameter.map(|p| Cow::Owned(p.to_string()));
+		let args = [cheat_id.into(), enabled.into()].into_iter().chain(parameter);
+		build("SET_CHEAT_STATE", args)
+	}
+
 	pub fn debugger() -> Self {
 		Self("DEBUGGER".into())
 	}
