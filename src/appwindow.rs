@@ -351,7 +351,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	let model_clone = model.clone();
 	app_window.on_menu_item_activated(move |parent_title, title| {
 		// dispatch the command
-		if let (Some(command), _) = menu_item_info(Some(&parent_title), &title) {
+		if let Some(command) = menu_item_command(Some(&parent_title), &title) {
 			handle_command(&model_clone, command);
 		}
 	});
@@ -604,63 +604,63 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	app_window.show().unwrap();
 }
 
-fn menu_item_info(parent_title: Option<&str>, title: &str) -> (Option<AppCommand>, Option<Accelerator>) {
-	let (command, accelerator) = match (parent_title, title) {
+fn menu_item_command(parent_title: Option<&str>, title: &str) -> Option<AppCommand> {
+	let command = match (parent_title, title) {
 		// File menu
-		(_, "Stop") => (Some(AppCommand::FileStop), None),
-		(_, "Pause") => (Some(AppCommand::FilePause), Some("Pause")),
-		(_, "Devices and Images...") => (Some(AppCommand::FileDevicesAndImages), None),
-		(_, "Quick Load State") => (Some(AppCommand::FileQuickLoadState), Some("F7")),
-		(_, "Quick Save State") => (Some(AppCommand::FileQuickLoadState), Some("Shift+F7")),
-		(_, "Load State...") => (Some(AppCommand::FileLoadState), Some("Ctrl+F7")),
-		(_, "Save State...") => (Some(AppCommand::FileLoadState), Some("Ctrl+Shift+F7")),
-		(_, "Save Screenshot...") => (Some(AppCommand::FileSaveScreenshot), Some("F12")),
-		(_, "Record Movie...") => (Some(AppCommand::FileRecordMovie), Some("Shift+F12")),
-		(_, "Stop Recording") => (Some(AppCommand::FileRecordMovie), Some("Shift+F12")),
-		(_, "Debugger...") => (Some(AppCommand::FileDebugger), None),
-		(_, "Soft Reset") => (Some(AppCommand::FileResetSoft), None),
-		(_, "Hard Reset") => (Some(AppCommand::FileResetHard), None),
-		(_, "Exit") => (Some(AppCommand::FileExit), Some("Ctrl+Alt+X")),
+		(_, "Stop") => Some(AppCommand::FileStop),
+		(_, "Pause") => Some(AppCommand::FilePause),
+		(_, "Devices and Images...") => Some(AppCommand::FileDevicesAndImages),
+		(_, "Quick Load State") => Some(AppCommand::FileQuickLoadState),
+		(_, "Quick Save State") => Some(AppCommand::FileQuickLoadState),
+		(_, "Load State...") => Some(AppCommand::FileLoadState),
+		(_, "Save State...") => Some(AppCommand::FileLoadState),
+		(_, "Save Screenshot...") => Some(AppCommand::FileSaveScreenshot),
+		(_, "Record Movie...") => Some(AppCommand::FileRecordMovie),
+		(_, "Stop Recording") => Some(AppCommand::FileRecordMovie),
+		(_, "Debugger...") => Some(AppCommand::FileDebugger),
+		(_, "Soft Reset") => Some(AppCommand::FileResetSoft),
+		(_, "Hard Reset") => Some(AppCommand::FileResetHard),
+		(_, "Exit") => Some(AppCommand::FileExit),
 
 		// Options menu
-		(Some("Throttle"), "Increase Speed") => (None, Some("F9")),
-		(Some("Throttle"), "Decrease Speed") => (None, Some("F8")),
-		(Some("Throttle"), "Warp mode") => (Some(AppCommand::OptionsToggleWarp), Some("F10")),
+		(Some("Throttle"), "Increase Speed") => None,
+		(Some("Throttle"), "Decrease Speed") => None,
+		(Some("Throttle"), "Warp mode") => Some(AppCommand::OptionsToggleWarp),
 		(Some("Throttle"), rate) => {
 			let rate = rate.strip_suffix('%').unwrap().parse().unwrap();
-			(Some(AppCommand::OptionsThrottleRate(rate)), None)
+			Some(AppCommand::OptionsThrottleRate(rate))
 		}
-		(_, "Full Screen") => (Some(AppCommand::OptionsToggleFullScreen), Some("F11")),
-		(_, "Toggle Menu Bar") => (Some(AppCommand::OptionsToggleMenuBar), Some("ScrLk")),
-		(_, "Sound") => (Some(AppCommand::OptionsToggleSound), None),
-		(_, "Cheats...") => (Some(AppCommand::OptionsCheats), None),
-		(_, "Classic MAME Menu") => (Some(AppCommand::OptionsClassic), None),
-		(_, "Console") => (Some(AppCommand::OptionsConsole), None),
+		(_, "Full Screen") => Some(AppCommand::OptionsToggleFullScreen),
+		(_, "Toggle Menu Bar") => Some(AppCommand::OptionsToggleMenuBar),
+		(_, "Sound") => Some(AppCommand::OptionsToggleSound),
+		(_, "Cheats...") => Some(AppCommand::OptionsCheats),
+		(_, "Classic MAME Menu") => Some(AppCommand::OptionsClassic),
+		(_, "Console") => Some(AppCommand::OptionsConsole),
 
 		// Settings menu
-		(_, "Joysticks and Controllers...") => (Some(AppCommand::SettingsInput(InputClass::Controller)), None),
-		(_, "Keyboard...") => (Some(AppCommand::SettingsInput(InputClass::Keyboard)), None),
-		(_, "Miscellaneous Input...") => (Some(AppCommand::SettingsInput(InputClass::Misc)), None),
-		(_, "Configuration...") => (Some(AppCommand::SettingsInput(InputClass::Config)), None),
-		(_, "DIP Switches...") => (Some(AppCommand::SettingsInput(InputClass::DipSwitch)), None),
-		(_, "Paths...") => (Some(AppCommand::SettingsPaths(None)), None),
+		(_, "Joysticks and Controllers...") => Some(AppCommand::SettingsInput(InputClass::Controller)),
+		(_, "Keyboard...") => Some(AppCommand::SettingsInput(InputClass::Keyboard)),
+		(_, "Miscellaneous Input...") => Some(AppCommand::SettingsInput(InputClass::Misc)),
+		(_, "Configuration...") => Some(AppCommand::SettingsInput(InputClass::Config)),
+		(_, "DIP Switches...") => Some(AppCommand::SettingsInput(InputClass::DipSwitch)),
+		(_, "Paths...") => Some(AppCommand::SettingsPaths(None)),
 		(Some("Builtin Collections"), col) => {
 			let col = BuiltinCollection::from_str(col).unwrap();
-			(Some(AppCommand::SettingsToggleBuiltinCollection(col)), None)
+			Some(AppCommand::SettingsToggleBuiltinCollection(col))
 		}
-		(_, "Reset Settings To Default") => (Some(AppCommand::SettingsReset), None),
-		(_, "Import MAME INI...") => (Some(AppCommand::SettingsImportMameIni), None),
+		(_, "Reset Settings To Default") => Some(AppCommand::SettingsReset),
+		(_, "Import MAME INI...") => Some(AppCommand::SettingsImportMameIni),
 
 		// Help menu
-		(_, "Refresh MAME machine info...") => (Some(AppCommand::HelpRefreshInfoDb), None),
-		(_, "BletchMAME web site...") => (Some(AppCommand::HelpWebSite), None),
-		(_, "About...") => (Some(AppCommand::HelpAbout), None),
+		(_, "Refresh MAME machine info...") => Some(AppCommand::HelpRefreshInfoDb),
+		(_, "BletchMAME web site...") => Some(AppCommand::HelpWebSite),
+		(_, "About...") => Some(AppCommand::HelpAbout),
 
 		// Anything else
-		(_, _) => (None, None),
+		(_, _) => None,
 	};
-	debug!(parent_title=?parent_title, title=?title, command=?command, accelerator=?accelerator, "menu_item_info");
-	(command, accelerator.and_then(accel))
+	debug!(parent_title=?parent_title, title=?title, command=?command, "menu_item_command");
+	command
 }
 
 fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
