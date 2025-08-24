@@ -54,6 +54,7 @@ export component AppWindow inherits Window {
     in property <int> current-throttle-rate;
     in property <bool> has-last-save-state;
     in property <bool> has-cheats;
+    in property <bool> has-classic-mame-menu;
     in property <bool> can-record-movie;
     in property <bool> can-refresh-info-db;
     in property <bool> has-input-class-controller;
@@ -63,7 +64,6 @@ export component AppWindow inherits Window {
     in property <bool> has-input-class-dipswitch;
     callback menu-item-activated(string, string);
     callback menu-item-command(string);
-    pure callback minimum-mame(int, int) -> bool;
     in property <[string]> menu-items-builtin-collections;
     public function menubar-height() -> length {
         return hbox.absolute-position.y;
@@ -364,7 +364,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Classic MAME Menu");
-                enabled: minimum-mame(0, 274);
+                enabled: has-classic-mame-menu;
                 activated => {
                     menu-item-activated(parent.title, self.title);
                 }
