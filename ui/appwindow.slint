@@ -66,7 +66,8 @@ export component AppWindow inherits Window {
     callback menu-item-command(string);
     in property <[SimpleMenuEntry]> menu-entries-throttle;
     in property <int> menu-entries-throttle-current-index;
-    in property <[string]> menu-items-builtin-collections;
+    in property <[SimpleMenuEntry]> menu-entries-builtin-collections;
+    in property <[bool]> menu-entries-builtin-collections-checked;
     public function menubar-height() -> length {
         return hbox.absolute-position.y;
     }
@@ -436,10 +437,12 @@ export component AppWindow inherits Window {
             Menu {
                 title: @tr("MenuBar" => "Builtin Collections");
                 enabled: true;
-                for title in menu-items-builtin-collections: MenuItem {
-                    title: title;
+                for entry[index] in menu-entries-builtin-collections: MenuItem {
+                    title: entry.title;
+                    checkable: true;
+                    checked: menu-entries-builtin-collections-checked[index];
                     activated => {
-                        menu-item-activated(parent.title, self.title);
+                        menu-item-command(entry.command);
                     }
                 }
             }

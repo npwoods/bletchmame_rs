@@ -16,6 +16,7 @@ use slint::Model;
 use slint::ModelRc;
 use slint::SharedString;
 use slint::TableColumn;
+use slint::ToSharedString;
 use slint::VecModel;
 use slint::Weak;
 use slint::quit_event_loop;
@@ -171,6 +172,7 @@ impl AppModel {
 			info!("modify_prefs(): prefs.collection changed");
 			let info_db = self.state.borrow().info_db().cloned();
 			self.with_collections_view_model(|x| x.update(info_db, &prefs.collections));
+			update_builtin_collections_menu_checked(self, &prefs);
 		}
 
 		let must_update_for_current_history_item = prefs.current_history_entry() != old_prefs.current_history_entry();
@@ -301,13 +303,6 @@ impl AppModel {
 }
 
 pub async fn start(app_window: &AppWindow, args: AppArgs) {
-	// prepare the menu bar; we explicitly want to do this before `wait_for_window_ready()`
-	app_window.set_menu_items_builtin_collections(ModelRc::new(VecModel::from(
-		BuiltinCollection::iter()
-			.map(|x| SharedString::from(x.to_string()))
-			.collect::<Vec<_>>(),
-	)));
-
 	// wait for app_window to be ready
 	args.backend_runtime
 		.wait_for_window_ready(app_window.window())
@@ -569,10 +564,23 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	let menu_entries_throttle = ModelRc::new(menu_entries_throttle);
 	app_window.set_menu_entries_throttle(menu_entries_throttle);
 
+	// builtin collections menu
+	let menu_entries_builtin_collections = BuiltinCollection::iter()
+		.map(|b| {
+			let title = b.to_shared_string();
+			let command = AppCommand::SettingsToggleBuiltinCollection(b).encode_for_slint();
+			SimpleMenuEntry { title, command }
+		})
+		.collect::<Vec<_>>();
+	let menu_entries_builtin_collections = VecModel::from(menu_entries_builtin_collections);
+	let menu_entries_builtin_collections = ModelRc::new(menu_entries_builtin_collections);
+	app_window.set_menu_entries_builtin_collections(menu_entries_builtin_collections);
+
 	// initial updates
 	update_ui_for_current_history_item(&model);
 	update_items_columns_model(&model);
 	update_items_model_for_current_prefs(&model);
+	update_builtin_collections_menu_checked(&model, &model.preferences.borrow());
 
 	// create the child window
 	let mame_windowing = match args.mame_windowing {
@@ -1450,6 +1458,22 @@ fn update_items_model_for_current_prefs(model: &AppModel) {
 
 	// and finish tracing
 	debug!(duration=?start_instant.elapsed(), "update_items_model_for_current_prefs() completed");
+}
+
+fn update_builtin_collections_menu_checked(model: &AppModel, prefs: &Preferences) {
+	let builtin_collections_checked = BuiltinCollection::iter()
+		.map(|b| {
+			prefs
+				.collections
+				.iter()
+				.any(|c| matches!(c.as_ref(), PrefsCollection::Builtin(x) if *x == b))
+		})
+		.collect::<Vec<_>>();
+	let builtin_collections_checked = VecModel::from(builtin_collections_checked);
+	let builtin_collections_checked = ModelRc::new(builtin_collections_checked);
+	model
+		.app_window()
+		.set_menu_entries_builtin_collections_checked(builtin_collections_checked);
 }
 
 fn update_prefs(model: &Rc<AppModel>) {
