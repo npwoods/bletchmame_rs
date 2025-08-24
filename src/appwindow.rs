@@ -366,26 +366,25 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 
 	// set up the accelerator map
 	let accelerator_command_map = [
-		("Pause", Some(AppCommand::FilePause)),
-		("F7", Some(AppCommand::FileQuickLoadState)),
-		("Shift+F7", Some(AppCommand::FileQuickLoadState)),
-		("Ctrl+F7", Some(AppCommand::FileLoadState)),
-		("Ctrl+Shift+F7", Some(AppCommand::FileLoadState)),
-		("F12", Some(AppCommand::FileSaveScreenshot)),
-		("Shift+F12", Some(AppCommand::FileRecordMovie)),
-		("Ctrl+Alt+X", Some(AppCommand::FileExit)),
-		("F9", Some(AppCommand::OptionsThrottleSpeedIncrease)),
-		("F8", Some(AppCommand::OptionsThrottleSpeedDecrease)),
-		("F10", Some(AppCommand::OptionsToggleWarp)),
-		("F11", Some(AppCommand::OptionsToggleFullScreen)),
-		("ScrLk", Some(AppCommand::OptionsToggleMenuBar)),
+		("Pause", AppCommand::FilePause),
+		("F7", AppCommand::FileQuickLoadState),
+		("Shift+F7", AppCommand::FileQuickLoadState),
+		("Ctrl+F7", AppCommand::FileLoadState),
+		("Ctrl+Shift+F7", AppCommand::FileLoadState),
+		("F12", AppCommand::FileSaveScreenshot),
+		("Shift+F12", AppCommand::FileRecordMovie),
+		("Ctrl+Alt+X", AppCommand::FileExit),
+		("F9", AppCommand::OptionsThrottleSpeedIncrease),
+		("F8", AppCommand::OptionsThrottleSpeedDecrease),
+		("F10", AppCommand::OptionsToggleWarp),
+		("F11", AppCommand::OptionsToggleFullScreen),
+		("ScrLk", AppCommand::OptionsToggleMenuBar),
 	];
-	let accelerator_command_map =
-		HashMap::<Accelerator, AppCommand>::from_iter(accelerator_command_map.into_iter().filter_map(
-			|(accelerator, command)| {
-				accel(accelerator).and_then(|accelerator| command.map(|command| (accelerator, command)))
-			},
-		));
+	let accelerator_command_map = HashMap::<Accelerator, AppCommand>::from_iter(
+		accelerator_command_map
+			.into_iter()
+			.filter_map(|(accelerator, command)| accel(accelerator).map(|accelerator| (accelerator, command))),
+	);
 	let model_clone = model.clone();
 	model
 		.backend_runtime
