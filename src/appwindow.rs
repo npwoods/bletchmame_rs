@@ -93,6 +93,20 @@ const SAVE_STATE_EXTENSION: &str = "sta";
 const SAVE_STATE_FILE_TYPES: &[(Option<&str>, &str)] = &[(Some("MAME Saved State Files"), SAVE_STATE_EXTENSION)];
 
 const THROTTLE_RATES: &[f32] = &[10.0, 5.0, 2.0, 1.0, 0.5, 0.2, 0.1];
+const FRAMESKIP_RATES: &[Option<u8>] = &[
+	None,
+	Some(0),
+	Some(1),
+	Some(2),
+	Some(3),
+	Some(4),
+	Some(5),
+	Some(6),
+	Some(7),
+	Some(8),
+	Some(9),
+	Some(10),
+];
 
 /// Arguments to the application (derivative from the command line); almost all of this
 /// are power user features or diagnostics
@@ -555,6 +569,22 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	let menu_entries_throttle = ModelRc::new(menu_entries_throttle);
 	app_window.set_menu_entries_throttle(menu_entries_throttle);
 
+	// frameskip menu
+	let menu_entries_frameskip = FRAMESKIP_RATES
+		.iter()
+		.map(|&rate| {
+			let title = match rate {
+				None => "Auto".to_shared_string(),
+				Some(n) => format!("{}", n).into(),
+			};
+			let command = AppCommand::OptionsFrameskip(rate).encode_for_slint();
+			SimpleMenuEntry { title, command }
+		})
+		.collect::<Vec<_>>();
+	let menu_entries_frameskip = VecModel::from(menu_entries_frameskip);
+	let menu_entries_frameskip = ModelRc::new(menu_entries_frameskip);
+	app_window.set_menu_entries_frameskip(menu_entries_frameskip);
+
 	// builtin collections menu
 	let menu_entries_builtin_collections = BuiltinCollection::iter()
 		.map(|b| {
@@ -834,6 +864,9 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				.map(|r| r.is_throttled)
 				.unwrap_or_default();
 			model.issue_command(MameCommand::throttled(!is_throttled));
+		}
+		AppCommand::OptionsFrameskip(rate) => {
+			model.issue_command(MameCommand::frameskip(rate));
 		}
 		AppCommand::OptionsToggleFullScreen => {
 			let app_window = model.app_window();
@@ -1289,7 +1322,11 @@ fn update_menus(model: &AppModel) {
 	let is_paused = running.as_ref().map(|r| r.is_paused).unwrap_or_default();
 	let is_throttled = running.as_ref().map(|r| r.is_throttled).unwrap_or_default();
 	let menu_entries_throttle_current_index = running
-		.and_then(|running| THROTTLE_RATES.iter().position(|&r| r == running.throttle_rate))
+		.and_then(|running: &crate::status::Running| THROTTLE_RATES.iter().position(|&r| r == running.throttle_rate))
+		.map(|x| i32::try_from(x).unwrap())
+		.unwrap_or(-1);
+	let menu_entries_frameskip_current_index = running
+		.and_then(|running| FRAMESKIP_RATES.iter().position(|&r| r == running.frameskip))
 		.map(|x| i32::try_from(x).unwrap())
 		.unwrap_or(-1);
 	let is_sound_enabled = running
@@ -1324,6 +1361,7 @@ fn update_menus(model: &AppModel) {
 	app_window.set_is_fullscreen(is_fullscreen);
 	app_window.set_is_sound_enabled(is_sound_enabled);
 	app_window.set_menu_entries_throttle_current_index(menu_entries_throttle_current_index);
+	app_window.set_menu_entries_frameskip_current_index(menu_entries_frameskip_current_index);
 	app_window.set_has_last_save_state(has_last_save_state);
 	app_window.set_has_cheats(has_cheats);
 	app_window.set_has_classic_mame_menu(has_classic_mame_menu);

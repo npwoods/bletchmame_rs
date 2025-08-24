@@ -117,10 +117,14 @@ impl State {
 				Some(Phase::Status)
 			}
 			(Phase::Status, b"video") => {
-				let [throttled, throttle_rate, is_recording] =
-					evt.find_attributes([b"throttled", b"throttle_rate", b"is_recording"])?;
+				let [throttled, throttle_rate, frameskip, is_recording] =
+					evt.find_attributes([b"throttled", b"throttle_rate", b"frameskip", b"is_recording"])?;
 				let throttled = throttled.map(parse_mame_bool).transpose()?;
 				let throttle_rate = throttle_rate.map(|x| x.parse::<f32>()).transpose()?;
+				let frameskip = frameskip
+					.map(|x| x.parse::<i8>())
+					.transpose()?
+					.map(|x| u8::try_from(x).ok());
 				let is_recording = is_recording.map(parse_mame_bool).transpose()?;
 
 				debug!(
@@ -131,6 +135,7 @@ impl State {
 
 				self.running.is_throttled = throttled.or(self.running.is_throttled);
 				self.running.throttle_rate = throttle_rate.or(self.running.throttle_rate);
+				self.running.frameskip = frameskip.or(self.running.frameskip);
 				self.running.is_recording = is_recording.or(self.running.is_recording);
 				None
 			}

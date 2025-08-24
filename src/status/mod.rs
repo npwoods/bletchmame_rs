@@ -42,6 +42,7 @@ impl Status {
 			let is_paused = running.is_paused.unwrap_or(status_running.is_paused);
 			let is_throttled = running.is_throttled.unwrap_or(status_running.is_throttled);
 			let throttle_rate = running.throttle_rate.unwrap_or(status_running.throttle_rate);
+			let frameskip = running.frameskip.unwrap_or(status_running.frameskip);
 			let system_mute = running.system_mute.or(status_running.system_mute);
 			let sound_attenuation = running.sound_attenuation.or(status_running.sound_attenuation);
 			let is_recording = running.is_recording.unwrap_or(status_running.is_recording);
@@ -83,6 +84,7 @@ impl Status {
 				is_paused,
 				is_throttled,
 				throttle_rate,
+				frameskip,
 				system_mute,
 				sound_attenuation,
 				is_recording,
@@ -122,6 +124,7 @@ pub struct Running {
 	pub is_paused: bool,
 	pub is_throttled: bool,
 	pub throttle_rate: f32,
+	pub frameskip: Option<u8>,
 	pub system_mute: Option<bool>,
 	pub sound_attenuation: Option<i32>,
 	pub is_recording: bool,
@@ -221,6 +224,7 @@ struct RunningUpdate {
 	pub is_paused: Option<bool>,
 	pub is_throttled: Option<bool>,
 	pub throttle_rate: Option<f32>,
+	pub frameskip: Option<Option<u8>>,
 	pub system_mute: Option<bool>,
 	pub sound_attenuation: Option<i32>,
 	pub is_recording: Option<bool>,
