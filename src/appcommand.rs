@@ -38,6 +38,7 @@ pub enum AppCommand {
 
 	// Options menu
 	OptionsThrottleRate(f32),
+	OptionsThrottleSpeedIncrease,
 	OptionsToggleWarp,
 	OptionsToggleFullScreen,
 	OptionsToggleMenuBar,

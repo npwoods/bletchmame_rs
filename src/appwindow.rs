@@ -374,7 +374,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		("F12", Some(AppCommand::FileSaveScreenshot)),
 		("Shift+F12", Some(AppCommand::FileRecordMovie)),
 		("Ctrl+Alt+X", Some(AppCommand::FileExit)),
-		("F9", None),
+		("F9", Some(AppCommand::OptionsThrottleSpeedIncrease)),
 		("F8", None),
 		("F10", Some(AppCommand::OptionsToggleWarp)),
 		("F11", Some(AppCommand::OptionsToggleFullScreen)),
@@ -584,6 +584,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		app_window.set_menu_command_file_reset_soft(FileResetSoft.encode_for_slint());
 		app_window.set_menu_command_file_reset_hard(FileResetHard.encode_for_slint());
 		app_window.set_menu_command_file_exit(FileExit.encode_for_slint());
+		app_window.set_menu_command_options_throttle_speed_increase(OptionsThrottleSpeedIncrease.encode_for_slint());
 		app_window.set_menu_command_options_toggle_warp(OptionsToggleWarp.encode_for_slint());
 		app_window.set_menu_command_options_toggle_fullscreen(OptionsToggleFullScreen.encode_for_slint());
 		app_window.set_menu_command_options_toggle_menubar(OptionsToggleMenuBar.encode_for_slint());
@@ -804,6 +805,17 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 		}
 		AppCommand::OptionsThrottleRate(throttle) => {
 			model.issue_command(MameCommand::throttle_rate(throttle));
+		}
+		AppCommand::OptionsThrottleSpeedIncrease => {
+			let state = model.state.borrow();
+			let current_rate = state.status().and_then(|s| s.running.as_ref()).map(|r| r.throttle_rate);
+			let new_rate = THROTTLE_RATES
+				.iter()
+				.rev()
+				.find(|&r| current_rate.is_some_and(|cr| *r > cr));
+			if let Some(&new_rate) = new_rate {
+				model.issue_command(MameCommand::throttle_rate(new_rate));
+			}
 		}
 		AppCommand::OptionsToggleWarp => {
 			let is_throttled = model
