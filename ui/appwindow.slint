@@ -1,6 +1,7 @@
 import { HorizontalBox, VerticalBox, Button, StandardListView, StandardTableView, LineEdit, ListView, ScrollView, GridBox, Spinner } from "std-widgets.slint";
 import { MagicListView, MagicListViewItem } from "@vivi/magic.slint";
 import { FilledIconButton, SearchBar } from "@slint/material.slint";
+import { SimpleMenuEntry } from "common.slint";
 
 struct CollectionContextMenuInfo {
     move-up-command: string,
@@ -51,7 +52,6 @@ export component AppWindow inherits Window {
     in property <bool> is-throttled;
     in property <bool> is-fullscreen;
     in property <bool> is-sound-enabled;
-    in property <int> current-throttle-rate;
     in property <bool> has-last-save-state;
     in property <bool> has-cheats;
     in property <bool> has-classic-mame-menu;
@@ -64,6 +64,8 @@ export component AppWindow inherits Window {
     in property <bool> has-input-class-dipswitch;
     callback menu-item-activated(string, string);
     callback menu-item-command(string);
+    in property <[SimpleMenuEntry]> menu-entries-throttle;
+    in property <int> menu-entries-throttle-current-index;
     in property <[string]> menu-items-builtin-collections;
     public function menubar-height() -> length {
         return hbox.absolute-position.y;
@@ -267,12 +269,12 @@ export component AppWindow inherits Window {
             Menu {
                 title: @tr("MenuBar" => "Throttle");
                 enabled: mode() == "running";
-                for rate in [1000, 500, 200, 100, 50, 20, 10]: MenuItem {
-                    title: rate + "%";
+                for entry[index] in menu-entries-throttle: MenuItem {
+                    title: entry.title;
                     checkable: true;
-                    checked: rate == current-throttle-rate;
+                    checked: index == menu-entries-throttle-current-index;
                     activated => {
-                        menu-item-activated(parent.title, self.title);
+                        menu-item-command(entry.command);
                     }
                 }
                 MenuSeparator { }

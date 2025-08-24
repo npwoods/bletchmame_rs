@@ -83,6 +83,7 @@ use crate::status::Status;
 use crate::ui::AboutDialog;
 use crate::ui::AppWindow;
 use crate::ui::ReportIssue;
+use crate::ui::SimpleMenuEntry;
 use crate::version::MameVersion;
 
 const SOUND_ATTENUATION_OFF: i32 = -32;
@@ -90,6 +91,8 @@ const SOUND_ATTENUATION_ON: i32 = 0;
 
 const SAVE_STATE_EXTENSION: &str = "sta";
 const SAVE_STATE_FILE_TYPES: &[(Option<&str>, &str)] = &[(Some("MAME Saved State Files"), SAVE_STATE_EXTENSION)];
+
+const THROTTLE_RATES: &[f32] = &[10.0, 5.0, 2.0, 1.0, 0.5, 0.2, 0.1];
 
 /// Arguments to the application (derivative from the command line); almost all of this
 /// are power user features or diagnostics
@@ -552,6 +555,19 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		};
 		handle_command(&model_clone, command);
 	});
+
+	// throttle menu
+	let menu_entries_throttle = THROTTLE_RATES
+		.iter()
+		.map(|&rate| {
+			let title = format!("{}%", (rate * 100.0) as u32).into();
+			let command = AppCommand::OptionsThrottleRate(rate).encode_for_slint();
+			SimpleMenuEntry { title, command }
+		})
+		.collect::<Vec<_>>();
+	let menu_entries_throttle = VecModel::from(menu_entries_throttle);
+	let menu_entries_throttle = ModelRc::new(menu_entries_throttle);
+	app_window.set_menu_entries_throttle(menu_entries_throttle);
 
 	// initial updates
 	update_ui_for_current_history_item(&model);
@@ -1275,7 +1291,10 @@ fn update_menus(model: &AppModel) {
 	let is_running = running.is_some();
 	let is_paused = running.as_ref().map(|r| r.is_paused).unwrap_or_default();
 	let is_throttled = running.as_ref().map(|r| r.is_throttled).unwrap_or_default();
-	let throttle_rate = running.as_ref().map(|r| r.throttle_rate);
+	let menu_entries_throttle_current_index = running
+		.and_then(|running| THROTTLE_RATES.iter().position(|&r| r == running.throttle_rate))
+		.map(|x| i32::try_from(x).unwrap())
+		.unwrap_or(-1);
 	let is_sound_enabled = running
 		.as_ref()
 		.map(|r| {
@@ -1307,7 +1326,7 @@ fn update_menus(model: &AppModel) {
 	app_window.set_is_throttled(is_throttled);
 	app_window.set_is_fullscreen(is_fullscreen);
 	app_window.set_is_sound_enabled(is_sound_enabled);
-	app_window.set_current_throttle_rate(throttle_rate.map(|x| (x * 100.0) as i32).unwrap_or(-1));
+	app_window.set_menu_entries_throttle_current_index(menu_entries_throttle_current_index);
 	app_window.set_has_last_save_state(has_last_save_state);
 	app_window.set_has_cheats(has_cheats);
 	app_window.set_has_classic_mame_menu(has_classic_mame_menu);
