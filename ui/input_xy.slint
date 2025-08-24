@@ -1,5 +1,6 @@
 import { VerticalBox, GridBox, HorizontalBox, Button, StandardButton } from "std-widgets.slint";
-import { InputDialogEntry, InputContextMenuEntry } from "input.slint";
+import { InputDialogEntry } from "input.slint";
+import { SimpleMenuEntry } from "common.slint";
 
 component InputXyPart {
     // properties
@@ -55,9 +56,9 @@ export component InputXyDialog inherits Window {
     callback down-context-button-clicked(Point);
 
     // context menu
-    in-out property <[InputContextMenuEntry]> context-menu-entries-1;
-    in-out property <[InputContextMenuEntry]> context-menu-entries-2;
-    public function show-context-menu(entries-1: [InputContextMenuEntry], entries-2: [InputContextMenuEntry], point: Point) {
+    in-out property <[SimpleMenuEntry]> context-menu-entries-1;
+    in-out property <[SimpleMenuEntry]> context-menu-entries-2;
+    public function show-context-menu(entries-1: [SimpleMenuEntry], entries-2: [SimpleMenuEntry], point: Point) {
         self.context-menu-entries-1 = entries-1;
         self.context-menu-entries-2 = entries-2;
         context-menu.show(point);
