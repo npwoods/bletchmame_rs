@@ -361,18 +361,6 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 			handle_command(&model_clone, command);
 		}
 	});
-	let model_clone = model.clone();
-	app_window.on_minimum_mame(move |major, minor| {
-		let major = major.try_into().unwrap();
-		let minor = minor.try_into().unwrap();
-		let version = MameVersion::new(major, minor);
-		model_clone
-			.state
-			.borrow()
-			.status()
-			.map(|status| status.running.is_some() && status.build >= version)
-			.unwrap_or(false)
-	});
 
 	// create a repeating future that will update the child window forever
 	let model_weak = Rc::downgrade(&model);
@@ -1281,6 +1269,7 @@ async fn show_paths_dialog(model: Rc<AppModel>, path_type: Option<PathType>) {
 fn update_menus(model: &AppModel) {
 	// calculate properties
 	let state = model.state.borrow();
+	let build = state.status().as_ref().map(|s| &s.build);
 	let running = state.status().and_then(|s| s.running.as_ref());
 	let has_mame_executable = model.preferences.borrow().paths.mame_executable.is_some();
 	let is_running = running.is_some();
@@ -1297,6 +1286,7 @@ fn update_menus(model: &AppModel) {
 			}
 		})
 		.unwrap_or_default();
+	let can_record_movie = build.is_some_and(|b| *b >= MameVersion::new(0, 221)); // recording movies by specifying absolute paths was introduced in MAME 0.221
 	let can_refresh_info_db = has_mame_executable && !state.is_building_infodb();
 	let is_fullscreen = model.app_window().window().is_fullscreen();
 	let is_recording = running.as_ref().map(|r| r.is_recording).unwrap_or_default();
@@ -1308,6 +1298,7 @@ fn update_menus(model: &AppModel) {
 		.filter_map(|x| x.class)
 		.collect::<HashSet<_>>();
 	let has_cheats = running.as_ref().map(|r| !r.cheats.is_empty()).unwrap_or_default();
+	let has_classic_mame_menu = build.is_some_and(|b| *b >= MameVersion::new(0, 274));
 
 	// update the menu bar
 	let app_window = model.app_window();
@@ -1319,6 +1310,8 @@ fn update_menus(model: &AppModel) {
 	app_window.set_current_throttle_rate(throttle_rate.map(|x| (x * 100.0) as i32).unwrap_or(-1));
 	app_window.set_has_last_save_state(has_last_save_state);
 	app_window.set_has_cheats(has_cheats);
+	app_window.set_has_classic_mame_menu(has_classic_mame_menu);
+	app_window.set_can_record_movie(can_record_movie);
 	app_window.set_can_refresh_info_db(can_refresh_info_db);
 	app_window.set_has_input_class_controller(input_classes.contains(&InputClass::Controller));
 	app_window.set_has_input_class_keyboard(input_classes.contains(&InputClass::Keyboard));
