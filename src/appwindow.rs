@@ -5,7 +5,6 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::str::FromStr;
 use std::time::Instant;
 
 use muda::accelerator::Accelerator;
@@ -347,13 +346,6 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 
 	// attach the menu bar (either natively or with an approximation using Slint); looking forward to Slint having first class menuing support
 	let model_clone = model.clone();
-	app_window.on_menu_item_activated(move |parent_title, title| {
-		// dispatch the command
-		if let Some(command) = menu_item_command(Some(&parent_title), &title) {
-			handle_command(&model_clone, command);
-		}
-	});
-	let model_clone = model.clone();
 	app_window.on_menu_item_command(move |command_string| {
 		if let Some(command) = AppCommand::decode_from_slint(command_string) {
 			handle_command(&model_clone, command);
@@ -576,6 +568,42 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	let menu_entries_builtin_collections = ModelRc::new(menu_entries_builtin_collections);
 	app_window.set_menu_entries_builtin_collections(menu_entries_builtin_collections);
 
+	// menu commands
+	{
+		use AppCommand::*;
+		app_window.set_menu_command_file_stop(FileStop.encode_for_slint());
+		app_window.set_menu_command_file_pause(FilePause.encode_for_slint());
+		app_window.set_menu_command_file_devices_and_images(FileDevicesAndImages.encode_for_slint());
+		app_window.set_menu_command_file_quick_load_state(FileQuickLoadState.encode_for_slint());
+		app_window.set_menu_command_file_quick_save_state(FileQuickSaveState.encode_for_slint());
+		app_window.set_menu_command_file_load_state(FileLoadState.encode_for_slint());
+		app_window.set_menu_command_file_save_state(FileSaveState.encode_for_slint());
+		app_window.set_menu_command_file_save_screenshot(FileSaveScreenshot.encode_for_slint());
+		app_window.set_menu_command_file_record_movie(FileRecordMovie.encode_for_slint());
+		app_window.set_menu_command_file_debugger(FileDebugger.encode_for_slint());
+		app_window.set_menu_command_file_reset_soft(FileResetSoft.encode_for_slint());
+		app_window.set_menu_command_file_reset_hard(FileResetHard.encode_for_slint());
+		app_window.set_menu_command_file_exit(FileExit.encode_for_slint());
+		app_window.set_menu_command_options_toggle_warp(OptionsToggleWarp.encode_for_slint());
+		app_window.set_menu_command_options_toggle_fullscreen(OptionsToggleFullScreen.encode_for_slint());
+		app_window.set_menu_command_options_toggle_menubar(OptionsToggleMenuBar.encode_for_slint());
+		app_window.set_menu_command_options_toggle_sound(OptionsToggleSound.encode_for_slint());
+		app_window.set_menu_command_options_cheats(OptionsCheats.encode_for_slint());
+		app_window.set_menu_command_options_classic(OptionsClassic.encode_for_slint());
+		app_window.set_menu_command_options_console(OptionsConsole.encode_for_slint());
+		app_window.set_menu_command_settings_input_controller(SettingsInput(InputClass::Controller).encode_for_slint());
+		app_window.set_menu_command_settings_input_keyboard(SettingsInput(InputClass::Keyboard).encode_for_slint());
+		app_window.set_menu_command_settings_input_misc(SettingsInput(InputClass::Misc).encode_for_slint());
+		app_window.set_menu_command_settings_input_config(SettingsInput(InputClass::Config).encode_for_slint());
+		app_window.set_menu_command_settings_input_dipswitch(SettingsInput(InputClass::DipSwitch).encode_for_slint());
+		app_window.set_menu_command_settings_paths(SettingsPaths(None).encode_for_slint());
+		app_window.set_menu_command_settings_reset(SettingsReset.encode_for_slint());
+		app_window.set_menu_command_settings_import_mame_ini(SettingsImportMameIni.encode_for_slint());
+		app_window.set_menu_command_help_refresh_info_db(HelpRefreshInfoDb.encode_for_slint());
+		app_window.set_menu_command_help_website(HelpWebSite.encode_for_slint());
+		app_window.set_menu_command_help_about(HelpAbout.encode_for_slint());
+	}
+
 	// initial updates
 	update_ui_for_current_history_item(&model);
 	update_items_columns_model(&model);
@@ -614,65 +642,6 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 
 	// and show the window and we're done!
 	app_window.show().unwrap();
-}
-
-fn menu_item_command(parent_title: Option<&str>, title: &str) -> Option<AppCommand> {
-	let command = match (parent_title, title) {
-		// File menu
-		(_, "Stop") => Some(AppCommand::FileStop),
-		(_, "Pause") => Some(AppCommand::FilePause),
-		(_, "Devices and Images...") => Some(AppCommand::FileDevicesAndImages),
-		(_, "Quick Load State") => Some(AppCommand::FileQuickLoadState),
-		(_, "Quick Save State") => Some(AppCommand::FileQuickLoadState),
-		(_, "Load State...") => Some(AppCommand::FileLoadState),
-		(_, "Save State...") => Some(AppCommand::FileLoadState),
-		(_, "Save Screenshot...") => Some(AppCommand::FileSaveScreenshot),
-		(_, "Record Movie...") => Some(AppCommand::FileRecordMovie),
-		(_, "Stop Recording") => Some(AppCommand::FileRecordMovie),
-		(_, "Debugger...") => Some(AppCommand::FileDebugger),
-		(_, "Soft Reset") => Some(AppCommand::FileResetSoft),
-		(_, "Hard Reset") => Some(AppCommand::FileResetHard),
-		(_, "Exit") => Some(AppCommand::FileExit),
-
-		// Options menu
-		(Some("Throttle"), "Increase Speed") => None,
-		(Some("Throttle"), "Decrease Speed") => None,
-		(Some("Throttle"), "Warp mode") => Some(AppCommand::OptionsToggleWarp),
-		(Some("Throttle"), rate) => {
-			let rate = rate.strip_suffix('%').unwrap().parse().unwrap();
-			Some(AppCommand::OptionsThrottleRate(rate))
-		}
-		(_, "Full Screen") => Some(AppCommand::OptionsToggleFullScreen),
-		(_, "Toggle Menu Bar") => Some(AppCommand::OptionsToggleMenuBar),
-		(_, "Sound") => Some(AppCommand::OptionsToggleSound),
-		(_, "Cheats...") => Some(AppCommand::OptionsCheats),
-		(_, "Classic MAME Menu") => Some(AppCommand::OptionsClassic),
-		(_, "Console") => Some(AppCommand::OptionsConsole),
-
-		// Settings menu
-		(_, "Joysticks and Controllers...") => Some(AppCommand::SettingsInput(InputClass::Controller)),
-		(_, "Keyboard...") => Some(AppCommand::SettingsInput(InputClass::Keyboard)),
-		(_, "Miscellaneous Input...") => Some(AppCommand::SettingsInput(InputClass::Misc)),
-		(_, "Configuration...") => Some(AppCommand::SettingsInput(InputClass::Config)),
-		(_, "DIP Switches...") => Some(AppCommand::SettingsInput(InputClass::DipSwitch)),
-		(_, "Paths...") => Some(AppCommand::SettingsPaths(None)),
-		(Some("Builtin Collections"), col) => {
-			let col = BuiltinCollection::from_str(col).unwrap();
-			Some(AppCommand::SettingsToggleBuiltinCollection(col))
-		}
-		(_, "Reset Settings To Default") => Some(AppCommand::SettingsReset),
-		(_, "Import MAME INI...") => Some(AppCommand::SettingsImportMameIni),
-
-		// Help menu
-		(_, "Refresh MAME machine info...") => Some(AppCommand::HelpRefreshInfoDb),
-		(_, "BletchMAME web site...") => Some(AppCommand::HelpWebSite),
-		(_, "About...") => Some(AppCommand::HelpAbout),
-
-		// Anything else
-		(_, _) => None,
-	};
-	debug!(parent_title=?parent_title, title=?title, command=?command, "menu_item_command");
-	command
 }
 
 fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
