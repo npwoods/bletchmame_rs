@@ -366,26 +366,25 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 
 	// set up the accelerator map
 	let accelerator_command_map = [
-		("Pause", Some(AppCommand::FilePause)),
-		("F7", Some(AppCommand::FileQuickLoadState)),
-		("Shift+F7", Some(AppCommand::FileQuickLoadState)),
-		("Ctrl+F7", Some(AppCommand::FileLoadState)),
-		("Ctrl+Shift+F7", Some(AppCommand::FileLoadState)),
-		("F12", Some(AppCommand::FileSaveScreenshot)),
-		("Shift+F12", Some(AppCommand::FileRecordMovie)),
-		("Ctrl+Alt+X", Some(AppCommand::FileExit)),
-		("F9", None),
-		("F8", None),
-		("F10", Some(AppCommand::OptionsToggleWarp)),
-		("F11", Some(AppCommand::OptionsToggleFullScreen)),
-		("ScrLk", Some(AppCommand::OptionsToggleMenuBar)),
+		("Pause", AppCommand::FilePause),
+		("F7", AppCommand::FileQuickLoadState),
+		("Shift+F7", AppCommand::FileQuickLoadState),
+		("Ctrl+F7", AppCommand::FileLoadState),
+		("Ctrl+Shift+F7", AppCommand::FileLoadState),
+		("F12", AppCommand::FileSaveScreenshot),
+		("Shift+F12", AppCommand::FileRecordMovie),
+		("Ctrl+Alt+X", AppCommand::FileExit),
+		("F9", AppCommand::OptionsThrottleSpeedIncrease),
+		("F8", AppCommand::OptionsThrottleSpeedDecrease),
+		("F10", AppCommand::OptionsToggleWarp),
+		("F11", AppCommand::OptionsToggleFullScreen),
+		("ScrLk", AppCommand::OptionsToggleMenuBar),
 	];
-	let accelerator_command_map =
-		HashMap::<Accelerator, AppCommand>::from_iter(accelerator_command_map.into_iter().filter_map(
-			|(accelerator, command)| {
-				accel(accelerator).and_then(|accelerator| command.map(|command| (accelerator, command)))
-			},
-		));
+	let accelerator_command_map = HashMap::<Accelerator, AppCommand>::from_iter(
+		accelerator_command_map
+			.into_iter()
+			.filter_map(|(accelerator, command)| accel(accelerator).map(|accelerator| (accelerator, command))),
+	);
 	let model_clone = model.clone();
 	model
 		.backend_runtime
@@ -584,6 +583,8 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		app_window.set_menu_command_file_reset_soft(FileResetSoft.encode_for_slint());
 		app_window.set_menu_command_file_reset_hard(FileResetHard.encode_for_slint());
 		app_window.set_menu_command_file_exit(FileExit.encode_for_slint());
+		app_window.set_menu_command_options_throttle_speed_increase(OptionsThrottleSpeedIncrease.encode_for_slint());
+		app_window.set_menu_command_options_throttle_speed_decrease(OptionsThrottleSpeedDecrease.encode_for_slint());
 		app_window.set_menu_command_options_toggle_warp(OptionsToggleWarp.encode_for_slint());
 		app_window.set_menu_command_options_toggle_fullscreen(OptionsToggleFullScreen.encode_for_slint());
 		app_window.set_menu_command_options_toggle_menubar(OptionsToggleMenuBar.encode_for_slint());
@@ -804,6 +805,25 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 		}
 		AppCommand::OptionsThrottleRate(throttle) => {
 			model.issue_command(MameCommand::throttle_rate(throttle));
+		}
+		AppCommand::OptionsThrottleSpeedIncrease => {
+			let state = model.state.borrow();
+			let current_rate = state.status().and_then(|s| s.running.as_ref()).map(|r| r.throttle_rate);
+			let new_rate = THROTTLE_RATES
+				.iter()
+				.rev()
+				.find(|&r| current_rate.is_some_and(|cr| *r > cr));
+			if let Some(&new_rate) = new_rate {
+				model.issue_command(MameCommand::throttle_rate(new_rate));
+			}
+		}
+		AppCommand::OptionsThrottleSpeedDecrease => {
+			let state = model.state.borrow();
+			let current_rate = state.status().and_then(|s| s.running.as_ref()).map(|r| r.throttle_rate);
+			let new_rate = THROTTLE_RATES.iter().find(|&r| current_rate.is_some_and(|cr| *r < cr));
+			if let Some(&new_rate) = new_rate {
+				model.issue_command(MameCommand::throttle_rate(new_rate));
+			}
 		}
 		AppCommand::OptionsToggleWarp => {
 			let is_throttled = model
