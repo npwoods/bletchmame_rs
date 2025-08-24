@@ -41,6 +41,7 @@ pub enum AppCommand {
 	OptionsThrottleSpeedIncrease,
 	OptionsThrottleSpeedDecrease,
 	OptionsToggleWarp,
+	OptionsFrameskip(Option<u8>),
 	OptionsToggleFullScreen,
 	OptionsToggleMenuBar,
 	OptionsToggleSound,

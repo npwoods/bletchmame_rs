@@ -86,6 +86,11 @@ impl MameCommand {
 		build("THROTTLE_RATE", [rate.as_str()])
 	}
 
+	pub fn frameskip(rate: Option<u8>) -> Self {
+		let rate = rate.map(|r| Cow::Owned(r.to_string())).unwrap_or(Cow::Borrowed("auto"));
+		build("FRAMESKIP", [rate])
+	}
+
 	pub fn set_system_mute(system_mute: bool) -> Self {
 		build("SET_SYSTEM_MUTE", [bool_str(system_mute)])
 	}
