@@ -54,6 +54,7 @@ export component AppWindow inherits Window {
     in property <int> current-throttle-rate;
     in property <bool> has-last-save-state;
     in property <bool> has-cheats;
+    in property <bool> can-record-movie;
     in property <bool> can-refresh-info-db;
     in property <bool> has-input-class-controller;
     in property <bool> has-input-class-keyboard;
@@ -216,7 +217,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: is-recording ? @tr("MenuBar" => "Stop Recording") : @tr("MenuBar" => "Record Movie...");
-                enabled: minimum-mame(0, 221);  // recording movies by specifying absolute paths was introduced in MAME 0.221
+                enabled: can-record-movie;
                 muda-accelerator: "Shift+F12";
                 activated => {
                     menu-item-activated(parent.title, self.title);
