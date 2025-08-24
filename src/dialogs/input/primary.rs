@@ -37,9 +37,9 @@ use crate::status::InputClass;
 use crate::status::InputDeviceClass;
 use crate::status::InputDeviceToken;
 use crate::status::Status;
-use crate::ui::InputContextMenuEntry;
 use crate::ui::InputDialog;
 use crate::ui::InputDialogEntry;
+use crate::ui::SimpleMenuEntry;
 
 struct InputDialogModel {
 	dialog_weak: Weak<InputDialog>,
@@ -176,7 +176,7 @@ impl InputDialogModel {
 		}
 	}
 
-	pub fn context_menu(&self, index: usize) -> (ModelRc<InputContextMenuEntry>, ModelRc<InputContextMenuEntry>) {
+	pub fn context_menu(&self, index: usize) -> (ModelRc<SimpleMenuEntry>, ModelRc<SimpleMenuEntry>) {
 		let state = self.state.borrow();
 		let inputs = state.inputs.as_ref();
 

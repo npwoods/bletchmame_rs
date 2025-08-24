@@ -5,7 +5,6 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::str::FromStr;
 use std::time::Instant;
 
 use muda::accelerator::Accelerator;
@@ -16,6 +15,7 @@ use slint::Model;
 use slint::ModelRc;
 use slint::SharedString;
 use slint::TableColumn;
+use slint::ToSharedString;
 use slint::VecModel;
 use slint::Weak;
 use slint::quit_event_loop;
@@ -83,6 +83,7 @@ use crate::status::Status;
 use crate::ui::AboutDialog;
 use crate::ui::AppWindow;
 use crate::ui::ReportIssue;
+use crate::ui::SimpleMenuEntry;
 use crate::version::MameVersion;
 
 const SOUND_ATTENUATION_OFF: i32 = -32;
@@ -90,6 +91,8 @@ const SOUND_ATTENUATION_ON: i32 = 0;
 
 const SAVE_STATE_EXTENSION: &str = "sta";
 const SAVE_STATE_FILE_TYPES: &[(Option<&str>, &str)] = &[(Some("MAME Saved State Files"), SAVE_STATE_EXTENSION)];
+
+const THROTTLE_RATES: &[f32] = &[10.0, 5.0, 2.0, 1.0, 0.5, 0.2, 0.1];
 
 /// Arguments to the application (derivative from the command line); almost all of this
 /// are power user features or diagnostics
@@ -168,6 +171,7 @@ impl AppModel {
 			info!("modify_prefs(): prefs.collection changed");
 			let info_db = self.state.borrow().info_db().cloned();
 			self.with_collections_view_model(|x| x.update(info_db, &prefs.collections));
+			update_builtin_collections_menu_checked(self, &prefs);
 		}
 
 		let must_update_for_current_history_item = prefs.current_history_entry() != old_prefs.current_history_entry();
@@ -298,13 +302,6 @@ impl AppModel {
 }
 
 pub async fn start(app_window: &AppWindow, args: AppArgs) {
-	// prepare the menu bar; we explicitly want to do this before `wait_for_window_ready()`
-	app_window.set_menu_items_builtin_collections(ModelRc::new(VecModel::from(
-		BuiltinCollection::iter()
-			.map(|x| SharedString::from(x.to_string()))
-			.collect::<Vec<_>>(),
-	)));
-
 	// wait for app_window to be ready
 	args.backend_runtime
 		.wait_for_window_ready(app_window.window())
@@ -348,13 +345,6 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	}
 
 	// attach the menu bar (either natively or with an approximation using Slint); looking forward to Slint having first class menuing support
-	let model_clone = model.clone();
-	app_window.on_menu_item_activated(move |parent_title, title| {
-		// dispatch the command
-		if let Some(command) = menu_item_command(Some(&parent_title), &title) {
-			handle_command(&model_clone, command);
-		}
-	});
 	let model_clone = model.clone();
 	app_window.on_menu_item_command(move |command_string| {
 		if let Some(command) = AppCommand::decode_from_slint(command_string) {
@@ -553,10 +543,72 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		handle_command(&model_clone, command);
 	});
 
+	// throttle menu
+	let menu_entries_throttle = THROTTLE_RATES
+		.iter()
+		.map(|&rate| {
+			let title = format!("{}%", (rate * 100.0) as u32).into();
+			let command = AppCommand::OptionsThrottleRate(rate).encode_for_slint();
+			SimpleMenuEntry { title, command }
+		})
+		.collect::<Vec<_>>();
+	let menu_entries_throttle = VecModel::from(menu_entries_throttle);
+	let menu_entries_throttle = ModelRc::new(menu_entries_throttle);
+	app_window.set_menu_entries_throttle(menu_entries_throttle);
+
+	// builtin collections menu
+	let menu_entries_builtin_collections = BuiltinCollection::iter()
+		.map(|b| {
+			let title = b.to_shared_string();
+			let command = AppCommand::SettingsToggleBuiltinCollection(b).encode_for_slint();
+			SimpleMenuEntry { title, command }
+		})
+		.collect::<Vec<_>>();
+	let menu_entries_builtin_collections = VecModel::from(menu_entries_builtin_collections);
+	let menu_entries_builtin_collections = ModelRc::new(menu_entries_builtin_collections);
+	app_window.set_menu_entries_builtin_collections(menu_entries_builtin_collections);
+
+	// menu commands
+	{
+		use AppCommand::*;
+		app_window.set_menu_command_file_stop(FileStop.encode_for_slint());
+		app_window.set_menu_command_file_pause(FilePause.encode_for_slint());
+		app_window.set_menu_command_file_devices_and_images(FileDevicesAndImages.encode_for_slint());
+		app_window.set_menu_command_file_quick_load_state(FileQuickLoadState.encode_for_slint());
+		app_window.set_menu_command_file_quick_save_state(FileQuickSaveState.encode_for_slint());
+		app_window.set_menu_command_file_load_state(FileLoadState.encode_for_slint());
+		app_window.set_menu_command_file_save_state(FileSaveState.encode_for_slint());
+		app_window.set_menu_command_file_save_screenshot(FileSaveScreenshot.encode_for_slint());
+		app_window.set_menu_command_file_record_movie(FileRecordMovie.encode_for_slint());
+		app_window.set_menu_command_file_debugger(FileDebugger.encode_for_slint());
+		app_window.set_menu_command_file_reset_soft(FileResetSoft.encode_for_slint());
+		app_window.set_menu_command_file_reset_hard(FileResetHard.encode_for_slint());
+		app_window.set_menu_command_file_exit(FileExit.encode_for_slint());
+		app_window.set_menu_command_options_toggle_warp(OptionsToggleWarp.encode_for_slint());
+		app_window.set_menu_command_options_toggle_fullscreen(OptionsToggleFullScreen.encode_for_slint());
+		app_window.set_menu_command_options_toggle_menubar(OptionsToggleMenuBar.encode_for_slint());
+		app_window.set_menu_command_options_toggle_sound(OptionsToggleSound.encode_for_slint());
+		app_window.set_menu_command_options_cheats(OptionsCheats.encode_for_slint());
+		app_window.set_menu_command_options_classic(OptionsClassic.encode_for_slint());
+		app_window.set_menu_command_options_console(OptionsConsole.encode_for_slint());
+		app_window.set_menu_command_settings_input_controller(SettingsInput(InputClass::Controller).encode_for_slint());
+		app_window.set_menu_command_settings_input_keyboard(SettingsInput(InputClass::Keyboard).encode_for_slint());
+		app_window.set_menu_command_settings_input_misc(SettingsInput(InputClass::Misc).encode_for_slint());
+		app_window.set_menu_command_settings_input_config(SettingsInput(InputClass::Config).encode_for_slint());
+		app_window.set_menu_command_settings_input_dipswitch(SettingsInput(InputClass::DipSwitch).encode_for_slint());
+		app_window.set_menu_command_settings_paths(SettingsPaths(None).encode_for_slint());
+		app_window.set_menu_command_settings_reset(SettingsReset.encode_for_slint());
+		app_window.set_menu_command_settings_import_mame_ini(SettingsImportMameIni.encode_for_slint());
+		app_window.set_menu_command_help_refresh_info_db(HelpRefreshInfoDb.encode_for_slint());
+		app_window.set_menu_command_help_website(HelpWebSite.encode_for_slint());
+		app_window.set_menu_command_help_about(HelpAbout.encode_for_slint());
+	}
+
 	// initial updates
 	update_ui_for_current_history_item(&model);
 	update_items_columns_model(&model);
 	update_items_model_for_current_prefs(&model);
+	update_builtin_collections_menu_checked(&model, &model.preferences.borrow());
 
 	// create the child window
 	let mame_windowing = match args.mame_windowing {
@@ -590,65 +642,6 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 
 	// and show the window and we're done!
 	app_window.show().unwrap();
-}
-
-fn menu_item_command(parent_title: Option<&str>, title: &str) -> Option<AppCommand> {
-	let command = match (parent_title, title) {
-		// File menu
-		(_, "Stop") => Some(AppCommand::FileStop),
-		(_, "Pause") => Some(AppCommand::FilePause),
-		(_, "Devices and Images...") => Some(AppCommand::FileDevicesAndImages),
-		(_, "Quick Load State") => Some(AppCommand::FileQuickLoadState),
-		(_, "Quick Save State") => Some(AppCommand::FileQuickLoadState),
-		(_, "Load State...") => Some(AppCommand::FileLoadState),
-		(_, "Save State...") => Some(AppCommand::FileLoadState),
-		(_, "Save Screenshot...") => Some(AppCommand::FileSaveScreenshot),
-		(_, "Record Movie...") => Some(AppCommand::FileRecordMovie),
-		(_, "Stop Recording") => Some(AppCommand::FileRecordMovie),
-		(_, "Debugger...") => Some(AppCommand::FileDebugger),
-		(_, "Soft Reset") => Some(AppCommand::FileResetSoft),
-		(_, "Hard Reset") => Some(AppCommand::FileResetHard),
-		(_, "Exit") => Some(AppCommand::FileExit),
-
-		// Options menu
-		(Some("Throttle"), "Increase Speed") => None,
-		(Some("Throttle"), "Decrease Speed") => None,
-		(Some("Throttle"), "Warp mode") => Some(AppCommand::OptionsToggleWarp),
-		(Some("Throttle"), rate) => {
-			let rate = rate.strip_suffix('%').unwrap().parse().unwrap();
-			Some(AppCommand::OptionsThrottleRate(rate))
-		}
-		(_, "Full Screen") => Some(AppCommand::OptionsToggleFullScreen),
-		(_, "Toggle Menu Bar") => Some(AppCommand::OptionsToggleMenuBar),
-		(_, "Sound") => Some(AppCommand::OptionsToggleSound),
-		(_, "Cheats...") => Some(AppCommand::OptionsCheats),
-		(_, "Classic MAME Menu") => Some(AppCommand::OptionsClassic),
-		(_, "Console") => Some(AppCommand::OptionsConsole),
-
-		// Settings menu
-		(_, "Joysticks and Controllers...") => Some(AppCommand::SettingsInput(InputClass::Controller)),
-		(_, "Keyboard...") => Some(AppCommand::SettingsInput(InputClass::Keyboard)),
-		(_, "Miscellaneous Input...") => Some(AppCommand::SettingsInput(InputClass::Misc)),
-		(_, "Configuration...") => Some(AppCommand::SettingsInput(InputClass::Config)),
-		(_, "DIP Switches...") => Some(AppCommand::SettingsInput(InputClass::DipSwitch)),
-		(_, "Paths...") => Some(AppCommand::SettingsPaths(None)),
-		(Some("Builtin Collections"), col) => {
-			let col = BuiltinCollection::from_str(col).unwrap();
-			Some(AppCommand::SettingsToggleBuiltinCollection(col))
-		}
-		(_, "Reset Settings To Default") => Some(AppCommand::SettingsReset),
-		(_, "Import MAME INI...") => Some(AppCommand::SettingsImportMameIni),
-
-		// Help menu
-		(_, "Refresh MAME machine info...") => Some(AppCommand::HelpRefreshInfoDb),
-		(_, "BletchMAME web site...") => Some(AppCommand::HelpWebSite),
-		(_, "About...") => Some(AppCommand::HelpAbout),
-
-		// Anything else
-		(_, _) => None,
-	};
-	debug!(parent_title=?parent_title, title=?title, command=?command, "menu_item_command");
-	command
 }
 
 fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
@@ -1275,7 +1268,10 @@ fn update_menus(model: &AppModel) {
 	let is_running = running.is_some();
 	let is_paused = running.as_ref().map(|r| r.is_paused).unwrap_or_default();
 	let is_throttled = running.as_ref().map(|r| r.is_throttled).unwrap_or_default();
-	let throttle_rate = running.as_ref().map(|r| r.throttle_rate);
+	let menu_entries_throttle_current_index = running
+		.and_then(|running| THROTTLE_RATES.iter().position(|&r| r == running.throttle_rate))
+		.map(|x| i32::try_from(x).unwrap())
+		.unwrap_or(-1);
 	let is_sound_enabled = running
 		.as_ref()
 		.map(|r| {
@@ -1307,7 +1303,7 @@ fn update_menus(model: &AppModel) {
 	app_window.set_is_throttled(is_throttled);
 	app_window.set_is_fullscreen(is_fullscreen);
 	app_window.set_is_sound_enabled(is_sound_enabled);
-	app_window.set_current_throttle_rate(throttle_rate.map(|x| (x * 100.0) as i32).unwrap_or(-1));
+	app_window.set_menu_entries_throttle_current_index(menu_entries_throttle_current_index);
 	app_window.set_has_last_save_state(has_last_save_state);
 	app_window.set_has_cheats(has_cheats);
 	app_window.set_has_classic_mame_menu(has_classic_mame_menu);
@@ -1431,6 +1427,22 @@ fn update_items_model_for_current_prefs(model: &AppModel) {
 
 	// and finish tracing
 	debug!(duration=?start_instant.elapsed(), "update_items_model_for_current_prefs() completed");
+}
+
+fn update_builtin_collections_menu_checked(model: &AppModel, prefs: &Preferences) {
+	let builtin_collections_checked = BuiltinCollection::iter()
+		.map(|b| {
+			prefs
+				.collections
+				.iter()
+				.any(|c| matches!(c.as_ref(), PrefsCollection::Builtin(x) if *x == b))
+		})
+		.collect::<Vec<_>>();
+	let builtin_collections_checked = VecModel::from(builtin_collections_checked);
+	let builtin_collections_checked = ModelRc::new(builtin_collections_checked);
+	model
+		.app_window()
+		.set_menu_entries_builtin_collections_checked(builtin_collections_checked);
 }
 
 fn update_prefs(model: &Rc<AppModel>) {

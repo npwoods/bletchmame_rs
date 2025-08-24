@@ -1,14 +1,11 @@
 import { GridBox, VerticalBox, HorizontalBox, Button, StandardButton, ScrollView } from "std-widgets.slint";
+import { SimpleMenuEntry } from "common.slint";
 
 export struct InputDialogEntry {
     name: string,
     text: string,
     primary-command: string}
 
-export struct InputContextMenuEntry {
-    title: string,
-    command: string}
-    
 export component InputDialog inherits Window {
     title: dialog-title;
     icon: @image-url("bletchmame.png");
@@ -26,9 +23,9 @@ export component InputDialog inherits Window {
     callback menu-item-command(string);
 
     // context menu
-    in-out property <[InputContextMenuEntry]> context-menu-entries-1;
-    in-out property <[InputContextMenuEntry]> context-menu-entries-2;
-    public function show-context-menu(entries-1: [InputContextMenuEntry], entries-2: [InputContextMenuEntry], point: Point) {
+    in-out property <[SimpleMenuEntry]> context-menu-entries-1;
+    in-out property <[SimpleMenuEntry]> context-menu-entries-2;
+    public function show-context-menu(entries-1: [SimpleMenuEntry], entries-2: [SimpleMenuEntry], point: Point) {
         self.context-menu-entries-1 = entries-1;
         self.context-menu-entries-2 = entries-2;
         context-menu.show(point);

@@ -21,7 +21,7 @@ use crate::status::InputDevice;
 use crate::status::InputDeviceClass;
 use crate::status::InputDeviceClassName;
 use crate::status::InputDeviceItem;
-use crate::ui::InputContextMenuEntry;
+use crate::ui::SimpleMenuEntry;
 
 #[derive(Copy, Clone, Debug)]
 enum InputAxis {
@@ -190,7 +190,7 @@ fn build_context_menu<'a>(
 	specify_command: Option<AppCommand>,
 	add_command: Option<AppCommand>,
 	clear_command: Option<AppCommand>,
-) -> (ModelRc<InputContextMenuEntry>, ModelRc<InputContextMenuEntry>) {
+) -> (ModelRc<SimpleMenuEntry>, ModelRc<SimpleMenuEntry>) {
 	// first pass on processing quick items
 	let quick_items = quick_items
 		.into_iter()
@@ -225,7 +225,7 @@ fn build_context_menu<'a>(
 		let command = AppCommand::InputSelectMultipleDialog { selections };
 		let command = command.encode_for_slint();
 		let title = "Multiple...".into();
-		InputContextMenuEntry { title, command }
+		SimpleMenuEntry { title, command }
 	});
 
 	// now combine
@@ -235,7 +235,7 @@ fn build_context_menu<'a>(
 			let command = MameCommand::seq_set(&seqs);
 			let command = AppCommand::from(command).encode_for_slint();
 			let title = title.as_ref().into();
-			InputContextMenuEntry { title, command }
+			SimpleMenuEntry { title, command }
 		})
 		.chain(multiple_command)
 		.collect::<Vec<_>>();
@@ -251,7 +251,7 @@ fn build_context_menu<'a>(
 			command.map(|command| {
 				let title = title.into();
 				let command = command.encode_for_slint();
-				InputContextMenuEntry { title, command }
+				SimpleMenuEntry { title, command }
 			})
 		})
 		.collect::<Vec<_>>();
