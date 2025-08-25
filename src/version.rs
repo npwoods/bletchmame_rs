@@ -11,19 +11,19 @@ use serde::Serializer;
 #[derive(Clone, PartialEq)]
 pub struct MameVersion {
 	major_minor: Option<(u16, u16)>,
-	full_text: Box<str>,
+	full_text: Option<Box<str>>,
 }
 
 impl MameVersion {
-	pub fn new(major: u16, minor: u16) -> Self {
+	pub const fn new(major: u16, minor: u16) -> Self {
 		Self {
 			major_minor: Some((major, minor)),
-			full_text: "".into(),
+			full_text: None,
 		}
 	}
 
 	pub fn is_dirty(&self) -> bool {
-		self.major_minor.is_none() || !self.full_text.is_empty()
+		self.major_minor.is_none() || self.full_text.is_some()
 	}
 
 	pub fn parse_simple(s: impl AsRef<str>) -> Option<Self> {
@@ -58,7 +58,7 @@ where
 		// we might need to create a dirty version
 		version.unwrap_or_else(|| Self {
 			major_minor,
-			full_text: s.into(),
+			full_text: Some(s.into()),
 		})
 	}
 }
@@ -78,8 +78,8 @@ impl PartialOrd for MameVersion {
 
 impl Display for MameVersion {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-		if !self.full_text.is_empty() || self.major_minor.is_none() {
-			write!(f, "{}", self.full_text)
+		if self.full_text.is_some() || self.major_minor.is_none() {
+			write!(f, "{}", self.full_text.as_deref().unwrap_or_default())
 		} else {
 			let (major, minor) = self.major_minor.unwrap();
 			write!(f, "{major}.{minor} (mame{major}{minor})")

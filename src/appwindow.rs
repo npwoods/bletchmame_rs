@@ -108,6 +108,9 @@ const FRAMESKIP_RATES: &[Option<u8>] = &[
 	Some(10),
 ];
 
+const MINIMUM_MAME_RECORD_MOVIE: MameVersion = MameVersion::new(0, 221); // recording movies by specifying absolute paths was introduced in MAME 0.221
+const MINIMUM_MAME_CLASSIC_MENU: MameVersion = MameVersion::new(0, 274);
+
 /// Arguments to the application (derivative from the command line); almost all of this
 /// are power user features or diagnostics
 pub struct AppArgs {
@@ -1339,7 +1342,7 @@ fn update_menus(model: &AppModel) {
 			}
 		})
 		.unwrap_or_default();
-	let can_record_movie = build.is_some_and(|b| *b >= MameVersion::new(0, 221)); // recording movies by specifying absolute paths was introduced in MAME 0.221
+	let can_record_movie = running.is_some() && build.is_some_and(|b| *b >= MINIMUM_MAME_RECORD_MOVIE);
 	let can_refresh_info_db = has_mame_executable && !state.is_building_infodb();
 	let is_fullscreen = model.app_window().window().is_fullscreen();
 	let is_recording = running.as_ref().map(|r| r.is_recording).unwrap_or_default();
@@ -1351,7 +1354,7 @@ fn update_menus(model: &AppModel) {
 		.filter_map(|x| x.class)
 		.collect::<HashSet<_>>();
 	let has_cheats = running.as_ref().map(|r| !r.cheats.is_empty()).unwrap_or_default();
-	let has_classic_mame_menu = build.is_some_and(|b| *b >= MameVersion::new(0, 274));
+	let has_classic_mame_menu = running.is_some() && build.is_some_and(|b| *b >= MINIMUM_MAME_CLASSIC_MENU);
 
 	// update the menu bar
 	let app_window = model.app_window();
