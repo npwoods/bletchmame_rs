@@ -15,6 +15,7 @@ use raw_window_handle::RawWindowHandle;
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::Sender;
 use tracing::debug;
+use tracing::info;
 use tracing::info_span;
 use winit::event::ElementState;
 use winit::event::WindowEvent;
@@ -22,6 +23,7 @@ use winit::event_loop::ActiveEventLoop;
 use winit::keyboard::Key;
 use winit::keyboard::ModifiersState;
 use winit::keyboard::NamedKey;
+use winit::keyboard::NativeKey;
 use winit::keyboard::SmolStr;
 use winit::monitor::MonitorHandle;
 use winit::window::Fullscreen;
@@ -231,6 +233,8 @@ impl CustomApplicationHandler for WinitBackendRuntime {
 					&& !event.repeat
 					&& let Some(accelerator) = muda_accelerator(&event.logical_key, &state.modifiers_state)
 				{
+					info!(accelerator=?accelerator, "window_event(): Muda accelerator detected");
+
 					let window_id = state
 						.live
 						.iter()
@@ -378,6 +382,7 @@ fn muda_accelerator(logical_key: &Key<SmolStr>, modifiers: &ModifiersState) -> O
 				None
 			}
 		}
+		Key::Unidentified(NativeKey::Windows(0x0058)) => Some(Accelerator::new(mods, Code::KeyX)),
 		Key::Named(NamedKey::F7) => Some(Accelerator::new(mods, Code::F7)),
 		Key::Named(NamedKey::F8) => Some(Accelerator::new(mods, Code::F8)),
 		Key::Named(NamedKey::F9) => Some(Accelerator::new(mods, Code::F9)),
