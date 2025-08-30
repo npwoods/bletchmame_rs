@@ -141,7 +141,7 @@ impl State {
 					"handle_start()"
 				);
 
-				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?;
+				let name = name.mandatory("name")?;
 				let name_strindex = self.strings.lookup(&name);
 				let source_file_strindex = self.strings.lookup(&source_file.unwrap_or_default());
 				let clone_of_machine_index = self.strings.lookup(&clone_of.unwrap_or_default());
@@ -174,11 +174,7 @@ impl State {
 			(Phase::Machine, b"manufacturer") => Some(Phase::MachineManufacturer),
 			(Phase::Machine, b"chip") => {
 				let [chip_type, tag, name, clock] = evt.find_attributes([b"type", b"tag", b"name", b"clock"])?;
-				let Ok(chip_type) = chip_type
-					.ok_or(ThisError::MissingMandatoryAttribute("type"))?
-					.as_ref()
-					.parse::<ChipType>()
-				else {
+				let Ok(chip_type) = chip_type.mandatory("type")?.as_ref().parse::<ChipType>() else {
 					// presumably an unknown chip type; ignore
 					return Ok(None);
 				};
@@ -198,7 +194,7 @@ impl State {
 			(Phase::Machine, b"device") => {
 				let [device_type, tag, mandatory, interface] =
 					evt.find_attributes([b"type", b"tag", b"mandatory", b"interface"])?;
-				let tag = tag.ok_or(ThisError::MissingMandatoryAttribute("tag"))?;
+				let tag = tag.mandatory("tag")?;
 				let tag = normalize_tag(tag);
 				let type_strindex = self.strings.lookup(&device_type.unwrap_or_default());
 				let tag_strindex = self.strings.lookup(&tag);
@@ -219,7 +215,7 @@ impl State {
 			}
 			(Phase::Machine, b"slot") => {
 				let [name] = evt.find_attributes([b"name"])?;
-				let name = name.ok_or(ThisError::MissingMandatoryAttribute("slot"))?;
+				let name = name.mandatory("slot")?;
 				let name = normalize_tag(name);
 				let name_strindex = self.strings.lookup(&name);
 				let slot_options_pos = self.slot_options.len_db();
@@ -235,12 +231,12 @@ impl State {
 			}
 			(Phase::Machine, b"softwarelist") => {
 				let [tag, name, status, filter] = evt.find_attributes([b"tag", b"name", b"status", b"filter"])?;
-				let status = status.ok_or(ThisError::MissingMandatoryAttribute("status"))?;
+				let status = status.mandatory("status")?;
 				let Ok(status) = status.as_ref().parse::<SoftwareListStatus>() else {
 					// presumably an unknown software list status; ignore
 					return Ok(None);
 				};
-				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?;
+				let name = name.mandatory("name")?;
 				let tag_strindex = self.strings.lookup(&tag.unwrap_or_default());
 				let name_strindex = self.strings.lookup(&name);
 				let filter_strindex = self.strings.lookup(&filter.unwrap_or_default());
@@ -283,8 +279,8 @@ impl State {
 			}
 			(Phase::MachineSlot, b"slotoption") => {
 				let [name, devname, is_default] = evt.find_attributes([b"name", b"devname", b"default"])?;
-				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?;
-				let devname = devname.ok_or(ThisError::MissingMandatoryAttribute("devname"))?;
+				let name = name.mandatory("name")?;
+				let devname = devname.mandatory("devname")?;
 				let name_strindex = self.strings.lookup(&name);
 				let devname_strindex = self.strings.lookup(&devname);
 				let is_default = is_default.map(parse_mame_bool).transpose()?.unwrap_or_default();
@@ -625,6 +621,13 @@ impl<T> Vec<T> {
 
 	pub fn try_len_db(&self) -> Result<UsizeDb> {
 		self.len().try_into().map_err(|_| Error::msg("too many records"))
+	}
+}
+
+#[ext]
+impl<T> Option<T> {
+	pub fn mandatory(self, name: &'static str) -> Result<T> {
+		self.ok_or(ThisError::MissingMandatoryAttribute(name).into())
 	}
 }
 
