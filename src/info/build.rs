@@ -36,6 +36,8 @@ enum Phase {
 	MachineDescription,
 	MachineYear,
 	MachineManufacturer,
+	MachineConfiguration,
+	MachineConfigurationSetting,
 	MachineDevice,
 	MachineSlot,
 	MachineRamOption,
@@ -52,6 +54,9 @@ struct State {
 	phase_stack: Vec<Phase>,
 	machines: Vec<binary::Machine>,
 	chips: Vec<binary::Chip>,
+	configs: Vec<binary::Configuration>,
+	config_settings: Vec<binary::ConfigurationSetting>,
+	config_setting_conditions: Vec<binary::ConfigurationSettingCondition>,
 	devices: Vec<binary::Device>,
 	slots: Vec<binary::Slot>,
 	slot_options: Vec<binary::SlotOption>,
@@ -91,6 +96,9 @@ enum ThisError {
 //        2473230 string bytes
 const CAPACITY_MACHINES: usize = 55000;
 const CAPACITY_CHIPS: usize = 240000;
+const CAPACITY_CONFIGS: usize = 100000;
+const CAPACITY_CONFIG_SETTINGS: usize = 100000;
+const CAPACITY_CONFIG_SETTING_CONDITIONS: usize = 100000;
 const CAPACITY_DEVICES: usize = 14000;
 const CAPACITY_SLOTS: usize = 26000;
 const CAPACITY_SLOT_OPTIONS: usize = 480000;
@@ -111,6 +119,9 @@ impl State {
 			phase_stack: Vec::with_capacity(32),
 			machines: Vec::with_capacity(CAPACITY_MACHINES),
 			chips: Vec::with_capacity(CAPACITY_CHIPS),
+			configs: Vec::with_capacity(CAPACITY_CONFIGS),
+			config_settings: Vec::with_capacity(CAPACITY_CONFIG_SETTINGS),
+			config_setting_conditions: Vec::with_capacity(CAPACITY_CONFIG_SETTING_CONDITIONS),
 			devices: Vec::with_capacity(CAPACITY_DEVICES),
 			slots: Vec::with_capacity(CAPACITY_SLOTS),
 			slot_options: Vec::with_capacity(CAPACITY_SLOT_OPTIONS),
@@ -155,6 +166,8 @@ impl State {
 					rom_of_machine_index,
 					chips_start: self.chips.len_db(),
 					chips_end: self.chips.len_db(),
+					configs_start: self.configs.len_db(),
+					configs_end: self.configs.len_db(),
 					devices_start: self.devices.len_db(),
 					devices_end: self.devices.len_db(),
 					slots_start: self.slots.len_db(),
@@ -189,6 +202,59 @@ impl State {
 				};
 				self.chips.push_db(chip)?;
 				self.machines.last_mut().unwrap().chips_end += 1;
+				None
+			}
+			(Phase::Machine, b"configuration" | b"dipswitch") => {
+				let [name, tag, mask] = evt.find_attributes([b"name", b"tag", b"mask"])?;
+				let name = name.mandatory("name")?;
+				let tag = normalize_tag(tag.mandatory("tag")?);
+				let mask = mask.mandatory("mask")?.as_ref().parse::<u32>()?.into();
+				let name_strindex = self.strings.lookup(&name);
+				let tag_strindex = self.strings.lookup(&tag);
+				let config = binary::Configuration {
+					name_strindex,
+					tag_strindex,
+					mask,
+					settings_start: self.config_settings.len_db(),
+					settings_end: self.config_settings.len_db(),
+				};
+				self.configs.push_db(config)?;
+				self.machines.last_mut().unwrap().configs_end += 1;
+				Some(Phase::MachineConfiguration)
+			}
+			(Phase::MachineConfiguration, b"confsetting" | b"dipvalue") => {
+				let [name, value] = evt.find_attributes([b"name", b"value"])?;
+				let name_strindex = self.strings.lookup(&name.mandatory("name")?);
+				let value = value.mandatory("value")?.parse::<u32>()?.into();
+				let config_setting = binary::ConfigurationSetting {
+					name_strindex,
+					value,
+					conditions_start: self.config_setting_conditions.len_db(),
+					conditions_end: self.config_setting_conditions.len_db(),
+				};
+				self.config_settings.push_db(config_setting)?;
+				self.configs.last_mut().unwrap().settings_end += 1;
+				Some(Phase::MachineConfigurationSetting)
+			}
+			(Phase::MachineConfigurationSetting, b"condition") => {
+				let [tag, relation, mask, value] = evt.find_attributes([b"tag", b"relation", b"mask", b"value"])?;
+				let tag = normalize_tag(tag.mandatory("tag")?);
+				let tag_strindex = self.strings.lookup(&tag);
+				let Ok(condition_relation) = relation.mandatory("relation")?.parse::<binary::ConditionRelation>()
+				else {
+					// presumably an unknown condition relation; ignore
+					return Ok(None);
+				};
+				let mask = mask.mandatory("mask")?.as_ref().parse::<u32>()?.into();
+				let value = value.mandatory("value")?.as_ref().parse::<u32>()?.into();
+				let condition = binary::ConfigurationSettingCondition {
+					tag_strindex,
+					condition_relation,
+					mask,
+					value,
+				};
+				self.config_setting_conditions.push_db(condition)?;
+				self.config_settings.last_mut().unwrap().conditions_end += 1;
 				None
 			}
 			(Phase::Machine, b"device") => {
@@ -466,6 +532,9 @@ impl State {
 			build_strindex: self.build_strindex,
 			machine_count: machines.len_db(),
 			chips_count: self.chips.len_db(),
+			config_count: self.configs.len_db(),
+			config_setting_count: self.config_settings.len_db(),
+			config_setting_condition_count: self.config_setting_conditions.len_db(),
 			device_count: self.devices.len_db(),
 			slot_count: self.slots.len_db(),
 			slot_option_count: self.slot_options.len_db(),
@@ -481,6 +550,9 @@ impl State {
 			.iter()
 			.chain(machines.iter().flat_map(IntoBytes::as_bytes))
 			.chain(self.chips.iter().flat_map(IntoBytes::as_bytes))
+			.chain(self.configs.iter().flat_map(IntoBytes::as_bytes))
+			.chain(self.config_settings.iter().flat_map(IntoBytes::as_bytes))
+			.chain(self.config_setting_conditions.iter().flat_map(IntoBytes::as_bytes))
 			.chain(self.devices.iter().flat_map(IntoBytes::as_bytes))
 			.chain(self.slots.iter().flat_map(IntoBytes::as_bytes))
 			.chain(self.slot_options.iter().flat_map(IntoBytes::as_bytes))
@@ -594,6 +666,9 @@ pub fn calculate_sizes_hash() -> U64 {
 		size_of::<binary::Header>(),
 		size_of::<binary::Machine>(),
 		size_of::<binary::Chip>(),
+		size_of::<binary::Configuration>(),
+		size_of::<binary::ConfigurationSetting>(),
+		size_of::<binary::ConfigurationSettingCondition>(),
 		size_of::<binary::Device>(),
 		size_of::<binary::Slot>(),
 		size_of::<binary::SlotOption>(),

@@ -5,6 +5,7 @@ use zerocopy::IntoBytes;
 use zerocopy::KnownLayout;
 use zerocopy::TryFromBytes;
 use zerocopy::little_endian::U16;
+use zerocopy::little_endian::U32;
 use zerocopy::little_endian::U64;
 
 use crate::info::UsizeDb;
@@ -27,6 +28,9 @@ pub struct Header {
 	pub build_strindex: UsizeDb,
 	pub machine_count: UsizeDb,
 	pub chips_count: UsizeDb,
+	pub config_count: UsizeDb,
+	pub config_setting_count: UsizeDb,
+	pub config_setting_condition_count: UsizeDb,
 	pub device_count: UsizeDb,
 	pub slot_count: UsizeDb,
 	pub slot_option_count: UsizeDb,
@@ -48,6 +52,8 @@ pub struct Machine {
 	pub manufacturer_strindex: UsizeDb,
 	pub chips_start: UsizeDb,
 	pub chips_end: UsizeDb,
+	pub configs_start: UsizeDb,
+	pub configs_end: UsizeDb,
 	pub devices_start: UsizeDb,
 	pub devices_end: UsizeDb,
 	pub slots_start: UsizeDb,
@@ -85,6 +91,53 @@ pub enum ChipType {
 	Cpu,
 	#[strum(serialize = "audio")]
 	Audio,
+}
+
+#[repr(C, packed)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout)]
+pub struct Configuration {
+	pub name_strindex: UsizeDb,
+	pub tag_strindex: UsizeDb,
+	pub mask: U32,
+	pub settings_start: UsizeDb,
+	pub settings_end: UsizeDb,
+}
+
+#[repr(C, packed)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout)]
+pub struct ConfigurationSetting {
+	pub name_strindex: UsizeDb,
+	pub value: U32,
+	pub conditions_start: UsizeDb,
+	pub conditions_end: UsizeDb,
+}
+
+#[repr(C, packed)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout)]
+pub struct ConfigurationSettingCondition {
+	pub tag_strindex: UsizeDb,
+	pub condition_relation: ConditionRelation,
+	pub mask: U32,
+	pub value: U32,
+}
+
+#[repr(u8)]
+#[derive(
+	Clone, Copy, Debug, Deserialize, TryFromBytes, IntoBytes, Immutable, KnownLayout, EnumString, PartialEq, Eq,
+)]
+pub enum ConditionRelation {
+	#[strum(serialize = "eq")]
+	Eq,
+	#[strum(serialize = "ne")]
+	Ne,
+	#[strum(serialize = "gt")]
+	Gt,
+	#[strum(serialize = "le")]
+	Le,
+	#[strum(serialize = "lt")]
+	Lt,
+	#[strum(serialize = "ge")]
+	Ge,
 }
 
 #[repr(C, packed)]

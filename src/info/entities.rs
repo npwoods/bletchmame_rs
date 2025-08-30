@@ -15,6 +15,9 @@ use crate::info::binary;
 pub type Machine<'a> = Object<'a, binary::Machine>;
 pub type MachinesView<'a> = SimpleView<'a, binary::Machine>;
 pub type Chip<'a> = Object<'a, binary::Chip>;
+pub type Configuration<'a> = Object<'a, binary::Configuration>;
+pub type ConfigurationSetting<'a> = Object<'a, binary::ConfigurationSetting>;
+pub type ConfigurationSettingCondition<'a> = Object<'a, binary::ConfigurationSettingCondition>;
 pub type Device<'a> = Object<'a, binary::Device>;
 pub type Slot<'a> = Object<'a, binary::Slot>;
 pub type SlotOption<'a> = Object<'a, binary::SlotOption>;
@@ -61,6 +64,11 @@ impl<'a> Machine<'a> {
 	pub fn chips(&self) -> impl View<'a, Chip<'a>> + use<'a> {
 		let range = self.obj().chips_start.into()..self.obj().chips_end.into();
 		self.db.chips().sub_view(range)
+	}
+
+	pub fn configurations(&self) -> impl View<'a, Configuration<'a>> + use<'a> {
+		let range = self.obj().configs_start.into()..self.obj().configs_end.into();
+		self.db.configurations().sub_view(range)
 	}
 
 	pub fn devices(&self) -> impl View<'a, Device<'a>> + use<'a> {
@@ -118,6 +126,35 @@ impl<'a> Chip<'a> {
 
 	pub fn chip_type(&self) -> ChipType {
 		self.obj().chip_type
+	}
+}
+
+impl<'a> Configuration<'a> {
+	pub fn name(&self) -> &'a str {
+		self.string(|x| x.name_strindex)
+	}
+
+	pub fn tag(&self) -> &'a str {
+		self.string(|x| x.tag_strindex)
+	}
+
+	pub fn mask(&self) -> u32 {
+		self.obj().mask.into()
+	}
+
+	pub fn settings(&self) -> impl View<'a, ConfigurationSetting<'a>> + use<'a> {
+		let range = self.obj().settings_start.into()..self.obj().settings_end.into();
+		self.db.configuration_settings().sub_view(range)
+	}
+}
+
+impl<'a> ConfigurationSetting<'a> {
+	pub fn name(&self) -> &'a str {
+		self.string(|x| x.name_strindex)
+	}
+
+	pub fn value(&self) -> u32 {
+		self.obj().value.into()
 	}
 }
 
