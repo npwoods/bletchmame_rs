@@ -269,6 +269,7 @@ pub struct Input {
 	pub player: u8,
 	pub is_analog: bool,
 	pub name: SmolStr,
+	pub value: Option<u32>,
 	pub first_keyboard_code: Option<u32>,
 	pub seq_standard_tokens: Option<SmolStr>,
 	pub seq_increment_tokens: Option<SmolStr>,

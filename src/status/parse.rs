@@ -376,6 +376,7 @@ impl State {
 					player,
 					is_analog,
 					name,
+					value,
 					first_keyboard_code,
 				] = evt.find_attributes([
 					b"port_tag",
@@ -386,6 +387,7 @@ impl State {
 					b"player",
 					b"is_analog",
 					b"name",
+					b"value",
 					b"first_keyboard_code",
 				])?;
 
@@ -400,6 +402,7 @@ impl State {
 				let player = player.ok_or(ThisError::MissingMandatoryAttribute("player"))?.parse()?;
 				let is_analog = parse_mame_bool(is_analog.ok_or(ThisError::MissingMandatoryAttribute("is_analog"))?)?;
 				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?.into();
+				let value = value.map(|value| value.parse::<u32>()).transpose()?;
 				let first_keyboard_code = first_keyboard_code.map(|x| x.parse()).transpose()?;
 
 				let input = Input {
@@ -411,6 +414,7 @@ impl State {
 					player,
 					is_analog,
 					name,
+					value,
 					first_keyboard_code,
 					seq_standard_tokens: None,
 					seq_increment_tokens: None,
