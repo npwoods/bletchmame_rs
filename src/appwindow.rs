@@ -61,6 +61,7 @@ use crate::dialogs::namecollection::dialog_rename_collection;
 use crate::dialogs::paths::dialog_paths;
 use crate::dialogs::seqpoll::dialog_seq_poll;
 use crate::dialogs::socket::dialog_connect_to_socket;
+use crate::dialogs::switches::dialog_switches;
 use crate::guiutils::is_context_menu_event;
 use crate::guiutils::menuing::accel;
 use crate::guiutils::modal::ModalStack;
@@ -950,22 +951,43 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			let status_update_channel = model.status_changed_channel.clone();
 			let model_clone = model.clone();
 			let invoke_command = move |command| handle_command(&model_clone, command);
-			let (inputs, input_device_classes) = {
+			let (inputs, input_device_classes, machine_index) = {
 				let state = model.state.borrow();
 				let running = state.status().unwrap().running.as_ref().unwrap();
 				let inputs = running.inputs.clone();
 				let input_device_classes = running.input_device_classes.clone();
-				(inputs, input_device_classes)
+				let machine_index = state
+					.info_db()
+					.and_then(|info_db| info_db.machines().find_index(&running.machine_name).ok());
+				(inputs, input_device_classes, machine_index)
 			};
-			let fut = dialog_input(
-				model.modal_stack.clone(),
-				inputs,
-				input_device_classes,
-				class,
-				status_update_channel,
-				invoke_command,
-			);
-			spawn_local(fut).unwrap();
+			let modal_stack = model.modal_stack.clone();
+			match class {
+				InputClass::Controller | InputClass::Keyboard | InputClass::Misc => {
+					let fut = dialog_input(
+						modal_stack,
+						inputs,
+						input_device_classes,
+						class,
+						status_update_channel,
+						invoke_command,
+					);
+					spawn_local(fut).unwrap();
+				}
+				InputClass::Config | InputClass::DipSwitch => {
+					let info_db = model.state.borrow().info_db().unwrap().clone();
+					let fut = dialog_switches(
+						modal_stack,
+						inputs,
+						info_db,
+						class,
+						machine_index,
+						status_update_channel,
+						invoke_command,
+					);
+					spawn_local(fut).unwrap();
+				}
+			};
 		}
 		AppCommand::SettingsPaths(path_type) => {
 			let fut = show_paths_dialog(model.clone(), path_type);

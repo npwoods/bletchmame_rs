@@ -1,0 +1,69 @@
+import { GridBox, VerticalBox, HorizontalBox, Button, StandardButton, ScrollView, ComboBox } from "std-widgets.slint";
+
+export struct SwitchesDialogEntry {
+    name: string,
+    options: [string],
+    current-option-index: int}
+
+export component SwitchesDialog inherits Window {
+    title: dialog-title;
+    icon: @image-url("bletchmame.png");
+    preferred-width: 600px;
+    preferred-height: 500px;
+
+    // properties
+    in property <string> dialog-title;
+    in property <[SwitchesDialogEntry]> entries;
+    in property <string> restore-defaults-command;
+
+    // callbacks
+    callback ok-clicked();
+    callback menu-item-command(string);
+
+    // control hierarchy
+    VerticalBox {
+        ScrollView {
+            VerticalBox {
+                padding: 3px;
+                vertical-stretch: 0;
+                for entry[index] in root.entries: HorizontalLayout {
+                    vertical-stretch: 0;
+                    height: 30px;
+                    VerticalLayout {
+                        width: 300px;
+                        alignment: center;
+                        Text {
+                            text: entry.name;
+                        }
+                    }
+
+                    ComboBox {
+                        model: entry.options;
+                        current-index: entry.current-option-index;
+                        enabled: false;
+                    }
+                }
+            }
+        }
+
+        HorizontalBox {
+            alignment: end;
+            Button {
+                text: @tr("Restore Defaults");
+                horizontal-stretch: 0;
+                enabled: !root.restore-defaults-command.is-empty;
+                clicked => {
+                    menu-item-command(root.restore-defaults-command);
+                }
+            }
+
+            StandardButton {
+                kind: ok;
+                horizontal-stretch: 0;
+                clicked => {
+                    root.ok-clicked();
+                }
+            }
+        }
+    }
+}

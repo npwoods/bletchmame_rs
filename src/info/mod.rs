@@ -47,6 +47,9 @@ use crate::version::MameVersion;
 pub use self::binary::ChipType;
 pub use self::binary::SoftwareListStatus;
 pub use self::entities::Chip;
+pub use self::entities::Configuration;
+pub use self::entities::ConfigurationSetting;
+pub use self::entities::ConfigurationSettingCondition;
 pub use self::entities::Device;
 pub use self::entities::Machine;
 pub use self::entities::MachineSoftwareList;
@@ -76,6 +79,9 @@ pub struct InfoDb {
 	data: Box<[u8]>,
 	machines: RootView<binary::Machine>,
 	chips: RootView<binary::Chip>,
+	configs: RootView<binary::Configuration>,
+	config_settings: RootView<binary::ConfigurationSetting>,
+	config_setting_conditions: RootView<binary::ConfigurationSettingCondition>,
 	devices: RootView<binary::Device>,
 	slots: RootView<binary::Slot>,
 	slot_options: RootView<binary::SlotOption>,
@@ -100,6 +106,9 @@ impl InfoDb {
 		let mut cursor = size_of::<binary::Header>()..data.len();
 		let machines = next_root_view(&mut cursor, hdr.machine_count)?;
 		let chips = next_root_view(&mut cursor, hdr.chips_count)?;
+		let configs = next_root_view(&mut cursor, hdr.config_count)?;
+		let config_settings = next_root_view(&mut cursor, hdr.config_setting_count)?;
+		let config_setting_conditions = next_root_view(&mut cursor, hdr.config_setting_condition_count)?;
 		let devices = next_root_view(&mut cursor, hdr.device_count)?;
 		let slots = next_root_view(&mut cursor, hdr.slot_count)?;
 		let slot_options = next_root_view(&mut cursor, hdr.slot_option_count)?;
@@ -117,6 +126,9 @@ impl InfoDb {
 			data,
 			machines,
 			chips,
+			configs,
+			config_settings,
+			config_setting_conditions,
 			devices,
 			slots,
 			slot_options,
@@ -239,6 +251,18 @@ impl InfoDb {
 
 	pub fn chips(&self) -> impl View<'_, Chip<'_>> {
 		self.make_view(&self.chips)
+	}
+
+	pub fn configurations(&self) -> impl View<'_, Configuration<'_>> {
+		self.make_view(&self.configs)
+	}
+
+	pub fn configuration_settings(&self) -> impl View<'_, ConfigurationSetting<'_>> {
+		self.make_view(&self.config_settings)
+	}
+
+	pub fn configuration_setting_conditions(&self) -> impl View<'_, ConfigurationSettingCondition<'_>> {
+		self.make_view(&self.config_setting_conditions)
 	}
 
 	pub fn devices(&self) -> impl View<'_, Device<'_>> {
@@ -930,5 +954,15 @@ mod test {
 			(expected_originals, expected_compatibles),
 			(actual_originals, actual_compatibles)
 		);
+	}
+
+	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", &[("beckerport", 1), ("ctrl_sel", 15), ("ctrl_sel", 240), ("dwsock:drivewire_port", 65535), ("hires_intf", 7), ("rs232:rs_printer:RS232_DATABITS", 255), ("rs232:rs_printer:RS232_PARITY", 255), ("rs232:rs_printer:RS232_RXBAUD", 255), ("rs232:rs_printer:RS232_STOPBITS", 255), ("vdg:artifacting", 3)])]
+	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "coco3", &[("beckerport", 1), ("ctrl_sel", 15), ("ctrl_sel", 240), ("dwsock:drivewire_port", 65535), ("gime:artifacting", 3), ("hires_intf", 7), ("rs232:rs_printer:RS232_DATABITS", 255), ("rs232:rs_printer:RS232_PARITY", 255), ("rs232:rs_printer:RS232_RXBAUD", 255), ("rs232:rs_printer:RS232_STOPBITS", 255), ("screen_config", 1)])]
+	fn configurations(_index: usize, xml: &str, machine_name: &str, expected: &[(&str, u32)]) {
+		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
+		let configs = db.machines().find(machine_name).unwrap().configurations();
+
+		let actual = configs.iter().map(|c| (c.tag(), c.mask())).collect::<Vec<_>>();
+		assert_eq!(expected, actual.as_slice());
 	}
 }

@@ -20,6 +20,7 @@ use crate::info::SERIAL;
 use crate::info::SoftwareListStatus;
 use crate::info::UsizeDb;
 use crate::info::binary;
+use crate::info::binary::ConfigurationSetting;
 use crate::info::binary::Fixup;
 use crate::info::strings::StringTableBuilder;
 use crate::parse::normalize_tag;
@@ -36,6 +37,8 @@ enum Phase {
 	MachineDescription,
 	MachineYear,
 	MachineManufacturer,
+	MachineConfiguration,
+	MachineConfigurationSetting,
 	MachineDevice,
 	MachineSlot,
 	MachineRamOption,
@@ -52,6 +55,9 @@ struct State {
 	phase_stack: Vec<Phase>,
 	machines: Vec<binary::Machine>,
 	chips: Vec<binary::Chip>,
+	configs: Vec<binary::Configuration>,
+	config_settings: Vec<binary::ConfigurationSetting>,
+	config_setting_conditions: Vec<binary::ConfigurationSettingCondition>,
 	devices: Vec<binary::Device>,
 	slots: Vec<binary::Slot>,
 	slot_options: Vec<binary::SlotOption>,
@@ -91,6 +97,9 @@ enum ThisError {
 //        2473230 string bytes
 const CAPACITY_MACHINES: usize = 55000;
 const CAPACITY_CHIPS: usize = 240000;
+const CAPACITY_CONFIGS: usize = 100000;
+const CAPACITY_CONFIG_SETTINGS: usize = 100000;
+const CAPACITY_CONFIG_SETTING_CONDITIONS: usize = 100000;
 const CAPACITY_DEVICES: usize = 14000;
 const CAPACITY_SLOTS: usize = 26000;
 const CAPACITY_SLOT_OPTIONS: usize = 480000;
@@ -111,6 +120,9 @@ impl State {
 			phase_stack: Vec::with_capacity(32),
 			machines: Vec::with_capacity(CAPACITY_MACHINES),
 			chips: Vec::with_capacity(CAPACITY_CHIPS),
+			configs: Vec::with_capacity(CAPACITY_CONFIGS),
+			config_settings: Vec::with_capacity(CAPACITY_CONFIG_SETTINGS),
+			config_setting_conditions: Vec::with_capacity(CAPACITY_CONFIG_SETTING_CONDITIONS),
 			devices: Vec::with_capacity(CAPACITY_DEVICES),
 			slots: Vec::with_capacity(CAPACITY_SLOTS),
 			slot_options: Vec::with_capacity(CAPACITY_SLOT_OPTIONS),
@@ -141,7 +153,7 @@ impl State {
 					"handle_start()"
 				);
 
-				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?;
+				let name = name.mandatory("name")?;
 				let name_strindex = self.strings.lookup(&name);
 				let source_file_strindex = self.strings.lookup(&source_file.unwrap_or_default());
 				let clone_of_machine_index = self.strings.lookup(&clone_of.unwrap_or_default());
@@ -155,6 +167,8 @@ impl State {
 					rom_of_machine_index,
 					chips_start: self.chips.len_db(),
 					chips_end: self.chips.len_db(),
+					configs_start: self.configs.len_db(),
+					configs_end: self.configs.len_db(),
 					devices_start: self.devices.len_db(),
 					devices_end: self.devices.len_db(),
 					slots_start: self.slots.len_db(),
@@ -174,11 +188,7 @@ impl State {
 			(Phase::Machine, b"manufacturer") => Some(Phase::MachineManufacturer),
 			(Phase::Machine, b"chip") => {
 				let [chip_type, tag, name, clock] = evt.find_attributes([b"type", b"tag", b"name", b"clock"])?;
-				let Ok(chip_type) = chip_type
-					.ok_or(ThisError::MissingMandatoryAttribute("type"))?
-					.as_ref()
-					.parse::<ChipType>()
-				else {
+				let Ok(chip_type) = chip_type.mandatory("type")?.as_ref().parse::<ChipType>() else {
 					// presumably an unknown chip type; ignore
 					return Ok(None);
 				};
@@ -195,10 +205,63 @@ impl State {
 				self.machines.last_mut().unwrap().chips_end += 1;
 				None
 			}
+			(Phase::Machine, b"configuration" | b"dipswitch") => {
+				let [name, tag, mask] = evt.find_attributes([b"name", b"tag", b"mask"])?;
+				let name = name.mandatory("name")?;
+				let tag = normalize_tag(tag.mandatory("tag")?);
+				let mask = mask.mandatory("mask")?.as_ref().parse::<u32>()?.into();
+				let name_strindex = self.strings.lookup(&name);
+				let tag_strindex = self.strings.lookup(&tag);
+				let config = binary::Configuration {
+					name_strindex,
+					tag_strindex,
+					mask,
+					settings_start: self.config_settings.len_db(),
+					settings_end: self.config_settings.len_db(),
+				};
+				self.configs.push_db(config)?;
+				self.machines.last_mut().unwrap().configs_end += 1;
+				Some(Phase::MachineConfiguration)
+			}
+			(Phase::MachineConfiguration, b"confsetting" | b"dipvalue") => {
+				let [name, value] = evt.find_attributes([b"name", b"value"])?;
+				let name_strindex = self.strings.lookup(&name.mandatory("name")?);
+				let value = value.mandatory("value")?.parse::<u32>()?.into();
+				let config_setting = binary::ConfigurationSetting {
+					name_strindex,
+					value,
+					conditions_start: self.config_setting_conditions.len_db(),
+					conditions_end: self.config_setting_conditions.len_db(),
+				};
+				self.config_settings.push_db(config_setting)?;
+				self.configs.last_mut().unwrap().settings_end += 1;
+				Some(Phase::MachineConfigurationSetting)
+			}
+			(Phase::MachineConfigurationSetting, b"condition") => {
+				let [tag, relation, mask, value] = evt.find_attributes([b"tag", b"relation", b"mask", b"value"])?;
+				let tag = normalize_tag(tag.mandatory("tag")?);
+				let tag_strindex = self.strings.lookup(&tag);
+				let Ok(condition_relation) = relation.mandatory("relation")?.parse::<binary::ConditionRelation>()
+				else {
+					// presumably an unknown condition relation; ignore
+					return Ok(None);
+				};
+				let mask = mask.mandatory("mask")?.as_ref().parse::<u32>()?.into();
+				let value = value.mandatory("value")?.as_ref().parse::<u32>()?.into();
+				let condition = binary::ConfigurationSettingCondition {
+					tag_strindex,
+					condition_relation,
+					mask,
+					value,
+				};
+				self.config_setting_conditions.push_db(condition)?;
+				self.config_settings.last_mut().unwrap().conditions_end += 1;
+				None
+			}
 			(Phase::Machine, b"device") => {
 				let [device_type, tag, mandatory, interface] =
 					evt.find_attributes([b"type", b"tag", b"mandatory", b"interface"])?;
-				let tag = tag.ok_or(ThisError::MissingMandatoryAttribute("tag"))?;
+				let tag = tag.mandatory("tag")?;
 				let tag = normalize_tag(tag);
 				let type_strindex = self.strings.lookup(&device_type.unwrap_or_default());
 				let tag_strindex = self.strings.lookup(&tag);
@@ -219,7 +282,7 @@ impl State {
 			}
 			(Phase::Machine, b"slot") => {
 				let [name] = evt.find_attributes([b"name"])?;
-				let name = name.ok_or(ThisError::MissingMandatoryAttribute("slot"))?;
+				let name = name.mandatory("slot")?;
 				let name = normalize_tag(name);
 				let name_strindex = self.strings.lookup(&name);
 				let slot_options_pos = self.slot_options.len_db();
@@ -235,12 +298,12 @@ impl State {
 			}
 			(Phase::Machine, b"softwarelist") => {
 				let [tag, name, status, filter] = evt.find_attributes([b"tag", b"name", b"status", b"filter"])?;
-				let status = status.ok_or(ThisError::MissingMandatoryAttribute("status"))?;
+				let status = status.mandatory("status")?;
 				let Ok(status) = status.as_ref().parse::<SoftwareListStatus>() else {
 					// presumably an unknown software list status; ignore
 					return Ok(None);
 				};
-				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?;
+				let name = name.mandatory("name")?;
 				let tag_strindex = self.strings.lookup(&tag.unwrap_or_default());
 				let name_strindex = self.strings.lookup(&name);
 				let filter_strindex = self.strings.lookup(&filter.unwrap_or_default());
@@ -283,8 +346,8 @@ impl State {
 			}
 			(Phase::MachineSlot, b"slotoption") => {
 				let [name, devname, is_default] = evt.find_attributes([b"name", b"devname", b"default"])?;
-				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?;
-				let devname = devname.ok_or(ThisError::MissingMandatoryAttribute("devname"))?;
+				let name = name.mandatory("name")?;
+				let devname = devname.mandatory("devname")?;
 				let name_strindex = self.strings.lookup(&name);
 				let devname_strindex = self.strings.lookup(&devname);
 				let is_default = is_default.map(parse_mame_bool).transpose()?.unwrap_or_default();
@@ -309,6 +372,14 @@ impl State {
 		debug!(self=?self, "handle_end()");
 
 		match self.phase_stack.last().unwrap_or(&Phase::Root) {
+			Phase::Machine => {
+				try_consolidate_last_machine_configuration(
+					&mut self.machines,
+					&mut self.configs,
+					&mut self.config_settings,
+					&mut self.config_setting_conditions,
+				);
+			}
 			Phase::MachineDescription => {
 				let description = text.unwrap();
 				if !description.is_empty() && callback(&description) {
@@ -470,6 +541,9 @@ impl State {
 			build_strindex: self.build_strindex,
 			machine_count: machines.len_db(),
 			chips_count: self.chips.len_db(),
+			config_count: self.configs.len_db(),
+			config_setting_count: self.config_settings.len_db(),
+			config_setting_condition_count: self.config_setting_conditions.len_db(),
 			device_count: self.devices.len_db(),
 			slot_count: self.slots.len_db(),
 			slot_option_count: self.slot_options.len_db(),
@@ -485,6 +559,9 @@ impl State {
 			.iter()
 			.chain(machines.iter().flat_map(IntoBytes::as_bytes))
 			.chain(self.chips.iter().flat_map(IntoBytes::as_bytes))
+			.chain(self.configs.iter().flat_map(IntoBytes::as_bytes))
+			.chain(self.config_settings.iter().flat_map(IntoBytes::as_bytes))
+			.chain(self.config_setting_conditions.iter().flat_map(IntoBytes::as_bytes))
 			.chain(self.devices.iter().flat_map(IntoBytes::as_bytes))
 			.chain(self.slots.iter().flat_map(IntoBytes::as_bytes))
 			.chain(self.slot_options.iter().flat_map(IntoBytes::as_bytes))
@@ -535,6 +612,111 @@ fn fixup(
 		}
 	}
 	Ok(())
+}
+
+fn try_consolidate_last_machine_configuration(
+	machines: &mut [binary::Machine],
+	configs: &mut Vec<binary::Configuration>,
+	config_settings: &mut Vec<binary::ConfigurationSetting>,
+	config_setting_conditions: &mut Vec<binary::ConfigurationSettingCondition>,
+) {
+	fn compare_collection<T>(
+		collection: &[T],
+		a_start: UsizeDb,
+		a_end: UsizeDb,
+		b_start: UsizeDb,
+		b_end: UsizeDb,
+		make_proxy: impl Fn(&T) -> T,
+		supplemental_compare: impl Fn(&T, &T) -> bool,
+	) -> bool
+	where
+		T: PartialEq,
+	{
+		let a_slice = &collection[a_start.into()..a_end.into()];
+		let b_slice = &collection[b_start.into()..b_end.into()];
+		if a_slice.len() != b_slice.len() {
+			return false;
+		}
+		a_slice
+			.iter()
+			.zip(b_slice.iter())
+			.all(|(a, b)| make_proxy(a) == make_proxy(b) && supplemental_compare(a, b))
+	}
+
+	// find the last two machines
+	if machines.len() < 2 {
+		return;
+	}
+	let (a_machine, b_machine) = {
+		let machines_len = machines.len();
+		let (a, b) = machines.split_at_mut(machines_len - 1);
+		(&a[a.len() - 1], &mut b[0])
+	};
+
+	let can_consolidate = a_machine.configs_end == b_machine.configs_start
+		&& compare_collection(
+			configs.as_slice(),
+			a_machine.configs_start,
+			a_machine.configs_end,
+			b_machine.configs_start,
+			b_machine.configs_end,
+			|x| binary::Configuration {
+				settings_start: Default::default(),
+				settings_end: Default::default(),
+				..*x
+			},
+			|a, b| {
+				compare_collection(
+					config_settings.as_slice(),
+					a.settings_start,
+					a.settings_end,
+					b.settings_start,
+					b.settings_end,
+					|x| ConfigurationSetting {
+						conditions_start: Default::default(),
+						conditions_end: Default::default(),
+						..*x
+					},
+					|a, b| {
+						compare_collection(
+							config_setting_conditions.as_slice(),
+							a.conditions_start,
+							a.conditions_end,
+							b.conditions_start,
+							b.conditions_end,
+							|x| *x,
+							|_, _| true,
+						)
+					},
+				)
+			},
+		);
+
+	// can we consolidate?
+	if can_consolidate {
+		// if so, find the new ends of each collection
+		let configs_end = a_machine.configs_end.into();
+		let config_settings_end = configs[a_machine.configs_start.into()..configs_end]
+			.iter()
+			.map(|x| x.settings_end.into())
+			.max()
+			.unwrap_or(config_settings.len());
+		let config_setting_conditions_end = configs[a_machine.configs_start.into()..configs_end]
+			.iter()
+			.flat_map(|x| &config_settings[x.settings_start.into()..x.settings_end.into()])
+			.map(|x| x.conditions_end.into())
+			.max()
+			.unwrap_or(config_setting_conditions.len());
+
+		// and with those numbers, truncate the collections
+		configs.truncate(configs_end);
+		config_settings.truncate(config_settings_end);
+		config_setting_conditions.truncate(config_setting_conditions_end);
+
+		// and make the second machine use the first machine's configuration
+		b_machine.configs_start = a_machine.configs_start;
+		b_machine.configs_end = a_machine.configs_end;
+	}
 }
 
 fn listxml_err(reader: &XmlReader<impl BufRead>, e: impl Into<Error>) -> Error {
@@ -598,6 +780,9 @@ pub fn calculate_sizes_hash() -> U64 {
 		size_of::<binary::Header>(),
 		size_of::<binary::Machine>(),
 		size_of::<binary::Chip>(),
+		size_of::<binary::Configuration>(),
+		size_of::<binary::ConfigurationSetting>(),
+		size_of::<binary::ConfigurationSettingCondition>(),
 		size_of::<binary::Device>(),
 		size_of::<binary::Slot>(),
 		size_of::<binary::SlotOption>(),
@@ -625,6 +810,13 @@ impl<T> Vec<T> {
 
 	pub fn try_len_db(&self) -> Result<UsizeDb> {
 		self.len().try_into().map_err(|_| Error::msg("too many records"))
+	}
+}
+
+#[ext]
+impl<T> Option<T> {
+	pub fn mandatory(self, name: &'static str) -> Result<T> {
+		self.ok_or(ThisError::MissingMandatoryAttribute(name).into())
 	}
 }
 

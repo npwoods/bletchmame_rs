@@ -13,6 +13,7 @@ pub mod namecollection;
 pub mod paths;
 pub mod seqpoll;
 pub mod socket;
+pub mod switches;
 
 #[ext(SenderExt)]
 impl<T> Sender<T> {
