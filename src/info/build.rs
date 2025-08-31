@@ -20,6 +20,7 @@ use crate::info::SERIAL;
 use crate::info::SoftwareListStatus;
 use crate::info::UsizeDb;
 use crate::info::binary;
+use crate::info::binary::ConfigurationSetting;
 use crate::info::binary::Fixup;
 use crate::info::strings::StringTableBuilder;
 use crate::parse::normalize_tag;
@@ -371,6 +372,14 @@ impl State {
 		debug!(self=?self, "handle_end()");
 
 		match self.phase_stack.last().unwrap_or(&Phase::Root) {
+			Phase::Machine => {
+				try_consolidate_last_machine_configuration(
+					&mut self.machines,
+					&mut self.configs,
+					&mut self.config_settings,
+					&mut self.config_setting_conditions,
+				);
+			}
 			Phase::MachineDescription => {
 				let description = text.unwrap();
 				if !description.is_empty() && callback(&description) {
@@ -603,6 +612,111 @@ fn fixup(
 		}
 	}
 	Ok(())
+}
+
+fn try_consolidate_last_machine_configuration(
+	machines: &mut [binary::Machine],
+	configs: &mut Vec<binary::Configuration>,
+	config_settings: &mut Vec<binary::ConfigurationSetting>,
+	config_setting_conditions: &mut Vec<binary::ConfigurationSettingCondition>,
+) {
+	fn compare_collection<T>(
+		collection: &[T],
+		a_start: UsizeDb,
+		a_end: UsizeDb,
+		b_start: UsizeDb,
+		b_end: UsizeDb,
+		make_proxy: impl Fn(&T) -> T,
+		supplemental_compare: impl Fn(&T, &T) -> bool,
+	) -> bool
+	where
+		T: PartialEq,
+	{
+		let a_slice = &collection[a_start.into()..a_end.into()];
+		let b_slice = &collection[b_start.into()..b_end.into()];
+		if a_slice.len() != b_slice.len() {
+			return false;
+		}
+		a_slice
+			.iter()
+			.zip(b_slice.iter())
+			.all(|(a, b)| make_proxy(a) == make_proxy(b) && supplemental_compare(a, b))
+	}
+
+	// find the last two machines
+	if machines.len() < 2 {
+		return;
+	}
+	let (a_machine, b_machine) = {
+		let machines_len = machines.len();
+		let (a, b) = machines.split_at_mut(machines_len - 1);
+		(&a[a.len() - 1], &mut b[0])
+	};
+
+	let can_consolidate = a_machine.configs_end == b_machine.configs_start
+		&& compare_collection(
+			configs.as_slice(),
+			a_machine.configs_start,
+			a_machine.configs_end,
+			b_machine.configs_start,
+			b_machine.configs_end,
+			|x| binary::Configuration {
+				settings_start: Default::default(),
+				settings_end: Default::default(),
+				..*x
+			},
+			|a, b| {
+				compare_collection(
+					config_settings.as_slice(),
+					a.settings_start,
+					a.settings_end,
+					b.settings_start,
+					b.settings_end,
+					|x| ConfigurationSetting {
+						conditions_start: Default::default(),
+						conditions_end: Default::default(),
+						..*x
+					},
+					|a, b| {
+						compare_collection(
+							config_setting_conditions.as_slice(),
+							a.conditions_start,
+							a.conditions_end,
+							b.conditions_start,
+							b.conditions_end,
+							|x| *x,
+							|_, _| true,
+						)
+					},
+				)
+			},
+		);
+
+	// can we consolidate?
+	if can_consolidate {
+		// if so, find the new ends of each collection
+		let configs_end = a_machine.configs_end.into();
+		let config_settings_end = configs[a_machine.configs_start.into()..configs_end]
+			.iter()
+			.map(|x| x.settings_end.into())
+			.max()
+			.unwrap_or(config_settings.len());
+		let config_setting_conditions_end = configs[a_machine.configs_start.into()..configs_end]
+			.iter()
+			.flat_map(|x| &config_settings[x.settings_start.into()..x.settings_end.into()])
+			.map(|x| x.conditions_end.into())
+			.max()
+			.unwrap_or(config_setting_conditions.len());
+
+		// and with those numbers, truncate the collections
+		configs.truncate(configs_end);
+		config_settings.truncate(config_settings_end);
+		config_setting_conditions.truncate(config_setting_conditions_end);
+
+		// and make the second machine use the first machine's configuration
+		b_machine.configs_start = a_machine.configs_start;
+		b_machine.configs_end = a_machine.configs_end;
+	}
 }
 
 fn listxml_err(reader: &XmlReader<impl BufRead>, e: impl Into<Error>) -> Error {

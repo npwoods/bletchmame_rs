@@ -94,7 +94,7 @@ pub enum ChipType {
 }
 
 #[repr(C, packed)]
-#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq)]
 pub struct Configuration {
 	pub name_strindex: UsizeDb,
 	pub tag_strindex: UsizeDb,
@@ -104,7 +104,7 @@ pub struct Configuration {
 }
 
 #[repr(C, packed)]
-#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq)]
 pub struct ConfigurationSetting {
 	pub name_strindex: UsizeDb,
 	pub value: U32,
@@ -113,7 +113,7 @@ pub struct ConfigurationSetting {
 }
 
 #[repr(C, packed)]
-#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq)]
 pub struct ConfigurationSettingCondition {
 	pub tag_strindex: UsizeDb,
 	pub condition_relation: ConditionRelation,
