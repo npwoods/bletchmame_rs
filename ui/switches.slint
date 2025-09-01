@@ -19,6 +19,7 @@ export component SwitchesDialog inherits Window {
     // callbacks
     callback ok-clicked();
     callback menu-item-command(string);
+    callback entry-option-changed(int, int);
 
     // control hierarchy
     VerticalBox {
@@ -40,7 +41,9 @@ export component SwitchesDialog inherits Window {
                     ComboBox {
                         model: entry.options;
                         current-index: entry.current-option-index;
-                        enabled: false;
+                        selected(value) => {
+                            root.entry-option-changed(index, self.current-index);
+                        }
                     }
                 }
             }

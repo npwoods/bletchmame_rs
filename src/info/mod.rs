@@ -45,6 +45,7 @@ use crate::prefs::prefs_filename;
 use crate::version::MameVersion;
 
 pub use self::binary::ChipType;
+pub use self::binary::ConditionRelation;
 pub use self::binary::SoftwareListStatus;
 pub use self::entities::Chip;
 pub use self::entities::Configuration;
