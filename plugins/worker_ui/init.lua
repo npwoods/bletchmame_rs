@@ -1069,18 +1069,28 @@ end
 
 -- SET_INPUT_VALUE command
 function command_set_input_value(args)
-	local field = find_port_and_field(args[2], args[3])
-	if not field then
-		print("@ERROR ### Can't find field mask '" .. tostring(tonumber(args[3])) .. "' on port '" .. args[2] .. "'")
-		return
-	end
-	if not field.enabled then
-		print("@ERROR ### Field '" .. args[2] .. "':" .. tostring(tonumber(args[3])) .. " is disabled")
-		return
-	end
+	-- loop; this is a batch command
+	for i = 2,#args-2,3 do
+		local field = find_port_and_field(args[i+0], args[i+1])
+		if not field then
+			print("@ERROR ### Can't find field mask '" .. tostring(tonumber(args[i+1])) .. "' on port '" .. args[i+0] .. "'")
+			return
+		end
+		if not field.enabled then
+			print("@ERROR ### Field '" .. args[i+0] .. "':" .. tostring(tonumber(args[i+1])) .. " is disabled")
+			return
+		end
 
-	field.user_value = tonumber(args[4]);
-	print("@OK STATUS ### Field '" .. args[2] .. "':" .. tostring(args[3]) .. " set to " .. tostring(field.user_value))
+		field.user_value = tonumber(args[i+2]);
+
+		local prompt
+		if i < #args-2 then
+			prompt = "@INFO"
+		else
+			prompt = "@OK STATUS"
+		end
+		print(prompt .. " ### Field '" .. args[i+0] .. "':" .. tostring(args[i+1]) .. " set to " .. tostring(field.user_value))
+	end
 	emit_status()
 end
 
