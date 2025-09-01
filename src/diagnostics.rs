@@ -48,43 +48,54 @@ pub fn info_db_from_xml_file(path: Option<impl AsRef<Path>>) -> ExitCode {
 }
 
 fn print_stats(info_db: &InfoDb, elapsed_time: Duration) {
-	let width = 8;
+	let count_width = 8;
 	let (total_size, total_size_unit) = Byte::from(info_db.data_len()).get_exact_unit(true);
 	let (strings_size, strings_size_unit) = Byte::from(info_db.strings_len()).get_exact_unit(true);
 
+	// these are all of the entry counts and associated labels
+	let entry_counts = [
+		("Machines", info_db.machines().len()),
+		("Chips", info_db.chips().len()),
+		("Configurations", info_db.configurations().len()),
+		("Configuration Settings", info_db.configuration_settings().len()),
+		(
+			"Configuration Setting Conditions",
+			info_db.configuration_setting_conditions().len(),
+		),
+		("Devices", info_db.devices().len()),
+		("Slots", info_db.slots().len()),
+		("Slots Options", info_db.slot_options().len()),
+		("Software Lists", info_db.software_lists().len()),
+		(
+			"Machine --> Software List Indexes",
+			info_db.software_list_machine_indexes().len(),
+		),
+		(
+			"Software List --> Machine Indexes",
+			info_db.machine_software_lists().len(),
+		),
+		("RAM Options", info_db.ram_options().len()),
+	];
+
+	// figure out how wide the largest label is
+	let max_label_width = entry_counts.iter().map(|(label, _)| label.len()).max().unwrap();
+
 	println!("{}", style(info_db.build()).reverse());
+	for (label, count) in entry_counts {
+		println!("{:<max_label_width$}: {:>count_width$}", label, count);
+	}
 	println!(
-		"Machines:                          {:>width$}",
-		info_db.machines().len()
+		"{:<max_label_width$}: {:>count_width$} {}",
+		"String Table Length", strings_size, strings_size_unit
 	);
-	println!("Chips:                             {:>width$}", info_db.chips().len());
-	println!("Devices:                           {:>width$}", info_db.devices().len());
-	println!("Slots:                             {:>width$}", info_db.slots().len());
-	println!(
-		"Slot Options:                      {:>width$}",
-		info_db.slot_options().len()
-	);
-	println!(
-		"Software Lists:                    {:>width$}",
-		info_db.software_lists().len()
-	);
-	println!(
-		"Machine --> Software List Indexes: {:>width$}",
-		info_db.software_list_machine_indexes().len()
-	);
-	println!(
-		"Software List --> Machine Indexes: {:>width$}",
-		info_db.machine_software_lists().len()
-	);
-	println!(
-		"RAM Options:                       {:>width$}",
-		info_db.ram_options().len()
-	);
-	println!("String Table Length:               {strings_size:>width$} {strings_size_unit}");
 	println!();
-	println!("Total Size:                        {total_size:>width$} {total_size_unit}");
 	println!(
-		"Elapsed Time:                      {:>width$} secs",
+		"{:<max_label_width$}: {:>count_width$} {}",
+		"Total Size", total_size, total_size_unit
+	);
+	println!(
+		"{:<max_label_width$}: {:>count_width$} secs",
+		"Elapsed Time",
 		elapsed_time.as_millis() as f32 / 1000.0
 	);
 }
