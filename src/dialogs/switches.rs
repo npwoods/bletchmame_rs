@@ -5,12 +5,14 @@ use std::sync::Arc;
 
 use itertools::Itertools;
 use slint::CloseRequestResponse;
+use slint::ComponentHandle;
 use slint::Model;
 use slint::ModelNotify;
 use slint::ModelRc;
 use slint::ModelTracker;
 use slint::ToSharedString;
 use slint::VecModel;
+use slint::Weak;
 use tokio::sync::mpsc;
 
 use crate::appcommand::AppCommand;
@@ -28,6 +30,7 @@ use crate::ui::SwitchesDialog;
 use crate::ui::SwitchesDialogEntry;
 
 struct SwitchesDialogModel {
+	dialog_weak: Weak<SwitchesDialog>,
 	state: RefCell<SwitchesDialogState>,
 	class: InputClass,
 	info_db: Rc<InfoDb>,
@@ -82,8 +85,17 @@ pub async fn dialog_switches(
 		tx_clone.signal(());
 	});
 
+	// set up the invoke command callback
+	let invoke_command_clone = invoke_command.clone();
+	modal.dialog().on_menu_item_command(move |command_string| {
+		if let Some(command) = AppCommand::decode_from_slint(command_string) {
+			invoke_command_clone(command)
+		}
+	});
+
 	// set up the model
-	let model = SwitchesDialogModel::new(class, info_db.clone());
+	let dialog_weak = modal.dialog().as_weak();
+	let model = SwitchesDialogModel::new(class, info_db.clone(), dialog_weak);
 	let model = Rc::new(model);
 	let model = ModelRc::new(model);
 	modal.dialog().set_entries(model.clone());
@@ -119,11 +131,12 @@ pub async fn dialog_switches(
 }
 
 impl SwitchesDialogModel {
-	pub fn new(class: InputClass, info_db: Rc<InfoDb>) -> Self {
+	pub fn new(class: InputClass, info_db: Rc<InfoDb>, dialog_weak: Weak<SwitchesDialog>) -> Self {
 		let state = SwitchesDialogState::default();
 		let state = RefCell::new(state);
 		let notify = ModelNotify::default();
 		Self {
+			dialog_weak,
 			state,
 			class,
 			info_db,
@@ -139,6 +152,11 @@ impl SwitchesDialogModel {
 				state.machine_index = machine_index;
 				state.inputs = inputs;
 				state.entries = build_entries(&self.info_db, self.class, machine_index, &state.inputs);
+
+				let command = build_restore_defaults_command(&self.info_db, self.class, machine_index, &state.inputs);
+				self.dialog_weak.unwrap().set_restore_defaults_command(
+					command.as_ref().map(AppCommand::encode_for_slint).unwrap_or_default(),
+				);
 			}
 			changed
 		};
@@ -274,4 +292,29 @@ fn evaluate_condition(inputs: &[Input], tag: &str, relation: ConditionRelation, 
 		ConditionRelation::Lt => input_value < value,
 		ConditionRelation::Ge => input_value >= value,
 	}
+}
+
+fn build_restore_defaults_command(
+	info_db: &InfoDb,
+	class: InputClass,
+	machine_index: Option<usize>,
+	inputs: &[Input],
+) -> Option<AppCommand> {
+	let infodb_configs = info_db.machines().get(machine_index?).unwrap().configurations();
+	let inputs = inputs
+		.iter()
+		.filter(|input| input.class == Some(class))
+		.filter_map(|input| {
+			let config = infodb_configs
+				.iter()
+				.find(|c| c.tag() == input.port_tag && c.mask() == input.mask)?;
+			let default_setting_index = config.default_setting_index()?;
+			let setting = config.settings().get(default_setting_index).unwrap();
+
+			// only return this if the value is different
+			(input.value != Some(setting.value())).then(|| (config.tag(), config.mask(), setting.value()))
+		})
+		.collect::<Vec<_>>();
+
+	(!inputs.is_empty()).then(|| MameCommand::set_input_values(&inputs).into())
 }

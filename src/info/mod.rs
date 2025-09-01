@@ -957,13 +957,16 @@ mod test {
 		);
 	}
 
-	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", &[("beckerport", 1), ("ctrl_sel", 15), ("ctrl_sel", 240), ("dwsock:drivewire_port", 65535), ("hires_intf", 7), ("rs232:rs_printer:RS232_DATABITS", 255), ("rs232:rs_printer:RS232_PARITY", 255), ("rs232:rs_printer:RS232_RXBAUD", 255), ("rs232:rs_printer:RS232_STOPBITS", 255), ("vdg:artifacting", 3)])]
-	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "coco3", &[("beckerport", 1), ("ctrl_sel", 15), ("ctrl_sel", 240), ("dwsock:drivewire_port", 65535), ("gime:artifacting", 3), ("hires_intf", 7), ("rs232:rs_printer:RS232_DATABITS", 255), ("rs232:rs_printer:RS232_PARITY", 255), ("rs232:rs_printer:RS232_RXBAUD", 255), ("rs232:rs_printer:RS232_STOPBITS", 255), ("screen_config", 1)])]
-	fn configurations(_index: usize, xml: &str, machine_name: &str, expected: &[(&str, u32)]) {
+	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", &[("beckerport", 1, 0), ("ctrl_sel", 15, 1), ("ctrl_sel", 240, 1), ("dwsock:drivewire_port", 65535, 4), ("hires_intf", 7, 0), ("rs232:rs_printer:RS232_DATABITS", 255, 3), ("rs232:rs_printer:RS232_PARITY", 255, 0), ("rs232:rs_printer:RS232_RXBAUD", 255, 7), ("rs232:rs_printer:RS232_STOPBITS", 255, 1), ("vdg:artifacting", 3, 1)])]
+	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "coco3", &[("beckerport", 1, 0), ("ctrl_sel", 15, 1), ("ctrl_sel", 240, 1), ("dwsock:drivewire_port", 65535, 4), ("gime:artifacting", 3, 1), ("hires_intf", 7, 0), ("rs232:rs_printer:RS232_DATABITS", 255, 3), ("rs232:rs_printer:RS232_PARITY", 255, 0), ("rs232:rs_printer:RS232_RXBAUD", 255, 7), ("rs232:rs_printer:RS232_STOPBITS", 255, 1), ("screen_config", 1, 0)])]
+	fn configurations(_index: usize, xml: &str, machine_name: &str, expected: &[(&str, u32, usize)]) {
 		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
 		let configs = db.machines().find(machine_name).unwrap().configurations();
 
-		let actual = configs.iter().map(|c| (c.tag(), c.mask())).collect::<Vec<_>>();
+		let actual = configs
+			.iter()
+			.map(|c| (c.tag(), c.mask(), c.default_setting_index().unwrap()))
+			.collect::<Vec<_>>();
 		assert_eq!(expected, actual.as_slice());
 	}
 }

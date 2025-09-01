@@ -147,6 +147,11 @@ impl<'a> Configuration<'a> {
 		let range = self.obj().settings_start.into()..self.obj().settings_end.into();
 		self.db.configuration_settings().sub_view(range)
 	}
+
+	pub fn default_setting_index(&self) -> Option<usize> {
+		let default_setting_index = self.obj().default_setting_index.into();
+		(default_setting_index < self.settings().len()).then_some(default_setting_index)
+	}
 }
 
 impl<'a> ConfigurationSetting<'a> {

@@ -203,10 +203,17 @@ impl MameCommand {
 	}
 
 	pub fn set_input_value(port_tag: impl AsRef<str>, mask: u32, value: u32) -> Self {
-		let port_tag = port_tag.as_ref();
-		let mask = mask.to_string();
-		let value = value.to_string();
-		build("SET_INPUT_VALUE", [port_tag, mask.as_str(), value.as_str()])
+		Self::set_input_values(&[(port_tag, mask, value)])
+	}
+
+	pub fn set_input_values(inputs: &[(impl AsRef<str>, u32, u32)]) -> Self {
+		let args = inputs.iter().flat_map(|(port_tag, mask, value)| {
+			let port_tag = Cow::Borrowed(port_tag.as_ref());
+			let mask = Cow::Owned(mask.to_string());
+			let value = Cow::Owned(value.to_string());
+			[port_tag, mask, value]
+		});
+		build("SET_INPUT_VALUE", args)
 	}
 
 	pub fn set_mouse_enabled(enabled: bool) -> Self {
