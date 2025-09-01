@@ -86,26 +86,29 @@ enum ThisError {
 	MissingMandatoryAttribute(&'static str),
 }
 
-// capacity defaults based on MAME 0.277
-// 			48166 machines
-//         198694 chips
-//          11918 devices
-//          24252 slots
-//         434464 slot options
-//           6966 links
+// capacity defaults based on MAME 0.280
+//          48893 machines
+//         191452 chips
+//         146163 configurations
+//         441057 configuration settings
+//           5001 configuration setting configurations
+//          11975 devices
+//          24670 slots
+//         470150 slot options
+//           7038 links
 //           6660 RAM options
-//        2473230 string bytes
+//        2854471 string bytes
 const CAPACITY_MACHINES: usize = 55000;
 const CAPACITY_CHIPS: usize = 240000;
-const CAPACITY_CONFIGS: usize = 100000;
-const CAPACITY_CONFIG_SETTINGS: usize = 100000;
-const CAPACITY_CONFIG_SETTING_CONDITIONS: usize = 100000;
+const CAPACITY_CONFIGS: usize = 180000;
+const CAPACITY_CONFIG_SETTINGS: usize = 500000;
+const CAPACITY_CONFIG_SETTING_CONDITIONS: usize = 5500;
 const CAPACITY_DEVICES: usize = 14000;
 const CAPACITY_SLOTS: usize = 26000;
-const CAPACITY_SLOT_OPTIONS: usize = 480000;
+const CAPACITY_SLOT_OPTIONS: usize = 490000;
 const CAPACITY_MACHINE_SOFTWARE_LISTS: usize = 7500;
 const CAPACITY_RAM_OPTIONS: usize = 7200;
-const CAPACITY_STRING_TABLE: usize = 2600000;
+const CAPACITY_STRING_TABLE: usize = 3000000;
 
 impl State {
 	pub fn new() -> Self {
