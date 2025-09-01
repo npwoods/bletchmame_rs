@@ -202,6 +202,13 @@ impl MameCommand {
 		Self("SEQ_POLL_STOP".into())
 	}
 
+	pub fn set_input_value(port_tag: impl AsRef<str>, mask: u32, value: u32) -> Self {
+		let port_tag = port_tag.as_ref();
+		let mask = mask.to_string();
+		let value = value.to_string();
+		build("SET_INPUT_VALUE", [port_tag, mask.as_str(), value.as_str()])
+	}
+
 	pub fn set_mouse_enabled(enabled: bool) -> Self {
 		let enabled = (enabled as u8).to_string();
 		build("SET_MOUSE_ENABLED", [enabled])

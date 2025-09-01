@@ -20,6 +20,7 @@ use crate::guiutils::modal::ModalStack;
 use crate::info::ConditionRelation;
 use crate::info::InfoDb;
 use crate::info::View;
+use crate::runtime::command::MameCommand;
 use crate::status::Input;
 use crate::status::InputClass;
 use crate::status::Status;
@@ -49,7 +50,7 @@ struct Entry {
 #[derive(Debug)]
 struct EntryConfig {
 	pub config_index: usize,
-	pub setting_indexes: Box<[usize]>,
+	pub option_indexes: Box<[usize]>,
 }
 
 pub async fn dialog_switches(
@@ -59,7 +60,7 @@ pub async fn dialog_switches(
 	class: InputClass,
 	machine_index: Option<usize>,
 	status_update_channel: Channel<Status>,
-	_invoke_command: impl Fn(AppCommand) + Clone + 'static,
+	invoke_command: impl Fn(AppCommand) + Clone + 'static,
 ) {
 	// prepare the dialog
 	let modal = modal_stack.modal(|| SwitchesDialog::new().unwrap());
@@ -86,6 +87,18 @@ pub async fn dialog_switches(
 	let model = Rc::new(model);
 	let model = ModelRc::new(model);
 	modal.dialog().set_entries(model.clone());
+
+	// set up the callback for when an option changes
+	let model_clone = model.clone();
+	modal
+		.dialog()
+		.on_entry_option_changed(move |setting_index, option_index| {
+			let model = SwitchesDialogModel::get_model(&model_clone);
+			let setting_index = setting_index.try_into().unwrap();
+			let option_index = option_index.try_into().unwrap();
+			let command = model.set_setting_option_command(setting_index, option_index);
+			invoke_command(command);
+		});
 
 	// subscribe to status changes
 	let model_clone = model.clone();
@@ -134,6 +147,23 @@ impl SwitchesDialogModel {
 		}
 	}
 
+	pub fn set_setting_option_command(&self, setting_index: usize, option_index: usize) -> AppCommand {
+		let state = self.state.borrow();
+		let entry = &state.entries[setting_index];
+		let input = &state.inputs[entry.input_index];
+		let config = entry.config.as_ref().unwrap();
+		let option_index = config.option_indexes[option_index];
+
+		let machine = self.info_db.machines().get(state.machine_index.unwrap()).unwrap();
+		let infodb_config = machine.configurations().get(config.config_index).unwrap();
+
+		let port_tag = &input.port_tag;
+		let mask = input.mask;
+		let value = infodb_config.settings().get(option_index).unwrap().value();
+
+		MameCommand::set_input_value(port_tag, mask, value).into()
+	}
+
 	pub fn get_model(model: &impl Model) -> &'_ Self {
 		model.as_any().downcast_ref::<Self>().unwrap()
 	}
@@ -162,7 +192,7 @@ impl Model for SwitchesDialogModel {
 			.map(|config| {
 				let settings = machine.configurations().get(config.config_index).unwrap().settings();
 				let options = config
-					.setting_indexes
+					.option_indexes
 					.iter()
 					.map(|&setting_index| settings.get(setting_index).unwrap().name().to_shared_string())
 					.collect::<Vec<_>>();
@@ -208,7 +238,7 @@ fn build_entries(info_db: &InfoDb, class: InputClass, machine_index: Option<usiz
 				.find_position(|c| c.tag() == input.port_tag && c.mask() == input.mask);
 
 			let config = config_and_index.map(|(config_index, config)| {
-				let setting_indexes = config
+				let option_indexes = config
 					.settings()
 					.iter()
 					.enumerate()
@@ -221,7 +251,7 @@ fn build_entries(info_db: &InfoDb, class: InputClass, machine_index: Option<usiz
 					.collect();
 				EntryConfig {
 					config_index,
-					setting_indexes,
+					option_indexes,
 				}
 			});
 
