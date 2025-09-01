@@ -221,15 +221,23 @@ impl State {
 					mask,
 					settings_start: self.config_settings.len_db(),
 					settings_end: self.config_settings.len_db(),
+					default_setting_index: !UsizeDb::default(),
 				};
 				self.configs.push_db(config)?;
 				self.machines.last_mut().unwrap().configs_end += 1;
 				Some(Phase::MachineConfiguration)
 			}
 			(Phase::MachineConfiguration, b"confsetting" | b"dipvalue") => {
-				let [name, value] = evt.find_attributes([b"name", b"value"])?;
+				let [name, value, is_default] = evt.find_attributes([b"name", b"value", b"default"])?;
 				let name_strindex = self.strings.lookup(&name.mandatory("name")?);
 				let value = value.mandatory("value")?.parse::<u32>()?.into();
+				let is_default = is_default.map(parse_mame_bool).transpose()?.unwrap_or(false);
+
+				if is_default {
+					let config = self.configs.last_mut().unwrap();
+					config.default_setting_index = config.settings_end - config.settings_start;
+				}
+
 				let config_setting = binary::ConfigurationSetting {
 					name_strindex,
 					value,

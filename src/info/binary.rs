@@ -101,6 +101,7 @@ pub struct Configuration {
 	pub mask: U32,
 	pub settings_start: UsizeDb,
 	pub settings_end: UsizeDb,
+	pub default_setting_index: UsizeDb,
 }
 
 #[repr(C, packed)]
