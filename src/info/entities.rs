@@ -5,6 +5,7 @@ use binary_search::Direction;
 use binary_search::binary_search;
 
 use crate::info::ChipType;
+use crate::info::ConditionRelation;
 use crate::info::IndirectView;
 use crate::info::Object;
 use crate::info::SimpleView;
@@ -151,6 +152,29 @@ impl<'a> Configuration<'a> {
 impl<'a> ConfigurationSetting<'a> {
 	pub fn name(&self) -> &'a str {
 		self.string(|x| x.name_strindex)
+	}
+
+	pub fn value(&self) -> u32 {
+		self.obj().value.into()
+	}
+
+	pub fn conditions(&self) -> impl View<'a, ConfigurationSettingCondition<'a>> + use<'a> {
+		let range = self.obj().conditions_start.into()..self.obj().conditions_end.into();
+		self.db.configuration_setting_conditions().sub_view(range)
+	}
+}
+
+impl<'a> ConfigurationSettingCondition<'a> {
+	pub fn tag(&self) -> &'a str {
+		self.string(|x| x.tag_strindex)
+	}
+
+	pub fn relation(&self) -> ConditionRelation {
+		self.obj().condition_relation
+	}
+
+	pub fn mask(&self) -> u32 {
+		self.obj().mask.into()
 	}
 
 	pub fn value(&self) -> u32 {

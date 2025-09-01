@@ -3,6 +3,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use itertools::Itertools;
 use slint::CloseRequestResponse;
 use slint::Model;
 use slint::ModelNotify;
@@ -16,6 +17,7 @@ use crate::appcommand::AppCommand;
 use crate::channel::Channel;
 use crate::dialogs::SenderExt;
 use crate::guiutils::modal::ModalStack;
+use crate::info::ConditionRelation;
 use crate::info::InfoDb;
 use crate::info::View;
 use crate::status::Input;
@@ -41,7 +43,13 @@ struct SwitchesDialogState {
 #[derive(Debug)]
 struct Entry {
 	pub input_index: usize,
-	pub config_index: Option<usize>,
+	pub config: Option<EntryConfig>,
+}
+
+#[derive(Debug)]
+struct EntryConfig {
+	pub config_index: usize,
+	pub setting_indexes: Box<[usize]>,
 }
 
 pub async fn dialog_switches(
@@ -147,28 +155,23 @@ impl Model for SwitchesDialogModel {
 		let machine_index = state.machine_index?;
 		let machine = self.info_db.machines().get(machine_index).unwrap();
 
-		// get a view into the current config settings
-		let config_settings = entry.config_index.map(|config_index| {
-			let config = machine.configurations().get(config_index).unwrap();
-			config.settings()
-		});
-
 		// build the options list
-		let options = config_settings
+		let (options, current_option_index) = entry
+			.config
 			.as_ref()
-			.map(|config_settings| {
-				config_settings
+			.map(|config| {
+				let settings = machine.configurations().get(config.config_index).unwrap().settings();
+				let options = config
+					.setting_indexes
 					.iter()
-					.map(|s| s.name().to_shared_string())
-					.collect::<Vec<_>>()
+					.map(|&setting_index| settings.get(setting_index).unwrap().name().to_shared_string())
+					.collect::<Vec<_>>();
+				let current_options_index = settings.iter().position(|s| input.value == Some(s.value()));
+				(options, current_options_index)
 			})
-			.unwrap_or_default();
+			.unwrap_or((Vec::new(), None));
 		let options = VecModel::from(options);
 		let options = ModelRc::new(options);
-
-		let current_option_index = config_settings
-			.as_ref()
-			.and_then(|config_settings| config_settings.iter().position(|s| input.value == Some(s.value())));
 		let current_option_index = current_option_index.map(|x| x.try_into().unwrap()).unwrap_or(-1);
 
 		let entry = SwitchesDialogEntry {
@@ -200,13 +203,45 @@ fn build_entries(info_db: &InfoDb, class: InputClass, machine_index: Option<usiz
 		.enumerate()
 		.filter(|(_, input)| input.class == Some(class))
 		.map(|(input_index, input)| {
-			let config_index = configurations
+			let config_and_index = configurations
 				.iter()
-				.position(|c| c.tag() == input.port_tag && c.mask() == input.mask);
-			Entry {
-				input_index,
-				config_index,
-			}
+				.find_position(|c| c.tag() == input.port_tag && c.mask() == input.mask);
+
+			let config = config_and_index.map(|(config_index, config)| {
+				let setting_indexes = config
+					.settings()
+					.iter()
+					.enumerate()
+					.filter(|(_, setting)| {
+						setting.conditions().iter().all(|cond| {
+							evaluate_condition(inputs, cond.tag(), cond.relation(), cond.mask(), cond.value())
+						})
+					})
+					.map(|(setting_index, _)| setting_index)
+					.collect();
+				EntryConfig {
+					config_index,
+					setting_indexes,
+				}
+			});
+
+			Entry { input_index, config }
 		})
 		.collect()
+}
+
+fn evaluate_condition(inputs: &[Input], tag: &str, relation: ConditionRelation, mask: u32, value: u32) -> bool {
+	let input = inputs.iter().find(|x| x.port_tag.as_str() == tag).unwrap();
+	let Some(input_value) = input.value else {
+		return false;
+	};
+	let input_value = input_value & mask;
+	match relation {
+		ConditionRelation::Eq => input_value == value,
+		ConditionRelation::Ne => input_value != value,
+		ConditionRelation::Gt => input_value > value,
+		ConditionRelation::Le => input_value <= value,
+		ConditionRelation::Lt => input_value < value,
+		ConditionRelation::Ge => input_value >= value,
+	}
 }
