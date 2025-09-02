@@ -27,6 +27,7 @@ pub struct Header {
 	pub sizes_hash: U64,
 	pub build_strindex: UsizeDb,
 	pub machine_count: UsizeDb,
+	pub biosset_count: UsizeDb,
 	pub chips_count: UsizeDb,
 	pub config_count: UsizeDb,
 	pub config_setting_count: UsizeDb,
@@ -50,6 +51,9 @@ pub struct Machine {
 	pub description_strindex: UsizeDb,
 	pub year_strindex: UsizeDb,
 	pub manufacturer_strindex: UsizeDb,
+	pub biossets_start: UsizeDb,
+	pub biossets_end: UsizeDb,
+	pub default_biosset_index: UsizeDb,
 	pub chips_start: UsizeDb,
 	pub chips_end: UsizeDb,
 	pub configs_start: UsizeDb,
@@ -71,6 +75,13 @@ impl Fixup for Machine {
 	fn identify_machine_indexes(&mut self) -> impl IntoIterator<Item = &mut UsizeDb> {
 		[&mut self.clone_of_machine_index, &mut self.rom_of_machine_index]
 	}
+}
+
+#[repr(C, packed)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout)]
+pub struct BiosSet {
+	pub name_strindex: UsizeDb,
+	pub description_strindex: UsizeDb,
 }
 
 #[repr(C, packed)]

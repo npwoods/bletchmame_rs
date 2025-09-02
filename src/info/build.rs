@@ -54,6 +54,7 @@ const TEXT_CAPTURE_PHASES: &[Phase] = &[
 struct State {
 	phase_stack: Vec<Phase>,
 	machines: Vec<binary::Machine>,
+	biossets: Vec<binary::BiosSet>,
 	chips: Vec<binary::Chip>,
 	configs: Vec<binary::Configuration>,
 	config_settings: Vec<binary::ConfigurationSetting>,
@@ -88,6 +89,7 @@ enum ThisError {
 
 // capacity defaults based on MAME 0.280
 //          48893 machines
+//          40220 BIOS sets
 //         191452 chips
 //         146163 configurations
 //         441057 configuration settings
@@ -99,6 +101,7 @@ enum ThisError {
 //           6660 RAM options
 //        2854471 string bytes
 const CAPACITY_MACHINES: usize = 55000;
+const CAPACITY_BIOSSETS: usize = 45000;
 const CAPACITY_CHIPS: usize = 240000;
 const CAPACITY_CONFIGS: usize = 180000;
 const CAPACITY_CONFIG_SETTINGS: usize = 500000;
@@ -122,6 +125,7 @@ impl State {
 		Self {
 			phase_stack: Vec::with_capacity(32),
 			machines: Vec::with_capacity(CAPACITY_MACHINES),
+			biossets: Vec::with_capacity(CAPACITY_BIOSSETS),
 			chips: Vec::with_capacity(CAPACITY_CHIPS),
 			configs: Vec::with_capacity(CAPACITY_CONFIGS),
 			config_settings: Vec::with_capacity(CAPACITY_CONFIG_SETTINGS),
@@ -168,6 +172,9 @@ impl State {
 					source_file_strindex,
 					clone_of_machine_index,
 					rom_of_machine_index,
+					biossets_start: self.biossets.len_db(),
+					biossets_end: self.biossets.len_db(),
+					default_biosset_index: !UsizeDb::default(),
 					chips_start: self.chips.len_db(),
 					chips_end: self.chips.len_db(),
 					configs_start: self.configs.len_db(),
@@ -189,6 +196,25 @@ impl State {
 			(Phase::Machine, b"description") => Some(Phase::MachineDescription),
 			(Phase::Machine, b"year") => Some(Phase::MachineYear),
 			(Phase::Machine, b"manufacturer") => Some(Phase::MachineManufacturer),
+			(Phase::Machine, b"biosset") => {
+				let [name, description, is_default] = evt.find_attributes([b"name", b"description", b"default"])?;
+				let name_strindex = self.strings.lookup(&name.mandatory("name")?);
+				let description_strindex = self.strings.lookup(&description.mandatory("description")?);
+				let is_default = is_default.map(parse_mame_bool).transpose()?.unwrap_or(false);
+
+				if is_default {
+					let machine = self.machines.last_mut().unwrap();
+					machine.default_biosset_index = machine.biossets_end - machine.biossets_start;
+				}
+
+				let biosset = binary::BiosSet {
+					name_strindex,
+					description_strindex,
+				};
+				self.biossets.push_db(biosset)?;
+				self.machines.last_mut().unwrap().biossets_end += 1;
+				None
+			}
 			(Phase::Machine, b"chip") => {
 				let [chip_type, tag, name, clock] = evt.find_attributes([b"type", b"tag", b"name", b"clock"])?;
 				let Ok(chip_type) = chip_type.mandatory("type")?.as_ref().parse::<ChipType>() else {
@@ -551,6 +577,7 @@ impl State {
 			sizes_hash: calculate_sizes_hash(),
 			build_strindex: self.build_strindex,
 			machine_count: machines.len_db(),
+			biosset_count: self.biossets.len_db(),
 			chips_count: self.chips.len_db(),
 			config_count: self.configs.len_db(),
 			config_setting_count: self.config_settings.len_db(),
@@ -569,6 +596,7 @@ impl State {
 			.as_bytes()
 			.iter()
 			.chain(machines.iter().flat_map(IntoBytes::as_bytes))
+			.chain(self.biossets.iter().flat_map(IntoBytes::as_bytes))
 			.chain(self.chips.iter().flat_map(IntoBytes::as_bytes))
 			.chain(self.configs.iter().flat_map(IntoBytes::as_bytes))
 			.chain(self.config_settings.iter().flat_map(IntoBytes::as_bytes))
@@ -790,6 +818,7 @@ pub fn calculate_sizes_hash() -> U64 {
 	[
 		size_of::<binary::Header>(),
 		size_of::<binary::Machine>(),
+		size_of::<binary::BiosSet>(),
 		size_of::<binary::Chip>(),
 		size_of::<binary::Configuration>(),
 		size_of::<binary::ConfigurationSetting>(),
