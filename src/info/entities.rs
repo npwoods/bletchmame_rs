@@ -15,6 +15,7 @@ use crate::info::binary;
 
 pub type Machine<'a> = Object<'a, binary::Machine>;
 pub type MachinesView<'a> = SimpleView<'a, binary::Machine>;
+pub type BiosSet<'a> = Object<'a, binary::BiosSet>;
 pub type Chip<'a> = Object<'a, binary::Chip>;
 pub type Configuration<'a> = Object<'a, binary::Configuration>;
 pub type ConfigurationSetting<'a> = Object<'a, binary::ConfigurationSetting>;
@@ -60,6 +61,16 @@ impl<'a> Machine<'a> {
 
 	pub fn runnable(&self) -> bool {
 		self.obj().runnable
+	}
+
+	pub fn biossets(&self) -> impl View<'a, BiosSet<'a>> + use<'a> {
+		let range = self.obj().biossets_start.into()..self.obj().biossets_end.into();
+		self.db.biossets().sub_view(range)
+	}
+
+	pub fn default_biosset_index(&self) -> Option<usize> {
+		let default_biosset_index = self.obj().default_biosset_index.into();
+		(default_biosset_index < self.biossets().len()).then_some(default_biosset_index)
 	}
 
 	pub fn chips(&self) -> impl View<'a, Chip<'a>> + use<'a> {
@@ -113,6 +124,16 @@ impl<'a> MachinesView<'a> {
 
 	pub fn find(&self, target: &str) -> Result<Machine<'a>> {
 		self.find_index(target).map(|index| self.get(index).unwrap())
+	}
+}
+
+impl<'a> BiosSet<'a> {
+	pub fn name(&self) -> &'a str {
+		self.string(|x| x.name_strindex)
+	}
+
+	pub fn description(&self) -> &'a str {
+		self.string(|x| x.description_strindex)
 	}
 }
 

@@ -47,6 +47,7 @@ use crate::version::MameVersion;
 pub use self::binary::ChipType;
 pub use self::binary::ConditionRelation;
 pub use self::binary::SoftwareListStatus;
+pub use self::entities::BiosSet;
 pub use self::entities::Chip;
 pub use self::entities::Configuration;
 pub use self::entities::ConfigurationSetting;
@@ -79,6 +80,7 @@ enum ThisError {
 pub struct InfoDb {
 	data: Box<[u8]>,
 	machines: RootView<binary::Machine>,
+	biossets: RootView<binary::BiosSet>,
 	chips: RootView<binary::Chip>,
 	configs: RootView<binary::Configuration>,
 	config_settings: RootView<binary::ConfigurationSetting>,
@@ -106,6 +108,7 @@ impl InfoDb {
 		// now walk the views
 		let mut cursor = size_of::<binary::Header>()..data.len();
 		let machines = next_root_view(&mut cursor, hdr.machine_count)?;
+		let biossets = next_root_view(&mut cursor, hdr.biosset_count)?;
 		let chips = next_root_view(&mut cursor, hdr.chips_count)?;
 		let configs = next_root_view(&mut cursor, hdr.config_count)?;
 		let config_settings = next_root_view(&mut cursor, hdr.config_setting_count)?;
@@ -126,6 +129,7 @@ impl InfoDb {
 		let result = Self {
 			data,
 			machines,
+			biossets,
 			chips,
 			configs,
 			config_settings,
@@ -248,6 +252,10 @@ impl InfoDb {
 
 	pub fn machines(&self) -> MachinesView<'_> {
 		self.make_view(&self.machines)
+	}
+
+	pub fn biossets(&self) -> impl View<'_, BiosSet<'_>> {
+		self.make_view(&self.biossets)
 	}
 
 	pub fn chips(&self) -> impl View<'_, Chip<'_>> {
@@ -787,6 +795,29 @@ mod test {
 			let other_machine = db.machines().find(machine.name()).unwrap();
 			assert_eq!(other_machine.name(), machine.name());
 		}
+	}
+
+	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco_scii", 1, &[("cdos", "Disto C-DOS v4.0 for the CoCo 1/2"), ("cdos3", "Disto C-DOS 3 v1.2 for the CoCo 3")])]
+	pub fn biossets(
+		_index: usize,
+		xml: &str,
+		machine: &str,
+		expected_default_biosset_index: usize,
+		expected: &[(&str, &str)],
+	) {
+		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
+		let machine = db.machines().find(machine).unwrap();
+		let actual_default_biosset_index = machine.default_biosset_index();
+		let actual = machine
+			.biossets()
+			.iter()
+			.map(|b| (b.name(), b.description()))
+			.collect::<Vec<_>>();
+
+		assert_eq!(
+			(Some(expected_default_biosset_index), expected),
+			(actual_default_biosset_index, actual.as_slice())
+		);
 	}
 
 	#[test_case(0, include_str!("test_data/listxml_alienar.xml"), "alienar", &[(ChipType::Cpu, "maincpu"), (ChipType::Cpu, "soundcpu"), (ChipType::Audio, "speaker"), (ChipType::Audio, "dac")])]
