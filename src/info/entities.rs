@@ -69,8 +69,14 @@ impl<'a> Machine<'a> {
 	}
 
 	pub fn default_biosset_index(&self) -> Option<usize> {
-		let default_biosset_index = self.obj().default_biosset_index.into();
-		(default_biosset_index < self.biossets().len()).then_some(default_biosset_index)
+		(!self.biossets().is_empty()).then(|| {
+			let default_biosset_index = self.obj().default_biosset_index.into();
+			if default_biosset_index < self.biossets().len() {
+				default_biosset_index
+			} else {
+				0
+			}
+		})
 	}
 
 	pub fn chips(&self) -> impl View<'a, Chip<'a>> + use<'a> {
@@ -101,6 +107,10 @@ impl<'a> Machine<'a> {
 	pub fn ram_options(&self) -> impl View<'a, RamOption<'a>> + use<'a> {
 		let range = self.obj().ram_options_start.into()..self.obj().ram_options_end.into();
 		self.db.ram_options().sub_view(range)
+	}
+
+	pub fn default_ram_option_index(&self) -> Option<usize> {
+		self.ram_options().iter().position(|x| x.is_default())
 	}
 }
 

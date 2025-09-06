@@ -33,6 +33,14 @@ impl MameCommand {
 			Either::Right([].into_iter())
 		};
 
+		// BIOS
+		let bios_args_iter = if let Some(bios) = start_args.bios.as_deref() {
+			let args = [Cow::Borrowed("-bios"), bios.to_string().into()];
+			Either::Left(args.into_iter())
+		} else {
+			Either::Right([].into_iter())
+		};
+
 		// slots
 		let slot_args_iter = start_args
 			.slots
@@ -48,6 +56,7 @@ impl MameCommand {
 		// and assemble everything
 		let args = once(Cow::Borrowed(start_args.machine_name.as_str()))
 			.chain(ram_size_args_iter)
+			.chain(bios_args_iter)
 			.chain(slot_args_iter)
 			.chain(image_args_iter);
 		build("START", args)
@@ -332,6 +341,7 @@ mod test {
 			let start_args = MameStartArgs {
 				machine_name,
 				ram_size,
+				bios: None,
 				slots: [].into(),
 				images,
 			};

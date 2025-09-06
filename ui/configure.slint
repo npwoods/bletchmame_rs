@@ -18,6 +18,8 @@ export component ConfigureDialog inherits Window {
     in property <string> dev-images-error;
     in property <[string]> ram-sizes-model;
     in-out property <int> ram-sizes-index;
+    in property <[string]> bios-selection-model;
+    in-out property <int> bios-selection-index;
     in property <[SoftwareMachine]> software-machines;
     in property <bool> software-machines-bulk-all-enabled;
     in property <bool> software-machines-bulk-none-enabled;
@@ -40,63 +42,81 @@ export component ConfigureDialog inherits Window {
 
     // control hierarchy
     VerticalBox {
-        TabWidget {
-            visible: root.software-machines.length == 0;
-            Tab {
-                title: "Devices";
-                GridBox {
-                    preferred-width: 100%;
-                    preferred-height: 100%;
-                    dev-images-list := DevicesAndImagesList {
-                        visible: root.dev-images-error == "";
-                        state: root.dev-images-state;
-                        images-button-enabled: true;
-                        entry-option-changed(index, option-name) => {
-                            root.entry-option-changed(index, option-name);
+        GridLayout {
+            TabWidget {
+                row: 0;
+                col: 0;
+                visible: root.software-machines.length == 0;
+                Tab {
+                    title: "Devices";
+                    GridBox {
+                        dev-images-list := DevicesAndImagesList {
+                            visible: root.dev-images-error == "";
+                            state: root.dev-images-state;
+                            images-button-enabled: true;
+                            entry-option-changed(index, option-name) => {
+                                root.entry-option-changed(index, option-name);
+                            }
+                            entry-button-clicked(index, point) => {
+                                root.entry-button-clicked(index, point);
+                            }
+                            menu-item-command(command) => {
+                                root.menu-item-command(command);
+                            }
                         }
-                        entry-button-clicked(index, point) => {
-                            root.entry-button-clicked(index, point);
-                        }
-                        menu-item-command(command) => {
-                            root.menu-item-command(command);
-                        }
-                    }
 
-                    Text {
-                        visible: root.dev-images-error != "";
-                        text: root.dev-images-error;
-                    }
-                }
-            }
-
-            Tab {
-                title: "RAM Sizes";
-                VerticalBox {
-                    alignment: start;
-                    GridLayout {
                         Text {
-                            row: 0;
-                            col: 0;
-                            vertical-alignment: center;
-                            text: "RAM Size:";
+                            visible: root.dev-images-error != "";
+                            text: root.dev-images-error;
                         }
+                    }
+                }
 
-                        ComboBox {
-                            row: 0;
-                            col: 1;
-                            model: root.ram-sizes-model;
-                            enabled: root.ram-sizes-model.length >= 2;
-                            current-index <=> ram-sizes-index;
+                Tab {
+                    title: "General";
+                    VerticalBox {
+                        alignment: start;
+                        GridLayout {
+                            Text {
+                                row: 0;
+                                col: 0;
+                                vertical-alignment: center;
+                                text: "RAM Size:";
+                            }
+
+                            ComboBox {
+                                row: 0;
+                                col: 1;
+                                model: root.ram-sizes-model;
+                                enabled: root.ram-sizes-model.length >= 2;
+                                current-index <=> ram-sizes-index;
+                            }
+
+                            Text {
+                                row: 1;
+                                col: 0;
+                                vertical-alignment: center;
+                                text: "BIOS Selection:";
+                            }
+
+                            ComboBox {
+                                row: 1;
+                                col: 1;
+                                model: root.bios-selection-model;
+                                enabled: root.bios-selection-model.length >= 2;
+                                current-index <=> bios-selection-index;
+                            }
                         }
                     }
                 }
             }
-        }
 
-        if root.software-machines.length > 0: TabWidget {
-            Tab {
-                title: "Preferred Machines";
-                VerticalBox {
+            TabWidget {
+                row: 0;
+                col: 0;
+                visible: root.software-machines.length > 0;
+                Tab {
+                    title: "Preferred Machines";
                     ListView {
                         preferred-height: 100%;
                         vertical-stretch: 1;
@@ -114,28 +134,10 @@ export component ConfigureDialog inherits Window {
                             }
                         }
                     }
-
-                    HorizontalBox {
-                        vertical-stretch: 0;
-                        Button {
-                            text: "Select All";
-                            enabled: root.software-machines-bulk-all-enabled;
-                            clicked => {
-                                root.software-machines-bulk-all-clicked();
-                            }
-                        }
-
-                        Button {
-                            text: "Select None";
-                            enabled: root.software-machines-bulk-none-enabled;
-                            clicked => {
-                                root.software-machines-bulk-none-clicked();
-                            }
-                        }
-                    }
                 }
             }
         }
+
         HorizontalBox {
             alignment: end;
             if root.software-machines.length == 0: StandardButton {
@@ -143,6 +145,20 @@ export component ConfigureDialog inherits Window {
                 kind: reset;
                 clicked => {
                     root.reset-clicked();
+                }
+            }
+            if root.software-machines.length > 0: Button {
+                text: "Select All";
+                enabled: root.software-machines-bulk-all-enabled;
+                clicked => {
+                    root.software-machines-bulk-all-clicked();
+                }
+            }
+            if root.software-machines.length > 0: Button {
+                text: "Select None";
+                enabled: root.software-machines-bulk-none-enabled;
+                clicked => {
+                    root.software-machines-bulk-none-clicked();
                 }
             }
             StandardButton {
