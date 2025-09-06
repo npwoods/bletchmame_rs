@@ -168,24 +168,7 @@ impl AppState {
 
 		if let Some(info_db) = info_db {
 			let preflight_problems = self.paths.preflight();
-			let session = preflight_problems.is_empty().then(|| {
-				let (job, command_sender) = spawn_mame_session_thread(
-					self.paths.as_ref(),
-					&self.fixed.mame_windowing,
-					self.fixed.mame_stderr,
-					self.fixed.console.clone(),
-					self.fixed.callback.clone(),
-				);
-				let command_sender = Some(Arc::new(command_sender));
-				Session {
-					job,
-					command_sender,
-					status: None,
-					pending_status: None,
-					pending_paths_update: None,
-					pending_restart: false,
-				}
-			});
+			let session = preflight_problems.is_empty().then(|| self.start_session());
 
 			let failure = session
 				.is_none()
@@ -199,6 +182,25 @@ impl AppState {
 		} else {
 			// we don't have InfoDb; force a rebuild
 			self.infodb_rebuild()
+		}
+	}
+
+	fn start_session(&self) -> Session {
+		let (job, command_sender) = spawn_mame_session_thread(
+			self.paths.as_ref(),
+			&self.fixed.mame_windowing,
+			self.fixed.mame_stderr,
+			self.fixed.console.clone(),
+			self.fixed.callback.clone(),
+		);
+		let command_sender = Some(Arc::new(command_sender));
+		Session {
+			job,
+			command_sender,
+			status: None,
+			pending_status: None,
+			pending_paths_update: None,
+			pending_restart: false,
 		}
 	}
 
@@ -350,8 +352,9 @@ impl AppState {
 					};
 					(Some(new_session), failure)
 				} else {
-					// no session, no problem!
-					(None, None)
+					// no session; create a new one
+					let session = self.start_session();
+					(Some(session), None)
 				};
 				let new_live = Live {
 					info_db: Rc::new(info_db),
