@@ -527,34 +527,43 @@ export component AppWindow inherits Window {
     }
     collection-context-menu := ContextMenuArea {
         Menu {
-            if collection-context-menu-info.move-up-command != "": MenuItem {
+            MenuItem {
                 title: @tr("CollectionContextMenu" => "Move Up");
+                enabled: collection-context-menu-info.move-up-command != "";
                 activated => {
                     menu-item-command(collection-context-menu-info.move-up-command);
                 }
             }
-            if collection-context-menu-info.move-down-command != "": MenuItem {
+
+            MenuItem {
                 title: @tr("CollectionContextMenu" => "Move Down");
+                enabled: collection-context-menu-info.move-down-command != "";
                 activated => {
                     menu-item-command(collection-context-menu-info.move-down-command);
                 }
             }
-            if collection-context-menu-info.delete-command != "": MenuItem {
+
+            MenuItem {
                 title: @tr("CollectionContextMenu" => "Delete");
+                enabled: collection-context-menu-info.delete-command != "";
                 activated => {
                     menu-item-command(collection-context-menu-info.delete-command);
                 }
             }
-            if collection-context-menu-info.rename-command != "": MenuItem {
+
+            MenuItem {
                 title: @tr("CollectionContextMenu" => "Rename");
+                enabled: collection-context-menu-info.rename-command != "";
                 activated => {
                     menu-item-command(collection-context-menu-info.rename-command);
                 }
             }
+
             MenuSeparator { }
 
-            if collection-context-menu-info.new-collection-command != "": MenuItem {
+            MenuItem {
                 title: @tr("CollectionContextMenu" => "New Collection");
+                enabled: collection-context-menu-info.new-collection-command != "";
                 activated => {
                     menu-item-command(collection-context-menu-info.new-collection-command);
                 }
@@ -564,8 +573,9 @@ export component AppWindow inherits Window {
 
     item-context-menu := ContextMenuArea {
         Menu {
-            if !item-context-menu-info.run-desc.command.is-empty: MenuItem {
+            if !item-context-menu-info.run-desc.title.is-empty: MenuItem {
                 title: item-context-menu-info.run-desc.title;
+                enabled: !item-context-menu-info.run-desc.command.is-empty;
                 activated => {
                     menu-item-command(item-context-menu-info.run-desc.command);
                 }
@@ -579,20 +589,24 @@ export component AppWindow inherits Window {
                     }
                 }
             }
-            if !item-context-menu-info.configure-command.is-empty: MenuItem {
+            MenuItem {
                 title: @tr("ItemContextMenu" => "Configure...");
+                enabled: !item-context-menu-info.configure-command.is-empty;
                 activated => {
                     menu-item-command(item-context-menu-info.configure-command);
                 }
             }
+
             MenuSeparator { }
 
-            if !item-context-menu-info.browse-command.is-empty: MenuItem {
+            MenuItem {
                 title: @tr("ItemContextMenu" => "Browse Software");
+                enabled: !item-context-menu-info.browse-command.is-empty;
                 activated => {
                     menu-item-command(item-context-menu-info.browse-command);
                 }
             }
+
             if item-context-menu-info.add-to-existing-folder-descs.length > 0 || !item-context-menu-info.new-folder-command.is-empty: Menu {
                 title: @tr("ItemContextMenu" => "Add To Folder");
                 for desc in item-context-menu-info.add-to-existing-folder-descs: MenuItem {
@@ -610,8 +624,9 @@ export component AppWindow inherits Window {
                     }
                 }
             }
-            if !item-context-menu-info.remove-from-folder-desc.command.is-empty: MenuItem {
+            if !item-context-menu-info.remove-from-folder-desc.title.is-empty: MenuItem {
                 title: item-context-menu-info.remove-from-folder-desc.title;
+                enabled: !item-context-menu-info.remove-from-folder-desc.command.is-empty;
                 activated => {
                     menu-item-command(item-context-menu-info.remove-from-folder-desc.command);
                 }
