@@ -69,8 +69,14 @@ impl<'a> Machine<'a> {
 	}
 
 	pub fn default_biosset_index(&self) -> Option<usize> {
-		let default_biosset_index = self.obj().default_biosset_index.into();
-		(default_biosset_index < self.biossets().len()).then_some(default_biosset_index)
+		(!self.biossets().is_empty()).then(|| {
+			let default_biosset_index = self.obj().default_biosset_index.into();
+			if default_biosset_index < self.biossets().len() {
+				default_biosset_index
+			} else {
+				0
+			}
+		})
 	}
 
 	pub fn chips(&self) -> impl View<'a, Chip<'a>> + use<'a> {

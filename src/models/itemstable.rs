@@ -193,6 +193,7 @@ impl ItemsTableModel {
 								machine_config,
 								images: Default::default(),
 								ram_size: None,
+								bios: None,
 							}
 						})
 						.collect::<Rc<[_]>>(),
@@ -254,10 +255,12 @@ impl ItemsTableModel {
 								.ok()?;
 								let images = item.images.clone();
 								let ram_size = item.ram_size;
+								let bios = item.bios.clone();
 								let item = Item::Machine {
 									machine_config,
 									images,
 									ram_size,
+									bios,
 								};
 								Some(item)
 							}
@@ -330,11 +333,13 @@ impl ItemsTableModel {
 				machine_config,
 				images,
 				ram_size,
+				bios,
 			} => {
 				let machine = machine_config.machine();
 				assert!(machine.runnable());
 				let machine_name = machine.name().into();
 				let ram_size = *ram_size;
+				let bios = bios.clone();
 
 				let slots = machine_config
 					.changed_slots(None)
@@ -351,6 +356,7 @@ impl ItemsTableModel {
 				let start_args = MameStartArgs {
 					machine_name,
 					ram_size,
+					bios,
 					slots,
 					images,
 				};
@@ -394,6 +400,7 @@ impl ItemsTableModel {
 							let start_args = MameStartArgs {
 								machine_name: machine.name().into(),
 								ram_size: None,
+								bios: None,
 								slots: [].into(),
 								images,
 							};
@@ -616,6 +623,7 @@ enum Item {
 		machine_config: MachineConfig,
 		images: HashMap<String, ImageDesc>,
 		ram_size: Option<u64>,
+		bios: Option<String>,
 	},
 	Software {
 		software_list: Arc<SoftwareList>,
@@ -635,16 +643,19 @@ fn make_prefs_item(_info_db: &InfoDb, item: &Item) -> PrefsItem {
 			machine_config,
 			images,
 			ram_size,
+			bios,
 		} => {
 			let machine_name = machine_config.machine().name().to_string();
 			let slots = machine_config.changed_slots(None);
 			let images = images.clone();
 			let ram_size = *ram_size;
+			let bios = bios.clone();
 			let item = PrefsMachineItem {
 				machine_name,
 				slots,
 				images,
 				ram_size,
+				bios,
 			};
 			PrefsItem::Machine(item)
 		}

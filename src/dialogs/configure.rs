@@ -51,6 +51,7 @@ enum CoreState {
 	Machine {
 		dimodel_state: DiModelState,
 		ram_size: Option<u64>,
+		bios: Option<String>,
 	},
 	Software {
 		info_db: Rc<InfoDb>,
@@ -149,6 +150,22 @@ pub async fn dialog_configure(
 			tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 			let current_index = current_index.try_into().unwrap();
 			dialog_weak.unwrap().set_ram_sizes_index(current_index);
+		};
+		spawn_local(fut).unwrap();
+	}
+
+	// BIOS options
+	if let Some((bios_option_texts, current_index)) = state.bios_options() {
+		let bios_option_texts = VecModel::from(bios_option_texts);
+		let bios_option_texts = ModelRc::new(bios_option_texts);
+		modal.dialog().set_bios_selection_model(bios_option_texts);
+
+		// workaround for https://github.com/slint-ui/slint/issues/7632; please remove hack when fixed
+		let dialog_weak = modal.dialog().as_weak();
+		let fut = async move {
+			tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+			let current_index = current_index.try_into().unwrap();
+			dialog_weak.unwrap().set_bios_selection_index(current_index);
 		};
 		spawn_local(fut).unwrap();
 	}
@@ -274,6 +291,7 @@ impl State {
 				let machine_config =
 					MachineConfig::from_machine_index_and_slots(info_db.clone(), machine_index, &item.slots);
 				let ram_size = item.ram_size;
+				let bios = item.bios.clone();
 				let dimodel_state = match machine_config {
 					Ok(machine_config) => {
 						let diconfig = DevicesImagesConfig::from(machine_config);
@@ -291,6 +309,7 @@ impl State {
 				CoreState::Machine {
 					dimodel_state,
 					ram_size,
+					bios,
 				}
 			}
 			PrefsItem::Software(item) => {
@@ -365,15 +384,12 @@ impl State {
 				let default_index = machine
 					.default_ram_option_index()
 					.expect("expected a default RAM option");
-				let default_text = ram_size_display_text(ram_options.get(default_index).unwrap().size(), true);
+				let default_text = ram_size_display_text(ram_options.get(default_index).unwrap().size());
+				let default_text = default_text_string(&default_text);
 
 				// build the text for the RAM options
 				let ram_option_texts = once(SharedString::from(default_text))
-					.chain(
-						ram_options
-							.iter()
-							.map(|opt| ram_size_display_text(opt.size(), false).into()),
-					)
+					.chain(ram_options.iter().map(|opt| ram_size_display_text(opt.size()).into()))
 					.collect::<Vec<_>>();
 
 				// current RAM size option
@@ -383,6 +399,40 @@ impl State {
 					.unwrap_or_default();
 
 				(ram_option_texts, current_index)
+			})
+		})
+	}
+
+	pub fn bios_options(&self) -> Option<(Vec<SharedString>, usize)> {
+		let CoreState::Machine {
+			dimodel_state, bios, ..
+		} = &self.core
+		else {
+			return None;
+		};
+		dimodel_state.with_machine(|machine| {
+			let machine = machine.unwrap();
+			let biossets = machine.biossets();
+			(!biossets.is_empty()).then(|| {
+				// figure out the default BIOS
+				let default_index = machine
+					.default_biosset_index()
+					.expect("expected a default BIOS set index");
+				let default_text = default_text_string(biossets.get(default_index).unwrap().description());
+
+				// build the text for the BIOS options
+				let bios_option_texts = once(SharedString::from(default_text))
+					.chain(biossets.iter().map(|opt| opt.description().into()))
+					.collect::<Vec<_>>();
+
+				// current BIOS option
+				let current_index = bios
+					.as_deref()
+					.and_then(|bios| biossets.iter().position(|x| x.name() == bios))
+					.map(|idx| idx + 1)
+					.unwrap_or_default();
+
+				(bios_option_texts, current_index)
 			})
 		})
 	}
@@ -451,11 +501,16 @@ impl State {
 				let ram_size = usize::try_from(ram_sizes_index - 1)
 					.ok()
 					.map(|index| machine.ram_options().get(index).unwrap().size());
+				let bios_index = dialog.get_bios_selection_index();
+				let bios = usize::try_from(bios_index - 1)
+					.ok()
+					.map(|index| machine.biossets().get(index).unwrap().name().into());
 				let item = PrefsMachineItem {
 					machine_name,
 					slots,
 					images,
 					ram_size,
+					bios,
 				};
 				PrefsItem::Machine(item)
 			}),
@@ -650,12 +705,12 @@ fn configure_dialog_title(description: &str, name: Option<&str>) -> String {
 	}
 }
 
-fn ram_size_display_text(ram_size: u64, is_default: bool) -> String {
+fn ram_size_display_text(ram_size: u64) -> String {
 	let ram_size = byte_unit::Byte::from_u64(ram_size);
 	let (n, unit) = ram_size.get_exact_unit(true);
-	if is_default {
-		format!("Default ({n} {unit})")
-	} else {
-		format!("{n} {unit}")
-	}
+	format!("{n} {unit}")
+}
+
+fn default_text_string(s: &str) -> String {
+	format!("Default ({s})")
 }

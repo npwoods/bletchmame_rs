@@ -18,6 +18,8 @@ export component ConfigureDialog inherits Window {
     in property <string> dev-images-error;
     in property <[string]> ram-sizes-model;
     in-out property <int> ram-sizes-index;
+    in property <[string]> bios-selection-model;
+    in-out property <int> bios-selection-index;
     in property <[SoftwareMachine]> software-machines;
     in property <bool> software-machines-bulk-all-enabled;
     in property <bool> software-machines-bulk-none-enabled;
@@ -71,7 +73,7 @@ export component ConfigureDialog inherits Window {
                 }
 
                 Tab {
-                    title: "RAM Sizes";
+                    title: "General";
                     VerticalBox {
                         alignment: start;
                         GridLayout {
@@ -88,6 +90,21 @@ export component ConfigureDialog inherits Window {
                                 model: root.ram-sizes-model;
                                 enabled: root.ram-sizes-model.length >= 2;
                                 current-index <=> ram-sizes-index;
+                            }
+
+                            Text {
+                                row: 1;
+                                col: 0;
+                                vertical-alignment: center;
+                                text: "BIOS Selection:";
+                            }
+
+                            ComboBox {
+                                row: 1;
+                                col: 1;
+                                model: root.bios-selection-model;
+                                enabled: root.bios-selection-model.length >= 2;
+                                current-index <=> bios-selection-index;
                             }
                         }
                     }
