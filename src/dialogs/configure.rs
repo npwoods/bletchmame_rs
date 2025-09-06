@@ -27,6 +27,7 @@ use crate::dialogs::socket::dialog_connect_to_socket;
 use crate::guiutils::modal::ModalStack;
 use crate::imagedesc::ImageDesc;
 use crate::info::InfoDb;
+use crate::info::Machine;
 use crate::info::View;
 use crate::mconfig::MachineConfig;
 use crate::models::devimages::DevicesAndImagesModel;
@@ -48,21 +49,26 @@ struct State {
 
 enum CoreState {
 	Machine {
-		dimodel: ModelRc<DeviceAndImageEntry>,
-		images: RefCell<HashMap<String, ImageDesc>>,
+		dimodel_state: DiModelState,
 		ram_size: Option<u64>,
-	},
-	MachineError {
-		info_db: Rc<InfoDb>,
-		machine_index: usize,
-		ram_size: Option<u64>,
-		error: Error,
 	},
 	Software {
 		info_db: Rc<InfoDb>,
 		software_list: String,
 		software: String,
 		software_machines: ModelRc<SoftwareMachine>,
+	},
+}
+
+enum DiModelState {
+	Ok {
+		dimodel: ModelRc<DeviceAndImageEntry>,
+		images: RefCell<HashMap<String, ImageDesc>>,
+	},
+	Error {
+		error: Error,
+		info_db: Rc<InfoDb>,
+		machine_index: usize,
 	},
 }
 
@@ -85,121 +91,91 @@ pub async fn dialog_configure(
 	// set the title
 	modal.dialog().set_dialog_title(state.title(paths).into());
 
-	// do different things based on the state
-	let ram_info = match &state.core {
-		CoreState::Machine { dimodel, ram_size, .. } => {
-			// set up the devices and images model
-			let none_string = DevicesAndImagesModel::get_model(dimodel).none_string.clone();
-			let distate = DevicesAndImagesState {
-				entries: dimodel.clone(),
-				none_string,
-			};
-			modal.dialog().set_dev_images_state(distate);
+	// do we have a devices and images model?
+	if let Some(dimodel) = state.dimodel() {
+		// if so we have lots to set up
+		let none_string = DevicesAndImagesModel::get_model(dimodel).none_string.clone();
+		let distate = DevicesAndImagesState {
+			entries: dimodel.clone(),
+			none_string,
+		};
+		modal.dialog().set_dev_images_state(distate);
 
-			// set up callback for when an entry option changed
-			let state_clone = state.clone();
-			modal
-				.dialog()
-				.on_entry_option_changed(move |entry_index, new_option_name| {
-					let entry_index = entry_index.try_into().unwrap();
-					let new_option_name = (!new_option_name.is_empty()).then_some(new_option_name.as_str());
-					state_clone.set_slot_entry_option(entry_index, new_option_name);
-				});
-
-			// set up callback for when an image button is pressed
-			let state_clone = state.clone();
-			modal.dialog().on_entry_button_clicked(move |entry_index, point| {
-				let dialog = state_clone.dialog_weak.unwrap();
-				let CoreState::Machine { dimodel, .. } = &state_clone.core else {
-					unreachable!()
-				};
-				let model = DevicesAndImagesModel::get_model(dimodel);
+		// set up callback for when an entry option changed
+		let state_clone = state.clone();
+		modal
+			.dialog()
+			.on_entry_option_changed(move |entry_index, new_option_name| {
 				let entry_index = entry_index.try_into().unwrap();
-				entry_popup_menu(model, entry_index, point, |entries, point| {
-					dialog.invoke_show_context_menu(entries, point)
-				})
+				let new_option_name = (!new_option_name.is_empty()).then_some(new_option_name.as_str());
+				state_clone.set_slot_entry_option(entry_index, new_option_name);
 			});
 
-			// set up the context menu command handler
-			let state_clone = state.clone();
-			modal.dialog().on_menu_item_command(move |command_string| {
-				if let Some(command) = AppCommand::decode_from_slint(command_string) {
-					context_menu_command(&state_clone, command);
-				}
-			});
-
-			// RAM info
-			let machine_index = state.with_diconfig(|diconfig| diconfig.machine().unwrap().index());
-			Some((machine_index, *ram_size))
-		}
-
-		CoreState::MachineError {
-			error,
-			machine_index,
-			ram_size,
-			..
-		} => {
-			let text = error.to_string().into();
-			modal.dialog().set_dev_images_error(text);
-
-			// RAM info
-			Some((*machine_index, *ram_size))
-		}
-
-		CoreState::Software { software_machines, .. } => {
-			modal.dialog().set_software_machines(software_machines.clone());
-			state.update_software_machines_bulk_enabled();
-
-			let state_clone = state.clone();
-			modal.dialog().on_software_machines_toggle_checked(move |index| {
-				state_clone.toggle_software_machines_checked(index.try_into().unwrap())
-			});
-			let state_clone = state.clone();
-			modal
-				.dialog()
-				.on_software_machines_bulk_none_clicked(move || state_clone.set_software_machines_bulk_checked(false));
-			let state_clone = state.clone();
-			modal
-				.dialog()
-				.on_software_machines_bulk_all_clicked(move || state_clone.set_software_machines_bulk_checked(true));
-
-			None
-		}
-	};
-
-	// set up RAM size options
-	if let Some((machine_index, ram_size)) = ram_info {
-		let ram_options = info_db.machines().get(machine_index).unwrap().ram_options();
-		if !ram_options.is_empty() {
-			let default_index = ram_options
-				.iter()
-				.position(|x| x.is_default())
-				.expect("expected a default RAM option");
-			let default_text = format!(
-				"Default ({})",
-				ram_size_display_text(ram_options.get(default_index).unwrap().size())
-			);
-			let ram_option_texts = once(SharedString::from(default_text))
-				.chain(ram_options.iter().map(|opt| ram_size_display_text(opt.size()).into()))
-				.collect::<Vec<_>>();
-			let ram_option_texts = VecModel::from(ram_option_texts);
-			let ram_option_texts = ModelRc::new(ram_option_texts);
-			modal.dialog().set_ram_sizes_model(ram_option_texts);
-
-			// current RAM size option
-			let index = ram_size
-				.and_then(|ram_size| ram_options.iter().position(|x| x.size() == ram_size))
-				.map(|idx| idx + 1)
-				.unwrap_or_default();
-
-			// workaround for https://github.com/slint-ui/slint/issues/7632; please remove hack when fixed
-			let dialog_weak = modal.dialog().as_weak();
-			let fut = async move {
-				tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-				dialog_weak.unwrap().set_ram_sizes_index(index.try_into().unwrap());
+		// set up callback for when an image button is pressed
+		let state_clone = state.clone();
+		modal.dialog().on_entry_button_clicked(move |entry_index, point| {
+			let dialog = state_clone.dialog_weak.unwrap();
+			let CoreState::Machine { dimodel_state, .. } = &state_clone.core else {
+				unreachable!()
 			};
-			spawn_local(fut).unwrap();
-		}
+			let DiModelState::Ok { dimodel, .. } = dimodel_state else {
+				unreachable!()
+			};
+			let model = DevicesAndImagesModel::get_model(dimodel);
+			let entry_index = entry_index.try_into().unwrap();
+			entry_popup_menu(model, entry_index, point, |entries, point| {
+				dialog.invoke_show_context_menu(entries, point)
+			})
+		});
+
+		// set up the context menu command handler
+		let state_clone = state.clone();
+		modal.dialog().on_menu_item_command(move |command_string| {
+			if let Some(command) = AppCommand::decode_from_slint(command_string) {
+				context_menu_command(&state_clone, command);
+			}
+		});
+	}
+
+	// RAM options
+	if let Some((ram_option_texts, current_index)) = state.ram_options() {
+		let ram_option_texts = VecModel::from(ram_option_texts);
+		let ram_option_texts = ModelRc::new(ram_option_texts);
+		modal.dialog().set_ram_sizes_model(ram_option_texts);
+
+		// workaround for https://github.com/slint-ui/slint/issues/7632; please remove hack when fixed
+		let dialog_weak = modal.dialog().as_weak();
+		let fut = async move {
+			tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+			let current_index = current_index.try_into().unwrap();
+			dialog_weak.unwrap().set_ram_sizes_index(current_index);
+		};
+		spawn_local(fut).unwrap();
+	}
+
+	// loading error?
+	if let Some(error) = state.error() {
+		let text = error.to_string().into();
+		modal.dialog().set_dev_images_error(text);
+	}
+
+	// software machines?
+	if let Some(software_machines) = state.software_machines() {
+		modal.dialog().set_software_machines(software_machines.clone());
+		state.update_software_machines_bulk_enabled();
+
+		let state_clone = state.clone();
+		modal.dialog().on_software_machines_toggle_checked(move |index| {
+			state_clone.toggle_software_machines_checked(index.try_into().unwrap())
+		});
+		let state_clone = state.clone();
+		modal
+			.dialog()
+			.on_software_machines_bulk_none_clicked(move || state_clone.set_software_machines_bulk_checked(false));
+		let state_clone = state.clone();
+		modal
+			.dialog()
+			.on_software_machines_bulk_all_clicked(move || state_clone.set_software_machines_bulk_checked(true));
 	}
 
 	// set up the close handler
@@ -231,12 +207,6 @@ pub async fn dialog_configure(
 
 	// present the modal dialog
 	modal.run(async { rx.recv().await.unwrap() }).await
-}
-
-fn ram_size_display_text(ram_size: u64) -> String {
-	let ram_size = byte_unit::Byte::from_u64(ram_size);
-	let (n, unit) = ram_size.get_exact_unit(true);
-	format!("{n} {unit}")
 }
 
 fn context_menu_command(state: &Rc<State>, command: AppCommand) {
@@ -304,24 +274,23 @@ impl State {
 				let machine_config =
 					MachineConfig::from_machine_index_and_slots(info_db.clone(), machine_index, &item.slots);
 				let ram_size = item.ram_size;
-				match machine_config {
+				let dimodel_state = match machine_config {
 					Ok(machine_config) => {
 						let diconfig = DevicesImagesConfig::from(machine_config);
 						let dimodel = DevicesAndImagesModel::new(diconfig);
 						let dimodel: ModelRc<DeviceAndImageEntry> = ModelRc::new(dimodel);
 						let images = RefCell::new(item.images);
-						CoreState::Machine {
-							dimodel,
-							images,
-							ram_size,
-						}
+						DiModelState::Ok { dimodel, images }
 					}
-					Err(error) => CoreState::MachineError {
+					Err(error) => DiModelState::Error {
 						info_db: info_db.clone(),
 						machine_index,
-						ram_size,
 						error,
 					},
+				};
+				CoreState::Machine {
+					dimodel_state,
+					ram_size,
 				}
 			}
 			PrefsItem::Software(item) => {
@@ -367,8 +336,83 @@ impl State {
 		state
 	}
 
+	pub fn dimodel(&self) -> Option<&'_ ModelRc<DeviceAndImageEntry>> {
+		if let CoreState::Machine {
+			dimodel_state: DiModelState::Ok { dimodel, .. },
+			..
+		} = &self.core
+		{
+			Some(dimodel)
+		} else {
+			None
+		}
+	}
+
+	pub fn ram_options(&self) -> Option<(Vec<SharedString>, usize)> {
+		let CoreState::Machine {
+			dimodel_state,
+			ram_size,
+			..
+		} = &self.core
+		else {
+			return None;
+		};
+		dimodel_state.with_machine(|machine| {
+			let machine = machine.unwrap();
+			let ram_options = machine.ram_options();
+			(!ram_options.is_empty()).then(|| {
+				// figure out the default RAM option
+				let default_index = machine
+					.default_ram_option_index()
+					.expect("expected a default RAM option");
+				let default_text = ram_size_display_text(ram_options.get(default_index).unwrap().size(), true);
+
+				// build the text for the RAM options
+				let ram_option_texts = once(SharedString::from(default_text))
+					.chain(
+						ram_options
+							.iter()
+							.map(|opt| ram_size_display_text(opt.size(), false).into()),
+					)
+					.collect::<Vec<_>>();
+
+				// current RAM size option
+				let current_index = ram_size
+					.and_then(|ram_size| ram_options.iter().position(|x| x.size() == ram_size))
+					.map(|idx| idx + 1)
+					.unwrap_or_default();
+
+				(ram_option_texts, current_index)
+			})
+		})
+	}
+
+	pub fn error(&self) -> Option<&Error> {
+		if let CoreState::Machine {
+			dimodel_state: DiModelState::Error { error, .. },
+			..
+		} = &self.core
+		{
+			Some(error)
+		} else {
+			None
+		}
+	}
+
+	pub fn software_machines(&self) -> Option<&ModelRc<SoftwareMachine>> {
+		if let CoreState::Software { software_machines, .. } = &self.core {
+			Some(software_machines)
+		} else {
+			None
+		}
+	}
+
 	pub fn with_diconfig<R>(&self, callback: impl FnOnce(&DevicesImagesConfig) -> R) -> R {
-		let CoreState::Machine { dimodel, .. } = &self.core else {
+		let CoreState::Machine {
+			dimodel_state: DiModelState::Ok { dimodel, .. },
+			..
+		} = &self.core
+		else {
 			unreachable!()
 		};
 		let dimodel = DevicesAndImagesModel::get_model(dimodel);
@@ -376,7 +420,11 @@ impl State {
 	}
 
 	pub fn update_images(&self) {
-		let CoreState::Machine { dimodel, images, .. } = &self.core else {
+		let CoreState::Machine {
+			dimodel_state: DiModelState::Ok { dimodel, images },
+			..
+		} = &self.core
+		else {
 			unreachable!()
 		};
 		let dimodel = DevicesAndImagesModel::get_model(dimodel);
@@ -411,8 +459,6 @@ impl State {
 				};
 				PrefsItem::Machine(item)
 			}),
-
-			CoreState::MachineError { .. } => todo!(),
 
 			CoreState::Software {
 				info_db,
@@ -450,7 +496,11 @@ impl State {
 	}
 
 	pub fn set_slot_entry_option(&self, entry_index: usize, new_option_name: Option<&str>) {
-		let CoreState::Machine { dimodel, .. } = &self.core else {
+		let CoreState::Machine {
+			dimodel_state: DiModelState::Ok { dimodel, .. },
+			..
+		} = &self.core
+		else {
 			unreachable!()
 		};
 		let dimodel = DevicesAndImagesModel::get_model(dimodel);
@@ -459,7 +509,11 @@ impl State {
 	}
 
 	pub fn set_image_imagedesc(&self, tag: String, image_desc: Option<ImageDesc>) {
-		let CoreState::Machine { images, .. } = &self.core else {
+		let CoreState::Machine {
+			dimodel_state: DiModelState::Ok { images, .. },
+			..
+		} = &self.core
+		else {
 			unreachable!()
 		};
 		if let Some(image_desc) = image_desc {
@@ -530,53 +584,60 @@ impl State {
 		dialog.set_ram_sizes_index(0);
 
 		match &self.core {
-			CoreState::Machine { dimodel, .. } => {
-				let dimodel = DevicesAndImagesModel::get_model(dimodel);
-				dimodel.change_diconfig(|diconfig| Some(diconfig.reset_to_defaults()));
+			CoreState::Machine { dimodel_state, .. } => {
+				if let DiModelState::Ok { dimodel, .. } = dimodel_state {
+					let dimodel = DevicesAndImagesModel::get_model(dimodel);
+					dimodel.change_diconfig(|diconfig| Some(diconfig.reset_to_defaults()));
+				}
 			}
-			CoreState::MachineError { .. } => {}
 			CoreState::Software { .. } => todo!(),
 		}
 	}
 
 	pub fn title(&self, paths: &PrefsPaths) -> String {
-		if let CoreState::Software {
-			info_db,
-			software_list,
-			software,
-			..
-		} = &self.core
-		{
-			let mut dispenser = SoftwareListDispenser::new(info_db, &paths.software_lists);
+		match &self.core {
+			CoreState::Machine { dimodel_state, .. } => dimodel_state.with_machine(|machine| {
+				let machine = machine.unwrap();
+				configure_dialog_title(machine.description(), Some(machine.name()))
+			}),
 
-			let software_entry = dispenser.get(software_list).ok().and_then(|(_, x)| {
-				x.software
-					.iter()
-					.flat_map(|x| (x.name == software).then(|| x.clone()))
-					.next()
-			});
-			if let Some(software_entry) = software_entry.as_deref() {
-				configure_dialog_title(software_entry.description.as_ref(), Some(software_entry.name.as_ref()))
-			} else {
-				configure_dialog_title(software.as_str(), None)
-			}
-		} else {
-			let (info_db, machine_index) = match &self.core {
-				CoreState::Machine { dimodel, .. } => {
-					DevicesAndImagesModel::get_model(dimodel).with_diconfig(|diconfig| {
-						(
-							diconfig.machine_config().unwrap().info_db.clone(),
-							diconfig.machine().unwrap().index(),
-						)
-					})
+			CoreState::Software {
+				info_db,
+				software_list,
+				software,
+				..
+			} => {
+				let mut dispenser = SoftwareListDispenser::new(info_db, &paths.software_lists);
+
+				let software_entry = dispenser.get(software_list).ok().and_then(|(_, x)| {
+					x.software
+						.iter()
+						.flat_map(|x| (x.name == software).then(|| x.clone()))
+						.next()
+				});
+				if let Some(software_entry) = software_entry.as_deref() {
+					configure_dialog_title(software_entry.description.as_ref(), Some(software_entry.name.as_ref()))
+				} else {
+					configure_dialog_title(software.as_str(), None)
 				}
-				CoreState::MachineError {
-					info_db, machine_index, ..
-				} => (info_db.clone(), *machine_index),
-				CoreState::Software { .. } => unreachable!(),
-			};
-			let machine = info_db.machines().get(machine_index).unwrap();
-			configure_dialog_title(machine.description(), Some(machine.name()))
+			}
+		}
+	}
+}
+
+impl DiModelState {
+	pub fn with_machine<R>(&self, callback: impl FnOnce(Option<Machine<'_>>) -> R) -> R {
+		match self {
+			Self::Ok { dimodel, .. } => {
+				let dimodel = DevicesAndImagesModel::get_model(dimodel);
+				dimodel.with_diconfig(|diconfig| callback(diconfig.machine()))
+			}
+			Self::Error {
+				info_db, machine_index, ..
+			} => {
+				let machine = info_db.machines().get(*machine_index).unwrap();
+				callback(Some(machine))
+			}
 		}
 	}
 }
@@ -586,5 +647,15 @@ fn configure_dialog_title(description: &str, name: Option<&str>) -> String {
 		format!("Configure {description} ({name})")
 	} else {
 		format!("Configure {description}")
+	}
+}
+
+fn ram_size_display_text(ram_size: u64, is_default: bool) -> String {
+	let ram_size = byte_unit::Byte::from_u64(ram_size);
+	let (n, unit) = ram_size.get_exact_unit(true);
+	if is_default {
+		format!("Default ({n} {unit})")
+	} else {
+		format!("{n} {unit}")
 	}
 }

@@ -102,6 +102,10 @@ impl<'a> Machine<'a> {
 		let range = self.obj().ram_options_start.into()..self.obj().ram_options_end.into();
 		self.db.ram_options().sub_view(range)
 	}
+
+	pub fn default_ram_option_index(&self) -> Option<usize> {
+		self.ram_options().iter().position(|x| x.is_default())
+	}
 }
 
 impl<'a> MachinesView<'a> {
