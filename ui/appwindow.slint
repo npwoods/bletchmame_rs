@@ -11,8 +11,8 @@ struct CollectionContextMenuInfo {
     new-collection-command: string}
 
 struct ItemContextMenuInfo {
-    run-desc: {command: string, title: string},
-    run-subdescs: [{command: string, title: string}],
+    run-title: string,
+    run-descs: [SimpleMenuEntry],
     configure-command: string,
     browse-command: string,
     add-to-existing-folder-descs: [{command: string, title: string}],
@@ -573,16 +573,15 @@ export component AppWindow inherits Window {
 
     item-context-menu := ContextMenuArea {
         Menu {
-            if !item-context-menu-info.run-desc.title.is-empty: MenuItem {
-                title: item-context-menu-info.run-desc.title;
-                enabled: !item-context-menu-info.run-desc.command.is-empty;
+            if item-context-menu-info.run-descs.length == 1: MenuItem {
+                title: item-context-menu-info.run-title;
                 activated => {
-                    menu-item-command(item-context-menu-info.run-desc.command);
+                    menu-item-command(item-context-menu-info.run-descs[0].command);
                 }
             }
-            if item-context-menu-info.run-subdescs.length > 0: Menu {
-                title: item-context-menu-info.run-desc.title;
-                for subdesc in item-context-menu-info.run-subdescs: MenuItem {
+            if item-context-menu-info.run-descs.length > 1: Menu {
+                title: item-context-menu-info.run-title;
+                for subdesc in item-context-menu-info.run-descs: MenuItem {
                     title: subdesc.title;
                     activated => {
                         menu-item-command(subdesc.command);
