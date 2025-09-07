@@ -5,9 +5,9 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::str::FromStr;
 use std::time::Instant;
 
-use muda::accelerator::Accelerator;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
 use slint::LogicalSize;
@@ -31,7 +31,8 @@ use crate::appcommand::AppCommand;
 use crate::appstate::AppState;
 use crate::backend::BackendRuntime;
 use crate::backend::ChildWindow;
-use crate::backend::WindowExt as WindowExt_1;
+use crate::backend::WindowExt as _;
+use crate::backend::WinitAccelerator;
 use crate::channel::Channel;
 use crate::collections::add_items_to_existing_folder_collection;
 use crate::collections::add_items_to_new_folder_collection;
@@ -63,7 +64,6 @@ use crate::dialogs::seqpoll::dialog_seq_poll;
 use crate::dialogs::socket::dialog_connect_to_socket;
 use crate::dialogs::switches::dialog_switches;
 use crate::guiutils::is_context_menu_event;
-use crate::guiutils::menuing::accel;
 use crate::guiutils::modal::ModalStack;
 use crate::history::History;
 use crate::models::collectionsview::CollectionsViewModel;
@@ -398,10 +398,11 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		("F11", AppCommand::OptionsToggleFullScreen),
 		("ScrLk", AppCommand::OptionsToggleMenuBar),
 	];
-	let accelerator_command_map = HashMap::<Accelerator, AppCommand>::from_iter(
-		accelerator_command_map
-			.into_iter()
-			.filter_map(|(accelerator, command)| accel(accelerator).map(|accelerator| (accelerator, command))),
+	let accelerator_command_map = HashMap::<WinitAccelerator, AppCommand>::from_iter(
+		accelerator_command_map.into_iter().map(|(accelerator, command)| {
+			let accelerator = WinitAccelerator::from_str(accelerator).unwrap();
+			(accelerator, command)
+		}),
 	);
 	let model_clone = model.clone();
 	model

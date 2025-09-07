@@ -8,7 +8,6 @@ use std::rc::Rc;
 use anyhow::Result;
 use easy_ext::ext;
 use i_slint_backend_winit::WinitWindowAccessor;
-use muda::accelerator::Accelerator;
 use slint::PhysicalPosition;
 use slint::PhysicalSize;
 use slint::Window;
@@ -20,6 +19,8 @@ use crate::backend::winit::SlintWindowExt;
 use crate::backend::winit::WinitBackendRuntime;
 use crate::backend::winit::WinitChildWindow;
 use crate::backend::winit::WinitWindowExt;
+
+pub use crate::backend::winit::WinitAccelerator;
 
 #[cfg(feature = "slint-qt-backend")]
 use crate::backend::qt::QtBackendRuntime;
@@ -99,7 +100,11 @@ impl BackendRuntime {
 		Ok(child_window)
 	}
 
-	pub fn install_muda_accelerator_handler(&self, window: &Window, callback: impl Fn(&Accelerator) -> bool + 'static) {
+	pub fn install_muda_accelerator_handler(
+		&self,
+		window: &Window,
+		callback: impl Fn(&WinitAccelerator) -> bool + 'static,
+	) {
 		match self {
 			Self::Winit(backend) => backend.install_muda_accelerator_handler(window, callback),
 
