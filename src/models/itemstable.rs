@@ -44,6 +44,7 @@ use crate::software::Software;
 use crate::software::SoftwareList;
 use crate::software::SoftwareListDispenser;
 use crate::ui::ItemContextMenuInfo;
+use crate::ui::SimpleMenuEntry;
 
 pub struct ItemsTableModel {
 	info_db: RefCell<Option<Rc<InfoDb>>>,
@@ -328,7 +329,7 @@ impl ItemsTableModel {
 		let items = vec![make_prefs_item(info_db, item)];
 
 		// get the critical information - the description and where (if anyplace) "Browse" would go to
-		let (run, browse_target, can_configure) = match item {
+		let (run_title, run_descs, browse_target, can_configure) = match item {
 			Item::Machine {
 				machine_config,
 				images,
@@ -361,21 +362,24 @@ impl ItemsTableModel {
 					images,
 				};
 				let command = has_mame_initialized.then_some(AppCommand::Start(start_args));
-				let title = run_item_text(machine.description()).into();
+				let run_title = run_item_text(machine.description()).into();
+				let run_descs = vec![MenuDesc {
+					title: "".into(),
+					command,
+				}];
 				let browse_target =
 					(!machine.machine_software_lists().is_empty()).then(|| PrefsCollection::MachineSoftware {
 						machine_name: machine.name().to_string(),
 					});
 
-				let run_info = RunInfo::Single(MenuDesc { command, title });
-				(run_info, browse_target, true)
+				(run_title, run_descs, browse_target, true)
 			}
 			Item::Software {
 				software,
 				machine_indexes,
 				..
 			} => {
-				let sub_items = machine_indexes
+				let run_descs = machine_indexes
 					.iter()
 					.filter_map(|&index| {
 						// get the machine out of the InfoDB
@@ -410,14 +414,13 @@ impl ItemsTableModel {
 						})
 					})
 					.collect::<Vec<_>>();
-				let title = run_item_text(&software.description).into();
-				let run_info = RunInfo::Multi(title, sub_items);
-				(run_info, None, true)
+				let run_title = run_item_text(&software.description).into();
+				(run_title, run_descs, None, true)
 			}
 			Item::Unrecognized { error, .. } => {
-				let title = error.to_string().into();
-				let run_info = RunInfo::Single(MenuDesc { command: None, title });
-				(run_info, None, false)
+				let run_title = error.to_string().into();
+				let run_descs = Vec::new();
+				(run_title, run_descs, None, false)
 			}
 		};
 
@@ -460,7 +463,8 @@ impl ItemsTableModel {
 
 		// and return!
 		let result = LocalItemContextMenuInfo {
-			run,
+			run_title,
+			run_descs,
 			configure_command,
 			browse_command,
 			add_to_existing_folder_descs,
@@ -828,17 +832,13 @@ fn run_item_text(text: &str) -> String {
 
 /// Rust friendly equivalent of ItemContextMenuInfo
 struct LocalItemContextMenuInfo {
-	run: RunInfo,
+	run_title: SharedString,
+	run_descs: Vec<MenuDesc>,
 	configure_command: Option<AppCommand>,
 	browse_command: Option<AppCommand>,
 	add_to_existing_folder_descs: Vec<MenuDesc>,
 	new_folder_command: AppCommand,
 	remove_from_folder_desc: Option<MenuDesc>,
-}
-
-enum RunInfo {
-	Single(MenuDesc),
-	Multi(SharedString, Vec<MenuDesc>),
 }
 
 struct MenuDesc {
@@ -848,27 +848,22 @@ struct MenuDesc {
 
 impl From<LocalItemContextMenuInfo> for ItemContextMenuInfo {
 	fn from(value: LocalItemContextMenuInfo) -> Self {
-		let (run_command, run_title, run_subdescs) = match value.run {
-			RunInfo::Single(menu_desc) => (
-				menu_desc
+		let run_title = value.run_title;
+		let run_descs = value
+			.run_descs
+			.into_iter()
+			.map(|desc| {
+				let command = desc
 					.command
 					.as_ref()
 					.map(AppCommand::encode_for_slint)
-					.unwrap_or_default(),
-				menu_desc.title,
-				Default::default(),
-			),
-			RunInfo::Multi(title, menu_descs) => {
-				let menu_descs = menu_descs
-					.into_iter()
-					.map(MenuDesc::encode_for_slint)
-					.collect::<Vec<_>>();
-				let menu_descs = VecModel::from(menu_descs);
-				let menu_descs = ModelRc::new(menu_descs);
-				(Default::default(), title, menu_descs)
-			}
-		};
-		let run_desc = (run_command, run_title);
+					.unwrap_or_default();
+				let title = desc.title;
+				SimpleMenuEntry { command, title }
+			})
+			.collect::<Vec<_>>();
+		let run_descs = VecModel::from(run_descs);
+		let run_descs = ModelRc::new(run_descs);
 		let configure_command = value
 			.configure_command
 			.as_ref()
@@ -892,8 +887,8 @@ impl From<LocalItemContextMenuInfo> for ItemContextMenuInfo {
 			.map(MenuDesc::encode_for_slint)
 			.unwrap_or_default();
 		Self {
-			run_desc,
-			run_subdescs,
+			run_title,
+			run_descs,
 			configure_command,
 			browse_command,
 			add_to_existing_folder_descs,
