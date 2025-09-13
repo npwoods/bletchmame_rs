@@ -1,16 +1,105 @@
-import { AboutSlint, Button, VerticalBox, HorizontalBox, ComboBox, StandardListView, StandardButton } from "std-widgets.slint";
-import { MagicListView, MagicListViewItem } from "@vivi/magic.slint";
+import { AboutSlint, Button, VerticalBox, HorizontalBox, ComboBox, StandardListView, StandardButton, ListView, LineEdit, Palette } from "std-widgets.slint";
+
+struct PathsListViewItem {
+    text: string,
+    is-error: bool,
+}
+
+component PathsListView {
+    // properties
+    in property <[PathsListViewItem]> model;
+    in-out property <int> current-entry-index: -1;
+    in-out property <bool> editing;
+    in property <string> empty-text: "<          >";
+    property <int> to-focus-index: -1;
+
+    // callbacks
+    callback selected-index-changed();
+
+    // functions
+    public function begin-editing() {
+        if (current-entry-index >= 0) {
+            editing = true;
+            to-focus-index = current-entry-index;
+        }
+    }
+
+    // controls
+    ListView {
+        for item[idx] in model: entry-rectangle := Rectangle {
+            TouchArea {
+                HorizontalBox {
+                    alignment: start;
+                    Text {
+                        text: item.text != "" ? item.text : empty-text;
+                        color: item.is-error ? #FF0000 : idx == current-entry-index ? Palette.selection-foreground : Palette.foreground;
+                    }
+                }
+
+                visible: current-entry-index != idx || !editing;
+                clicked => {
+                    if (current-entry-index != idx) {
+                        current-entry-index = idx;
+                        editing = false;
+                        selected-index-changed();
+                    }
+                }
+                double-clicked => {
+                    editing = true;
+                    line-edit.focus();
+                    line-edit.select-all();
+                }
+            }
+
+            line-edit := LineEdit {
+                text: item.text;
+                horizontal-stretch: 1;
+                width: 100%;
+                visible: current-entry-index == idx && editing;
+                accepted(text) => {
+                    item.text = text;
+                    editing = false;
+                }
+
+                // crude focus trick
+                property <bool> should-get-focus: to-focus-index == idx;
+                changed should-get-focus => {
+                    if (should-get-focus) {
+                        self.focus();
+                        to-focus-index = -1;
+                    }
+                }
+
+                // the ESC key should break out
+                key-pressed(event) => {
+                    if (event.text == Key.Escape) {
+                        // Abort editing: reset to original text and remove focus
+                        self.text = item.text;
+                        self.clear-focus();
+                        editing = false;
+                        return EventResult.accept;
+                    }
+                    return EventResult.reject;
+                }
+            }
+
+            background: idx == current-entry-index ? Palette.selection-background : Colors.transparent;
+        }
+    }
+}
 
 export component PathsDialog inherits Window {
     title: "Paths";
     icon: @image-url("bletchmame.png");
+
+    // properties
     in property <[string]> path-labels;
-    in property <[MagicListViewItem]> path-entries;
+    in property <[PathsListViewItem]> path-entries;
     in property <bool> ok-enabled;
-    in property <bool> browse-enabled;
-    in property <bool> delete-enabled;
     in-out property <int> path-label-index;
-    out property <int> path-entry-index <=> entries-view.current-index;
+    out property <int> path-entry-index <=> entries-view.current-entry-index;
+
+    // callbacks
     callback ok-clicked();
     callback cancel-clicked();
     callback browse-clicked();
@@ -18,6 +107,13 @@ export component PathsDialog inherits Window {
     callback delete-clicked();
     callback path-label-index-changed();
     callback path-entries-index-changed();
+
+    // functions
+    public function begin-editing() {
+        entries-view.begin-editing();
+    }
+
+    // controls
     HorizontalBox {
         VerticalBox {
             preferred-width: 300px;
@@ -38,9 +134,9 @@ export component PathsDialog inherits Window {
                 text: "Paths:";
             }
 
-            entries-view := MagicListView {
+            entries-view := PathsListView {
                 model: path-entries;
-                selected => {
+                selected-index-changed => {
                     path-entries-index-changed();
                 }
             }
@@ -67,7 +163,7 @@ export component PathsDialog inherits Window {
 
             Button {
                 text: "Browse";
-                enabled: browse-enabled;
+                enabled: entries-view.current-entry-index >= 0;
                 clicked => {
                     root.browse-clicked();
                 }
@@ -75,7 +171,7 @@ export component PathsDialog inherits Window {
 
             Button {
                 text: "Insert";
-                enabled: false;
+                enabled: entries-view.current-entry-index >= 0 && entries-view.current-entry-index < path-entries.length - 1 && path-entries[path-entries.length - 1].text == "";
                 clicked => {
                     root.insert-clicked();
                 }
@@ -83,7 +179,7 @@ export component PathsDialog inherits Window {
 
             Button {
                 text: "Delete";
-                enabled: delete-enabled;
+                enabled: entries-view.current-entry-index >= 0 && path-entries[entries-view.current-entry-index].text != "";
                 clicked => {
                     root.delete-clicked();
                 }
