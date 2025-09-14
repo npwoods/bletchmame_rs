@@ -16,7 +16,7 @@ use crate::info::InfoDb;
 use crate::prefs::PrefsCollection;
 use crate::ui::AppWindow;
 use crate::ui::CollectionContextMenuInfo;
-use crate::ui::MagicListViewItem;
+use crate::ui::NavigationItem;
 
 pub struct CollectionsViewModel {
 	app_window_weak: Weak<AppWindow>,
@@ -98,7 +98,7 @@ impl CollectionsViewModel {
 }
 
 impl Model for CollectionsViewModel {
-	type Data = MagicListViewItem;
+	type Data = NavigationItem;
 
 	fn row_count(&self) -> usize {
 		invoke_after_refresh_callback(&self.after_refresh_callback);
@@ -113,12 +113,12 @@ impl Model for CollectionsViewModel {
 		let info_db = self.info_db.borrow();
 		let info_db = info_db.as_ref()?.as_ref();
 		self.get(row).map(|item| {
-			let prefix_icon = item.icon().slint_icon(&self.app_window_weak.unwrap());
+			let icon = item.icon().slint_icon(&self.app_window_weak.unwrap());
 			let text = item.description(info_db).as_ref().into();
-			MagicListViewItem {
-				prefix_icon,
+			NavigationItem {
+				icon,
 				text,
-				supporting_text: Default::default(),
+				..Default::default()
 			}
 		})
 	}
