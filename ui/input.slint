@@ -4,7 +4,7 @@ import { SimpleMenuEntry } from "common.slint";
 export struct InputDialogEntry {
     name: string,
     text: string,
-    primary-command: string}
+    primary-action: string}
 
 export component InputDialog inherits Window {
     title: dialog-title;
@@ -15,12 +15,12 @@ export component InputDialog inherits Window {
     // properties
     in property <string> dialog-title;
     in property <[InputDialogEntry]> entries;
-    in property <string> restore-defaults-command;
+    in property <string> restore-defaults-action;
 
     // callbacks
     callback ok-clicked();
     callback context-button-clicked(int, Point);
-    callback menu-item-command(string);
+    callback menu-item-action(string);
 
     // context menu
     in-out property <[SimpleMenuEntry]> context-menu-entries-1;
@@ -36,17 +36,17 @@ export component InputDialog inherits Window {
         Menu {
             for entry in context-menu-entries-1: MenuItem {
                 title: entry.title;
-                enabled: entry.command != "";
+                enabled: entry.action != "";
                 activated => {
-                    root.menu-item-command(entry.command);
+                    root.menu-item-action(entry.action);
                 }
             }
             if context-menu-entries-1.length > 0: MenuSeparator { }
             for entry in context-menu-entries-2: MenuItem {
                 title: entry.title;
-                enabled: entry.command != "";
+                enabled: entry.action != "";
                 activated => {
-                    root.menu-item-command(entry.command);
+                    root.menu-item-action(entry.action);
                 }
             }
         }
@@ -64,9 +64,9 @@ export component InputDialog inherits Window {
                     Button {
                         width: 300px;
                         text: entry.name;
-                        enabled: entry.primary-command != "";
+                        enabled: entry.primary-action != "";
                         clicked => {
-                            root.menu-item-command(entry.primary-command);
+                            root.menu-item-action(entry.primary-action);
                         }
                     }
 
@@ -95,9 +95,9 @@ export component InputDialog inherits Window {
             Button {
                 text: @tr("Restore Defaults");
                 horizontal-stretch: 0;
-                enabled: !root.restore-defaults-command.is-empty;
+                enabled: !root.restore-defaults-action.is-empty;
                 clicked => {
-                    menu-item-command(root.restore-defaults-command);
+                    menu-item-action(root.restore-defaults-action);
                 }
             }
 

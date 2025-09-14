@@ -20,7 +20,7 @@ use crate::status::InputClass;
 use crate::status::Update;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, EnumProperty, IntoStaticStr)]
-pub enum AppCommand {
+pub enum Action {
 	// File menu
 	FileStop,
 	FilePause,
@@ -131,7 +131,7 @@ pub enum AppCommand {
 
 const MENU_PREFIX: &str = "MENU_";
 
-impl AppCommand {
+impl Action {
 	pub fn encode_for_slint(&self) -> SharedString {
 		format!("{}{}", MENU_PREFIX, serde_json::to_string(self).unwrap()).into()
 	}
@@ -152,7 +152,7 @@ impl AppCommand {
 	}
 }
 
-impl From<MameCommand> for AppCommand {
+impl From<MameCommand> for Action {
 	fn from(value: MameCommand) -> Self {
 		Self::IssueMameCommand(value)
 	}

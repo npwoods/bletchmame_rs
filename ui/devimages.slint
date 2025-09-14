@@ -13,7 +13,7 @@ export component DevicesAndImagesDialog inherits Window {
     in property <bool> config-dirty;
     callback entry-option-changed(int, string);
     callback entry-button-clicked(int, Point);
-    callback menu-item-command(string);
+    callback menu-item-action(string);
     public function show-context-menu(info: DevicesAndImagesContextMenuInfo, point: Point) {
         dev-images-list.show-context-menu(info, point);
     }
@@ -29,8 +29,8 @@ export component DevicesAndImagesDialog inherits Window {
             entry-button-clicked(index, point) => {
                 root.entry-button-clicked(index, point);
             }
-            menu-item-command(command) => {
-                root.menu-item-command(command);
+            menu-item-action(action) => {
+                root.menu-item-action(action);
             }
         }
 

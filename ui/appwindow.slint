@@ -13,10 +13,10 @@ struct CollectionContextMenuInfo {
 struct ItemContextMenuInfo {
     run-title: string,
     run-descs: [SimpleMenuEntry],
-    configure-command: string,
-    browse-command: string,
+    configure-action: string,
+    browse-action: string,
     add-to-existing-folder-descs: [SimpleMenuEntry],
-    new-folder-command: string,
+    new-folder-action: string,
     remove-from-folder-desc: SimpleMenuEntry,
 }
 
@@ -63,7 +63,7 @@ export component AppWindow inherits Window {
     in property <bool> has-input-class-config;
     in property <bool> has-input-class-dipswitch;
     callback menu-item-activated(string, string);
-    callback menu-item-command(string);
+    callback menu-item-action(string);
     in property <[SimpleMenuEntry]> menu-entries-throttle;
     in property <int> menu-entries-throttle-current-index;
     in property <[SimpleMenuEntry]> menu-entries-frameskip;
@@ -72,39 +72,39 @@ export component AppWindow inherits Window {
     in property <[bool]> menu-entries-builtin-collections-checked;
 
     // menu command strings
-    in property <string> menu-command-file-stop;
-    in property <string> menu-command-file-pause;
-    in property <string> menu-command-file-devices-and-images;
-    in property <string> menu-command-file-quick-load-state;
-    in property <string> menu-command-file-quick-save-state;
-    in property <string> menu-command-file-load-state;
-    in property <string> menu-command-file-save-state;
-    in property <string> menu-command-file-save-screenshot;
-    in property <string> menu-command-file-record-movie;
-    in property <string> menu-command-file-debugger;
-    in property <string> menu-command-file-reset-soft;
-    in property <string> menu-command-file-reset-hard;
-    in property <string> menu-command-file-exit;
-    in property <string> menu-command-options-throttle-speed-increase;
-    in property <string> menu-command-options-throttle-speed-decrease;
-    in property <string> menu-command-options-toggle-warp;
-    in property <string> menu-command-options-toggle-fullscreen;
-    in property <string> menu-command-options-toggle-menubar;
-    in property <string> menu-command-options-toggle-sound;
-    in property <string> menu-command-options-cheats;
-    in property <string> menu-command-options-classic;
-    in property <string> menu-command-options-console;
-    in property <string> menu-command-settings-input-controller;
-    in property <string> menu-command-settings-input-keyboard;
-    in property <string> menu-command-settings-input-misc;
-    in property <string> menu-command-settings-input-config;
-    in property <string> menu-command-settings-input-dipswitch;
-    in property <string> menu-command-settings-paths;
-    in property <string> menu-command-settings-reset;
-    in property <string> menu-command-settings-import-mame-ini;
-    in property <string> menu-command-help-refresh-info-db;
-    in property <string> menu-command-help-website;
-    in property <string> menu-command-help-about;
+    in property <string> menu-action-file-stop;
+    in property <string> menu-action-file-pause;
+    in property <string> menu-action-file-devices-and-images;
+    in property <string> menu-action-file-quick-load-state;
+    in property <string> menu-action-file-quick-save-state;
+    in property <string> menu-action-file-load-state;
+    in property <string> menu-action-file-save-state;
+    in property <string> menu-action-file-save-screenshot;
+    in property <string> menu-action-file-record-movie;
+    in property <string> menu-action-file-debugger;
+    in property <string> menu-action-file-reset-soft;
+    in property <string> menu-action-file-reset-hard;
+    in property <string> menu-action-file-exit;
+    in property <string> menu-action-options-throttle-speed-increase;
+    in property <string> menu-action-options-throttle-speed-decrease;
+    in property <string> menu-action-options-toggle-warp;
+    in property <string> menu-action-options-toggle-fullscreen;
+    in property <string> menu-action-options-toggle-menubar;
+    in property <string> menu-action-options-toggle-sound;
+    in property <string> menu-action-options-cheats;
+    in property <string> menu-action-options-classic;
+    in property <string> menu-action-options-console;
+    in property <string> menu-action-settings-input-controller;
+    in property <string> menu-action-settings-input-keyboard;
+    in property <string> menu-action-settings-input-misc;
+    in property <string> menu-action-settings-input-config;
+    in property <string> menu-action-settings-input-dipswitch;
+    in property <string> menu-action-settings-paths;
+    in property <string> menu-action-settings-reset;
+    in property <string> menu-action-settings-import-mame-ini;
+    in property <string> menu-action-help-refresh-info-db;
+    in property <string> menu-action-help-website;
+    in property <string> menu-action-help-about;
 
     // height of the menubar
     public function menubar-height() -> length {
@@ -188,7 +188,7 @@ export component AppWindow inherits Window {
                 title: @tr("MenuBar" => "Stop");
                 enabled: mode() == "running";
                 activated => {
-                    menu-item-command(root.menu-command-file-stop);
+                    menu-item-action(root.menu-action-file-stop);
                 }
             }
 
@@ -196,7 +196,7 @@ export component AppWindow inherits Window {
                 title: @tr("MenuBar" => "Pause");
                 enabled: mode() == "running";
                 activated => {
-                    menu-item-command(root.menu-command-file-pause);
+                    menu-item-action(root.menu-action-file-pause);
                 }
             }
 
@@ -206,7 +206,7 @@ export component AppWindow inherits Window {
                 title: @tr("MenuBar" => "Devices and Images...");
                 enabled: mode() == "running";
                 activated => {
-                    menu-item-command(root.menu-command-file-devices-and-images);
+                    menu-item-action(root.menu-action-file-devices-and-images);
                 }
             }
 
@@ -215,7 +215,7 @@ export component AppWindow inherits Window {
                 enabled: has-last-save-state;
                 muda-accelerator: "F7";
                 activated => {
-                    menu-item-command(root.menu-command-file-quick-load-state);
+                    menu-item-action(root.menu-action-file-quick-load-state);
                 }
             }
 
@@ -224,7 +224,7 @@ export component AppWindow inherits Window {
                 enabled: has-last-save-state;
                 muda-accelerator: "Shift+F7";
                 activated => {
-                    menu-item-command(root.menu-command-file-quick-save-state);
+                    menu-item-action(root.menu-action-file-quick-save-state);
                 }
             }
 
@@ -233,7 +233,7 @@ export component AppWindow inherits Window {
                 enabled: mode() == "running";
                 muda-accelerator: "Ctrl+F7";
                 activated => {
-                    menu-item-command(root.menu-command-file-load-state);
+                    menu-item-action(root.menu-action-file-load-state);
                 }
             }
 
@@ -242,7 +242,7 @@ export component AppWindow inherits Window {
                 enabled: mode() == "running";
                 muda-accelerator: "Ctrl+Shift+F7";
                 activated => {
-                    menu-item-command(root.menu-command-file-save-state);
+                    menu-item-action(root.menu-action-file-save-state);
                 }
             }
 
@@ -253,7 +253,7 @@ export component AppWindow inherits Window {
                 enabled: mode() == "running";
                 muda-accelerator: "F12";
                 activated => {
-                    menu-item-command(root.menu-command-file-save-screenshot);
+                    menu-item-action(root.menu-action-file-save-screenshot);
                 }
             }
 
@@ -262,7 +262,7 @@ export component AppWindow inherits Window {
                 enabled: can-record-movie;
                 muda-accelerator: "Shift+F12";
                 activated => {
-                    menu-item-command(root.menu-command-file-record-movie);
+                    menu-item-action(root.menu-action-file-record-movie);
                 }
             }
 
@@ -272,7 +272,7 @@ export component AppWindow inherits Window {
                 title: @tr("MenuBar" => "Debugger...");
                 enabled: mode() == "running";
                 activated => {
-                    menu-item-command(root.menu-command-file-debugger);
+                    menu-item-action(root.menu-action-file-debugger);
                 }
             }
 
@@ -282,14 +282,14 @@ export component AppWindow inherits Window {
                 MenuItem {
                     title: @tr("MenuBar" => "Soft Reset");
                     activated => {
-                        menu-item-command(root.menu-command-file-reset-soft);
+                        menu-item-action(root.menu-action-file-reset-soft);
                     }
                 }
 
                 MenuItem {
                     title: @tr("MenuBar" => "Hard Reset");
                     activated => {
-                        menu-item-command(root.menu-command-file-reset-hard);
+                        menu-item-action(root.menu-action-file-reset-hard);
                     }
                 }
             }
@@ -299,7 +299,7 @@ export component AppWindow inherits Window {
                 enabled: true;
                 muda-accelerator: "Ctrl+Shift+KeyX";
                 activated => {
-                    menu-item-command(root.menu-command-file-exit);
+                    menu-item-action(root.menu-action-file-exit);
                 }
             }
         }
@@ -314,7 +314,7 @@ export component AppWindow inherits Window {
                     checkable: true;
                     checked: index == menu-entries-throttle-current-index;
                     activated => {
-                        menu-item-command(entry.command);
+                        menu-item-action(entry.action);
                     }
                 }
                 MenuSeparator { }
@@ -323,7 +323,7 @@ export component AppWindow inherits Window {
                     title: @tr("MenuBar" => "Increase Speed");
                     muda-accelerator: "F9";
                     activated => {
-                        menu-item-command(root.menu-command-options-throttle-speed-increase);
+                        menu-item-action(root.menu-action-options-throttle-speed-increase);
                     }
                 }
 
@@ -331,7 +331,7 @@ export component AppWindow inherits Window {
                     title: @tr("MenuBar" => "Decrease Speed");
                     muda-accelerator: "F8";
                     activated => {
-                        menu-item-command(root.menu-command-options-throttle-speed-decrease);
+                        menu-item-action(root.menu-action-options-throttle-speed-decrease);
                     }
                 }
 
@@ -341,7 +341,7 @@ export component AppWindow inherits Window {
                     checked: !is-throttled;
                     muda-accelerator: "F10";
                     activated => {
-                        menu-item-command(root.menu-command-options-toggle-warp);
+                        menu-item-action(root.menu-action-options-toggle-warp);
                     }
                 }
             }
@@ -354,7 +354,7 @@ export component AppWindow inherits Window {
                     checkable: true;
                     checked: index == menu-entries-frameskip-current-index;
                     activated => {
-                        menu-item-command(entry.command);
+                        menu-item-action(entry.action);
                     }
                 }
             }
@@ -366,7 +366,7 @@ export component AppWindow inherits Window {
                 checked: is-fullscreen;
                 muda-accelerator: "F11";
                 activated => {
-                    menu-item-command(root.menu-command-options-toggle-fullscreen);
+                    menu-item-action(root.menu-action-options-toggle-fullscreen);
                 }
             }
 
@@ -375,7 +375,7 @@ export component AppWindow inherits Window {
                 enabled: mode() == "running";
                 muda-accelerator: "ScrollLock";
                 activated => {
-                    menu-item-command(root.menu-command-options-toggle-menubar);
+                    menu-item-action(root.menu-action-options-toggle-menubar);
                 }
             }
 
@@ -385,7 +385,7 @@ export component AppWindow inherits Window {
                 checkable: true;
                 checked: is-sound-enabled;
                 activated => {
-                    menu-item-command(root.menu-command-options-toggle-sound);
+                    menu-item-action(root.menu-action-options-toggle-sound);
                 }
             }
 
@@ -393,7 +393,7 @@ export component AppWindow inherits Window {
                 title: @tr("MenuBar" => "Cheats...");
                 enabled: has-cheats;
                 activated => {
-                    menu-item-command(root.menu-command-options-cheats);
+                    menu-item-action(root.menu-action-options-cheats);
                 }
             }
 
@@ -403,7 +403,7 @@ export component AppWindow inherits Window {
                 title: @tr("MenuBar" => "Classic MAME Menu");
                 enabled: has-classic-mame-menu;
                 activated => {
-                    menu-item-command(root.menu-command-options-classic);
+                    menu-item-action(root.menu-action-options-classic);
                 }
             }
 
@@ -411,7 +411,7 @@ export component AppWindow inherits Window {
                 title: @tr("MenuBar" => "Console");
                 enabled: true;
                 activated => {
-                    menu-item-command(root.menu-command-options-console);
+                    menu-item-action(root.menu-action-options-console);
                 }
             }
         }
@@ -422,7 +422,7 @@ export component AppWindow inherits Window {
                 title: @tr("MenuBar" => "Joysticks and Controllers...");
                 enabled: has-input-class-controller;
                 activated => {
-                    menu-item-command(root.menu-command-settings-input-controller);
+                    menu-item-action(root.menu-action-settings-input-controller);
                 }
             }
 
@@ -430,7 +430,7 @@ export component AppWindow inherits Window {
                 title: @tr("MenuBar" => "Keyboard...");
                 enabled: has-input-class-keyboard;
                 activated => {
-                    menu-item-command(root.menu-command-settings-input-keyboard);
+                    menu-item-action(root.menu-action-settings-input-keyboard);
                 }
             }
 
@@ -438,7 +438,7 @@ export component AppWindow inherits Window {
                 title: @tr("MenuBar" => "Miscellaneous Input...");
                 enabled: has-input-class-misc;
                 activated => {
-                    menu-item-command(root.menu-command-settings-input-misc);
+                    menu-item-action(root.menu-action-settings-input-misc);
                 }
             }
 
@@ -446,7 +446,7 @@ export component AppWindow inherits Window {
                 title: @tr("MenuBar" => "Configuration...");
                 enabled: has-input-class-config;
                 activated => {
-                    menu-item-command(root.menu-command-settings-input-config);
+                    menu-item-action(root.menu-action-settings-input-config);
                 }
             }
 
@@ -454,7 +454,7 @@ export component AppWindow inherits Window {
                 title: @tr("MenuBar" => "DIP Switches...");
                 enabled: has-input-class-dipswitch;
                 activated => {
-                    menu-item-command(root.menu-command-settings-input-dipswitch);
+                    menu-item-action(root.menu-action-settings-input-dipswitch);
                 }
             }
 
@@ -464,7 +464,7 @@ export component AppWindow inherits Window {
                 title: @tr("MenuBar" => "Paths...");
                 enabled: true;
                 activated => {
-                    menu-item-command(root.menu-command-settings-paths);
+                    menu-item-action(root.menu-action-settings-paths);
                 }
             }
 
@@ -476,7 +476,7 @@ export component AppWindow inherits Window {
                     checkable: true;
                     checked: menu-entries-builtin-collections-checked[index];
                     activated => {
-                        menu-item-command(entry.command);
+                        menu-item-action(entry.action);
                     }
                 }
             }
@@ -485,7 +485,7 @@ export component AppWindow inherits Window {
                 title: @tr("MenuBar" => "Reset Settings To Default");
                 enabled: true;
                 activated => {
-                    menu-item-command(root.menu-command-settings-reset);
+                    menu-item-action(root.menu-action-settings-reset);
                 }
             }
 
@@ -493,7 +493,7 @@ export component AppWindow inherits Window {
                 title: @tr("MenuBar" => "Import MAME INI...");
                 enabled: true;
                 activated => {
-                    menu-item-command(root.menu-command-settings-import-mame-ini);
+                    menu-item-action(root.menu-action-settings-import-mame-ini);
                 }
             }
         }
@@ -504,7 +504,7 @@ export component AppWindow inherits Window {
                 title: @tr("MenuBar" => "Refresh MAME machine info...");
                 enabled: can-refresh-info-db;
                 activated => {
-                    menu-item-command(root.menu-command-help-refresh-info-db);
+                    menu-item-action(root.menu-action-help-refresh-info-db);
                 }
             }
 
@@ -512,7 +512,7 @@ export component AppWindow inherits Window {
                 title: @tr("MenuBar" => "BletchMAME web site...");
                 enabled: true;
                 activated => {
-                    menu-item-command(root.menu-command-help-website);
+                    menu-item-action(root.menu-action-help-website);
                 }
             }
 
@@ -520,7 +520,7 @@ export component AppWindow inherits Window {
                 title: @tr("MenuBar" => "About...");
                 enabled: true;
                 activated => {
-                    menu-item-command(root.menu-command-help-about);
+                    menu-item-action(root.menu-action-help-about);
                 }
             }
         }
@@ -531,7 +531,7 @@ export component AppWindow inherits Window {
                 title: @tr("CollectionContextMenu" => "Move Up");
                 enabled: collection-context-menu-info.move-up-command != "";
                 activated => {
-                    menu-item-command(collection-context-menu-info.move-up-command);
+                    menu-item-action(collection-context-menu-info.move-up-command);
                 }
             }
 
@@ -539,7 +539,7 @@ export component AppWindow inherits Window {
                 title: @tr("CollectionContextMenu" => "Move Down");
                 enabled: collection-context-menu-info.move-down-command != "";
                 activated => {
-                    menu-item-command(collection-context-menu-info.move-down-command);
+                    menu-item-action(collection-context-menu-info.move-down-command);
                 }
             }
 
@@ -547,7 +547,7 @@ export component AppWindow inherits Window {
                 title: @tr("CollectionContextMenu" => "Delete");
                 enabled: collection-context-menu-info.delete-command != "";
                 activated => {
-                    menu-item-command(collection-context-menu-info.delete-command);
+                    menu-item-action(collection-context-menu-info.delete-command);
                 }
             }
 
@@ -555,7 +555,7 @@ export component AppWindow inherits Window {
                 title: @tr("CollectionContextMenu" => "Rename");
                 enabled: collection-context-menu-info.rename-command != "";
                 activated => {
-                    menu-item-command(collection-context-menu-info.rename-command);
+                    menu-item-action(collection-context-menu-info.rename-command);
                 }
             }
 
@@ -565,7 +565,7 @@ export component AppWindow inherits Window {
                 title: @tr("CollectionContextMenu" => "New Collection");
                 enabled: collection-context-menu-info.new-collection-command != "";
                 activated => {
-                    menu-item-command(collection-context-menu-info.new-collection-command);
+                    menu-item-action(collection-context-menu-info.new-collection-command);
                 }
             }
         }
@@ -576,7 +576,7 @@ export component AppWindow inherits Window {
             if item-context-menu-info.run-descs.length == 1: MenuItem {
                 title: item-context-menu-info.run-title;
                 activated => {
-                    menu-item-command(item-context-menu-info.run-descs[0].command);
+                    menu-item-action(item-context-menu-info.run-descs[0].action);
                 }
             }
             if item-context-menu-info.run-descs.length > 1: Menu {
@@ -584,15 +584,15 @@ export component AppWindow inherits Window {
                 for subdesc in item-context-menu-info.run-descs: MenuItem {
                     title: subdesc.title;
                     activated => {
-                        menu-item-command(subdesc.command);
+                        menu-item-action(subdesc.action);
                     }
                 }
             }
             MenuItem {
                 title: @tr("ItemContextMenu" => "Configure...");
-                enabled: !item-context-menu-info.configure-command.is-empty;
+                enabled: !item-context-menu-info.configure-action.is-empty;
                 activated => {
-                    menu-item-command(item-context-menu-info.configure-command);
+                    menu-item-action(item-context-menu-info.configure-action);
                 }
             }
 
@@ -600,34 +600,34 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("ItemContextMenu" => "Browse Software");
-                enabled: !item-context-menu-info.browse-command.is-empty;
+                enabled: !item-context-menu-info.browse-action.is-empty;
                 activated => {
-                    menu-item-command(item-context-menu-info.browse-command);
+                    menu-item-action(item-context-menu-info.browse-action);
                 }
             }
 
-            if item-context-menu-info.add-to-existing-folder-descs.length > 0 || !item-context-menu-info.new-folder-command.is-empty: Menu {
+            if item-context-menu-info.add-to-existing-folder-descs.length > 0 || !item-context-menu-info.new-folder-action.is-empty: Menu {
                 title: @tr("ItemContextMenu" => "Add To Folder");
                 for desc in item-context-menu-info.add-to-existing-folder-descs: MenuItem {
                     title: desc.title;
                     activated => {
-                        menu-item-command(desc.command);
+                        menu-item-action(desc.action);
                     }
                 }
                 MenuSeparator { }
 
-                if !item-context-menu-info.new-folder-command.is-empty: MenuItem {
+                if !item-context-menu-info.new-folder-action.is-empty: MenuItem {
                     title: @tr("ItemContextMenu" => "New Folder...");
                     activated => {
-                        menu-item-command(item-context-menu-info.new-folder-command);
+                        menu-item-action(item-context-menu-info.new-folder-action);
                     }
                 }
             }
             if !item-context-menu-info.remove-from-folder-desc.title.is-empty: MenuItem {
                 title: item-context-menu-info.remove-from-folder-desc.title;
-                enabled: !item-context-menu-info.remove-from-folder-desc.command.is-empty;
+                enabled: !item-context-menu-info.remove-from-folder-desc.action.is-empty;
                 activated => {
-                    menu-item-command(item-context-menu-info.remove-from-folder-desc.command);
+                    menu-item-action(item-context-menu-info.remove-from-folder-desc.action);
                 }
             }
         }

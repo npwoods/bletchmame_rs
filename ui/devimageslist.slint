@@ -26,7 +26,7 @@ export component DevicesAndImagesList {
     // callbacks
     callback entry-option-changed(int, string);
     callback entry-button-clicked(int, Point);
-    callback menu-item-command(string);
+    callback menu-item-action(string);
 
     // context menu
     in-out property <DevicesAndImagesContextMenuInfo> context-menu-info;
@@ -47,7 +47,7 @@ export component DevicesAndImagesList {
                 title: @tr("DevicesAndImages" => "Load Image...");
                 enabled: root.context-menu-info.load-image-command != "";
                 activated => {
-                    menu-item-command(root.context-menu-info.load-image-command);
+                    menu-item-action(root.context-menu-info.load-image-command);
                 }
             }
 
@@ -60,7 +60,7 @@ export component DevicesAndImagesList {
                 title: @tr("DevicesAndImages" => "Connect To Socket...");
                 enabled: root.context-menu-info.connect-to-socket-command != "";
                 activated => {
-                    menu-item-command(root.context-menu-info.connect-to-socket-command);
+                    menu-item-action(root.context-menu-info.connect-to-socket-command);
                 }
             }
 
@@ -68,7 +68,7 @@ export component DevicesAndImagesList {
                 title: @tr("DevicesAndImages" => "Unload");
                 enabled: root.context-menu-info.unload-command != "";
                 activated => {
-                    menu-item-command(root.context-menu-info.unload-command);
+                    menu-item-action(root.context-menu-info.unload-command);
                 }
             }
         }

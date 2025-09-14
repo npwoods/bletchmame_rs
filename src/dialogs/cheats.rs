@@ -17,7 +17,7 @@ use strum::IntoStaticStr;
 use strum::VariantArray;
 use tokio::sync::mpsc;
 
-use crate::appcommand::AppCommand;
+use crate::action::Action;
 use crate::channel::Channel;
 use crate::dialogs::SenderExt;
 use crate::guiutils::modal::ModalStack;
@@ -49,7 +49,7 @@ pub async fn dialog_cheats(
 	modal_stack: ModalStack,
 	cheats: Arc<[Cheat]>,
 	status_update_channel: Channel<Status>,
-	invoke_command: impl Fn(AppCommand) + Clone + 'static,
+	invoke_command: impl Fn(Action) + Clone + 'static,
 ) {
 	// prepare the dialog
 	let modal = modal_stack.modal(|| CheatsDialog::new().unwrap());

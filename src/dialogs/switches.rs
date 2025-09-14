@@ -15,7 +15,7 @@ use slint::VecModel;
 use slint::Weak;
 use tokio::sync::mpsc;
 
-use crate::appcommand::AppCommand;
+use crate::action::Action;
 use crate::channel::Channel;
 use crate::dialogs::SenderExt;
 use crate::guiutils::modal::ModalStack;
@@ -63,7 +63,7 @@ pub async fn dialog_switches(
 	class: InputClass,
 	machine_index: Option<usize>,
 	status_update_channel: Channel<Status>,
-	invoke_command: impl Fn(AppCommand) + Clone + 'static,
+	invoke_command: impl Fn(Action) + Clone + 'static,
 ) {
 	// prepare the dialog
 	let modal = modal_stack.modal(|| SwitchesDialog::new().unwrap());
@@ -87,8 +87,8 @@ pub async fn dialog_switches(
 
 	// set up the invoke command callback
 	let invoke_command_clone = invoke_command.clone();
-	modal.dialog().on_menu_item_command(move |command_string| {
-		if let Some(command) = AppCommand::decode_from_slint(command_string) {
+	modal.dialog().on_menu_item_action(move |command_string| {
+		if let Some(command) = Action::decode_from_slint(command_string) {
 			invoke_command_clone(command)
 		}
 	});
@@ -154,9 +154,9 @@ impl SwitchesDialogModel {
 				state.entries = build_entries(&self.info_db, self.class, machine_index, &state.inputs);
 
 				let command = build_restore_defaults_command(&self.info_db, self.class, machine_index, &state.inputs);
-				self.dialog_weak.unwrap().set_restore_defaults_command(
-					command.as_ref().map(AppCommand::encode_for_slint).unwrap_or_default(),
-				);
+				self.dialog_weak
+					.unwrap()
+					.set_restore_defaults_action(command.as_ref().map(Action::encode_for_slint).unwrap_or_default());
 			}
 			changed
 		};
@@ -165,7 +165,7 @@ impl SwitchesDialogModel {
 		}
 	}
 
-	pub fn set_setting_option_command(&self, setting_index: usize, option_index: usize) -> AppCommand {
+	pub fn set_setting_option_command(&self, setting_index: usize, option_index: usize) -> Action {
 		let state = self.state.borrow();
 		let entry = &state.entries[setting_index];
 		let input = &state.inputs[entry.input_index];
@@ -299,7 +299,7 @@ fn build_restore_defaults_command(
 	class: InputClass,
 	machine_index: Option<usize>,
 	inputs: &[Input],
-) -> Option<AppCommand> {
+) -> Option<Action> {
 	let infodb_configs = info_db.machines().get(machine_index?).unwrap().configurations();
 	let inputs = inputs
 		.iter()

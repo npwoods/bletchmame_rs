@@ -16,7 +16,7 @@ use slint::spawn_local;
 use smol_str::SmolStr;
 use tokio::sync::mpsc;
 
-use crate::appcommand::AppCommand;
+use crate::action::Action;
 use crate::devimageconfig::DevicesImagesConfig;
 use crate::devimageconfig::EntryDetails;
 use crate::dialogs::SenderExt;
@@ -131,8 +131,8 @@ pub async fn dialog_configure(
 
 		// set up the context menu command handler
 		let state_clone = state.clone();
-		modal.dialog().on_menu_item_command(move |command_string| {
-			if let Some(command) = AppCommand::decode_from_slint(command_string) {
+		modal.dialog().on_menu_item_action(move |command_string| {
+			if let Some(command) = Action::decode_from_slint(command_string) {
 				context_menu_command(&state_clone, command);
 			}
 		});
@@ -226,10 +226,10 @@ pub async fn dialog_configure(
 	modal.run(async { rx.recv().await.unwrap() }).await
 }
 
-fn context_menu_command(state: &Rc<State>, command: AppCommand) {
+fn context_menu_command(state: &Rc<State>, command: Action) {
 	// this dialog interprets commands differently than core BletchMAME
 	match command {
-		AppCommand::LoadImageDialog { tag } => {
+		Action::LoadImageDialog { tag } => {
 			let (_image_desc, extensions) = state.with_diconfig(|config| {
 				let image_desc = (0..config.entry_count())
 					.filter_map(|index| {
@@ -260,7 +260,7 @@ fn context_menu_command(state: &Rc<State>, command: AppCommand) {
 			};
 			spawn_local(fut).unwrap();
 		}
-		AppCommand::ConnectToSocketDialog { tag } => {
+		Action::ConnectToSocketDialog { tag } => {
 			let state = state.clone();
 			let fut = async move {
 				if let Some(image_desc) = dialog_connect_to_socket(state.modal_stack.clone()).await {
@@ -270,7 +270,7 @@ fn context_menu_command(state: &Rc<State>, command: AppCommand) {
 			};
 			spawn_local(fut).unwrap();
 		}
-		AppCommand::UnloadImage { tag } => {
+		Action::UnloadImage { tag } => {
 			state.set_image_imagedesc(tag, None);
 		}
 		_ => unreachable!(),

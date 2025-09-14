@@ -11,7 +11,7 @@ use smol_str::SmolStr;
 use tokio::sync::mpsc;
 use tracing::info;
 
-use crate::appcommand::AppCommand;
+use crate::action::Action;
 use crate::dialogs::SenderExt;
 use crate::guiutils::modal::ModalStack;
 use crate::runtime::command::MameCommand;
@@ -21,7 +21,7 @@ use crate::ui::InputSelectMultipleDialog;
 pub async fn dialog_input_select_multiple(
 	modal_stack: ModalStack,
 	selections: impl AsRef<[(SmolStr, Vec<(SmolStr, u32, SeqType, SmolStr)>)]> + Debug + 'static,
-) -> Option<AppCommand> {
+) -> Option<Action> {
 	// the sanity checks
 	assert_ge!(selections.as_ref().len(), 2);
 	info!(selections=?selections, "dialog_input_select_multiple");
@@ -77,7 +77,7 @@ pub async fn dialog_input_select_multiple(
 }
 
 #[allow(clippy::type_complexity)]
-fn build_result(selections: &[(SmolStr, Vec<(SmolStr, u32, SeqType, SmolStr)>)], checked: &[Cell<bool>]) -> AppCommand {
+fn build_result(selections: &[(SmolStr, Vec<(SmolStr, u32, SeqType, SmolStr)>)], checked: &[Cell<bool>]) -> Action {
 	let seqs = selections
 		.iter()
 		.zip(checked.iter())

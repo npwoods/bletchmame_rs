@@ -12,7 +12,7 @@ use slint::ModelRc;
 use slint::VecModel;
 use strum::EnumString;
 
-use crate::appcommand::AppCommand;
+use crate::action::Action;
 use crate::dialogs::seqpoll::SeqPollDialogType;
 use crate::runtime::command::MameCommand;
 use crate::runtime::command::SeqType;
@@ -78,9 +78,9 @@ pub impl [InputDeviceClass] {
 }
 
 #[ext(InputSeqExt)]
-pub impl AppCommand {
+pub impl Action {
 	fn seq_specify_dialog(input: &Input, seq_type: SeqType) -> Self {
-		AppCommand::SeqPollDialog {
+		Action::SeqPollDialog {
 			port_tag: input.port_tag.clone(),
 			mask: input.mask,
 			seq_type,
@@ -89,7 +89,7 @@ pub impl AppCommand {
 	}
 
 	fn seq_add_dialog(input: &Input, seq_type: SeqType) -> Self {
-		AppCommand::SeqPollDialog {
+		Action::SeqPollDialog {
 			port_tag: input.port_tag.clone(),
 			mask: input.mask,
 			seq_type,
@@ -112,7 +112,7 @@ pub impl AppCommand {
 		y_standard_tokens: &str,
 		y_decrement_tokens: &str,
 		y_increment_tokens: &str,
-	) -> AppCommand {
+	) -> Action {
 		let seqs = [
 			x_input.map(|x_input| (&x_input.port_tag, x_input.mask, SeqType::Standard, x_standard_tokens)),
 			x_input.map(|x_input| (&x_input.port_tag, x_input.mask, SeqType::Decrement, x_decrement_tokens)),
@@ -125,10 +125,10 @@ pub impl AppCommand {
 		MameCommand::seq_set(seqs.as_slice()).into()
 	}
 
-	fn input_xy_dialog(x_input: Option<&Input>, y_input: Option<&Input>) -> AppCommand {
+	fn input_xy_dialog(x_input: Option<&Input>, y_input: Option<&Input>) -> Action {
 		let x_input = x_input.map(|input| (input.port_tag.clone(), input.mask));
 		let y_input = y_input.map(|input| (input.port_tag.clone(), input.mask));
-		AppCommand::InputXyDialog { x_input, y_input }
+		Action::InputXyDialog { x_input, y_input }
 	}
 }
 
@@ -187,9 +187,9 @@ fn build_codes(input_device_classes: &[InputDeviceClass]) -> HashMap<Box<str>, B
 fn build_context_menu<'a>(
 	quick_item_inputs: &[Option<&'a Input>],
 	quick_items: impl IntoIterator<Item = (Cow<'a, str>, Vec<(usize, SeqType, &'a str)>)>,
-	specify_command: Option<AppCommand>,
-	add_command: Option<AppCommand>,
-	clear_command: Option<AppCommand>,
+	specify_action: Option<Action>,
+	add_action: Option<Action>,
+	clear_action: Option<Action>,
 ) -> (ModelRc<SimpleMenuEntry>, ModelRc<SimpleMenuEntry>) {
 	// first pass on processing quick items
 	let quick_items = quick_items
@@ -210,7 +210,7 @@ fn build_context_menu<'a>(
 		.collect::<Vec<_>>();
 
 	// do we need a "Multiple..." entry?
-	let multiple_command = (quick_items.len() >= 2).then(|| {
+	let multiple_action = (quick_items.len() >= 2).then(|| {
 		let selections = quick_items
 			.iter()
 			.map(|(title, seqs)| {
@@ -222,10 +222,10 @@ fn build_context_menu<'a>(
 				(title, seqs)
 			})
 			.collect::<Vec<_>>();
-		let command = AppCommand::InputSelectMultipleDialog { selections };
-		let command = command.encode_for_slint();
+		let action = Action::InputSelectMultipleDialog { selections };
+		let action = action.encode_for_slint();
 		let title = "Multiple...".into();
-		SimpleMenuEntry { title, command }
+		SimpleMenuEntry { title, action }
 	});
 
 	// now combine
@@ -233,25 +233,25 @@ fn build_context_menu<'a>(
 		.into_iter()
 		.map(|(title, seqs)| {
 			let command = MameCommand::seq_set(&seqs);
-			let command = AppCommand::from(command).encode_for_slint();
+			let action = Action::from(command).encode_for_slint();
 			let title = title.as_ref().into();
-			SimpleMenuEntry { title, command }
+			SimpleMenuEntry { title, action }
 		})
-		.chain(multiple_command)
+		.chain(multiple_action)
 		.collect::<Vec<_>>();
 
 	let entries_2 = [
-		("Specify...", specify_command),
-		("Add...", add_command),
-		("Clear", clear_command),
+		("Specify...", specify_action),
+		("Add...", add_action),
+		("Clear", clear_action),
 	];
 	let entries_2 = entries_2
 		.into_iter()
 		.filter_map(|(title, command)| {
-			command.map(|command| {
+			command.map(|action| {
 				let title = title.into();
-				let command = command.encode_for_slint();
-				SimpleMenuEntry { title, command }
+				let action = action.encode_for_slint();
+				SimpleMenuEntry { title, action }
 			})
 		})
 		.collect::<Vec<_>>();

@@ -19,7 +19,7 @@ use tracing::info;
 use tracing::trace;
 use tracing::trace_span;
 
-use crate::appcommand::AppCommand;
+use crate::action::Action;
 use crate::channel::Channel;
 use crate::dialogs::SenderExt;
 use crate::dialogs::input::InputAxis;
@@ -72,7 +72,7 @@ pub async fn dialog_input(
 	input_device_classes: Arc<[InputDeviceClass]>,
 	class: InputClass,
 	status_update_channel: Channel<Status>,
-	invoke_command: impl Fn(AppCommand) + Clone + 'static,
+	invoke_command: impl Fn(Action) + Clone + 'static,
 ) {
 	// prepare the dialog
 	let modal = modal_stack.modal(|| InputDialog::new().unwrap());
@@ -95,8 +95,8 @@ pub async fn dialog_input(
 	});
 
 	// set up the context menu command handler
-	modal.dialog().on_menu_item_command(move |command_string| {
-		if let Some(command) = AppCommand::decode_from_slint(command_string) {
+	modal.dialog().on_menu_item_action(move |command_string| {
+		if let Some(command) = Action::decode_from_slint(command_string) {
 			invoke_command(command);
 		}
 	});
@@ -162,8 +162,8 @@ impl InputDialogModel {
 				state.codes = build_codes(&state.input_device_classes);
 
 				let command = build_restore_defaults_command(&state.inputs, &state.clusters);
-				let command = command.as_ref().map(AppCommand::encode_for_slint).unwrap_or_default();
-				self.dialog_weak.unwrap().set_restore_defaults_command(command);
+				let command = command.as_ref().map(Action::encode_for_slint).unwrap_or_default();
+				self.dialog_weak.unwrap().set_restore_defaults_action(command);
 
 				info!(inputs_len=?state.inputs.len(), input_device_classes_len=?state.input_device_classes.len(), "InputDialogModel::update(): Changing state");
 				dump_clusters_trace(state.inputs.as_ref(), state.clusters.as_ref());
@@ -183,9 +183,9 @@ impl InputDialogModel {
 		match &state.clusters[index] {
 			InputCluster::Single(index) => {
 				let input = &inputs[*index];
-				let specify_command = Some(AppCommand::seq_specify_dialog(input, SeqType::Standard));
-				let add_command = Some(AppCommand::seq_add_dialog(input, SeqType::Standard));
-				let clear_command = Some(AppCommand::seq_clear(input, SeqType::Standard));
+				let specify_command = Some(Action::seq_specify_dialog(input, SeqType::Standard));
+				let add_command = Some(Action::seq_add_dialog(input, SeqType::Standard));
+				let clear_command = Some(Action::seq_clear(input, SeqType::Standard));
 				build_context_menu(&[], [], specify_command, add_command, clear_command)
 			}
 			InputCluster::Xy {
@@ -251,8 +251,8 @@ impl InputDialogModel {
 
 				// finally build the context menu
 				let quick_item_inputs = [x_input, y_input];
-				let specify_command = Some(AppCommand::input_xy_dialog(x_input, y_input));
-				let clear_command = Some(AppCommand::set_multi_seq(x_input, y_input, "", "", "", "", "", ""));
+				let specify_command = Some(Action::input_xy_dialog(x_input, y_input));
+				let clear_command = Some(Action::set_multi_seq(x_input, y_input, "", "", "", "", "", ""));
 				build_context_menu(&quick_item_inputs, quick_items, specify_command, None, clear_command)
 			}
 		}
@@ -278,10 +278,10 @@ impl Model for InputDialogModel {
 		let input_seqs = input_cluster_input_seqs(&state.inputs, cluster);
 		let text = build_code_text(input_seqs, &state.codes).as_ref().into();
 
-		let primary_command = match cluster {
+		let primary_action = match cluster {
 			InputCluster::Single(input_index) => {
 				let input = &state.inputs[*input_index];
-				Some(AppCommand::seq_specify_dialog(input, SeqType::Standard))
+				Some(Action::seq_specify_dialog(input, SeqType::Standard))
 			}
 			InputCluster::Xy {
 				x_input_index,
@@ -290,19 +290,19 @@ impl Model for InputDialogModel {
 			} => {
 				let x_input = x_input_index.map(|idx| &state.inputs[idx]);
 				let y_input = y_input_index.map(|idx| &state.inputs[idx]);
-				let command = AppCommand::input_xy_dialog(x_input, y_input);
+				let command = Action::input_xy_dialog(x_input, y_input);
 				Some(command)
 			}
 		};
-		let primary_command = primary_command
+		let primary_action = primary_action
 			.as_ref()
-			.map(AppCommand::encode_for_slint)
+			.map(Action::encode_for_slint)
 			.unwrap_or_default();
 
 		Some(InputDialogEntry {
 			name,
 			text,
-			primary_command,
+			primary_action,
 		})
 	}
 
@@ -342,7 +342,7 @@ fn build_clusters(inputs: &[Input], class: InputClass) -> Box<[InputCluster]> {
 		.collect()
 }
 
-fn build_restore_defaults_command(inputs: &[Input], clusters: &[InputCluster]) -> Option<AppCommand> {
+fn build_restore_defaults_command(inputs: &[Input], clusters: &[InputCluster]) -> Option<Action> {
 	let seqs = clusters
 		.iter()
 		.flat_map(|cluster| input_cluster_input_seqs(inputs, cluster))

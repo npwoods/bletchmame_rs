@@ -7,12 +7,12 @@ component InputXyPart {
     in property <InputDialogEntry> entry;
 
     // callbacks
-    callback menu-item-command(string);
+    callback menu-item-action(string);
     callback context-button-clicked(Point);
 
     // widgets
     VerticalBox {
-        visible: !(entry.name.is-empty && entry.text.is-empty && entry.primary-command.is-empty);
+        visible: !(entry.name.is-empty && entry.text.is-empty && entry.primary-action.is-empty);
         Text {
             text: entry.text;
         }
@@ -20,9 +20,9 @@ component InputXyPart {
         HorizontalBox {
             Button {
                 text: entry.name;
-                enabled: !entry.primary-command.is-empty;
+                enabled: !entry.primary-action.is-empty;
                 clicked => {
-                    root.menu-item-command(entry.primary-command);
+                    root.menu-item-action(entry.primary-action);
                 }
             }
 
@@ -44,12 +44,12 @@ export component InputXyDialog inherits Window {
     in property <InputDialogEntry> right-entry;
     in property <InputDialogEntry> up-entry;
     in property <InputDialogEntry> down-entry;
-    in property <string> clear-command;
-    in property <string> restore-defaults-command;
+    in property <string> clear-action;
+    in property <string> restore-defaults-action;
 
     // callbacks
     callback ok-clicked();
-    callback menu-item-command(string);
+    callback menu-item-action(string);
     callback left-context-button-clicked(Point);
     callback right-context-button-clicked(Point);
     callback up-context-button-clicked(Point);
@@ -69,17 +69,17 @@ export component InputXyDialog inherits Window {
         Menu {
             for entry in context-menu-entries-1: MenuItem {
                 title: entry.title;
-                enabled: entry.command != "";
+                enabled: entry.action != "";
                 activated => {
-                    root.menu-item-command(entry.command);
+                    root.menu-item-action(entry.action);
                 }
             }
             if context-menu-entries-1.length > 0: MenuSeparator { }
             for entry in context-menu-entries-2: MenuItem {
                 title: entry.title;
-                enabled: entry.command != "";
+                enabled: entry.action != "";
                 activated => {
-                    root.menu-item-command(entry.command);
+                    root.menu-item-action(entry.action);
                 }
             }
         }
@@ -94,8 +94,8 @@ export component InputXyDialog inherits Window {
                 col: 0;
                 row: 1;
                 entry: root.left-entry;
-                menu-item-command(command) => {
-                    root.menu-item-command(command);
+                menu-item-action(action) => {
+                    root.menu-item-action(action);
                 }
                 context-button-clicked(point) => {
                     root.left-context-button-clicked(point);
@@ -106,8 +106,8 @@ export component InputXyDialog inherits Window {
                 col: 2;
                 row: 1;
                 entry: root.right-entry;
-                menu-item-command(command) => {
-                    root.menu-item-command(command);
+                menu-item-action(action) => {
+                    root.menu-item-action(action);
                 }
                 context-button-clicked(point) => {
                     root.right-context-button-clicked(point);
@@ -118,8 +118,8 @@ export component InputXyDialog inherits Window {
                 col: 1;
                 row: 0;
                 entry: root.up-entry;
-                menu-item-command(command) => {
-                    root.menu-item-command(command);
+                menu-item-action(action) => {
+                    root.menu-item-action(action);
                 }
                 context-button-clicked(point) => {
                     root.up-context-button-clicked(point);
@@ -130,8 +130,8 @@ export component InputXyDialog inherits Window {
                 col: 1;
                 row: 2;
                 entry: root.down-entry;
-                menu-item-command(command) => {
-                    root.menu-item-command(command);
+                menu-item-action(action) => {
+                    root.menu-item-action(action);
                 }
                 context-button-clicked(point) => {
                     root.down-context-button-clicked(point);
@@ -142,17 +142,17 @@ export component InputXyDialog inherits Window {
         HorizontalBox {
             Button {
                 text: "Clear";
-                enabled: !clear-command.is-empty;
+                enabled: !clear-action.is-empty;
                 clicked => {
-                    root.menu-item-command(clear-command);
+                    root.menu-item-action(clear-action);
                 }
             }
 
             Button {
                 text: "Restore Defaults";
-                enabled: !restore-defaults-command.is-empty;
+                enabled: !restore-defaults-action.is-empty;
                 clicked => {
-                    root.menu-item-command(restore-defaults-command);
+                    root.menu-item-action(restore-defaults-action);
                 }
             }
 
