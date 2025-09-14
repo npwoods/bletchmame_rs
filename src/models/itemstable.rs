@@ -853,15 +853,7 @@ impl From<LocalItemContextMenuInfo> for ItemContextMenuInfo {
 		let run_descs = value
 			.run_descs
 			.into_iter()
-			.map(|desc| {
-				let command = desc
-					.command
-					.as_ref()
-					.map(AppCommand::encode_for_slint)
-					.unwrap_or_default();
-				let title = desc.title;
-				SimpleMenuEntry { command, title }
-			})
+			.map(MenuDesc::encode_for_slint)
 			.collect::<Vec<_>>();
 		let run_descs = VecModel::from(run_descs);
 		let run_descs = ModelRc::new(run_descs);
@@ -900,13 +892,13 @@ impl From<LocalItemContextMenuInfo> for ItemContextMenuInfo {
 }
 
 impl MenuDesc {
-	pub fn encode_for_slint(self) -> (SharedString, SharedString) {
-		(
-			self.command
-				.as_ref()
-				.map(AppCommand::encode_for_slint)
-				.unwrap_or_default(),
-			self.title,
-		)
+	pub fn encode_for_slint(self) -> SimpleMenuEntry {
+		let command = self
+			.command
+			.as_ref()
+			.map(AppCommand::encode_for_slint)
+			.unwrap_or_default();
+		let title = self.title;
+		SimpleMenuEntry { command, title }
 	}
 }

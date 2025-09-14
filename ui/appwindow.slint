@@ -15,9 +15,9 @@ struct ItemContextMenuInfo {
     run-descs: [SimpleMenuEntry],
     configure-command: string,
     browse-command: string,
-    add-to-existing-folder-descs: [{command: string, title: string}],
+    add-to-existing-folder-descs: [SimpleMenuEntry],
     new-folder-command: string,
-    remove-from-folder-desc: {command: string, title: string},
+    remove-from-folder-desc: SimpleMenuEntry,
 }
 
 struct ReportIssue {
