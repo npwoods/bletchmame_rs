@@ -199,7 +199,7 @@ impl State {
 				let paths_iter = entries
 					.iter()
 					.filter(|x| !x.text.is_empty())
-					.map(|x| x.text.to_string());
+					.map(|x| x.text.as_str().into());
 				self.paths.borrow_mut().set_by_type(path_type, paths_iter);
 			});
 		});

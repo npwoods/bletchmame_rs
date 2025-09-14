@@ -9,6 +9,7 @@ use std::rc::Rc;
 use anyhow::Error;
 use anyhow::Result;
 use path_absolutize::Absolutize;
+use smol_str::SmolStr;
 use strum::EnumString;
 use strum::VariantArray;
 
@@ -21,7 +22,7 @@ pub struct ImportMameIni(Vec<ImportMameIniOptionState>);
 #[derive(Debug, PartialEq)]
 pub struct ImportMameIniOption {
 	pub path_type: PathType,
-	pub value: String,
+	pub value: SmolStr,
 }
 
 pub struct ImportMameIniOptionState {
@@ -53,6 +54,7 @@ impl ImportMameIni {
 				.ok()
 				.and_then(|p| p.into_owned().into_os_string().into_string().ok())
 				.unwrap_or_else(|| path.to_string())
+				.into()
 		};
 
 		let file = File::open(path)?;
@@ -118,7 +120,7 @@ impl ImportMameIniOptionState {
 	}
 }
 
-fn read_mame_ini(reader: impl BufRead, absolutize_path: impl Fn(&str) -> String) -> Result<Vec<ImportMameIniOption>> {
+fn read_mame_ini(reader: impl BufRead, absolutize_path: impl Fn(&str) -> SmolStr) -> Result<Vec<ImportMameIniOption>> {
 	let arg_map = PathType::VARIANTS
 		.iter()
 		.filter_map(|&path_type| {
@@ -216,14 +218,14 @@ mod test {
 		let expected = expected
 			.into_iter()
 			.map(|(path_type, value)| {
-				let value = value.to_string();
+				let value = value.into();
 				ImportMameIniOption { path_type, value }
 			})
 			.collect::<Vec<_>>();
 
 		let cursor = Cursor::new(ini_str);
 		let reader = BufReader::new(cursor);
-		let actual = read_mame_ini(reader, |x| x.to_string()).unwrap();
+		let actual = read_mame_ini(reader, |x| x.into()).unwrap();
 		assert_eq!(expected, actual);
 	}
 

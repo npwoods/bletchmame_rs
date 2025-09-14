@@ -25,6 +25,7 @@ use num::clamp;
 use serde::Deserialize;
 use serde::Serialize;
 use slint::LogicalSize;
+use smol_str::SmolStr;
 use strum::EnumIter;
 use strum::EnumProperty;
 use strum::EnumString;
@@ -53,7 +54,7 @@ pub struct Preferences {
 	pub is_fullscreen: bool,
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
-	pub fullscreen_display: Option<String>,
+	pub fullscreen_display: Option<SmolStr>,
 
 	#[serde(default)]
 	pub items_columns: Vec<PrefsColumn>,
@@ -72,39 +73,39 @@ pub struct Preferences {
 #[serde(rename_all = "camelCase")]
 pub struct PrefsPaths {
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
-	pub mame_executable: Option<String>,
+	pub mame_executable: Option<SmolStr>,
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
-	pub roms: Vec<String>,
+	pub roms: Vec<SmolStr>,
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
-	pub samples: Vec<String>,
+	pub samples: Vec<SmolStr>,
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
-	pub plugins: Vec<String>,
+	pub plugins: Vec<SmolStr>,
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
-	pub software_lists: Vec<String>,
+	pub software_lists: Vec<SmolStr>,
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
-	pub cfg: Option<String>,
+	pub cfg: Option<SmolStr>,
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
-	pub nvram: Option<String>,
+	pub nvram: Option<SmolStr>,
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
-	pub cheats: Option<String>,
+	pub cheats: Option<SmolStr>,
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
-	pub snapshots: Vec<String>,
+	pub snapshots: Vec<SmolStr>,
 }
 
 impl PrefsPaths {
-	pub fn by_type(&self, path_type: PathType) -> &[String] {
+	pub fn by_type(&self, path_type: PathType) -> &[SmolStr] {
 		access_paths(path_type).0(self)
 	}
 
-	pub fn set_by_type(&mut self, path_type: PathType, paths_iter: impl Iterator<Item = String>) {
+	pub fn set_by_type(&mut self, path_type: PathType, paths_iter: impl Iterator<Item = SmolStr>) {
 		let (_, store) = access_paths(path_type);
 		match store {
 			PathsStore::Single(store) => {
@@ -144,11 +145,11 @@ impl PrefsPaths {
 
 #[derive(Debug)]
 enum PathsStore {
-	Single(fn(&mut PrefsPaths) -> &mut Option<String>),
-	Multiple(fn(&mut PrefsPaths) -> &mut Vec<String>),
+	Single(fn(&mut PrefsPaths) -> &mut Option<SmolStr>),
+	Multiple(fn(&mut PrefsPaths) -> &mut Vec<SmolStr>),
 }
 
-fn access_paths(path_type: PathType) -> (fn(&PrefsPaths) -> &[String], PathsStore) {
+fn access_paths(path_type: PathType) -> (fn(&PrefsPaths) -> &[SmolStr], PathsStore) {
 	match path_type {
 		PathType::MameExecutable => (
 			(|x| x.mame_executable.as_slice()),
@@ -383,7 +384,7 @@ impl Preferences {
 		save_prefs(self, &path)
 	}
 
-	pub fn fresh(prefs_path: Option<String>) -> Self {
+	pub fn fresh(prefs_path: Option<SmolStr>) -> Self {
 		let json = include_str!("prefs_fresh.json");
 		let mut result = load_prefs_from_reader(json.as_bytes()).unwrap();
 		let result_paths = Rc::get_mut(&mut result.paths).unwrap();

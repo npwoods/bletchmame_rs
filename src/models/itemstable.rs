@@ -21,6 +21,7 @@ use slint::ModelTracker;
 use slint::SharedString;
 use slint::StandardListViewItem;
 use slint::VecModel;
+use smol_str::SmolStr;
 use tracing::debug;
 use tracing::debug_span;
 use tracing::info_span;
@@ -48,7 +49,7 @@ use crate::ui::SimpleMenuEntry;
 
 pub struct ItemsTableModel {
 	info_db: RefCell<Option<Rc<InfoDb>>>,
-	software_list_paths: RefCell<Vec<String>>,
+	software_list_paths: RefCell<Vec<SmolStr>>,
 	column_types: RefCell<Rc<[ColumnType]>>,
 	sorting: Cell<Option<(ColumnType, SortOrder)>>,
 	search: RefCell<String>,
@@ -94,7 +95,7 @@ impl ItemsTableModel {
 	pub fn update(
 		&self,
 		info_db: Option<Option<Rc<InfoDb>>>,
-		software_list_paths: Option<&[String]>,
+		software_list_paths: Option<&[SmolStr]>,
 		collection: Option<Rc<PrefsCollection>>,
 		column_types: Option<Rc<[ColumnType]>>,
 		search: Option<&str>,

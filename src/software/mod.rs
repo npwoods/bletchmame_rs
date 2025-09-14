@@ -67,12 +67,12 @@ impl Debug for SoftwareList {
 
 pub struct SoftwareListDispenser<'a> {
 	pub info_db: &'a InfoDb,
-	software_list_paths: &'a [String],
+	software_list_paths: &'a [SmolStr],
 	map: HashMap<String, (info::SoftwareList<'a>, Arc<SoftwareList>)>,
 }
 
 impl<'a> SoftwareListDispenser<'a> {
-	pub fn new(info_db: &'a InfoDb, software_list_paths: &'a [String]) -> Self {
+	pub fn new(info_db: &'a InfoDb, software_list_paths: &'a [SmolStr]) -> Self {
 		Self {
 			info_db,
 			software_list_paths,
@@ -97,7 +97,7 @@ impl<'a> SoftwareListDispenser<'a> {
 	pub fn get_all(&mut self) -> Vec<(info::SoftwareList<'a>, Arc<SoftwareList>)> {
 		scope(|scope| {
 			let info_db = self.info_db;
-			let paths: &[String] = self.software_list_paths;
+			let paths = self.software_list_paths;
 			let threads = info_db
 				.software_lists()
 				.iter()
@@ -121,10 +121,11 @@ impl<'a> SoftwareListDispenser<'a> {
 	}
 }
 
-fn load_software_list(paths: &[String], name: &str) -> Result<Arc<SoftwareList>> {
+fn load_software_list(paths: &[impl AsRef<str>], name: &str) -> Result<Arc<SoftwareList>> {
 	let mut err = Error::msg("Error loading software list: No paths specified");
 	paths
 		.iter()
+		.map(|x| x.as_ref())
 		.filter(|&path| !path.is_empty())
 		.filter_map(|path| {
 			let mut path = PathBuf::from(path);
