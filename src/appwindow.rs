@@ -331,7 +331,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	let preferences = Preferences::load(&prefs_path)
 		.ok()
 		.flatten()
-		.unwrap_or_else(|| Preferences::fresh(prefs_path.to_str().map(|x| x.to_string())));
+		.unwrap_or_else(|| Preferences::fresh(prefs_path.to_str().map(|x| x.into())));
 
 	// update window preferences
 	if let Some(window_size) = &preferences.window_size {
@@ -881,7 +881,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			window.set_fullscreen(new_fullscreen);
 			let mut prefs = model.preferences.borrow_mut();
 			prefs.is_fullscreen = new_fullscreen;
-			prefs.fullscreen_display = window.fullscreen_display();
+			prefs.fullscreen_display = window.fullscreen_display().map(|x| x.into());
 		}
 		AppCommand::OptionsToggleMenuBar => {
 			let has_input_using_mouse = model
@@ -1003,7 +1003,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			let prefs_path = {
 				let state = model.state.borrow();
 				let _ = prefs.save_backup(state.prefs_path());
-				state.prefs_path().to_str().map(str::to_string)
+				state.prefs_path().to_str().map(|x| x.into())
 			};
 			*prefs = Preferences::fresh(prefs_path);
 		}),
