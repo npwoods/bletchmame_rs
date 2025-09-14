@@ -1,6 +1,5 @@
 import { HorizontalBox, VerticalBox, Button, StandardListView, StandardTableView, LineEdit, ListView, ScrollView, GridBox, Spinner } from "std-widgets.slint";
-import { MagicListView, MagicListViewItem } from "@vivi/magic.slint";
-import { FilledIconButton, SearchBar } from "@slint/material.slint";
+import { NavigationDrawer, NavigationItem, FilledIconButton, SearchBar } from "@slint/material.slint";
 import { SimpleMenuEntry } from "common.slint";
 
 struct CollectionContextMenuInfo {
@@ -126,7 +125,7 @@ export component AppWindow inherits Window {
     }
 
     // the collections view on the left
-    in property <[MagicListViewItem]> collections-model;
+    in property <[NavigationItem]> collections-model;
     callback collections-view-selected(int);
     callback collections-row-pointer-event(int, PointerEvent, Point);
     public function collections-view-select(index: int) {
@@ -633,180 +632,175 @@ export component AppWindow inherits Window {
         }
     }
 
-    hbox := GridLayout {
-        HorizontalBox {
-            row: 0;
-            col: 0;
-            alignment: stretch;
+    hbox := HorizontalBox {
+        alignment: stretch;
+        preferred-width: 100%;
+        preferred-height: 100%;
+        visible: root.mode() == "ready";
 
-            // collections list view on the left
-            collections-list-view := MagicListView {
-                visible: root.mode() == "ready";
-                horizontal-stretch: 0;
-                vertical-stretch: 1;
+        // collections list view on the left
+        VerticalBox {
+            alignment: start;
+            preferred-height: 100%;
+            collections-list-view := NavigationDrawer {
+                vertical-stretch: 0;
                 width: 250px;
-                model: collections-model;
-                selected(index) => {
+                groups: [{ title: 0, items: collections-model }];
+                selected(group-index, index) => {
                     collections-view-selected(index)
                 }
-                row-pointer-event(row, event, point) => {
-                    collections-row-pointer-event(row, event, {
+                item-pointer-event(group-index, item-index, event, point) => {
+                    collections-row-pointer-event(item-index, event, {
                         x: point.x + collections-list-view.absolute-position.x,
                         y: point.y + collections-list-view.absolute-position.y
                     })
                 }
             }
 
-            VerticalBox {
-                alignment: stretch;
-                horizontal-stretch: 1;
-                
-                // current collection label
-                Text {
-                    horizontal-alignment: left;
-                    visible: root.mode() == "ready";
-                    text: current-collection-text;
-                    height: 20px;
-                }
-                
-                // toolbar below the current collection
-                HorizontalBox {
-                    alignment: stretch;
-                    visible: root.mode() == "ready";
-                    height: 50px;
-                    horizontal-stretch: 1;
-                    vertical-stretch: 0;
-                    preferred-width: 100%;
-                    FilledIconButton {
-                        horizontal-stretch: 0;
-                        icon: @image-url("icons/arrow-back.svg");
-                        enabled: history-can-go-back;
-                        clicked => {
-                            history-advance-clicked(-1)
-                        }
-                    }
-
-                    FilledIconButton {
-                        horizontal-stretch: 0;
-                        icon: @image-url("icons/book.svg");
-                        enabled: bookmark-collection-enabled;
-                        clicked => {
-                            bookmark-collection-clicked();
-                        }
-                    }
-
-                    FilledIconButton {
-                        horizontal-stretch: 0;
-                        icon: @image-url("icons/arrow-forward.svg");
-                        enabled: history-can-go-forward;
-                        clicked => {
-                            history-advance-clicked(+1)
-                        }
-                    }
-
-                    SearchBar {
-                        horizontal-stretch: 1;
-                        text <=> items-search-text;
-                        edited(text) => {
-                            items-search-text-changed(text)
-                        }
-                    }
-                }
-
-                GridLayout {
-                    horizontal-stretch: 1;
-                    vertical-stretch: 1;
-                    preferred-width: 100%;
-
-                    // items table
-                    items-table-view := StandardTableView {
-                        visible: root.mode() == "ready";
-                        rows: items-model;
-                        sort-ascending(index) => {
-                            items-sort-ascending(index)
-                        }
-                        sort-descending(index) => {
-                            items-sort-descending(index)
-                        }
-                        current-row-changed(index) => {
-                            items-current-row-changed()
-                        }
-                        row-pointer-event(row, event, point) => {
-                            items-row-pointer-event(row, event, {
-                                x: point.x + items-table-view.absolute-position.x,
-                                y: point.y + items-table-view.absolute-position.y
-                            })
-                        }
-                    }
-
-                    // items empty text
-                    Text {
-                        visible: root.mode() == "ready" && is-empty-reason != "";
-                        text: is-empty-reason;
-                    }
-                }
+            Rectangle {
+                vertical-stretch: 1;
+                background: green;
             }
         }
 
-        // report view
-        HorizontalBox {
-            row: 0;
-            col: 0;
-            visible: root.mode() == "report";
-            alignment: center;
-            if root.report-spinning: VerticalBox {
-                // spinner
-                alignment: center;
-                Spinner {
-                    width: 150px;
-                    height: 150px;
-                    indeterminate: true;
+        VerticalBox {
+            alignment: stretch;
+                
+            // current collection label
+            Text {
+                vertical-stretch: 0;
+                horizontal-alignment: left;
+                text: current-collection-text;
+                height: 20px;
+            }
+                
+            // toolbar below the current collection
+            HorizontalBox {
+                vertical-stretch: 0;
+                alignment: stretch;
+                height: 50px;
+                preferred-width: 100%;
+                FilledIconButton {
+                    horizontal-stretch: 0;
+                    icon: @image-url("icons/arrow-back.svg");
+                    enabled: history-can-go-back;
+                    clicked => {
+                        history-advance-clicked(-1)
+                    }
+                }
+
+                FilledIconButton {
+                    horizontal-stretch: 0;
+                    icon: @image-url("icons/book.svg");
+                    enabled: bookmark-collection-enabled;
+                    clicked => {
+                        bookmark-collection-clicked();
+                    }
+                }
+
+                FilledIconButton {
+                    horizontal-stretch: 0;
+                    icon: @image-url("icons/arrow-forward.svg");
+                    enabled: history-can-go-forward;
+                    clicked => {
+                        history-advance-clicked(+1)
+                    }
+                }
+
+                SearchBar {
+                    horizontal-stretch: 1;
+                    text <=> items-search-text;
+                    edited(text) => {
+                        items-search-text-changed(text)
+                    }
                 }
             }
-            VerticalBox {
+
+            // items table
+            items-table-view := StandardTableView {
+                vertical-stretch: 1;
+                rows: items-model;
+                sort-ascending(index) => {
+                    items-sort-ascending(index)
+                }
+                sort-descending(index) => {
+                    items-sort-descending(index)
+                }
+                current-row-changed(index) => {
+                    items-current-row-changed()
+                }
+                row-pointer-event(row, event, point) => {
+                    items-row-pointer-event(row, event, {
+                        x: point.x + items-table-view.absolute-position.x,
+                        y: point.y + items-table-view.absolute-position.y
+                    })
+                }
+            }
+
+            // items empty text
+            Text {
+                visible: root.mode() == "ready" && is-empty-reason != "";
+                text: is-empty-reason;
+            }
+        }
+    }
+
+    // report view
+    HorizontalBox {
+        visible: root.mode() == "report";
+        alignment: center;
+        if root.report-spinning: VerticalBox {
+            // spinner
+            alignment: center;
+            Spinner {
+                width: 150px;
+                height: 150px;
+                indeterminate: true;
+            }
+        }
+        VerticalBox {
+            alignment: center;
+
+            // report message
+            Text {
+                text: root.report-message;
+                horizontal-alignment: center;
+                font-size: 24px;
+                wrap: word-wrap;
+            }
+
+            // report submessage
+            if root.report-submessage != "": Text {
+                text: root.report-submessage;
+                horizontal-alignment: center;
+                font-size: 12px;
+                wrap: word-wrap;
+            }
+
+            // report button
+            if root.report-button-text != "": HorizontalBox {
                 alignment: center;
+                Button {
+                    text: root.report-button-text;
+                    width: 50px;
+                    clicked => {
+                        root.report-button-clicked();
+                    }
+                }
+            }
 
-                // report message
+            // report issues
+            for issue[index] in report-issues: HorizontalBox {
                 Text {
-                    text: root.report-message;
-                    horizontal-alignment: center;
-                    font-size: 24px;
-                    wrap: word-wrap;
+                    horizontal-alignment: left;
+                    text: issue.text;
                 }
 
-                // report submessage
-                if root.report-submessage != "": Text {
-                    text: root.report-submessage;
-                    horizontal-alignment: center;
-                    font-size: 12px;
-                    wrap: word-wrap;
-                }
-
-                // report button
-                if root.report-button-text != "": HorizontalBox {
-                    alignment: center;
-                    Button {
-                        text: root.report-button-text;
-                        width: 50px;
-                        clicked => {
-                            root.report-button-clicked();
-                        }
-                    }
-                }
-
-                // report issues
-                for issue[index] in report-issues: HorizontalBox {
-                    Text {
-                        horizontal-alignment: left;
-                        text: issue.text;
-                    }
-
-                    Button {
-                        visible: issue.button-text != "";
-                        text: issue.button-text;
-                        clicked => {
-                            root.issue-button-clicked(index);
-                        }
+                Button {
+                    visible: issue.button-text != "";
+                    text: issue.button-text;
+                    clicked => {
+                        root.issue-button-clicked(index);
                     }
                 }
             }
