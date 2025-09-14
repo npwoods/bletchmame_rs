@@ -14,11 +14,11 @@ export component SwitchesDialog inherits Window {
     // properties
     in property <string> dialog-title;
     in property <[SwitchesDialogEntry]> entries;
-    in property <string> restore-defaults-command;
+    in property <string> restore-defaults-action;
 
     // callbacks
     callback ok-clicked();
-    callback menu-item-command(string);
+    callback menu-item-action(string);
     callback entry-option-changed(int, int);
 
     // control hierarchy
@@ -54,9 +54,9 @@ export component SwitchesDialog inherits Window {
             Button {
                 text: @tr("Restore Defaults");
                 horizontal-stretch: 0;
-                enabled: !root.restore-defaults-command.is-empty;
+                enabled: !root.restore-defaults-action.is-empty;
                 clicked => {
-                    menu-item-command(root.restore-defaults-command);
+                    menu-item-action(root.restore-defaults-action);
                 }
             }
 

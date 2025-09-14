@@ -11,7 +11,7 @@ use smol_str::SmolStr;
 use strum::VariantArray;
 use tokio::sync::mpsc;
 
-use crate::appcommand::AppCommand;
+use crate::action::Action;
 use crate::channel::Channel;
 use crate::dialogs::SenderExt;
 use crate::dialogs::input::InputAxis;
@@ -51,7 +51,7 @@ pub async fn dialog_input_xy(
 	inputs: Arc<[Input]>,
 	input_device_classes: Arc<[InputDeviceClass]>,
 	status_changed_channel: Channel<Status>,
-	invoke_command: impl Fn(AppCommand) + Clone + 'static,
+	invoke_command: impl Fn(Action) + Clone + 'static,
 ) {
 	// prepare the dialog
 	let modal = modal_stack.modal(|| InputXyDialog::new().unwrap());
@@ -71,8 +71,8 @@ pub async fn dialog_input_xy(
 	});
 
 	// set up command handler
-	modal.dialog().on_menu_item_command(move |command_string| {
-		if let Some(command) = AppCommand::decode_from_slint(command_string) {
+	modal.dialog().on_menu_item_action(move |command_string| {
+		if let Some(command) = Action::decode_from_slint(command_string) {
 			invoke_command(command);
 		}
 	});
@@ -165,11 +165,11 @@ impl Model {
 		let entry = build_input_dialog_entry(y_input, InputAxis::Y, SeqType::Increment, &codes);
 		dialog.set_down_entry(entry);
 
-		// set up clear and restore defaults commands
-		let clear_command = set_all_seqs_command(x_input, y_input, "");
-		let restore_defaults_command = set_all_seqs_command(x_input, y_input, "*");
-		dialog.set_clear_command(clear_command.encode_for_slint());
-		dialog.set_restore_defaults_command(restore_defaults_command.encode_for_slint());
+		// set up clear and restore defaults actions
+		let clear_action = set_all_seqs_command(x_input, y_input, "");
+		let restore_defaults_action = set_all_seqs_command(x_input, y_input, "*");
+		dialog.set_clear_action(clear_action.encode_for_slint());
+		dialog.set_restore_defaults_action(restore_defaults_action.encode_for_slint());
 	}
 
 	pub fn context_menu(&self, point: LogicalPosition, axis: InputAxis, seq_type: SeqType) {
@@ -204,9 +204,9 @@ impl Model {
 
 			// and build the rest of the context menu
 			let quick_item_inputs = [Some(input)];
-			let specify_command = Some(AppCommand::seq_specify_dialog(input, seq_type));
-			let add_command = Some(AppCommand::seq_add_dialog(input, seq_type));
-			let clear_command = Some(AppCommand::seq_clear(input, seq_type));
+			let specify_command = Some(Action::seq_specify_dialog(input, seq_type));
+			let add_command = Some(Action::seq_add_dialog(input, seq_type));
+			let clear_command = Some(Action::seq_clear(input, seq_type));
 			build_context_menu(
 				&quick_item_inputs,
 				quick_items,
@@ -258,24 +258,24 @@ fn build_input_dialog_entry(
 		let suffix = seq_type.suffix();
 		let name = format!("{}{}", &input.name, suffix).into();
 		let text = build_code_text(input_seqs, codes).as_ref().into();
-		let primary_command = AppCommand::SeqPollDialog {
+		let primary_action = Action::SeqPollDialog {
 			port_tag: input.port_tag.clone(),
 			mask: input.mask,
 			seq_type,
 			poll_type: SeqPollDialogType::Specify,
 		};
-		let primary_command = primary_command.encode_for_slint();
+		let primary_action = primary_action.encode_for_slint();
 		InputDialogEntry {
 			name,
 			text,
-			primary_command,
+			primary_action,
 		}
 	} else {
 		InputDialogEntry::default()
 	}
 }
 
-fn set_all_seqs_command(x_input: Option<&Input>, y_input: Option<&Input>, tokens: &str) -> AppCommand {
+fn set_all_seqs_command(x_input: Option<&Input>, y_input: Option<&Input>, tokens: &str) -> Action {
 	let seqs = [x_input, y_input]
 		.into_iter()
 		.flatten()

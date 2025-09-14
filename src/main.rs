@@ -1,5 +1,5 @@
 #![cfg_attr(not(test), windows_subsystem = "windows")]
-mod appcommand;
+mod action;
 mod appstate;
 mod appwindow;
 mod backend;

@@ -30,7 +30,7 @@ export component ConfigureDialog inherits Window {
     callback reset-clicked();
     callback entry-option-changed(int, string);
     callback entry-button-clicked(int, Point);
-    callback menu-item-command(string);
+    callback menu-item-action(string);
     callback software-machines-toggle-checked(int);
     callback software-machines-bulk-all-clicked();
     callback software-machines-bulk-none-clicked();
@@ -60,8 +60,8 @@ export component ConfigureDialog inherits Window {
                             entry-button-clicked(index, point) => {
                                 root.entry-button-clicked(index, point);
                             }
-                            menu-item-command(command) => {
-                                root.menu-item-command(command);
+                            menu-item-action(action) => {
+                                root.menu-item-action(action);
                             }
                         }
 

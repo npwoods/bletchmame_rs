@@ -4,7 +4,7 @@ use slint::LogicalPosition;
 use slint::ModelRc;
 use tokio::sync::mpsc;
 
-use crate::appcommand::AppCommand;
+use crate::action::Action;
 use crate::channel::Channel;
 use crate::devimageconfig::DevicesImagesConfig;
 use crate::devimageconfig::EntryDetails;
@@ -21,7 +21,7 @@ pub async fn dialog_devices_and_images(
 	modal_stack: ModalStack,
 	diconfig: DevicesImagesConfig,
 	status_update_channel: Channel<Status>,
-	invoke_command: impl Fn(AppCommand) + Clone + 'static,
+	invoke_command: impl Fn(Action) + Clone + 'static,
 ) {
 	// prepare the dialog
 	let modal = modal_stack.modal(|| DevicesAndImagesDialog::new().unwrap());
@@ -61,8 +61,8 @@ pub async fn dialog_devices_and_images(
 	});
 
 	// set up the context menu command handler
-	modal.dialog().on_menu_item_command(move |command_string| {
-		if let Some(command) = AppCommand::decode_from_slint(command_string) {
+	modal.dialog().on_menu_item_action(move |command_string| {
+		if let Some(command) = Action::decode_from_slint(command_string) {
 			invoke_command(command);
 		}
 	});
@@ -120,31 +120,31 @@ pub fn entry_popup_menu(
 
 		let load_image_command = {
 			let tag = entry.tag.to_string();
-			Some(AppCommand::LoadImageDialog { tag })
+			Some(Action::LoadImageDialog { tag })
 		};
 
 		let connect_to_socket_command = {
 			let tag = entry.tag.to_string();
-			Some(AppCommand::ConnectToSocketDialog { tag })
+			Some(Action::ConnectToSocketDialog { tag })
 		};
 
 		let unload_command = {
 			let tag = entry.tag.to_string();
-			Some(AppCommand::UnloadImage { tag })
+			Some(Action::UnloadImage { tag })
 		};
 
 		DevicesAndImagesContextMenuInfo {
 			load_image_command: load_image_command
 				.as_ref()
-				.map(AppCommand::encode_for_slint)
+				.map(Action::encode_for_slint)
 				.unwrap_or_default(),
 			connect_to_socket_command: connect_to_socket_command
 				.as_ref()
-				.map(AppCommand::encode_for_slint)
+				.map(Action::encode_for_slint)
 				.unwrap_or_default(),
 			unload_command: unload_command
 				.as_ref()
-				.map(AppCommand::encode_for_slint)
+				.map(Action::encode_for_slint)
 				.unwrap_or_default(),
 		}
 	});

@@ -27,7 +27,7 @@ use tracing::debug_span;
 use tracing::info_span;
 use unicase::UniCase;
 
-use crate::appcommand::AppCommand;
+use crate::action::Action;
 use crate::imagedesc::ImageDesc;
 use crate::info::InfoDb;
 use crate::info::View;
@@ -362,11 +362,11 @@ impl ItemsTableModel {
 					slots,
 					images,
 				};
-				let command = has_mame_initialized.then_some(AppCommand::Start(start_args));
+				let action = has_mame_initialized.then_some(Action::Start(start_args));
 				let run_title = run_item_text(machine.description()).into();
 				let run_descs = vec![MenuDesc {
 					title: "".into(),
-					command,
+					action,
 				}];
 				let browse_target =
 					(!machine.machine_software_lists().is_empty()).then(|| PrefsCollection::MachineSoftware {
@@ -409,9 +409,9 @@ impl ItemsTableModel {
 								slots: [].into(),
 								images,
 							};
-							let command = Some(AppCommand::Start(start_args));
+							let action = Some(Action::Start(start_args));
 							let title = machine.description().into();
-							MenuDesc { command, title }
+							MenuDesc { action, title }
 						})
 					})
 					.collect::<Vec<_>>();
@@ -426,12 +426,12 @@ impl ItemsTableModel {
 		};
 
 		// now actually build the context menu
-		let configure_command = can_configure
+		let configure_action = can_configure
 			.then_some(folder_name.as_ref())
 			.flatten()
 			.cloned()
-			.map(|folder_name| AppCommand::Configure { folder_name, index });
-		let browse_command = browse_target.map(AppCommand::Browse);
+			.map(|folder_name| Action::Configure { folder_name, index });
+		let browse_action = browse_target.map(Action::Browse);
 
 		// add to folder
 		let add_to_existing_folder_descs = folder_info
@@ -446,30 +446,29 @@ impl ItemsTableModel {
 				};
 
 				let folder_contains_all_items = items.iter().all(|x| folder_items.contains(x));
-				let command =
-					(!folder_contains_all_items).then(|| AppCommand::AddToExistingFolder(*index, items.clone()));
+				let action = (!folder_contains_all_items).then(|| Action::AddToExistingFolder(*index, items.clone()));
 
 				let title = name.into();
-				MenuDesc { command, title }
+				MenuDesc { action, title }
 			})
 			.collect::<Vec<_>>();
-		let new_folder_command = AppCommand::AddToNewFolderDialog(items.clone());
+		let new_folder_action = Action::AddToNewFolderDialog(items.clone());
 
 		// remove from this folder
 		let remove_from_folder_desc = folder_name.map(|folder_name| {
 			let title = format!("Remove From \"{folder_name}\"").into();
-			let command = Some(AppCommand::RemoveFromFolder(folder_name, items.clone()));
-			MenuDesc { command, title }
+			let action = Some(Action::RemoveFromFolder(folder_name, items.clone()));
+			MenuDesc { action, title }
 		});
 
 		// and return!
 		let result = LocalItemContextMenuInfo {
 			run_title,
 			run_descs,
-			configure_command,
-			browse_command,
+			configure_action,
+			browse_action,
 			add_to_existing_folder_descs,
-			new_folder_command,
+			new_folder_action,
 			remove_from_folder_desc,
 		};
 		Some(result.into())
@@ -835,15 +834,15 @@ fn run_item_text(text: &str) -> String {
 struct LocalItemContextMenuInfo {
 	run_title: SharedString,
 	run_descs: Vec<MenuDesc>,
-	configure_command: Option<AppCommand>,
-	browse_command: Option<AppCommand>,
+	configure_action: Option<Action>,
+	browse_action: Option<Action>,
 	add_to_existing_folder_descs: Vec<MenuDesc>,
-	new_folder_command: AppCommand,
+	new_folder_action: Action,
 	remove_from_folder_desc: Option<MenuDesc>,
 }
 
 struct MenuDesc {
-	command: Option<AppCommand>,
+	action: Option<Action>,
 	title: SharedString,
 }
 
@@ -853,27 +852,19 @@ impl From<LocalItemContextMenuInfo> for ItemContextMenuInfo {
 		let run_descs = value
 			.run_descs
 			.into_iter()
-			.map(|desc| {
-				let command = desc
-					.command
-					.as_ref()
-					.map(AppCommand::encode_for_slint)
-					.unwrap_or_default();
-				let title = desc.title;
-				SimpleMenuEntry { command, title }
-			})
+			.map(MenuDesc::encode_for_slint)
 			.collect::<Vec<_>>();
 		let run_descs = VecModel::from(run_descs);
 		let run_descs = ModelRc::new(run_descs);
-		let configure_command = value
-			.configure_command
+		let configure_action = value
+			.configure_action
 			.as_ref()
-			.map(AppCommand::encode_for_slint)
+			.map(Action::encode_for_slint)
 			.unwrap_or_default();
-		let browse_command = value
-			.browse_command
+		let browse_action = value
+			.browse_action
 			.as_ref()
-			.map(AppCommand::encode_for_slint)
+			.map(Action::encode_for_slint)
 			.unwrap_or_default();
 		let add_to_existing_folder_descs = value
 			.add_to_existing_folder_descs
@@ -882,7 +873,7 @@ impl From<LocalItemContextMenuInfo> for ItemContextMenuInfo {
 			.collect::<Vec<_>>();
 		let add_to_existing_folder_descs = VecModel::from(add_to_existing_folder_descs);
 		let add_to_existing_folder_descs = ModelRc::new(add_to_existing_folder_descs);
-		let new_folder_command = value.new_folder_command.encode_for_slint();
+		let new_folder_action = value.new_folder_action.encode_for_slint();
 		let remove_from_folder_desc = value
 			.remove_from_folder_desc
 			.map(MenuDesc::encode_for_slint)
@@ -890,23 +881,19 @@ impl From<LocalItemContextMenuInfo> for ItemContextMenuInfo {
 		Self {
 			run_title,
 			run_descs,
-			configure_command,
-			browse_command,
+			configure_action,
+			browse_action,
 			add_to_existing_folder_descs,
-			new_folder_command,
+			new_folder_action,
 			remove_from_folder_desc,
 		}
 	}
 }
 
 impl MenuDesc {
-	pub fn encode_for_slint(self) -> (SharedString, SharedString) {
-		(
-			self.command
-				.as_ref()
-				.map(AppCommand::encode_for_slint)
-				.unwrap_or_default(),
-			self.title,
-		)
+	pub fn encode_for_slint(self) -> SimpleMenuEntry {
+		let action = self.action.as_ref().map(Action::encode_for_slint).unwrap_or_default();
+		let title = self.title.clone();
+		SimpleMenuEntry { action, title }
 	}
 }

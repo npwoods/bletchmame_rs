@@ -14,7 +14,7 @@ use anyhow::Result;
 use slint::invoke_from_event_loop;
 use throttle::Throttle;
 
-use crate::appcommand::AppCommand;
+use crate::action::Action;
 use crate::console::Console;
 use crate::info::InfoDb;
 use crate::job::Job;
@@ -86,7 +86,7 @@ struct Fixed {
 	callback: CommandCallback,
 }
 
-type CommandCallback = Rc<dyn Fn(AppCommand) + 'static>;
+type CommandCallback = Rc<dyn Fn(Action) + 'static>;
 
 #[derive(Default, Debug)]
 pub struct Report<'a> {
@@ -100,7 +100,7 @@ pub struct Report<'a> {
 #[derive(Clone, Debug)]
 pub struct Button {
 	pub text: Cow<'static, str>,
-	pub command: AppCommand,
+	pub command: Action,
 }
 
 #[derive(Clone, Debug)]
@@ -116,7 +116,7 @@ impl AppState {
 		paths: Rc<PrefsPaths>,
 		mame_windowing: MameWindowing,
 		mame_stderr: MameStderr,
-		callback: impl Fn(AppCommand) + 'static,
+		callback: impl Fn(Action) + 'static,
 	) -> Self {
 		let console = Arc::new(Mutex::new(None));
 		let callback = Rc::from(callback);
@@ -591,7 +591,7 @@ impl AppState {
 				let submessage = machine_description.map(Cow::Borrowed).unwrap_or_default();
 				let button = Button {
 					text: "Cancel".into(),
-					command: AppCommand::InfoDbBuildCancel,
+					command: Action::InfoDbBuildCancel,
 				};
 				Report {
 					message,
@@ -621,7 +621,7 @@ impl AppState {
 						let text = problem.to_string().into();
 						let button = problem.problem_type().map(|path_type| {
 							let text = Cow::Owned(format!("Choose {path_type}"));
-							let command = AppCommand::SettingsPaths(Some(path_type));
+							let command = Action::SettingsPaths(Some(path_type));
 							Button { text, command }
 						});
 						Issue { text, button }
@@ -636,7 +636,7 @@ impl AppState {
 			ReportType::SessionError(error) => {
 				let button = Button {
 					text: "Continue".into(),
-					command: AppCommand::ReactivateMame
+					command: Action::ReactivateMame
 				};
 				Report {
 					message: "MAME has errored".into(),
@@ -668,7 +668,7 @@ impl AppState {
 				let submessage = error.map(|e| Cow::Owned(e.to_string()));
 				let button = Button {
 					text: "Retry".into(),
-					command: AppCommand::HelpRefreshInfoDb,
+					command: Action::HelpRefreshInfoDb,
 				};
 				Report {
 					message: Cow::Borrowed(message),
@@ -682,7 +682,7 @@ impl AppState {
 				let submessage = Some("This is a very unexpected internal error".into());
 				let button = Button {
 					text: "Retry".into(),
-					command: AppCommand::HelpRefreshInfoDb,
+					command: Action::HelpRefreshInfoDb,
 				};
 				Report {
 					message,
@@ -775,7 +775,7 @@ fn infodb_build_thread_proc(
 		// do we need to update
 		if throttle.accept().is_ok() {
 			let machine_description = machine_description.to_string();
-			let command = AppCommand::InfoDbBuildProgress { machine_description };
+			let command = Action::InfoDbBuildProgress { machine_description };
 			invoke_command_clone(command);
 		}
 
@@ -792,7 +792,7 @@ fn infodb_build_thread_proc(
 	}
 
 	// signal that we're done
-	invoke_command(AppCommand::InfoDbBuildComplete);
+	invoke_command(Action::InfoDbBuildComplete);
 
 	// and return the result
 	result

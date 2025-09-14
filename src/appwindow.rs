@@ -27,7 +27,7 @@ use tracing::debug_span;
 use tracing::info;
 use tracing::info_span;
 
-use crate::appcommand::AppCommand;
+use crate::action::Action;
 use crate::appstate::AppState;
 use crate::backend::BackendRuntime;
 use crate::backend::ChildWindow;
@@ -364,9 +364,9 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 
 	// attach the menu bar (either natively or with an approximation using Slint); looking forward to Slint having first class menuing support
 	let model_clone = model.clone();
-	app_window.on_menu_item_command(move |command_string| {
-		if let Some(command) = AppCommand::decode_from_slint(command_string) {
-			handle_command(&model_clone, command);
+	app_window.on_menu_item_action(move |command_string| {
+		if let Some(command) = Action::decode_from_slint(command_string) {
+			handle_action(&model_clone, command);
 		}
 	});
 
@@ -384,21 +384,21 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 
 	// set up the accelerator map
 	let accelerator_command_map = [
-		("Pause", AppCommand::FilePause),
-		("F7", AppCommand::FileQuickLoadState),
-		("Shift+F7", AppCommand::FileQuickLoadState),
-		("Ctrl+F7", AppCommand::FileLoadState),
-		("Ctrl+Shift+F7", AppCommand::FileLoadState),
-		("F12", AppCommand::FileSaveScreenshot),
-		("Shift+F12", AppCommand::FileRecordMovie),
-		("Ctrl+Alt+X", AppCommand::FileExit),
-		("F9", AppCommand::OptionsThrottleSpeedIncrease),
-		("F8", AppCommand::OptionsThrottleSpeedDecrease),
-		("F10", AppCommand::OptionsToggleWarp),
-		("F11", AppCommand::OptionsToggleFullScreen),
-		("ScrLk", AppCommand::OptionsToggleMenuBar),
+		("Pause", Action::FilePause),
+		("F7", Action::FileQuickLoadState),
+		("Shift+F7", Action::FileQuickLoadState),
+		("Ctrl+F7", Action::FileLoadState),
+		("Ctrl+Shift+F7", Action::FileLoadState),
+		("F12", Action::FileSaveScreenshot),
+		("Shift+F12", Action::FileRecordMovie),
+		("Ctrl+Alt+X", Action::FileExit),
+		("F9", Action::OptionsThrottleSpeedIncrease),
+		("F8", Action::OptionsThrottleSpeedDecrease),
+		("F10", Action::OptionsToggleWarp),
+		("F11", Action::OptionsToggleFullScreen),
+		("ScrLk", Action::OptionsToggleMenuBar),
 	];
-	let accelerator_command_map = HashMap::<WinitAccelerator, AppCommand>::from_iter(
+	let accelerator_command_map = HashMap::<WinitAccelerator, Action>::from_iter(
 		accelerator_command_map.into_iter().map(|(accelerator, command)| {
 			let accelerator = WinitAccelerator::from_str(accelerator).unwrap();
 			(accelerator, command)
@@ -410,7 +410,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		.install_muda_accelerator_handler(app_window.window(), move |accelerator| {
 			let command = accelerator_command_map.get(accelerator);
 			if let Some(command) = command {
-				handle_command(&model_clone, command.clone());
+				handle_action(&model_clone, command.clone());
 			}
 			command.is_some()
 		});
@@ -441,8 +441,8 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		let index = index.try_into().unwrap();
 		if let Some(collection) = collections_view_model_clone.get(index) {
 			let collection = Rc::unwrap_or_clone(collection);
-			let command = AppCommand::Browse(collection);
-			handle_command(&model_clone, command);
+			let command = Action::Browse(collection);
+			handle_action(&model_clone, command);
 		}
 	});
 
@@ -450,13 +450,13 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	let model_clone = model.clone();
 	app_window.on_history_advance_clicked(move |delta| {
 		let delta = delta.try_into().unwrap();
-		handle_command(&model_clone, AppCommand::HistoryAdvance(delta));
+		handle_action(&model_clone, Action::HistoryAdvance(delta));
 	});
 
 	// set up bookmark collection button
 	let model_clone = model.clone();
 	app_window.on_bookmark_collection_clicked(move || {
-		handle_command(&model_clone, AppCommand::BookmarkCurrentCollection);
+		handle_action(&model_clone, Action::BookmarkCurrentCollection);
 	});
 
 	// set up items columns
@@ -489,23 +489,23 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	});
 	let model_clone = model.clone();
 	app_window.on_items_search_text_changed(move |search| {
-		let command = AppCommand::SearchText(search.into());
-		handle_command(&model_clone, command);
+		let command = Action::SearchText(search.into());
+		handle_action(&model_clone, command);
 	});
 	app_window.set_items_search_text(SharedString::from(
 		&model.preferences.borrow().current_history_entry().search,
 	));
 	let model_clone = model.clone();
 	app_window.on_items_current_row_changed(move || {
-		let command = AppCommand::ItemsSelectedChanged;
-		handle_command(&model_clone, command);
+		let command = Action::ItemsSelectedChanged;
+		handle_action(&model_clone, command);
 	});
 
 	// for when we shut down
 	let model_clone = model.clone();
 	app_window.window().on_close_requested(move || {
-		let command = AppCommand::FileExit;
-		handle_command(&model_clone, command);
+		let command = Action::FileExit;
+		handle_action(&model_clone, command);
 		CloseRequestResponse::KeepWindowShown
 	});
 
@@ -546,7 +546,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 			let state = model_clone.state.borrow();
 			state.report().unwrap().button.unwrap().command
 		};
-		handle_command(&model_clone, command);
+		handle_action(&model_clone, command);
 	});
 
 	// issue button
@@ -558,7 +558,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 			let issue = state.report().unwrap().issues.into_iter().nth(index).unwrap();
 			issue.button.unwrap().command
 		};
-		handle_command(&model_clone, command);
+		handle_action(&model_clone, command);
 	});
 
 	// throttle menu
@@ -566,8 +566,8 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		.iter()
 		.map(|&rate| {
 			let title = format!("{}%", (rate * 100.0) as u32).into();
-			let command = AppCommand::OptionsThrottleRate(rate).encode_for_slint();
-			SimpleMenuEntry { title, command }
+			let action = Action::OptionsThrottleRate(rate).encode_for_slint();
+			SimpleMenuEntry { title, action }
 		})
 		.collect::<Vec<_>>();
 	let menu_entries_throttle = VecModel::from(menu_entries_throttle);
@@ -582,8 +582,8 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 				None => "Auto".to_shared_string(),
 				Some(n) => format!("{}", n).into(),
 			};
-			let command = AppCommand::OptionsFrameskip(rate).encode_for_slint();
-			SimpleMenuEntry { title, command }
+			let action = Action::OptionsFrameskip(rate).encode_for_slint();
+			SimpleMenuEntry { title, action }
 		})
 		.collect::<Vec<_>>();
 	let menu_entries_frameskip = VecModel::from(menu_entries_frameskip);
@@ -594,8 +594,8 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	let menu_entries_builtin_collections = BuiltinCollection::iter()
 		.map(|b| {
 			let title = b.to_shared_string();
-			let command = AppCommand::SettingsToggleBuiltinCollection(b).encode_for_slint();
-			SimpleMenuEntry { title, command }
+			let action = Action::SettingsToggleBuiltinCollection(b).encode_for_slint();
+			SimpleMenuEntry { title, action }
 		})
 		.collect::<Vec<_>>();
 	let menu_entries_builtin_collections = VecModel::from(menu_entries_builtin_collections);
@@ -604,40 +604,40 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 
 	// menu commands
 	{
-		use AppCommand::*;
-		app_window.set_menu_command_file_stop(FileStop.encode_for_slint());
-		app_window.set_menu_command_file_pause(FilePause.encode_for_slint());
-		app_window.set_menu_command_file_devices_and_images(FileDevicesAndImages.encode_for_slint());
-		app_window.set_menu_command_file_quick_load_state(FileQuickLoadState.encode_for_slint());
-		app_window.set_menu_command_file_quick_save_state(FileQuickSaveState.encode_for_slint());
-		app_window.set_menu_command_file_load_state(FileLoadState.encode_for_slint());
-		app_window.set_menu_command_file_save_state(FileSaveState.encode_for_slint());
-		app_window.set_menu_command_file_save_screenshot(FileSaveScreenshot.encode_for_slint());
-		app_window.set_menu_command_file_record_movie(FileRecordMovie.encode_for_slint());
-		app_window.set_menu_command_file_debugger(FileDebugger.encode_for_slint());
-		app_window.set_menu_command_file_reset_soft(FileResetSoft.encode_for_slint());
-		app_window.set_menu_command_file_reset_hard(FileResetHard.encode_for_slint());
-		app_window.set_menu_command_file_exit(FileExit.encode_for_slint());
-		app_window.set_menu_command_options_throttle_speed_increase(OptionsThrottleSpeedIncrease.encode_for_slint());
-		app_window.set_menu_command_options_throttle_speed_decrease(OptionsThrottleSpeedDecrease.encode_for_slint());
-		app_window.set_menu_command_options_toggle_warp(OptionsToggleWarp.encode_for_slint());
-		app_window.set_menu_command_options_toggle_fullscreen(OptionsToggleFullScreen.encode_for_slint());
-		app_window.set_menu_command_options_toggle_menubar(OptionsToggleMenuBar.encode_for_slint());
-		app_window.set_menu_command_options_toggle_sound(OptionsToggleSound.encode_for_slint());
-		app_window.set_menu_command_options_cheats(OptionsCheats.encode_for_slint());
-		app_window.set_menu_command_options_classic(OptionsClassic.encode_for_slint());
-		app_window.set_menu_command_options_console(OptionsConsole.encode_for_slint());
-		app_window.set_menu_command_settings_input_controller(SettingsInput(InputClass::Controller).encode_for_slint());
-		app_window.set_menu_command_settings_input_keyboard(SettingsInput(InputClass::Keyboard).encode_for_slint());
-		app_window.set_menu_command_settings_input_misc(SettingsInput(InputClass::Misc).encode_for_slint());
-		app_window.set_menu_command_settings_input_config(SettingsInput(InputClass::Config).encode_for_slint());
-		app_window.set_menu_command_settings_input_dipswitch(SettingsInput(InputClass::DipSwitch).encode_for_slint());
-		app_window.set_menu_command_settings_paths(SettingsPaths(None).encode_for_slint());
-		app_window.set_menu_command_settings_reset(SettingsReset.encode_for_slint());
-		app_window.set_menu_command_settings_import_mame_ini(SettingsImportMameIni.encode_for_slint());
-		app_window.set_menu_command_help_refresh_info_db(HelpRefreshInfoDb.encode_for_slint());
-		app_window.set_menu_command_help_website(HelpWebSite.encode_for_slint());
-		app_window.set_menu_command_help_about(HelpAbout.encode_for_slint());
+		use Action::*;
+		app_window.set_menu_action_file_stop(FileStop.encode_for_slint());
+		app_window.set_menu_action_file_pause(FilePause.encode_for_slint());
+		app_window.set_menu_action_file_devices_and_images(FileDevicesAndImages.encode_for_slint());
+		app_window.set_menu_action_file_quick_load_state(FileQuickLoadState.encode_for_slint());
+		app_window.set_menu_action_file_quick_save_state(FileQuickSaveState.encode_for_slint());
+		app_window.set_menu_action_file_load_state(FileLoadState.encode_for_slint());
+		app_window.set_menu_action_file_save_state(FileSaveState.encode_for_slint());
+		app_window.set_menu_action_file_save_screenshot(FileSaveScreenshot.encode_for_slint());
+		app_window.set_menu_action_file_record_movie(FileRecordMovie.encode_for_slint());
+		app_window.set_menu_action_file_debugger(FileDebugger.encode_for_slint());
+		app_window.set_menu_action_file_reset_soft(FileResetSoft.encode_for_slint());
+		app_window.set_menu_action_file_reset_hard(FileResetHard.encode_for_slint());
+		app_window.set_menu_action_file_exit(FileExit.encode_for_slint());
+		app_window.set_menu_action_options_throttle_speed_increase(OptionsThrottleSpeedIncrease.encode_for_slint());
+		app_window.set_menu_action_options_throttle_speed_decrease(OptionsThrottleSpeedDecrease.encode_for_slint());
+		app_window.set_menu_action_options_toggle_warp(OptionsToggleWarp.encode_for_slint());
+		app_window.set_menu_action_options_toggle_fullscreen(OptionsToggleFullScreen.encode_for_slint());
+		app_window.set_menu_action_options_toggle_menubar(OptionsToggleMenuBar.encode_for_slint());
+		app_window.set_menu_action_options_toggle_sound(OptionsToggleSound.encode_for_slint());
+		app_window.set_menu_action_options_cheats(OptionsCheats.encode_for_slint());
+		app_window.set_menu_action_options_classic(OptionsClassic.encode_for_slint());
+		app_window.set_menu_action_options_console(OptionsConsole.encode_for_slint());
+		app_window.set_menu_action_settings_input_controller(SettingsInput(InputClass::Controller).encode_for_slint());
+		app_window.set_menu_action_settings_input_keyboard(SettingsInput(InputClass::Keyboard).encode_for_slint());
+		app_window.set_menu_action_settings_input_misc(SettingsInput(InputClass::Misc).encode_for_slint());
+		app_window.set_menu_action_settings_input_config(SettingsInput(InputClass::Config).encode_for_slint());
+		app_window.set_menu_action_settings_input_dipswitch(SettingsInput(InputClass::DipSwitch).encode_for_slint());
+		app_window.set_menu_action_settings_paths(SettingsPaths(None).encode_for_slint());
+		app_window.set_menu_action_settings_reset(SettingsReset.encode_for_slint());
+		app_window.set_menu_action_settings_import_mame_ini(SettingsImportMameIni.encode_for_slint());
+		app_window.set_menu_action_help_refresh_info_db(HelpRefreshInfoDb.encode_for_slint());
+		app_window.set_menu_action_help_website(HelpWebSite.encode_for_slint());
+		app_window.set_menu_action_help_about(HelpAbout.encode_for_slint());
 	}
 
 	// initial updates
@@ -665,7 +665,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	let model_weak = Rc::downgrade(&model);
 	let state = AppState::new(prefs_path, paths, mame_windowing, args.mame_stderr, move |command| {
 		let model = model_weak.upgrade().unwrap();
-		handle_command(&model, command);
+		handle_action(&model, command);
 	});
 
 	// and lets do something with that state; specifically
@@ -680,23 +680,23 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	app_window.show().unwrap();
 }
 
-fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
+fn handle_action(model: &Rc<AppModel>, command: Action) {
 	// tracing
 	let command_str: &'static str = (&command).into();
 	let span = if command.is_frequent() {
-		debug_span!("handle_command", command = command_str)
+		debug_span!("handle_action", command = command_str)
 	} else {
-		info_span!("handle_command", command = command_str)
+		info_span!("handle_action", command = command_str)
 	};
 	let _guard = span.enter();
-	info!(command=?&command, "handle_command()");
+	info!(command=?&command, "handle_action()");
 	let start_instant = Instant::now();
 
 	match command {
-		AppCommand::FileStop => {
+		Action::FileStop => {
 			model.issue_command(MameCommand::stop());
 		}
-		AppCommand::FilePause => {
+		Action::FilePause => {
 			let is_paused = model
 				.state
 				.borrow()
@@ -710,13 +710,13 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				model.issue_command(MameCommand::pause());
 			}
 		}
-		AppCommand::FileDevicesAndImages => {
+		Action::FileDevicesAndImages => {
 			let info_db = model.state.borrow().info_db().cloned().unwrap();
 			let diconfig = DevicesImagesConfig::new(info_db);
 			let diconfig = diconfig.update_status(model.state.borrow().status().as_ref().unwrap());
 			let status_update_channel = model.status_changed_channel.clone();
 			let model_clone = model.clone();
-			let invoke_command = move |command| handle_command(&model_clone, command);
+			let invoke_command = move |command| handle_action(&model_clone, command);
 			let fut = dialog_devices_and_images(
 				model.modal_stack.clone(),
 				diconfig,
@@ -725,15 +725,15 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			);
 			spawn_local(fut).unwrap();
 		}
-		AppCommand::FileQuickLoadState => {
+		Action::FileQuickLoadState => {
 			let last_save_state = model.state.borrow().last_save_state().unwrap();
 			model.issue_command(MameCommand::state_load(last_save_state));
 		}
-		AppCommand::FileQuickSaveState => {
+		Action::FileQuickSaveState => {
 			let last_save_state = model.state.borrow().last_save_state().unwrap();
 			model.issue_command(MameCommand::state_save(last_save_state));
 		}
-		AppCommand::FileLoadState => {
+		Action::FileLoadState => {
 			let model_clone = model.clone();
 			let fut = async move {
 				let last_save_state = model_clone.state.borrow().last_save_state();
@@ -750,7 +750,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			};
 			spawn_local(fut).unwrap();
 		}
-		AppCommand::FileSaveState => {
+		Action::FileSaveState => {
 			let model_clone = model.clone();
 			let fut = async move {
 				let last_save_state = model_clone.state.borrow().last_save_state();
@@ -777,7 +777,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			};
 			spawn_local(fut).unwrap();
 		}
-		AppCommand::FileSaveScreenshot => {
+		Action::FileSaveScreenshot => {
 			let model_clone = model.clone();
 			let fut = async move {
 				let model = model_clone.as_ref();
@@ -793,7 +793,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			};
 			spawn_local(fut).unwrap();
 		}
-		AppCommand::FileRecordMovie => {
+		Action::FileRecordMovie => {
 			let is_recording = model
 				.state
 				.borrow()
@@ -826,22 +826,22 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				spawn_local(fut).unwrap();
 			}
 		}
-		AppCommand::FileDebugger => {
+		Action::FileDebugger => {
 			model.issue_command(MameCommand::debugger());
 		}
-		AppCommand::FileResetSoft => {
+		Action::FileResetSoft => {
 			model.issue_command(MameCommand::soft_reset());
 		}
-		AppCommand::FileResetHard => {
+		Action::FileResetHard => {
 			model.issue_command(MameCommand::hard_reset());
 		}
-		AppCommand::FileExit => {
+		Action::FileExit => {
 			model.update_state(AppState::shutdown);
 		}
-		AppCommand::OptionsThrottleRate(throttle) => {
+		Action::OptionsThrottleRate(throttle) => {
 			model.issue_command(MameCommand::throttle_rate(throttle));
 		}
-		AppCommand::OptionsThrottleSpeedIncrease => {
+		Action::OptionsThrottleSpeedIncrease => {
 			let state = model.state.borrow();
 			let current_rate = state.status().and_then(|s| s.running.as_ref()).map(|r| r.throttle_rate);
 			let new_rate = THROTTLE_RATES
@@ -852,7 +852,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				model.issue_command(MameCommand::throttle_rate(new_rate));
 			}
 		}
-		AppCommand::OptionsThrottleSpeedDecrease => {
+		Action::OptionsThrottleSpeedDecrease => {
 			let state = model.state.borrow();
 			let current_rate = state.status().and_then(|s| s.running.as_ref()).map(|r| r.throttle_rate);
 			let new_rate = THROTTLE_RATES.iter().find(|&r| current_rate.is_some_and(|cr| *r < cr));
@@ -860,7 +860,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				model.issue_command(MameCommand::throttle_rate(new_rate));
 			}
 		}
-		AppCommand::OptionsToggleWarp => {
+		Action::OptionsToggleWarp => {
 			let is_throttled = model
 				.state
 				.borrow()
@@ -870,10 +870,10 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				.unwrap_or_default();
 			model.issue_command(MameCommand::throttled(!is_throttled));
 		}
-		AppCommand::OptionsFrameskip(rate) => {
+		Action::OptionsFrameskip(rate) => {
 			model.issue_command(MameCommand::frameskip(rate));
 		}
-		AppCommand::OptionsToggleFullScreen => {
+		Action::OptionsToggleFullScreen => {
 			let app_window = model.app_window();
 			let window = app_window.window();
 			let new_fullscreen = !window.is_fullscreen();
@@ -883,7 +883,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			prefs.is_fullscreen = new_fullscreen;
 			prefs.fullscreen_display = window.fullscreen_display().map(|x| x.into());
 		}
-		AppCommand::OptionsToggleMenuBar => {
+		Action::OptionsToggleMenuBar => {
 			let has_input_using_mouse = model
 				.state
 				.borrow()
@@ -898,11 +898,11 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 
 				if has_input_using_mouse {
 					let command = MameCommand::set_mouse_enabled(!new_visible).into();
-					handle_command(model, command);
+					handle_action(model, command);
 				}
 			}
 		}
-		AppCommand::OptionsToggleSound => {
+		Action::OptionsToggleSound => {
 			match model
 				.state
 				.borrow()
@@ -925,10 +925,10 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				_ => {}
 			}
 		}
-		AppCommand::OptionsCheats => {
+		Action::OptionsCheats => {
 			let status_update_channel = model.status_changed_channel.clone();
 			let model_clone = model.clone();
-			let invoke_command = move |command| handle_command(&model_clone, command);
+			let invoke_command = move |command| handle_action(&model_clone, command);
 			let cheats = model
 				.state
 				.borrow()
@@ -942,16 +942,16 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			let fut = dialog_cheats(model.modal_stack.clone(), cheats, status_update_channel, invoke_command);
 			spawn_local(fut).unwrap();
 		}
-		AppCommand::OptionsClassic => {
+		Action::OptionsClassic => {
 			model.issue_command(MameCommand::classic_menu());
 		}
-		AppCommand::OptionsConsole => {
+		Action::OptionsConsole => {
 			let _ = model.state.borrow().show_console();
 		}
-		AppCommand::SettingsInput(class) => {
+		Action::SettingsInput(class) => {
 			let status_update_channel = model.status_changed_channel.clone();
 			let model_clone = model.clone();
-			let invoke_command = move |command| handle_command(&model_clone, command);
+			let invoke_command = move |command| handle_action(&model_clone, command);
 			let (inputs, input_device_classes, machine_index) = {
 				let state = model.state.borrow();
 				let running = state.status().unwrap().running.as_ref().unwrap();
@@ -990,16 +990,16 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				}
 			};
 		}
-		AppCommand::SettingsPaths(path_type) => {
+		Action::SettingsPaths(path_type) => {
 			let fut = show_paths_dialog(model.clone(), path_type);
 			spawn_local(fut).unwrap();
 		}
-		AppCommand::SettingsToggleBuiltinCollection(col) => {
+		Action::SettingsToggleBuiltinCollection(col) => {
 			model.modify_prefs(|prefs| {
 				toggle_builtin_collection(&mut prefs.collections, col);
 			});
 		}
-		AppCommand::SettingsReset => model.modify_prefs(|prefs| {
+		Action::SettingsReset => model.modify_prefs(|prefs| {
 			let prefs_path = {
 				let state = model.state.borrow();
 				let _ = prefs.save_backup(state.prefs_path());
@@ -1007,7 +1007,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			};
 			*prefs = Preferences::fresh(prefs_path);
 		}),
-		AppCommand::SettingsImportMameIni => {
+		Action::SettingsImportMameIni => {
 			let model_clone = model.clone();
 			let paths = model.preferences.borrow().paths.clone();
 			let fut = async move {
@@ -1021,20 +1021,20 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			};
 			spawn_local(fut).unwrap();
 		}
-		AppCommand::HelpRefreshInfoDb => {
+		Action::HelpRefreshInfoDb => {
 			model.update_state(|state| state.infodb_rebuild());
 		}
-		AppCommand::HelpWebSite => {
+		Action::HelpWebSite => {
 			let _ = open::that("https://www.bletchmame.org");
 		}
-		AppCommand::HelpAbout => {
+		Action::HelpAbout => {
 			let modal = model.modal_stack.modal(|| AboutDialog::new().unwrap());
 			modal.launch();
 		}
-		AppCommand::MameSessionEnded => {
+		Action::MameSessionEnded => {
 			model.update_state(|state| Some(state.session_ended()));
 		}
-		AppCommand::MameStatusUpdate(update) => {
+		Action::MameStatusUpdate(update) => {
 			model.update_state(|state| state.status_update(update));
 
 			// special check to restore the menu bar if we're not in the emulation
@@ -1042,15 +1042,15 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				model.app_window().set_menubar_visible(true);
 			}
 		}
-		AppCommand::ErrorMessageBox(message) => {
+		Action::ErrorMessageBox(message) => {
 			let model_clone = model.clone();
 			let fut = dialog_message_box::<OkOnly>(model_clone.modal_stack.clone(), "Error", message);
 			spawn_local(fut).unwrap();
 		}
-		AppCommand::Start(start_args) => match start_args.preflight() {
+		Action::Start(start_args) => match start_args.preflight() {
 			Ok(_) => {
 				let command = MameCommand::start(&start_args).into();
-				handle_command(model, command);
+				handle_action(model, command);
 			}
 			Err(errors) => {
 				let message = errors.into_iter().map(|e| e.to_string()).collect::<String>();
@@ -1060,19 +1060,19 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				spawn_local(fut).unwrap();
 			}
 		},
-		AppCommand::IssueMameCommand(command) => {
+		Action::IssueMameCommand(command) => {
 			model.issue_command(command);
 		}
-		AppCommand::Browse(collection) => {
+		Action::Browse(collection) => {
 			let collection = Rc::new(collection);
 			model.modify_prefs(|prefs| {
 				prefs.history_push(collection);
 			});
 		}
-		AppCommand::HistoryAdvance(delta) => {
+		Action::HistoryAdvance(delta) => {
 			model.modify_prefs(|prefs| prefs.history_advance(delta));
 		}
-		AppCommand::SearchText(search) => {
+		Action::SearchText(search) => {
 			model.modify_prefs(|prefs| {
 				// modify the search text
 				let current_entry = prefs.current_history_entry_mut();
@@ -1080,7 +1080,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				current_entry.search = search;
 			});
 		}
-		AppCommand::ItemsSort(column_index, order) => {
+		Action::ItemsSort(column_index, order) => {
 			model.modify_prefs(|prefs| {
 				for (index, column) in prefs.items_columns.iter_mut().enumerate() {
 					column.sort = (index == column_index).then_some(order);
@@ -1088,39 +1088,39 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				prefs.current_history_entry_mut().sort_suppressed = false;
 			});
 		}
-		AppCommand::ItemsSelectedChanged => {
+		Action::ItemsSelectedChanged => {
 			let selection = model.with_items_table_model(|x| x.current_selection());
 			model.modify_prefs(|prefs| {
 				prefs.current_history_entry_mut().selection = selection;
 			});
 		}
-		AppCommand::AddToExistingFolder(folder_index, new_items) => {
+		Action::AddToExistingFolder(folder_index, new_items) => {
 			model.modify_prefs(|prefs| {
 				add_items_to_existing_folder_collection(&mut prefs.collections, folder_index, new_items);
 			});
 		}
-		AppCommand::AddToNewFolder(name, items) => {
+		Action::AddToNewFolder(name, items) => {
 			model.modify_prefs(|prefs| {
 				add_items_to_new_folder_collection(&mut prefs.collections, name, items);
 			});
 		}
-		AppCommand::AddToNewFolderDialog(items) => {
+		Action::AddToNewFolderDialog(items) => {
 			let existing_names = get_folder_collection_names(&model.preferences.borrow().collections);
 			let model_clone = model.clone();
 			let fut = async move {
 				if let Some(name) = dialog_new_collection(model_clone.modal_stack.clone(), existing_names).await {
-					let command = AppCommand::AddToNewFolder(name, items);
-					handle_command(&model_clone, command);
+					let command = Action::AddToNewFolder(name, items);
+					handle_action(&model_clone, command);
 				}
 			};
 			spawn_local(fut).unwrap();
 		}
-		AppCommand::RemoveFromFolder(name, items) => {
+		Action::RemoveFromFolder(name, items) => {
 			model.modify_prefs(|prefs| {
 				remove_items_from_folder_collection(&mut prefs.collections, name, &items);
 			});
 		}
-		AppCommand::MoveCollection { old_index, new_index } => {
+		Action::MoveCollection { old_index, new_index } => {
 			model.modify_prefs(|prefs| {
 				// detach the collection we're moving
 				let collection = prefs.collections.remove(old_index);
@@ -1135,7 +1135,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				}
 			});
 		}
-		AppCommand::DeleteCollectionDialog { index } => {
+		Action::DeleteCollectionDialog { index } => {
 			let model_clone = model.clone();
 			let old_name = get_collection_name(&model.preferences.borrow().collections, index).to_string();
 			let fut = async move {
@@ -1143,16 +1143,16 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				if dialog_message_box::<OkCancel>(model_clone.modal_stack.clone(), "Delete", message).await
 					== OkCancel::Ok
 				{
-					let command = AppCommand::MoveCollection {
+					let command = Action::MoveCollection {
 						old_index: index,
 						new_index: None,
 					};
-					handle_command(&model_clone, command);
+					handle_action(&model_clone, command);
 				}
 			};
 			spawn_local(fut).unwrap();
 		}
-		AppCommand::RenameCollectionDialog { index } => {
+		Action::RenameCollectionDialog { index } => {
 			let existing_names = get_folder_collection_names(&model.preferences.borrow().collections);
 			let model_clone = model.clone();
 			let old_name = get_collection_name(&model.preferences.borrow().collections, index).to_string();
@@ -1160,22 +1160,22 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				if let Some(new_name) =
 					dialog_rename_collection(model_clone.modal_stack.clone(), existing_names, old_name).await
 				{
-					let command = AppCommand::RenameCollection { index, new_name };
-					handle_command(&model_clone, command);
+					let command = Action::RenameCollection { index, new_name };
+					handle_action(&model_clone, command);
 				}
 			};
 			spawn_local(fut).unwrap();
 		}
-		AppCommand::RenameCollection { index, new_name } => model.modify_prefs(|prefs| {
+		Action::RenameCollection { index, new_name } => model.modify_prefs(|prefs| {
 			prefs.rename_folder(index, new_name);
 		}),
-		AppCommand::BookmarkCurrentCollection => {
+		Action::BookmarkCurrentCollection => {
 			let (collection, _) = model.preferences.borrow().current_collection();
 			model.modify_prefs(|prefs| {
 				prefs.collections.push(collection);
 			})
 		}
-		AppCommand::LoadImageDialog { tag } => {
+		Action::LoadImageDialog { tag } => {
 			let formats = {
 				let state = model.state.borrow();
 				let image = state
@@ -1201,31 +1201,31 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			let fut = async move {
 				if let Some(image_desc) = dialog_load_image(model_clone.modal_stack.clone(), &formats).await {
 					let command = MameCommand::load_image(tag, &image_desc).into();
-					handle_command(&model_clone, command);
+					handle_action(&model_clone, command);
 				}
 			};
 			spawn_local(fut).unwrap();
 		}
-		AppCommand::UnloadImage { tag } => {
+		Action::UnloadImage { tag } => {
 			model.issue_command(MameCommand::unload_image(&tag));
 		}
-		AppCommand::ConnectToSocketDialog { tag } => {
+		Action::ConnectToSocketDialog { tag } => {
 			let model_clone = model.clone();
 			let fut = async move {
 				if let Some(image_desc) = dialog_connect_to_socket(model_clone.modal_stack.clone()).await {
 					let command = MameCommand::load_image(tag, &image_desc).into();
-					handle_command(&model_clone, command);
+					handle_action(&model_clone, command);
 				}
 			};
 			spawn_local(fut).unwrap();
 		}
-		AppCommand::InfoDbBuildProgress { machine_description } => {
+		Action::InfoDbBuildProgress { machine_description } => {
 			model.update_state(|state| Some(state.infodb_build_progress(machine_description)))
 		}
-		AppCommand::InfoDbBuildComplete => model.update_state(|state| Some(state.infodb_build_complete())),
-		AppCommand::InfoDbBuildCancel => model.update_state(|state| Some(state.infodb_build_cancel())),
-		AppCommand::ReactivateMame => model.update_state(AppState::activate),
-		AppCommand::Configure { folder_name, index } => {
+		Action::InfoDbBuildComplete => model.update_state(|state| Some(state.infodb_build_complete())),
+		Action::InfoDbBuildCancel => model.update_state(|state| Some(state.infodb_build_cancel())),
+		Action::ReactivateMame => model.update_state(AppState::activate),
+		Action::Configure { folder_name, index } => {
 			let model_clone = model.clone();
 			let info_db = model.state.borrow().info_db().unwrap().clone();
 			let (folder_index, item) = model
@@ -1261,7 +1261,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			};
 			spawn_local(fut).unwrap();
 		}
-		AppCommand::SeqPollDialog {
+		Action::SeqPollDialog {
 			port_tag,
 			mask,
 			seq_type,
@@ -1277,7 +1277,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				.unwrap_or_default();
 			let status_changed_channel = model.status_changed_channel.clone();
 			let model_clone = model.clone();
-			let invoke_command = move |command| handle_command(&model_clone, command);
+			let invoke_command = move |command| handle_action(&model_clone, command);
 			let fut = dialog_seq_poll(
 				modal_stack,
 				port_tag,
@@ -1291,7 +1291,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			);
 			spawn_local(fut).unwrap();
 		}
-		AppCommand::InputXyDialog { x_input, y_input } => {
+		Action::InputXyDialog { x_input, y_input } => {
 			let modal_stack: ModalStack = model.modal_stack.clone();
 			let (inputs, input_device_classes) = model
 				.state
@@ -1302,7 +1302,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 				.unwrap_or_default();
 			let status_changed_channel = model.status_changed_channel.clone();
 			let model_clone = model.clone();
-			let invoke_command = move |command| handle_command(&model_clone, command);
+			let invoke_command = move |command| handle_action(&model_clone, command);
 			let fut = dialog_input_xy(
 				modal_stack,
 				x_input,
@@ -1314,13 +1314,13 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 			);
 			spawn_local(fut).unwrap();
 		}
-		AppCommand::InputSelectMultipleDialog { selections } => {
+		Action::InputSelectMultipleDialog { selections } => {
 			let modal_stack = model.modal_stack.clone();
 			let model = model.clone();
 			let fut = async move {
 				let command = dialog_input_select_multiple(modal_stack, selections).await;
 				if let Some(command) = command {
-					handle_command(&model, command);
+					handle_action(&model, command);
 				}
 			};
 			spawn_local(fut).unwrap();
@@ -1328,7 +1328,7 @@ fn handle_command(model: &Rc<AppModel>, command: AppCommand) {
 	};
 
 	// finish up
-	debug!(duration=?start_instant.elapsed(), "handle_command");
+	debug!(duration=?start_instant.elapsed(), "handle_action");
 }
 
 async fn show_paths_dialog(model: Rc<AppModel>, path_type: Option<PathType>) {
@@ -1556,6 +1556,6 @@ fn update_empty_reason(model: &AppModel, empty_reason: Option<EmptyReason>) {
 
 fn items_set_sorting(model: &Rc<AppModel>, column: i32, order: SortOrder) {
 	let column = usize::try_from(column).unwrap();
-	let command = AppCommand::ItemsSort(column, order);
-	handle_command(model, command);
+	let command = Action::ItemsSort(column, order);
+	handle_action(model, command);
 }

@@ -11,7 +11,7 @@ use slint::ModelTracker;
 use slint::Weak;
 use slint::spawn_local;
 
-use crate::appcommand::AppCommand;
+use crate::action::Action;
 use crate::info::InfoDb;
 use crate::prefs::PrefsCollection;
 use crate::ui::AppWindow;
@@ -66,16 +66,16 @@ impl CollectionsViewModel {
 			let items = self.items.borrow();
 			if old_index > 0 {
 				let new_index = Some(old_index - 1);
-				let command = AppCommand::MoveCollection { old_index, new_index };
+				let command = Action::MoveCollection { old_index, new_index };
 				result.move_up_command = command.encode_for_slint();
 			}
 			if old_index < items.len() - 1 {
 				let new_index = Some(old_index + 1);
-				let command = AppCommand::MoveCollection { old_index, new_index };
+				let command = Action::MoveCollection { old_index, new_index };
 				result.move_down_command = command.encode_for_slint();
 			}
 			if items.len() > 1 {
-				let command = AppCommand::DeleteCollectionDialog { index: old_index };
+				let command = Action::DeleteCollectionDialog { index: old_index };
 				result.delete_command = command.encode_for_slint();
 			}
 			if items
@@ -83,13 +83,13 @@ impl CollectionsViewModel {
 				.map(|x| matches!(x.as_ref(), PrefsCollection::Folder { .. }))
 				.unwrap_or_default()
 			{
-				let command = AppCommand::RenameCollectionDialog { index: old_index };
+				let command = Action::RenameCollectionDialog { index: old_index };
 				result.rename_command = command.encode_for_slint();
 			}
 		}
 
 		// new collection
-		let command = AppCommand::AddToNewFolderDialog([].into());
+		let command = Action::AddToNewFolderDialog([].into());
 		result.new_collection_command = command.encode_for_slint();
 
 		// make the popup menu

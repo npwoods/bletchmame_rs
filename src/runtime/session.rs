@@ -25,7 +25,7 @@ use tracing::Level;
 use tracing::info;
 use tracing::span;
 
-use crate::appcommand::AppCommand;
+use crate::action::Action;
 use crate::console::Console;
 use crate::console::EmitType;
 use crate::job::Job;
@@ -59,15 +59,15 @@ pub fn spawn_mame_session_thread(
 	mame_windowing: &MameWindowing,
 	mame_stderr: MameStderr,
 	console: Arc<Mutex<Option<Console>>>,
-	callback: Rc<dyn Fn(AppCommand) + 'static>,
+	callback: Rc<dyn Fn(Action) + 'static>,
 ) -> (Job<Result<()>>, Sender<MameCommand>) {
 	let callback_bubble = ThreadLocalBubble::new(callback);
 	let event_callback = move |event| {
 		let callback_bubble = callback_bubble.clone();
 		invoke_from_event_loop(move || {
 			let command = match event {
-				MameEvent::SessionEnded => AppCommand::MameSessionEnded,
-				MameEvent::StatusUpdate(update) => AppCommand::MameStatusUpdate(update),
+				MameEvent::SessionEnded => Action::MameSessionEnded,
+				MameEvent::StatusUpdate(update) => Action::MameStatusUpdate(update),
 			};
 			(callback_bubble.unwrap())(command)
 		})

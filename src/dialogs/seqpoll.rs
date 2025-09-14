@@ -10,7 +10,7 @@ use slint::SharedString;
 use slint::VecModel;
 use tokio::sync::mpsc;
 
-use crate::appcommand::AppCommand;
+use crate::action::Action;
 use crate::channel::Channel;
 use crate::dialogs::SenderExt;
 use crate::guiutils::modal::ModalStack;
@@ -38,7 +38,7 @@ pub async fn dialog_seq_poll(
 	inputs: impl AsRef<[Input]>,
 	input_device_classes: impl AsRef<[InputDeviceClass]>,
 	status_changed_channel: Channel<Status>,
-	invoke_command: impl Fn(AppCommand) + Clone + 'static,
+	invoke_command: impl Fn(Action) + Clone + 'static,
 ) {
 	// prepare the dialog
 	let modal = modal_stack.modal(|| SeqPollDialog::new().unwrap());
