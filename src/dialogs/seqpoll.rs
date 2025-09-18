@@ -97,7 +97,7 @@ pub async fn dialog_seq_poll(
 			let command = MameCommand::seq_set(&seqs);
 			(item.name.as_str(), command)
 		})
-		.sorted_by_key(|(name, _)| (*name))
+		.sorted_by_key(|(name, _)| *name)
 		.map(|(name, command)| (SharedString::from(name), command))
 		.unzip();
 
