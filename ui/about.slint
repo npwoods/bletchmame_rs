@@ -1,13 +1,14 @@
 import { AboutSlint, Button, VerticalBox, HorizontalBox } from "std-widgets.slint";
+import { Icons } from "icons.slint";
 
 export component AboutDialog inherits Window {
     title: "About BletchMAME";
-    icon: @image-url("bletchmame.png");
+    icon: Icons.bletchmame;
     HorizontalBox {
         Image {
             width: 192px;
             height: 192px;
-            source: @image-url("bletchmame.png");
+            source: Icons.bletchmame;
         }
 
         VerticalBox {

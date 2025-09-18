@@ -1,9 +1,10 @@
 
 import { VerticalBox, HorizontalBox, Button } from "std-widgets.slint";
+import { Icons } from "icons.slint";
 
 export component SeqPollDialog inherits Window {
     title: dialog-title;
-    icon: @image-url("bletchmame.png");
+    icon: Icons.bletchmame;
 
     // properties
     in property <string> dialog-title;

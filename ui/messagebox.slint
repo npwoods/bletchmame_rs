@@ -1,4 +1,5 @@
 import { Button, VerticalBox, HorizontalBox } from "std-widgets.slint";
+import { Icons } from "icons.slint";
 
 export component MessageBoxDialog inherits Window {
     in property <string> title-text;
@@ -6,7 +7,7 @@ export component MessageBoxDialog inherits Window {
     in property <[string]> button-texts;
     callback button-clicked(int);
     title: title-text;
-    icon: @image-url("bletchmame.png");
+    icon: Icons.bletchmame;
     VerticalBox {
         Text {
             text: message-text;

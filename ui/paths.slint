@@ -1,4 +1,5 @@
 import { AboutSlint, Button, VerticalBox, HorizontalBox, ComboBox, StandardListView, StandardButton, ListView, LineEdit, Palette } from "std-widgets.slint";
+import { Icons } from "icons.slint";
 
 struct PathsListViewItem {
     text: string,
@@ -90,7 +91,7 @@ component PathsListView {
 
 export component PathsDialog inherits Window {
     title: "Paths";
-    icon: @image-url("bletchmame.png");
+    icon: Icons.bletchmame;
 
     // properties
     in property <[string]> path-labels;

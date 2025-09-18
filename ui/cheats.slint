@@ -1,4 +1,5 @@
 import { GridBox, VerticalBox, HorizontalBox, Button, StandardButton, ScrollView, CheckBox, Slider, ComboBox } from "std-widgets.slint";
+import { Icons } from "icons.slint";
 
 export struct CheatsDialogEntry {
     cheat-type: string,
@@ -15,7 +16,7 @@ export struct CheatsDialogEntry {
 
 export component CheatsDialog inherits Window {
     title: "Cheats";
-    icon: @image-url("bletchmame.png");
+    icon: Icons.bletchmame;
     preferred-width: 600px;
     preferred-height: 500px;
 

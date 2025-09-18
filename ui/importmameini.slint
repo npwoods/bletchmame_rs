@@ -1,4 +1,5 @@
 import { VerticalBox, GridBox, HorizontalBox, StandardButton, ComboBox, ListView } from "std-widgets.slint";
+import { Icons } from "icons.slint";
 
 export struct ImportMameIniDialogEntry {
     path-type: string,
@@ -9,7 +10,7 @@ export struct ImportMameIniDialogEntry {
 
 export component ImportMameIniDialog inherits Window {
     title: "Import MAME INI";
-    icon: @image-url("bletchmame.png");
+    icon: Icons.bletchmame;
     preferred-width: 600px;
     preferred-height: 500px;
 
