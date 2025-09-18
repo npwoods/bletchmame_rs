@@ -716,7 +716,6 @@ dependencies = [
  "tracing-subscriber",
  "unicase",
  "uuid",
- "vivi_ui",
  "win32job",
  "windows 0.62.0",
  "winit",
@@ -5831,11 +5830,6 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
-
-[[package]]
-name = "vivi_ui"
-version = "0.2.0"
-source = "git+https://seed.radicle.garden/z3oxAZSLcyXgpa7fcvgtueF49jHpH.git?rev=92a0987cf92647290353826bf05113a65fca25a9#92a0987cf92647290353826bf05113a65fca25a9"
 
 [[package]]
 name = "vtable"

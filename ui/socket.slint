@@ -1,8 +1,9 @@
 import { Button, VerticalBox, HorizontalBox, LineEdit, StandardButton } from "std-widgets.slint";
+import { Icons } from "icons.slint";
 
 export component ConnectToSocketDialog inherits Window {
     title: "Connect To Socket";
-    icon: @image-url("bletchmame.png");
+    icon: Icons.bletchmame;
     height: 150px;
     width: 350px;
     callback accepted();

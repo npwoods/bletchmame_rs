@@ -1,6 +1,7 @@
 import { VerticalBox, GridBox, HorizontalBox, Button, StandardButton } from "std-widgets.slint";
 import { InputDialogEntry } from "input.slint";
 import { SimpleMenuEntry } from "common.slint";
+import { Icons } from "icons.slint";
 
 component InputXyPart {
     // properties
@@ -87,7 +88,7 @@ export component InputXyDialog inherits Window {
 
     // control hierarchy
     title: dialog-title;
-    icon: @image-url("bletchmame.png");
+    icon: Icons.bletchmame;
     VerticalBox {
         GridBox {
             InputXyPart {

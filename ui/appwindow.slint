@@ -1,6 +1,7 @@
 import { HorizontalBox, VerticalBox, Button, StandardListView, StandardTableView, LineEdit, ListView, ScrollView, GridBox, Spinner } from "std-widgets.slint";
 import { NavigationDrawer, NavigationItem, FilledIconButton, SearchBar } from "@slint/material.slint";
 import { SimpleMenuEntry } from "common.slint";
+import { Icons } from "icons.slint";
 
 struct CollectionContextMenuInfo {
     move-up-command: string,
@@ -29,7 +30,7 @@ export component AppWindow inherits Window {
     min-height: 100px;
     max-width: 10000px;
     max-height: 10000px;
-    icon: @image-url("bletchmame.png");
+    icon: Icons.bletchmame;
     title: @tr("BletchMAME 3.0 prototype") + (running-machine-desc != "" ? ": " + running-machine-desc : "");
 
     // width and height
@@ -682,7 +683,7 @@ export component AppWindow inherits Window {
                 preferred-width: 100%;
                 FilledIconButton {
                     horizontal-stretch: 0;
-                    icon: @image-url("icons/arrow-back.svg");
+                    icon: Icons.arrow-back;
                     enabled: history-can-go-back;
                     clicked => {
                         history-advance-clicked(-1)
@@ -691,7 +692,7 @@ export component AppWindow inherits Window {
 
                 FilledIconButton {
                     horizontal-stretch: 0;
-                    icon: @image-url("icons/book.svg");
+                    icon: Icons.book;
                     enabled: bookmark-collection-enabled;
                     clicked => {
                         bookmark-collection-clicked();
@@ -700,7 +701,7 @@ export component AppWindow inherits Window {
 
                 FilledIconButton {
                     horizontal-stretch: 0;
-                    icon: @image-url("icons/arrow-forward.svg");
+                    icon: Icons.arrow-forward;
                     enabled: history-can-go-forward;
                     clicked => {
                         history-advance-clicked(+1)

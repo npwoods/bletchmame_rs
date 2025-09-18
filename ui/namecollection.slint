@@ -1,8 +1,10 @@
 import { AboutSlint, Button, VerticalBox, HorizontalBox, LineEdit, StandardButton } from "std-widgets.slint";
+import { Icons } from "icons.slint";
+import { Icons } from "icons.slint";
 
 export component NameCollectionDialog inherits Window {
     title: title-text;
-    icon: @image-url("bletchmame.png");
+    icon: Icons.bletchmame;
     width: 400px;
     height: 100px;
     callback ok-clicked();

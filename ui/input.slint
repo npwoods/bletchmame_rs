@@ -1,5 +1,6 @@
 import { GridBox, VerticalBox, HorizontalBox, Button, StandardButton, ScrollView } from "std-widgets.slint";
 import { SimpleMenuEntry } from "common.slint";
+import { Icons } from "icons.slint";
 
 export struct InputDialogEntry {
     name: string,
@@ -8,7 +9,7 @@ export struct InputDialogEntry {
 
 export component InputDialog inherits Window {
     title: dialog-title;
-    icon: @image-url("bletchmame.png");
+    icon: Icons.bletchmame;
     preferred-width: 600px;
     preferred-height: 500px;
 
