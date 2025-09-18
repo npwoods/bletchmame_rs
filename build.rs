@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::env;
 use std::error::Error;
 use std::fs::File;
@@ -24,7 +25,7 @@ fn main() -> std::io::Result<()> {
 		.get("slint")
 		.unwrap()
 		.join("..");
-	let mut library_paths = vivi_ui::import_paths();
+	let mut library_paths = HashMap::new();
 	library_paths.insert("slint".into(), slint_material_components_dir);
 
 	// build Slint stuff

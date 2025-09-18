@@ -90,7 +90,6 @@ tempdir = "0.3.7"
 cpp_build = "0.5.10"
 ico = "0.4.0"
 slint-build = { git = "https://github.com/npwoods/slint.git", rev = "d18eaa5f07da1c7160b781c01e833ef4e957d6c4" }
-vivi_ui = { git = "https://seed.radicle.garden/z3oxAZSLcyXgpa7fcvgtueF49jHpH.git", rev = "92a0987cf92647290353826bf05113a65fca25a9" }
 slint-material-components = { git = "https://github.com/slint-ui/material-components.git", rev = "09988fb4f60a845a9b85e5b25cb744593abaacec" }
 winresource = "0.1.20"
 
