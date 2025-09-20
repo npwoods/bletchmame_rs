@@ -41,7 +41,7 @@ use crate::prefs::preflight::preflight_checks;
 use crate::prefs::var::resolve_path;
 use crate::prefs::var::resolve_paths_string;
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Preferences {
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
@@ -132,6 +132,7 @@ impl PrefsPaths {
 			.is_some_and(|metadata| match path_type.pick_type() {
 				PickType::File { .. } => metadata.is_file(),
 				PickType::Dir => metadata.is_dir(),
+				PickType::DirOrFile => metadata.is_file() || metadata.is_dir(),
 			})
 	}
 
