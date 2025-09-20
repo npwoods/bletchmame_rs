@@ -132,6 +132,7 @@ impl PrefsPaths {
 			.is_some_and(|metadata| match path_type.pick_type() {
 				PickType::File { .. } => metadata.is_file(),
 				PickType::Dir => metadata.is_dir(),
+				PickType::DirOrFile => metadata.is_file() || metadata.is_dir(),
 			})
 	}
 

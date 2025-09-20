@@ -68,8 +68,8 @@ impl PathType {
 			| Self::Plugins
 			| Self::Cfg
 			| Self::Nvram
-			| Self::Cheats
-			| Self::Snapshots => PickType::Dir,
+			| Self::Cheats => PickType::Dir,
+			Self::Snapshots => PickType::DirOrFile,
 		}
 	}
 
@@ -84,4 +84,5 @@ pub enum PickType {
 		extension: &'static str,
 	},
 	Dir,
+	DirOrFile,
 }

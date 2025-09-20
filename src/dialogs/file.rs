@@ -21,7 +21,7 @@ pub async fn choose_path_by_type_dialog(
 
 	let fh = match path_type.pick_type() {
 		PickType::File { name, extension } => dialog.add_filter(name, &[extension]).pick_file().await,
-		PickType::Dir => dialog.pick_folder().await,
+		PickType::Dir | PickType::DirOrFile => dialog.pick_folder().await,
 	}?;
 
 	Some(string_from_filehandle_lossy(fh))
