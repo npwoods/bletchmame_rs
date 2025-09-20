@@ -41,7 +41,7 @@ use crate::prefs::preflight::preflight_checks;
 use crate::prefs::var::resolve_path;
 use crate::prefs::var::resolve_paths_string;
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Preferences {
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]

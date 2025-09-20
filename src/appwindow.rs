@@ -177,24 +177,34 @@ impl AppModel {
 			old_prefs
 		};
 
+		// we need to treat the initial modify_prefs() differently; if this is the first
+		// time we didn't really have "old prefs"; we determine this by checking the history
+		let old_prefs = (!old_prefs.history.is_empty()).then_some(&old_prefs);
+
 		// reborrow prefs (but not mutably)
 		let prefs = self.preferences.borrow();
 
 		// save (ignore errors)
 		let _ = self.preferences.borrow().save(self.state.borrow().prefs_path());
 
+		// update the state (unless we're new)
+		if old_prefs.is_some() {
+			self.update_state(|state| state.update_paths(&prefs.paths));
+		}
+
 		// react to all of the possible changes
-		self.update_state(|state| state.update_paths(&prefs.paths));
-		if prefs.collections != old_prefs.collections {
+		if old_prefs.is_none_or(|old_prefs| prefs.collections != old_prefs.collections) {
 			info!("modify_prefs(): prefs.collection changed");
 			let info_db = self.state.borrow().info_db().cloned();
 			self.with_collections_view_model(|x| x.update(info_db, &prefs.collections));
 			update_builtin_collections_menu_checked(self, &prefs);
 		}
 
-		let must_update_for_current_history_item = prefs.current_history_entry() != old_prefs.current_history_entry();
-		let must_update_items_columns_model =
-			must_update_for_current_history_item || prefs.items_columns != old_prefs.items_columns;
+		let must_update_for_current_history_item =
+			old_prefs.is_none_or(|old_prefs| prefs.current_history_entry() != old_prefs.current_history_entry());
+		let must_update_items_columns_model = old_prefs.is_none_or(|old_prefs| {
+			must_update_for_current_history_item || prefs.items_columns != old_prefs.items_columns
+		});
 
 		if must_update_for_current_history_item {
 			info!("modify_prefs(): updating for current history item");
@@ -347,7 +357,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		app_window_weak: app_window.as_weak(),
 		backend_runtime: args.backend_runtime,
 		modal_stack,
-		preferences: RefCell::new(preferences),
+		preferences: RefCell::new(Preferences::default()),
 		state: RefCell::new(AppState::bogus()),
 		status_changed_channel: Channel::default(),
 		child_window: RefCell::new(None),
@@ -355,12 +365,9 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	let model = Rc::new(model);
 
 	// set full screen
-	{
-		let prefs = model.preferences.borrow();
-		app_window
-			.window()
-			.set_fullscreen_with_display(prefs.is_fullscreen, prefs.fullscreen_display.as_deref());
-	}
+	app_window
+		.window()
+		.set_fullscreen_with_display(preferences.is_fullscreen, preferences.fullscreen_display.as_deref());
 
 	// attach the menu bar (either natively or with an approximation using Slint); looking forward to Slint having first class menuing support
 	let model_clone = model.clone();
@@ -460,9 +467,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	});
 
 	// set up items columns
-	let items_columns = model
-		.preferences
-		.borrow()
+	let items_columns = preferences
 		.items_columns
 		.iter()
 		.map(|column| {
@@ -492,9 +497,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		let command = Action::SearchText(search.into());
 		handle_action(&model_clone, command);
 	});
-	app_window.set_items_search_text(SharedString::from(
-		&model.preferences.borrow().current_history_entry().search,
-	));
+	app_window.set_items_search_text(preferences.current_history_entry().search.to_shared_string());
 	let model_clone = model.clone();
 	app_window.on_items_current_row_changed(move || {
 		let command = Action::ItemsSelectedChanged;
@@ -641,10 +644,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	}
 
 	// initial updates
-	update_ui_for_current_history_item(&model);
-	update_items_columns_model(&model);
-	update_items_model_for_current_prefs(&model);
-	update_builtin_collections_menu_checked(&model, &model.preferences.borrow());
+	model.modify_prefs(|prefs| *prefs = preferences);
 
 	// create the child window
 	let mame_windowing = match args.mame_windowing {
