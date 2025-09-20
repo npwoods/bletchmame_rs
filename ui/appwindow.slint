@@ -156,6 +156,9 @@ export component AppWindow inherits Window {
         items-table-view.set-current-row(index);
     }
 
+    // snapshot and history
+    in property <image> snap-image;
+
     // the report view
     in property <string> report-message;
     in property <string> report-submessage;
@@ -742,6 +745,15 @@ export component AppWindow inherits Window {
             Text {
                 visible: root.mode() == "ready" && is-empty-reason != "";
                 text: is-empty-reason;
+            }
+        }
+
+        VerticalBox {
+            alignment: center;
+            Image {
+                source: snap-image;
+                width: 300px;
+                height: 300px;
             }
         }
     }

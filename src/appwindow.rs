@@ -10,6 +10,7 @@ use std::time::Instant;
 
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
+use slint::Global;
 use slint::LogicalSize;
 use slint::Model;
 use slint::ModelRc;
@@ -79,10 +80,12 @@ use crate::runtime::MameWindowing;
 use crate::runtime::command::MameCommand;
 use crate::runtime::command::MovieFormat;
 use crate::selection::SelectionManager;
+use crate::snapview::SnapView;
 use crate::status::InputClass;
 use crate::status::Status;
 use crate::ui::AboutDialog;
 use crate::ui::AppWindow;
+use crate::ui::Icons;
 use crate::ui::ReportIssue;
 use crate::ui::SimpleMenuEntry;
 use crate::version::MameVersion;
@@ -142,6 +145,7 @@ struct AppModel {
 	state: RefCell<AppState>,
 	status_changed_channel: Channel<Status>,
 	child_window: RefCell<Option<ChildWindow>>,
+	snap_image: SnapView,
 }
 
 impl AppModel {
@@ -198,6 +202,12 @@ impl AppModel {
 			let info_db = self.state.borrow().info_db().cloned();
 			self.with_collections_view_model(|x| x.update(info_db, &prefs.collections));
 			update_builtin_collections_menu_checked(self, &prefs);
+		}
+
+		// update the snap view paths?
+		if old_prefs.is_none_or(|old_prefs| prefs.paths.snapshots != old_prefs.paths.snapshots) {
+			info!("modify_prefs(): prefs.paths.snapshots changed");
+			self.snap_image.set_paths(Some(&prefs.paths.snapshots));
 		}
 
 		let must_update_for_current_history_item =
@@ -352,6 +362,16 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	// create the window stack
 	let modal_stack = ModalStack::new(args.backend_runtime.clone(), app_window);
 
+	// create the SnapImage
+	let app_window_weak = app_window.as_weak();
+	let snap_image = SnapView::new(move |svci| {
+		if let Some(app_window) = app_window_weak.upgrade()
+			&& let Some(snap) = svci.snap
+		{
+			app_window.set_snap_image(snap.unwrap_or_else(|| Icons::get(&app_window).get_bletchmame()));
+		}
+	});
+
 	// create the model
 	let model = AppModel {
 		app_window_weak: app_window.as_weak(),
@@ -361,6 +381,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		state: RefCell::new(AppState::bogus()),
 		status_changed_channel: Channel::default(),
 		child_window: RefCell::new(None),
+		snap_image,
 	};
 	let model = Rc::new(model);
 
@@ -1445,6 +1466,11 @@ fn update_ui_for_current_history_item(model: &AppModel) {
 				.invoke_collections_view_select(collection_index);
 		})
 	});
+
+	// update the snap image
+	model
+		.snap_image
+		.set_current_item(prefs.current_history_entry().selection.first());
 
 	// and finish tracing
 	debug!(duration=?start_instant.elapsed(), "update_ui_for_current_history_item() completed");

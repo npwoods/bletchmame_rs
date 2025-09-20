@@ -24,6 +24,7 @@ mod platform;
 mod prefs;
 mod runtime;
 mod selection;
+mod snapview;
 mod software;
 mod status;
 mod threadlocalbubble;
