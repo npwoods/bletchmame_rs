@@ -15,11 +15,6 @@ fn main() -> std::io::Result<()> {
 	// dependencies
 	println!("cargo::rerun-if-changed={icon_png}");
 
-	// set the experimental environment variable
-	unsafe {
-		env::set_var("SLINT_ENABLE_EXPERIMENTAL_FEATURES", "1");
-	}
-
 	// build library paths
 	let slint_material_components_dir = slint_material_components::import_path()
 		.get("slint")
