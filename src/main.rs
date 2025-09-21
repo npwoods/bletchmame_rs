@@ -12,6 +12,7 @@ mod diagnostics;
 mod dialogs;
 mod guiutils;
 mod history;
+mod history_xml;
 mod icon;
 mod imagedesc;
 mod importmameini;

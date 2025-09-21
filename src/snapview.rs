@@ -11,13 +11,17 @@ use image::ImageReader;
 use slint::Image;
 use slint::Rgba8Pixel;
 use slint::SharedPixelBuffer;
+use slint::SharedString;
 use smol_str::SmolStr;
+use tracing::info;
 use tracing::warn;
 use zip::ZipArchive;
 use zip::result::ZipError;
 
+use crate::history_xml::HistoryXml;
 use crate::prefs::PrefsItem;
 use crate::prefs::PrefsMachineItem;
+use crate::prefs::PrefsSoftwareItem;
 
 pub struct SnapView {
 	callback: Box<dyn Fn(SnapViewCallbackInfo)>,
@@ -27,12 +31,14 @@ pub struct SnapView {
 #[derive(Default, Debug)]
 struct SnapViewState {
 	snapshot_paths: Vec<MultiPath>,
+	history: Option<HistoryXml>,
 	current_snap: Option<SmolStr>,
 }
 
 #[derive(Default, Debug)]
 pub struct SnapViewCallbackInfo {
 	pub snap: Option<Option<Image>>,
+	pub history_text: Option<SharedString>,
 }
 
 #[derive(Debug)]
@@ -48,7 +54,11 @@ impl SnapView {
 		Self { callback, state }
 	}
 
-	pub fn set_paths(&self, snapshot_paths: Option<&[impl AsRef<Path>]>) {
+	pub fn set_paths(
+		&self,
+		snapshot_paths: Option<&[impl AsRef<Path>]>,
+		history_file_path: Option<Option<impl AsRef<Path>>>,
+	) {
 		if let Some(snapshot_paths) = snapshot_paths {
 			let new_snapshot_paths = snapshot_paths
 				.iter()
@@ -61,6 +71,15 @@ impl SnapView {
 				})
 				.collect::<Vec<_>>();
 			self.state.borrow_mut().snapshot_paths = new_snapshot_paths;
+		}
+
+		if let Some(history_file_path) = history_file_path {
+			let history_file_path = history_file_path.as_ref().map(|p| p.as_ref());
+			let history = history_file_path.map(HistoryXml::load).transpose().unwrap_or_else(|e| {
+				warn!(error=?e, path=?history_file_path, "HistoryXml::load() returned error");
+				None
+			});
+			self.state.borrow_mut().history = history;
 		}
 	}
 
@@ -84,8 +103,20 @@ impl SnapView {
 			})
 		};
 
-		if snap.is_some() {
-			let svci = SnapViewCallbackInfo { snap };
+		let history_text = self.state.borrow().history.as_ref().and_then(|history| match item {
+			Some(PrefsItem::Machine(PrefsMachineItem { machine_name, .. })) => history.by_system(machine_name.as_str()),
+			Some(PrefsItem::Software(PrefsSoftwareItem {
+				software_list,
+				software,
+				..
+			})) => history.by_software(software_list, software),
+			_ => None,
+		});
+		let history_text = Some(history_text.unwrap_or_default());
+
+		if snap.is_some() || history_text.is_some() {
+			info!(snap=?snap.as_ref().map(|x| x.as_ref().map(|_| "...")), history_text=?history_text.as_ref().map(|_| "..."), "SnapView::set_current_item(): invoking callback");
+			let svci = SnapViewCallbackInfo { snap, history_text };
 			(self.callback)(svci)
 		}
 	}
