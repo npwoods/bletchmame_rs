@@ -25,8 +25,7 @@ fn main() -> std::io::Result<()> {
 		.get("slint")
 		.unwrap()
 		.join("..");
-	let mut library_paths = HashMap::new();
-	library_paths.insert("slint".into(), slint_material_components_dir);
+	let library_paths = HashMap::from([("slint".into(), slint_material_components_dir)]);
 
 	// build Slint stuff
 	slint_build::compile_with_config(
