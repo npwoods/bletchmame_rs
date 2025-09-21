@@ -46,6 +46,8 @@ pub enum PathType {
 	Cheats,
 	#[strum(to_string = "Snapshots")]
 	Snapshots,
+	#[strum(to_string = "History")]
+	History,
 }
 
 impl PathType {
@@ -61,6 +63,10 @@ impl PathType {
 			Self::MameExecutable => PickType::File {
 				name: "MAME Executable",
 				extension: EXE_EXTENSION,
+			},
+			Self::History => PickType::File {
+				name: "History XML",
+				extension: "xml",
 			},
 			Self::Roms
 			| Self::Samples
