@@ -15,18 +15,12 @@ fn main() -> std::io::Result<()> {
 	// dependencies
 	println!("cargo::rerun-if-changed={icon_png}");
 
-	// set the experimental environment variable
-	unsafe {
-		env::set_var("SLINT_ENABLE_EXPERIMENTAL_FEATURES", "1");
-	}
-
 	// build library paths
 	let slint_material_components_dir = slint_material_components::import_path()
 		.get("slint")
 		.unwrap()
 		.join("..");
-	let mut library_paths = HashMap::new();
-	library_paths.insert("slint".into(), slint_material_components_dir);
+	let library_paths = HashMap::from([("slint".into(), slint_material_components_dir)]);
 
 	// build Slint stuff
 	slint_build::compile_with_config(
