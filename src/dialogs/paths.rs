@@ -176,7 +176,7 @@ impl State {
 		};
 
 		// add the final "append" entry if appropriate
-		if path_type.is_multi() {
+		if path_type.is_multi() || entries.is_empty() {
 			let text = "".into();
 			let is_error = false;
 			entries.push(PathsListViewItem { text, is_error });
