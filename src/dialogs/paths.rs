@@ -289,6 +289,7 @@ impl PathEntriesModel {
 
 	pub fn set_entry(&self, row: usize, text: impl Into<SharedString>) {
 		self.data.borrow_mut()[row].text = text.into();
+		self.notify.row_changed(row);
 		self.state.update_paths_from_entries();
 	}
 
