@@ -12,6 +12,7 @@ use std::time::Duration;
 use anyhow::Error;
 use anyhow::Result;
 use slint::invoke_from_event_loop;
+use strum::VariantArray;
 use throttle::Throttle;
 
 use crate::action::Action;
@@ -241,7 +242,8 @@ impl AppState {
 
 	// update paths and refresh MAME if needed
 	pub fn update_paths(&self, paths: &Rc<PrefsPaths>) -> Option<Self> {
-		if self.paths.as_ref() == paths.as_ref() {
+		if !paths_changes_require_new_session(&self.paths, paths) {
+			// no significant changes? nothing to do
 			return None;
 		}
 
@@ -827,6 +829,15 @@ fn validate_and_update_status(
 	} else {
 		(status.cloned(), pending_status.cloned(), result)
 	}
+}
+
+/// Returns true if changes between the two `PrefsPaths` require a new MAME session
+fn paths_changes_require_new_session(old: &PrefsPaths, new: &PrefsPaths) -> bool {
+	PathType::VARIANTS
+		.iter()
+		.copied()
+		.filter(|&path_type| path_type == PathType::MameExecutable || path_type.mame_argument().is_some())
+		.any(|path_type| old.by_type(path_type) != new.by_type(path_type))
 }
 
 #[cfg(test)]
