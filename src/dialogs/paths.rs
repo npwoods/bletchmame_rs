@@ -207,6 +207,7 @@ impl State {
 	}
 
 	pub async fn browse_clicked(&self) {
+		self.dialog_weak.unwrap().invoke_stop_editing();
 		let path_type = self.current_path_type();
 		let path_entry_index = self.current_path_entry_index().unwrap();
 
@@ -232,12 +233,14 @@ impl State {
 	}
 
 	pub async fn insert_clicked(&self) {
+		self.dialog_weak.unwrap().invoke_stop_editing();
 		let row = self.current_path_entry_index().unwrap();
 		self.with_path_entries_model(|model| model.insert(row));
 		self.dialog_weak.unwrap().invoke_begin_editing();
 	}
 
 	pub async fn delete_clicked(&self) {
+		self.dialog_weak.unwrap().invoke_stop_editing();
 		let row = self.current_path_entry_index().unwrap();
 		self.with_path_entries_model(|model| model.remove(row));
 	}

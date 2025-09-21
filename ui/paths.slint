@@ -113,6 +113,9 @@ export component PathsDialog inherits Window {
     public function begin-editing() {
         entries-view.begin-editing();
     }
+    public function stop-editing() {
+        entries-view.editing = false;
+    }
 
     // controls
     HorizontalBox {
