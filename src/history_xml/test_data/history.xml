@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<history version="2.45" date="2022-06-30">
+	<entry>
+		<systems>
+			<system name="litware64" />
+			<system name="litware128" />
+		</systems>
+		<text>
+      The &quot;Litware 64&quot; and &quot;Litware 128&quot; never existed
+    </text>
+  </entry>
+  <entry>
+		<software>
+			<item list="contoso_flop" name="contoso_alpha01" />
+			<item list="contoso_flop" name="contoso_alpha02" />
+			<item list="contoso_flop" name="contoso_alpha03" />
+		</software>
+		<text>
+      Contoso&apos;s alpha invaders never existed either
+    </text>
+  </entry>
+</history>      

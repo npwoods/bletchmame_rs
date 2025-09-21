@@ -96,7 +96,7 @@ mod test {
 			cfg: Some("/mydir/mame/cfg".into()),
 			nvram: Some("/mydir/mame/nvram".into()),
 			cheats: Some("/mydir/mame/cheats".into()),
-			snapshots: vec!["/mydir/mame/snapshots".into()],
+			..Default::default()
 		};
 		let result = MameArguments::new(&prefs_paths, &windowing);
 

@@ -98,6 +98,9 @@ pub struct PrefsPaths {
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub snapshots: Vec<SmolStr>,
+
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub history_file: Option<SmolStr>,
 }
 
 impl PrefsPaths {
@@ -164,6 +167,10 @@ fn access_paths(path_type: PathType) -> (fn(&PrefsPaths) -> &[SmolStr], PathsSto
 		PathType::Nvram => ((|x| x.nvram.as_slice()), PathsStore::Single(|x| &mut x.nvram)),
 		PathType::Cheats => ((|x| x.cheats.as_slice()), PathsStore::Single(|x| &mut x.cheats)),
 		PathType::Snapshots => ((|x| &x.snapshots), PathsStore::Multiple(|x| &mut x.snapshots)),
+		PathType::History => (
+			(|x| x.history_file.as_slice()),
+			PathsStore::Single(|x| &mut x.history_file),
+		),
 	}
 }
 

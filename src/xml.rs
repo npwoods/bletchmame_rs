@@ -86,6 +86,7 @@ where
 						b"lt" => "<".into(),
 						b"gt" => ">".into(),
 						b"quot" => "\"".into(),
+						b"apos" => "'".into(),
 						_ => {
 							let ch = bytes_ref.resolve_char_ref()?.ok_or_else(|| {
 								let message = format!("Unknown bytes_ref {bytes_ref:?}");

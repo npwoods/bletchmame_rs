@@ -145,7 +145,7 @@ struct AppModel {
 	state: RefCell<AppState>,
 	status_changed_channel: Channel<Status>,
 	child_window: RefCell<Option<ChildWindow>>,
-	snap_image: SnapView,
+	snap_view: SnapView,
 }
 
 impl AppModel {
@@ -205,9 +205,15 @@ impl AppModel {
 		}
 
 		// update the snap view paths?
-		if old_prefs.is_none_or(|old_prefs| prefs.paths.snapshots != old_prefs.paths.snapshots) {
-			info!("modify_prefs(): prefs.paths.snapshots changed");
-			self.snap_image.set_paths(Some(&prefs.paths.snapshots));
+		let snap_view_snapshots = old_prefs
+			.is_none_or(|old_prefs| prefs.paths.snapshots != old_prefs.paths.snapshots)
+			.then_some(prefs.paths.snapshots.as_slice());
+		let snap_view_history_file = old_prefs
+			.is_none_or(|old_prefs| prefs.paths.history_file != old_prefs.paths.history_file)
+			.then_some(prefs.paths.history_file.as_deref());
+		if snap_view_snapshots.is_some() || snap_view_history_file.is_some() {
+			info!("modify_prefs(): changing snap_view paths");
+			self.snap_view.set_paths(snap_view_snapshots, snap_view_history_file);
 		}
 
 		let must_update_for_current_history_item =
@@ -364,11 +370,14 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 
 	// create the SnapImage
 	let app_window_weak = app_window.as_weak();
-	let snap_image = SnapView::new(move |svci| {
-		if let Some(app_window) = app_window_weak.upgrade()
-			&& let Some(snap) = svci.snap
-		{
-			app_window.set_snap_image(snap.unwrap_or_else(|| Icons::get(&app_window).get_bletchmame()));
+	let snap_view = SnapView::new(move |svci| {
+		if let Some(app_window) = app_window_weak.upgrade() {
+			if let Some(snap) = svci.snap {
+				app_window.set_snap_image(snap.unwrap_or_else(|| Icons::get(&app_window).get_bletchmame()));
+			}
+			if let Some(history_text) = svci.history_text {
+				app_window.set_history_text(history_text);
+			}
 		}
 	});
 
@@ -381,7 +390,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		state: RefCell::new(AppState::bogus()),
 		status_changed_channel: Channel::default(),
 		child_window: RefCell::new(None),
-		snap_image,
+		snap_view,
 	};
 	let model = Rc::new(model);
 
@@ -1467,9 +1476,9 @@ fn update_ui_for_current_history_item(model: &AppModel) {
 		})
 	});
 
-	// update the snap image
+	// update the snap view
 	model
-		.snap_image
+		.snap_view
 		.set_current_item(prefs.current_history_entry().selection.first());
 
 	// and finish tracing
