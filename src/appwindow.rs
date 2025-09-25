@@ -1266,13 +1266,13 @@ fn handle_action(model: &Rc<AppModel>, command: Action) {
 				.enumerate()
 				.filter_map(|(folder_index, collection)| {
 					if let PrefsCollection::Folder { name, items } = collection.as_ref() {
-						(name == &folder_name).then_some((folder_index, items[index].clone()))
+						(name == &folder_name).then(|| (folder_index, items[index].clone()))
 					} else {
 						None
 					}
 				})
 				.next()
-				.unwrap();
+				.expect("could not find folder");
 
 			let fut = async move {
 				let paths = model_clone.preferences.borrow().paths.clone();
