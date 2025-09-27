@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::fs::File;
 use std::io::Cursor;
@@ -84,10 +85,19 @@ impl SnapView {
 	}
 
 	pub fn set_current_item(&self, item: Option<&PrefsItem>) {
+		// determine the "name" of the current item (e.g. - "pacman" or "nes/zelda")
 		let name = match item {
-			Some(PrefsItem::Machine(PrefsMachineItem { machine_name, .. })) => Some(machine_name.as_str()),
+			Some(PrefsItem::Machine(PrefsMachineItem { machine_name, .. })) => {
+				Some(Cow::Borrowed(machine_name.as_str()))
+			}
+			Some(PrefsItem::Software(PrefsSoftwareItem {
+				software_list,
+				software,
+				..
+			})) => Some(Cow::Owned(format!("{software_list}/{software}"))),
 			_ => None,
 		};
+		let name = name.as_deref();
 
 		let snap = {
 			let mut state = self.state.borrow_mut();
