@@ -707,6 +707,7 @@ dependencies = [
  "nu-utils",
  "num",
  "open",
+ "parallel_worker",
  "path-absolutize",
  "qttypes",
  "quick-xml 0.38.3",
@@ -4000,6 +4001,12 @@ checksum = "36820e9051aca1014ddc75770aab4d68bc1e9e632f0f5627c4086bc216fb583b"
 dependencies = [
  "ttf-parser 0.25.1",
 ]
+
+[[package]]
+name = "parallel_worker"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "969be3a8602e4c84f690e8c85503cec0c69772e43356fee2b4ade7b7b0292481"
 
 [[package]]
 name = "parking"

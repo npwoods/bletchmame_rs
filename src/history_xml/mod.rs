@@ -18,10 +18,10 @@ pub struct HistoryXml {
 }
 
 impl HistoryXml {
-	pub fn load(path: impl AsRef<Path>) -> Result<Self> {
+	pub fn load(path: impl AsRef<Path>, callback: impl Fn() -> bool) -> Result<Option<Self>> {
 		let file = File::open(path.as_ref())?;
 		let reader = BufReader::new(file);
-		parse_from_reader(reader)
+		parse_from_reader(reader, callback)
 	}
 
 	pub fn by_system(&self, system: impl AsRef<str>) -> Option<SharedString> {
@@ -43,7 +43,7 @@ mod tests {
 	#[test_case(1, include_str!("test_data/history.xml"), "litware128", Some("The \"Litware 64\" and \"Litware 128\" never existed"))]
 	#[test_case(2, include_str!("test_data/history.xml"), "DOESNT_EXIST", None)]
 	fn by_system(_index: usize, xml: &str, system: &str, expected: Option<&str>) {
-		let history = parse_from_reader(xml.as_bytes()).unwrap();
+		let history = parse_from_reader(xml.as_bytes(), || false).unwrap().unwrap();
 		let actual = history.by_system(system);
 		let actual = actual.as_deref();
 		assert_eq!(expected, actual);
@@ -53,7 +53,7 @@ mod tests {
 	#[test_case(1, include_str!("test_data/history.xml"), "contoso_flop", "contoso_alpha02", Some("Contoso's alpha invaders never existed either"))]
 	#[test_case(2, include_str!("test_data/history.xml"), "contoso_flop", "DOESNT_EXIST", None)]
 	fn by_software(_index: usize, xml: &str, list: &str, name: &str, expected: Option<&str>) {
-		let history = parse_from_reader(xml.as_bytes()).unwrap();
+		let history = parse_from_reader(xml.as_bytes(), || false).unwrap().unwrap();
 		let actual = history.by_software(list, name);
 		let actual = actual.as_deref();
 		assert_eq!(expected, actual);

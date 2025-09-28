@@ -127,6 +127,7 @@ pub enum Action {
 		#[allow(clippy::type_complexity)]
 		selections: Vec<(SmolStr, Vec<(SmolStr, u32, SeqType, SmolStr)>)>,
 	},
+	HistoryLoadCompleted,
 }
 
 const MENU_PREFIX: &str = "MENU_";
