@@ -8,6 +8,10 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use image::ImageReader;
+use parallel_worker::CancelableWorker;
+use parallel_worker::State;
+use parallel_worker::WorkerInit;
+use parallel_worker::WorkerMethods;
 use slint::Image;
 use slint::Rgba8Pixel;
 use slint::SharedPixelBuffer;
@@ -26,6 +30,8 @@ pub enum MultiPath {
 	Zip(RefCell<ZipArchive<File>>),
 	Dir(PathBuf),
 }
+
+pub struct HistoryLoader(CancelableWorker<PathBuf, Result<HistoryXml>>);
 
 pub fn snap_view_string(item: Option<&PrefsItem>) -> SharedString {
 	match item {
@@ -133,4 +139,26 @@ pub fn get_history_text(history: Option<&HistoryXml>, name: &str) -> SharedStrin
 			}
 		})
 		.unwrap_or_default()
+}
+
+impl HistoryLoader {
+	pub fn new(completed: impl Fn() + 'static + Send + Sync + Clone) -> Self {
+		let worker_function = move |path, state: &State| {
+			let result = HistoryXml::load(path, || state.is_cancelled()).transpose();
+			completed();
+			result
+		};
+		Self(CancelableWorker::new(worker_function))
+	}
+
+	pub fn load(&mut self, path: Option<impl Into<PathBuf>>) {
+		self.0.cancel_tasks();
+		if let Some(path) = path {
+			self.0.add_task(path.into());
+		}
+	}
+
+	pub fn take_result(&mut self) -> Option<Result<HistoryXml>> {
+		self.0.get()
+	}
 }

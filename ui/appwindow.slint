@@ -158,8 +158,19 @@ export component AppWindow inherits Window {
 
     // snapshot and history
     in property <string> current-snap-view;
+    in property <bool> history-xml-is-loading;
     pure callback get-snap-image(string) -> image;
     pure callback get-history-text(string) -> string;
+    in-out property <int> snap-image-salt;
+    in-out property <int> history-text-salt;
+    function get-snap-image-func() -> image {
+        let _ = snap-image-salt; // force re-evaluation when salt changes
+        return get-snap-image(current-snap-view);
+    }
+    function get-history-text-func() -> string {
+        let _ = history-text-salt; // force re-evaluation when salt changes
+        return get-history-text(current-snap-view);
+    }
 
     // the report view
     in property <string> report-message;
@@ -753,7 +764,7 @@ export component AppWindow inherits Window {
         VerticalBox {
             alignment: center;
             Image {
-                source: get-snap-image(current-snap-view);
+                source: get-snap-image-func();
                 width: 300px;
                 height: 300px;
             }
@@ -761,9 +772,16 @@ export component AppWindow inherits Window {
             TextEdit {
                 width: 300px;
                 height: 300px;
-                text: get-history-text(current-snap-view);
+                text: get-history-text-func();
                 visible: get-history-text(current-snap-view) != "";
                 read-only: true;
+            }
+
+            Spinner {
+                width: 300px;
+                height: 300px;
+                visible: root.history-xml-is-loading;
+                indeterminate: true;
             }
         }
     }

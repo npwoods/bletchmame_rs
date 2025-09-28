@@ -63,6 +63,7 @@ path-absolutize = "3.1.1"
 smol_str = { version = "0.3.2", features = ["serde"] }
 zip = "5.1.1"
 image = "0.25.8"
+parallel_worker = "1.0.2"
 
 [target.'cfg(target_os = "windows")'.dependencies.windows]
 version = "0.62.0"
