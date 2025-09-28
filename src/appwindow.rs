@@ -224,11 +224,12 @@ impl AppModel {
 		if old_prefs.is_none_or(|old_prefs| prefs.paths.history_file != old_prefs.paths.history_file) {
 			info!("modify_prefs(): prefs.paths.history_file changed");
 			let history = prefs.paths.history_file.as_deref().and_then(|path| {
-				HistoryXml::load(path)
+				HistoryXml::load(path, || false)
 					.inspect_err(|e| {
 						warn!(error=?e, path=?path, "HistoryXml::load() returned error");
 					})
 					.ok()
+					.flatten()
 			});
 			self.app_window()
 				.on_get_history_text(move |name| get_history_text(history.as_ref(), &name));

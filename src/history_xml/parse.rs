@@ -101,7 +101,7 @@ impl State {
 	}
 }
 
-pub fn parse_from_reader(reader: impl BufRead) -> Result<HistoryXml> {
+pub fn parse_from_reader(reader: impl BufRead, callback: impl Fn() -> bool) -> Result<Option<HistoryXml>> {
 	let span = info_span!("parse_from_reader");
 	let _guard = span.enter();
 
@@ -114,6 +114,10 @@ pub fn parse_from_reader(reader: impl BufRead) -> Result<HistoryXml> {
 	};
 
 	while let Some(evt) = reader.next(&mut buf)? {
+		if callback() {
+			// cancelled!
+			return Ok(None);
+		}
 		match evt {
 			XmlEvent::Start(evt) => {
 				let new_phase = state.handle_start(evt)?;
@@ -136,5 +140,5 @@ pub fn parse_from_reader(reader: impl BufRead) -> Result<HistoryXml> {
 			XmlEvent::Null => {} // meh
 		}
 	}
-	Ok(state.history)
+	Ok(Some(state.history))
 }
