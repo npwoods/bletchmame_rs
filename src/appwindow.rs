@@ -10,7 +10,6 @@ use std::time::Instant;
 
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
-use slint::Global;
 use slint::LogicalSize;
 use slint::Model;
 use slint::ModelRc;
@@ -27,6 +26,7 @@ use tracing::debug;
 use tracing::debug_span;
 use tracing::info;
 use tracing::info_span;
+use tracing::warn;
 
 use crate::action::Action;
 use crate::appstate::AppState;
@@ -67,6 +67,7 @@ use crate::dialogs::switches::dialog_switches;
 use crate::guiutils::is_context_menu_event;
 use crate::guiutils::modal::ModalStack;
 use crate::history::History;
+use crate::history_xml::HistoryXml;
 use crate::models::collectionsview::CollectionsViewModel;
 use crate::models::itemstable::EmptyReason;
 use crate::models::itemstable::ItemsTableModel;
@@ -80,12 +81,14 @@ use crate::runtime::MameWindowing;
 use crate::runtime::command::MameCommand;
 use crate::runtime::command::MovieFormat;
 use crate::selection::SelectionManager;
-use crate::snapview::SnapView;
+use crate::snapview::get_history_text;
+use crate::snapview::load_image_from_paths;
+use crate::snapview::make_multi_paths;
+use crate::snapview::snap_view_string;
 use crate::status::InputClass;
 use crate::status::Status;
 use crate::ui::AboutDialog;
 use crate::ui::AppWindow;
-use crate::ui::Icons;
 use crate::ui::ReportIssue;
 use crate::ui::SimpleMenuEntry;
 use crate::version::MameVersion;
@@ -145,7 +148,6 @@ struct AppModel {
 	state: RefCell<AppState>,
 	status_changed_channel: Channel<Status>,
 	child_window: RefCell<Option<ChildWindow>>,
-	snap_view: SnapView,
 }
 
 impl AppModel {
@@ -204,16 +206,32 @@ impl AppModel {
 			update_builtin_collections_menu_checked(self, &prefs);
 		}
 
-		// update the snap view paths?
-		let snap_view_snapshots = old_prefs
-			.is_none_or(|old_prefs| prefs.paths.snapshots != old_prefs.paths.snapshots)
-			.then_some(prefs.paths.snapshots.as_slice());
-		let snap_view_history_file = old_prefs
-			.is_none_or(|old_prefs| prefs.paths.history_file != old_prefs.paths.history_file)
-			.then_some(prefs.paths.history_file.as_deref());
-		if snap_view_snapshots.is_some() || snap_view_history_file.is_some() {
-			info!("modify_prefs(): changing snap_view paths");
-			self.snap_view.set_paths(snap_view_snapshots, snap_view_history_file);
+		// update the snapshot paths?
+		if old_prefs.is_none_or(|old_prefs| prefs.paths.snapshots != old_prefs.paths.snapshots) {
+			info!("modify_prefs(): prefs.paths.snapshots changed");
+			let multi_paths = make_multi_paths(&prefs.paths.snapshots);
+			self.app_window().on_get_snap_image(move |name| {
+				load_image_from_paths(&multi_paths, &name)
+					.inspect_err(|e| {
+						warn!(error=?e, name=?name, "load_image_from_paths() returned error");
+					})
+					.ok()
+					.flatten()
+					.unwrap_or_default()
+			});
+		}
+
+		if old_prefs.is_none_or(|old_prefs| prefs.paths.history_file != old_prefs.paths.history_file) {
+			info!("modify_prefs(): prefs.paths.history_file changed");
+			let history = prefs.paths.history_file.as_deref().and_then(|path| {
+				HistoryXml::load(path)
+					.inspect_err(|e| {
+						warn!(error=?e, path=?path, "HistoryXml::load() returned error");
+					})
+					.ok()
+			});
+			self.app_window()
+				.on_get_history_text(move |name| get_history_text(history.as_ref(), &name));
 		}
 
 		let must_update_for_current_history_item =
@@ -368,19 +386,6 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	// create the window stack
 	let modal_stack = ModalStack::new(args.backend_runtime.clone(), app_window);
 
-	// create the SnapImage
-	let app_window_weak = app_window.as_weak();
-	let snap_view = SnapView::new(move |svci| {
-		if let Some(app_window) = app_window_weak.upgrade() {
-			if let Some(snap) = svci.snap {
-				app_window.set_snap_image(snap.unwrap_or_else(|| Icons::get(&app_window).get_bletchmame()));
-			}
-			if let Some(history_text) = svci.history_text {
-				app_window.set_history_text(history_text);
-			}
-		}
-	});
-
 	// create the model
 	let model = AppModel {
 		app_window_weak: app_window.as_weak(),
@@ -390,7 +395,6 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		state: RefCell::new(AppState::bogus()),
 		status_changed_channel: Channel::default(),
 		child_window: RefCell::new(None),
-		snap_view,
 	};
 	let model = Rc::new(model);
 
@@ -1477,9 +1481,8 @@ fn update_ui_for_current_history_item(model: &AppModel) {
 	});
 
 	// update the snap view
-	model
-		.snap_view
-		.set_current_item(prefs.current_history_entry().selection.first());
+	let current_snap_view = snap_view_string(prefs.current_history_entry().selection.first());
+	app_window.set_current_snap_view(current_snap_view);
 
 	// and finish tracing
 	debug!(duration=?start_instant.elapsed(), "update_ui_for_current_history_item() completed");

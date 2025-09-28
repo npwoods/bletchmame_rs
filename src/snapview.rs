@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::cell::RefCell;
 use std::fs::File;
 use std::io::Cursor;
@@ -13,8 +12,6 @@ use slint::Image;
 use slint::Rgba8Pixel;
 use slint::SharedPixelBuffer;
 use slint::SharedString;
-use smol_str::SmolStr;
-use tracing::info;
 use tracing::warn;
 use zip::ZipArchive;
 use zip::result::ZipError;
@@ -24,112 +21,35 @@ use crate::prefs::PrefsItem;
 use crate::prefs::PrefsMachineItem;
 use crate::prefs::PrefsSoftwareItem;
 
-pub struct SnapView {
-	callback: Box<dyn Fn(SnapViewCallbackInfo)>,
-	state: RefCell<SnapViewState>,
-}
-
-#[derive(Default, Debug)]
-struct SnapViewState {
-	snapshot_paths: Vec<MultiPath>,
-	history: Option<HistoryXml>,
-	current_snap: Option<SmolStr>,
-}
-
-#[derive(Default, Debug)]
-pub struct SnapViewCallbackInfo {
-	pub snap: Option<Option<Image>>,
-	pub history_text: Option<SharedString>,
-}
-
 #[derive(Debug)]
-enum MultiPath {
+pub enum MultiPath {
 	Zip(RefCell<ZipArchive<File>>),
 	Dir(PathBuf),
 }
 
-impl SnapView {
-	pub fn new(callback: impl Fn(SnapViewCallbackInfo) + 'static) -> Self {
-		let callback = Box::new(callback) as Box<_>;
-		let state = RefCell::new(SnapViewState::default());
-		Self { callback, state }
+pub fn snap_view_string(item: Option<&PrefsItem>) -> SharedString {
+	match item {
+		None => "".into(),
+		Some(PrefsItem::Machine(PrefsMachineItem { machine_name, .. })) => machine_name.into(),
+		Some(PrefsItem::Software(PrefsSoftwareItem {
+			software_list,
+			software,
+			..
+		})) => format!("{software_list}/{software}").into(),
 	}
+}
 
-	pub fn set_paths(
-		&self,
-		snapshot_paths: Option<&[impl AsRef<Path>]>,
-		history_file_path: Option<Option<impl AsRef<Path>>>,
-	) {
-		if let Some(snapshot_paths) = snapshot_paths {
-			let new_snapshot_paths = snapshot_paths
-				.iter()
-				.filter_map(|path| match MultiPath::new(path) {
-					Ok(multi_path) => Some(multi_path),
-					Err(e) => {
-						warn!(error=?e, path=?path.as_ref(), "MultiPath::new() returned error");
-						None
-					}
-				})
-				.collect::<Vec<_>>();
-			self.state.borrow_mut().snapshot_paths = new_snapshot_paths;
-		}
-
-		if let Some(history_file_path) = history_file_path {
-			let history_file_path = history_file_path.as_ref().map(|p| p.as_ref());
-			let history = history_file_path.map(HistoryXml::load).transpose().unwrap_or_else(|e| {
-				warn!(error=?e, path=?history_file_path, "HistoryXml::load() returned error");
+pub fn make_multi_paths(paths: &[impl AsRef<Path>]) -> Vec<MultiPath> {
+	paths
+		.iter()
+		.filter_map(|path| match MultiPath::new(path) {
+			Ok(multi_path) => Some(multi_path),
+			Err(e) => {
+				warn!(error=?e, path=?path.as_ref(), "MultiPath::new() returned error");
 				None
-			});
-			self.state.borrow_mut().history = history;
-		}
-	}
-
-	pub fn set_current_item(&self, item: Option<&PrefsItem>) {
-		// determine the "name" of the current item (e.g. - "pacman" or "nes/zelda")
-		let name = match item {
-			Some(PrefsItem::Machine(PrefsMachineItem { machine_name, .. })) => {
-				Some(Cow::Borrowed(machine_name.as_str()))
 			}
-			Some(PrefsItem::Software(PrefsSoftwareItem {
-				software_list,
-				software,
-				..
-			})) => Some(Cow::Owned(format!("{software_list}/{software}"))),
-			_ => None,
-		};
-		let name = name.as_deref();
-
-		let snap = {
-			let mut state = self.state.borrow_mut();
-			(name != state.current_snap.as_deref()).then(|| {
-				let image = name.and_then(|name| {
-					load_image_from_paths(&state.snapshot_paths, name).unwrap_or_else(|e| {
-						warn!(error=?e, name=?name, "load_image_from_paths() returned error");
-						None
-					})
-				});
-				state.current_snap = image.is_some().then(|| name.unwrap().into());
-				image
-			})
-		};
-
-		let history_text = self.state.borrow().history.as_ref().and_then(|history| match item {
-			Some(PrefsItem::Machine(PrefsMachineItem { machine_name, .. })) => history.by_system(machine_name.as_str()),
-			Some(PrefsItem::Software(PrefsSoftwareItem {
-				software_list,
-				software,
-				..
-			})) => history.by_software(software_list, software),
-			_ => None,
-		});
-		let history_text = Some(history_text.unwrap_or_default());
-
-		if snap.is_some() || history_text.is_some() {
-			info!(snap=?snap.as_ref().map(|x| x.as_ref().map(|_| "...")), history_text=?history_text.as_ref().map(|_| "..."), "SnapView::set_current_item(): invoking callback");
-			let svci = SnapViewCallbackInfo { snap, history_text };
-			(self.callback)(svci)
-		}
-	}
+		})
+		.collect::<Vec<_>>()
 }
 
 impl MultiPath {
@@ -166,7 +86,7 @@ impl MultiPath {
 	}
 }
 
-fn load_image_from_paths(paths: &[MultiPath], name: &str) -> Result<Option<Image>> {
+pub fn load_image_from_paths(paths: &[MultiPath], name: &str) -> Result<Option<Image>> {
 	let name = format!("{name}.png");
 	let bytes = paths
 		.iter()
@@ -199,4 +119,18 @@ fn load_image_from_paths(paths: &[MultiPath], name: &str) -> Result<Option<Image
 
 	// create a slint::Image from the pixel buffer
 	Ok(Some(slint::Image::from_rgba8(buffer)))
+}
+
+pub fn get_history_text(history: Option<&HistoryXml>, name: &str) -> SharedString {
+	history
+		.and_then(|history| {
+			if name.is_empty() {
+				None
+			} else if let Some((list, software)) = name.split_once('/') {
+				history.by_software(list, software)
+			} else {
+				history.by_system(name)
+			}
+		})
+		.unwrap_or_default()
 }

@@ -157,8 +157,9 @@ export component AppWindow inherits Window {
     }
 
     // snapshot and history
-    in property <image> snap-image;
-    in property <string> history-text;
+    in property <string> current-snap-view;
+    pure callback get-snap-image(string) -> image;
+    pure callback get-history-text(string) -> string;
 
     // the report view
     in property <string> report-message;
@@ -752,7 +753,7 @@ export component AppWindow inherits Window {
         VerticalBox {
             alignment: center;
             Image {
-                source: snap-image;
+                source: get-snap-image(current-snap-view);
                 width: 300px;
                 height: 300px;
             }
@@ -760,8 +761,8 @@ export component AppWindow inherits Window {
             TextEdit {
                 width: 300px;
                 height: 300px;
-                text: history-text;
-                visible: history-text != "";
+                text: get-history-text(current-snap-view);
+                visible: get-history-text(current-snap-view) != "";
                 read-only: true;
             }
         }
