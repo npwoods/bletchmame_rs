@@ -11,6 +11,7 @@ use std::time::Instant;
 
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
+use slint::Global;
 use slint::LogicalSize;
 use slint::Model;
 use slint::ModelRc;
@@ -93,6 +94,7 @@ use crate::status::Status;
 use crate::threadlocalbubble::ThreadLocalBubble;
 use crate::ui::AboutDialog;
 use crate::ui::AppWindow;
+use crate::ui::Icons;
 use crate::ui::ReportIssue;
 use crate::ui::SimpleMenuEntry;
 use crate::version::MameVersion;
@@ -216,6 +218,7 @@ impl AppModel {
 			info!("modify_prefs(): prefs.paths.snapshots changed");
 			let multi_paths = make_multi_paths(&prefs.paths.snapshots);
 			let app_window = self.app_window();
+			let app_window_weak = self.app_window_weak.clone();
 			app_window.on_get_snap_image(move |name| {
 				load_image_from_paths(&multi_paths, &name)
 					.inspect_err(|e| {
@@ -223,6 +226,11 @@ impl AppModel {
 					})
 					.ok()
 					.flatten()
+					.or_else(|| {
+						app_window_weak
+							.upgrade()
+							.map(|app_window| Icons::get(&app_window).get_bletchmame_blank())
+					})
 					.unwrap_or_default()
 			});
 			app_window.set_snap_image_salt(app_window.get_snap_image_salt() + 1);
