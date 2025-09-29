@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::fs::File;
+use std::fs::metadata;
 use std::io::Cursor;
 use std::io::ErrorKind;
 use std::io::Read;
@@ -16,6 +17,7 @@ use slint::Image;
 use slint::Rgba8Pixel;
 use slint::SharedPixelBuffer;
 use slint::SharedString;
+use tracing::debug;
 use tracing::warn;
 use zip::ZipArchive;
 use zip::result::ZipError;
@@ -61,11 +63,15 @@ pub fn make_multi_paths(paths: &[impl AsRef<Path>]) -> Vec<MultiPath> {
 impl MultiPath {
 	pub fn new(path: impl AsRef<Path>) -> Result<Self> {
 		let path = path.as_ref();
-		match File::open(path) {
-			Ok(file) => Ok(Self::Zip(RefCell::new(ZipArchive::new(file)?))),
-			Err(e) if e.kind() == ErrorKind::IsADirectory => Ok(Self::Dir(path.to_path_buf())),
-			Err(e) => Err(e.into()),
-		}
+		let metadata = metadata(path)?;
+		let result = if metadata.is_dir() {
+			Self::Dir(path.to_path_buf())
+		} else {
+			let file = File::open(path)?;
+			let zip = ZipArchive::new(file)?;
+			Self::Zip(RefCell::new(zip))
+		};
+		Ok(result)
 	}
 
 	pub fn read(&self, name: &str) -> Result<Option<Vec<u8>>> {
@@ -79,15 +85,20 @@ impl MultiPath {
 				Err(ZipError::FileNotFound) => Ok(None),
 				Err(e) => Err(e.into()),
 			},
-			Self::Dir(path) => match File::open(path.join(name)) {
-				Ok(mut file) => {
-					let mut buf = Vec::new();
-					file.read_to_end(&mut buf)?;
-					Ok(Some(buf))
+			Self::Dir(path) => {
+				let path = path.join(name);
+				let file_result = File::open(&path);
+				debug!(?path, ?file_result, "MultiPath::read(): reading from MultiPath::Dir");
+				match file_result {
+					Ok(mut file) => {
+						let mut buf = Vec::new();
+						file.read_to_end(&mut buf)?;
+						Ok(Some(buf))
+					}
+					Err(e) if e.kind() == ErrorKind::NotFound => Ok(None),
+					Err(e) => Err(e.into()),
 				}
-				Err(e) if e.kind() == ErrorKind::NotFound => Ok(None),
-				Err(e) => Err(e.into()),
-			},
+			}
 		}
 	}
 }
