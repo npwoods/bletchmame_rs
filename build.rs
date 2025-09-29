@@ -10,7 +10,7 @@ use winresource::WindowsResource;
 
 fn main() -> std::io::Result<()> {
 	// constants
-	let icon_png = "ui/bletchmame.png";
+	let icon_png = "ui/icons/bletchmame.png";
 
 	// dependencies
 	println!("cargo::rerun-if-changed={icon_png}");
