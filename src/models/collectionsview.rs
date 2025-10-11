@@ -1,15 +1,11 @@
 use std::any::Any;
-use std::cell::Cell;
 use std::cell::RefCell;
-use std::future::Future;
-use std::pin::Pin;
 use std::rc::Rc;
 
 use slint::Model;
 use slint::ModelNotify;
 use slint::ModelTracker;
 use slint::Weak;
-use slint::spawn_local;
 
 use crate::action::Action;
 use crate::info::InfoDb;
@@ -22,7 +18,6 @@ pub struct CollectionsViewModel {
 	app_window_weak: Weak<AppWindow>,
 	info_db: RefCell<Option<Rc<InfoDb>>>,
 	items: RefCell<Vec<Rc<PrefsCollection>>>,
-	after_refresh_callback: Cell<Option<Box<dyn Future<Output = ()> + 'static>>>,
 	notify: ModelNotify,
 }
 
@@ -32,7 +27,6 @@ impl CollectionsViewModel {
 			app_window_weak,
 			info_db: RefCell::new(None),
 			items: RefCell::new(Vec::new()),
-			after_refresh_callback: Cell::new(None),
 			notify: ModelNotify::default(),
 		}
 	}
@@ -51,11 +45,6 @@ impl CollectionsViewModel {
 	pub fn get(&self, index: usize) -> Option<Rc<PrefsCollection>> {
 		let items = self.items.borrow();
 		items.get(index).cloned()
-	}
-
-	pub fn callback_after_refresh(&self, callback: impl Future<Output = ()> + 'static) {
-		let callback = Box::new(callback) as Box<dyn Future<Output = ()> + 'static>;
-		self.after_refresh_callback.set(Some(callback));
 	}
 
 	pub fn context_commands(&self, index: Option<usize>) -> Option<CollectionContextMenuInfo> {
@@ -101,7 +90,6 @@ impl Model for CollectionsViewModel {
 	type Data = NavigationItem;
 
 	fn row_count(&self) -> usize {
-		invoke_after_refresh_callback(&self.after_refresh_callback);
 		if self.info_db.borrow().is_some() {
 			self.items.borrow().len()
 		} else {
@@ -129,12 +117,5 @@ impl Model for CollectionsViewModel {
 
 	fn as_any(&self) -> &dyn Any {
 		self
-	}
-}
-
-fn invoke_after_refresh_callback(after_refresh_callback: &Cell<Option<Box<dyn Future<Output = ()> + 'static>>>) {
-	if let Some(callback) = after_refresh_callback.take() {
-		let callback = Pin::from(callback);
-		spawn_local(callback).unwrap();
 	}
 }
