@@ -132,7 +132,8 @@ impl<'a> MachinesView<'a> {
 		result.ok_or_else(|| ThisError::CannotFindMachine(target.to_string()).into())
 	}
 
-	pub fn find(&self, target: &str) -> Result<Machine<'a>> {
+	pub fn find(&self, target: impl AsRef<str>) -> Result<Machine<'a>> {
+		let target = target.as_ref();
 		self.find_index(target).map(|index| self.get(index).unwrap())
 	}
 }
