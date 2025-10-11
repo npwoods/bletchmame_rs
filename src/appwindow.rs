@@ -286,6 +286,7 @@ impl AppModel {
 				let info_db = info_db.clone();
 				collections_model.update(info_db, &prefs.collections);
 			});
+			update_ui_for_current_history_item(self);
 		}
 
 		// shutting down?
