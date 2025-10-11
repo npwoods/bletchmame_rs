@@ -1508,15 +1508,8 @@ fn update_ui_for_current_history_item(model: &AppModel) {
 	let is_collection_in_list = prefs.collections.contains(&collection);
 	app_window.set_bookmark_collection_enabled(!is_collection_in_list);
 
-	// update the collections view
-	let app_window_weak = app_window.as_weak();
-	model.with_collections_view_model(|x| {
-		x.callback_after_refresh(async move {
-			app_window_weak
-				.unwrap()
-				.invoke_collections_view_select(collection_index);
-		})
-	});
+	// set the collections view selected index
+	app_window.set_collections_view_selected_index(collection_index);
 
 	// update the snap view
 	let current_snap_view = snap_view_string(prefs.current_history_entry().selection.first());

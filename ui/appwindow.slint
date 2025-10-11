@@ -127,11 +127,9 @@ export component AppWindow inherits Window {
 
     // the collections view on the left
     in property <[NavigationItem]> collections-model;
+    in-out property <int> collections-view-selected-index;
     callback collections-view-selected(int);
     callback collections-row-pointer-event(int, PointerEvent, Point);
-    public function collections-view-select(index: int) {
-        collections-list-view.current_index = index;
-    }
 
     // the toolbar
     in property <bool> history-can-go-back;
@@ -659,18 +657,16 @@ export component AppWindow inherits Window {
         VerticalBox {
             alignment: start;
             preferred-height: 100%;
-            collections-list-view := NavigationDrawer {
+            NavigationDrawer {
                 vertical-stretch: 0;
                 width: 250px;
                 groups: [{ title: 0, items: collections-model }];
+                current-index <=> collections-view-selected-index;
                 selected(group-index, index) => {
                     collections-view-selected(index)
                 }
                 item-pointer-event(group-index, item-index, event, point) => {
-                    collections-row-pointer-event(item-index, event, {
-                        x: point.x + collections-list-view.absolute-position.x,
-                        y: point.y + collections-list-view.absolute-position.y
-                    })
+                    collections-row-pointer-event(item-index, event, { x: point.x + self.absolute-position.x, y: point.y + self.absolute-position.y })
                 }
             }
 
