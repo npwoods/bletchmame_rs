@@ -280,12 +280,12 @@ impl PrefsCollection {
 		}
 	}
 
-	pub fn description(&self, info_db: &InfoDb) -> Cow<'_, str> {
+	pub fn description(&self, info_db: Option<&InfoDb>) -> Cow<'_, str> {
 		match self {
 			PrefsCollection::Builtin(x) => format!("{x}").into(),
 			PrefsCollection::MachineSoftware { machine_name } => {
-				let machine_desc = info_db
-					.machines()
+				let machines = info_db.as_ref().map(|db| db.machines()).unwrap_or_default();
+				let machine_desc = machines
 					.find(machine_name.as_str())
 					.map(|x| x.description())
 					.unwrap_or(machine_name.as_str());

@@ -1497,12 +1497,7 @@ fn update_ui_for_current_history_item(model: &AppModel) {
 	let collection_index = collection_index.and_then(|x| i32::try_from(x).ok()).unwrap_or(-1);
 
 	// update current collection text
-	let current_collection_desc = model
-		.state
-		.borrow()
-		.info_db()
-		.map(|info_db| collection.description(info_db))
-		.unwrap_or_default();
+	let current_collection_desc = collection.description(model.state.borrow().info_db().map(|x| &**x));
 	app_window.set_current_collection_text(current_collection_desc.as_ref().into());
 
 	// update the bookmark this collection icon
