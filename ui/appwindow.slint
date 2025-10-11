@@ -679,14 +679,6 @@ export component AppWindow inherits Window {
         VerticalBox {
             alignment: stretch;
                 
-            // current collection label
-            Text {
-                vertical-stretch: 0;
-                horizontal-alignment: left;
-                text: current-collection-text;
-                height: 20px;
-            }
-                
             // toolbar below the current collection
             HorizontalBox {
                 vertical-stretch: 0;
@@ -722,11 +714,21 @@ export component AppWindow inherits Window {
 
                 SearchBar {
                     horizontal-stretch: 1;
+                    placeholder-text: "Search " + current-collection-text;
                     text <=> items-search-text;
                     edited(text) => {
                         items-search-text-changed(text)
                     }
                 }
+            }
+                
+            // current collection label
+            Text {
+                vertical-stretch: 0;
+                horizontal-alignment: left;
+                text: current-collection-text;
+                font-size: 16px;
+                height: 20px;
             }
 
             // items table
