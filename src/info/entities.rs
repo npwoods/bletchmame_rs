@@ -341,27 +341,14 @@ enum ThisError {
 
 #[cfg(test)]
 mod test {
-	use std::marker::PhantomData;
-
-	use crate::info::InfoDb;
-
 	use super::MachinesView;
 	use super::ThisError;
 
 	#[test]
 	pub fn empty_machine_find() {
-		let xml = include_str!("test_data/listxml_fake.xml");
-		let bogus_db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
-
-		let machines_view = MachinesView {
-			db: &bogus_db,
-			byte_offset: bogus_db.machines().byte_offset,
-			start: 0,
-			end: 0,
-			phantom: PhantomData,
-		};
-
-		let actual = machines_view.find("cant_find_this").map_err(|e| e.downcast().unwrap());
+		let actual = MachinesView::default()
+			.find("cant_find_this")
+			.map_err(|e| e.downcast().unwrap());
 		assert_eq!(Err(ThisError::CannotFindMachine("cant_find_this".to_string())), actual);
 	}
 }

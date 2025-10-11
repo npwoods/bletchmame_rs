@@ -308,7 +308,7 @@ impl InfoDb {
 
 	fn make_view<B>(&self, root_view: &RootView<B>) -> SimpleView<'_, B> {
 		SimpleView {
-			db: self,
+			db: Some(self),
 			byte_offset: root_view.offset,
 			start: 0,
 			end: root_view.count,
@@ -439,9 +439,9 @@ where
 	}
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct SimpleView<'a, B> {
-	db: &'a InfoDb,
+	db: Option<&'a InfoDb>,
 	byte_offset: usize,
 	start: usize,
 	end: usize,
@@ -458,7 +458,7 @@ where
 
 	fn get(&self, index: usize) -> Option<Object<'a, B>> {
 		(index < self.len()).then(|| Object {
-			db: self.db,
+			db: self.db.expect("expected InfoDb to be Some"),
 			byte_offset: self.byte_offset,
 			index: self.start + index,
 			phantom: PhantomData,
