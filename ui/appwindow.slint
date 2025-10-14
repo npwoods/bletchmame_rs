@@ -4,11 +4,11 @@ import { SimpleMenuEntry } from "common.slint";
 import { Icons } from "icons.slint";
 
 struct CollectionContextMenuInfo {
-    move-up-command: string,
-    move-down-command: string,
-    delete-command: string,
-    rename-command: string,
-    new-collection-command: string}
+    move-up-action: string,
+    move-down-action: string,
+    delete-action: string,
+    rename-action: string,
+    new-collection-action: string}
 
 struct ItemContextMenuInfo {
     run-title: string,
@@ -71,7 +71,7 @@ export component AppWindow inherits Window {
     in property <[SimpleMenuEntry]> menu-entries-builtin-collections;
     in property <[bool]> menu-entries-builtin-collections-checked;
 
-    // menu command strings
+    // menu action strings
     in property <string> menu-action-file-stop;
     in property <string> menu-action-file-pause;
     in property <string> menu-action-file-devices-and-images;
@@ -545,33 +545,33 @@ export component AppWindow inherits Window {
         Menu {
             MenuItem {
                 title: @tr("CollectionContextMenu" => "Move Up");
-                enabled: collection-context-menu-info.move-up-command != "";
+                enabled: collection-context-menu-info.move-up-action != "";
                 activated => {
-                    menu-item-action(collection-context-menu-info.move-up-command);
+                    menu-item-action(collection-context-menu-info.move-up-action);
                 }
             }
 
             MenuItem {
                 title: @tr("CollectionContextMenu" => "Move Down");
-                enabled: collection-context-menu-info.move-down-command != "";
+                enabled: collection-context-menu-info.move-down-action != "";
                 activated => {
-                    menu-item-action(collection-context-menu-info.move-down-command);
+                    menu-item-action(collection-context-menu-info.move-down-action);
                 }
             }
 
             MenuItem {
                 title: @tr("CollectionContextMenu" => "Delete");
-                enabled: collection-context-menu-info.delete-command != "";
+                enabled: collection-context-menu-info.delete-action != "";
                 activated => {
-                    menu-item-action(collection-context-menu-info.delete-command);
+                    menu-item-action(collection-context-menu-info.delete-action);
                 }
             }
 
             MenuItem {
                 title: @tr("CollectionContextMenu" => "Rename");
-                enabled: collection-context-menu-info.rename-command != "";
+                enabled: collection-context-menu-info.rename-action != "";
                 activated => {
-                    menu-item-action(collection-context-menu-info.rename-command);
+                    menu-item-action(collection-context-menu-info.rename-action);
                 }
             }
 
@@ -579,9 +579,9 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("CollectionContextMenu" => "New Collection");
-                enabled: collection-context-menu-info.new-collection-command != "";
+                enabled: collection-context-menu-info.new-collection-action != "";
                 activated => {
-                    menu-item-action(collection-context-menu-info.new-collection-command);
+                    menu-item-action(collection-context-menu-info.new-collection-action);
                 }
             }
         }
