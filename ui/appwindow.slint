@@ -4,11 +4,11 @@ import { SimpleMenuEntry } from "common.slint";
 import { Icons } from "icons.slint";
 
 struct CollectionContextMenuInfo {
-    move-up-command: string,
-    move-down-command: string,
-    delete-command: string,
-    rename-command: string,
-    new-collection-command: string}
+    move-up-action: string,
+    move-down-action: string,
+    delete-action: string,
+    rename-action: string,
+    new-collection-action: string}
 
 struct ItemContextMenuInfo {
     run-title: string,
@@ -71,7 +71,7 @@ export component AppWindow inherits Window {
     in property <[SimpleMenuEntry]> menu-entries-builtin-collections;
     in property <[bool]> menu-entries-builtin-collections-checked;
 
-    // menu command strings
+    // menu action strings
     in property <string> menu-action-file-stop;
     in property <string> menu-action-file-pause;
     in property <string> menu-action-file-devices-and-images;
@@ -142,8 +142,8 @@ export component AppWindow inherits Window {
 
     // the items view
     in property <string> is-empty-reason;
-    in-out property <int> items-view-selected-index <=> items-table-view.current-row;
-    in-out property <[TableColumn]> items-columns <=> items-table-view.columns;
+    in-out property <int> items-view-selected-index;
+    in-out property <[TableColumn]> items-columns;
     callback items-search-text-changed(string);
     callback items-sort-ascending(int);
     callback items-sort-descending(int);
@@ -151,6 +151,8 @@ export component AppWindow inherits Window {
     callback items-row-pointer-event(int, PointerEvent, Point);
     in property <[[StandardListViewItem]]> items-model;
     public function items-view-select(index: int) {
+        // it is insufficient to update items-view-selected-index; it is necessary that we call
+        // set-current-row() to bring that row into view
         items-table-view.set-current-row(index);
     }
 
@@ -543,33 +545,33 @@ export component AppWindow inherits Window {
         Menu {
             MenuItem {
                 title: @tr("CollectionContextMenu" => "Move Up");
-                enabled: collection-context-menu-info.move-up-command != "";
+                enabled: collection-context-menu-info.move-up-action != "";
                 activated => {
-                    menu-item-action(collection-context-menu-info.move-up-command);
+                    menu-item-action(collection-context-menu-info.move-up-action);
                 }
             }
 
             MenuItem {
                 title: @tr("CollectionContextMenu" => "Move Down");
-                enabled: collection-context-menu-info.move-down-command != "";
+                enabled: collection-context-menu-info.move-down-action != "";
                 activated => {
-                    menu-item-action(collection-context-menu-info.move-down-command);
+                    menu-item-action(collection-context-menu-info.move-down-action);
                 }
             }
 
             MenuItem {
                 title: @tr("CollectionContextMenu" => "Delete");
-                enabled: collection-context-menu-info.delete-command != "";
+                enabled: collection-context-menu-info.delete-action != "";
                 activated => {
-                    menu-item-action(collection-context-menu-info.delete-command);
+                    menu-item-action(collection-context-menu-info.delete-action);
                 }
             }
 
             MenuItem {
                 title: @tr("CollectionContextMenu" => "Rename");
-                enabled: collection-context-menu-info.rename-command != "";
+                enabled: collection-context-menu-info.rename-action != "";
                 activated => {
-                    menu-item-action(collection-context-menu-info.rename-command);
+                    menu-item-action(collection-context-menu-info.rename-action);
                 }
             }
 
@@ -577,9 +579,9 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("CollectionContextMenu" => "New Collection");
-                enabled: collection-context-menu-info.new-collection-command != "";
+                enabled: collection-context-menu-info.new-collection-action != "";
                 activated => {
-                    menu-item-action(collection-context-menu-info.new-collection-command);
+                    menu-item-action(collection-context-menu-info.new-collection-action);
                 }
             }
         }
@@ -735,6 +737,8 @@ export component AppWindow inherits Window {
             items-table-view := StandardTableView {
                 vertical-stretch: 1;
                 rows: items-model;
+                current-row <=> items-view-selected-index;
+                columns <=> items-columns;
                 sort-ascending(index) => {
                     items-sort-ascending(index)
                 }
@@ -745,10 +749,7 @@ export component AppWindow inherits Window {
                     items-current-row-changed()
                 }
                 row-pointer-event(row, event, point) => {
-                    items-row-pointer-event(row, event, {
-                        x: point.x + items-table-view.absolute-position.x,
-                        y: point.y + items-table-view.absolute-position.y
-                    })
+                    items-row-pointer-event(row, event, { x: point.x + self.absolute-position.x, y: point.y + self.absolute-position.y })
                 }
             }
 

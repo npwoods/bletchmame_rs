@@ -47,7 +47,7 @@ impl CollectionsViewModel {
 		items.get(index).cloned()
 	}
 
-	pub fn context_commands(&self, index: Option<usize>) -> Option<CollectionContextMenuInfo> {
+	pub fn context_actions(&self, index: Option<usize>) -> Option<CollectionContextMenuInfo> {
 		let mut result = CollectionContextMenuInfo::default();
 
 		// menu items pertaining to selected collections
@@ -55,31 +55,31 @@ impl CollectionsViewModel {
 			let items = self.items.borrow();
 			if old_index > 0 {
 				let new_index = Some(old_index - 1);
-				let command = Action::MoveCollection { old_index, new_index };
-				result.move_up_command = command.encode_for_slint();
+				let action = Action::MoveCollection { old_index, new_index };
+				result.move_up_action = action.encode_for_slint();
 			}
 			if old_index < items.len() - 1 {
 				let new_index = Some(old_index + 1);
-				let command = Action::MoveCollection { old_index, new_index };
-				result.move_down_command = command.encode_for_slint();
+				let action = Action::MoveCollection { old_index, new_index };
+				result.move_down_action = action.encode_for_slint();
 			}
 			if items.len() > 1 {
-				let command = Action::DeleteCollectionDialog { index: old_index };
-				result.delete_command = command.encode_for_slint();
+				let action = Action::DeleteCollectionDialog { index: old_index };
+				result.delete_action = action.encode_for_slint();
 			}
 			if items
 				.get(old_index)
 				.map(|x| matches!(x.as_ref(), PrefsCollection::Folder { .. }))
 				.unwrap_or_default()
 			{
-				let command = Action::RenameCollectionDialog { index: old_index };
-				result.rename_command = command.encode_for_slint();
+				let action = Action::RenameCollectionDialog { index: old_index };
+				result.rename_action = action.encode_for_slint();
 			}
 		}
 
 		// new collection
-		let command = Action::AddToNewFolderDialog([].into());
-		result.new_collection_command = command.encode_for_slint();
+		let action = Action::AddToNewFolderDialog([].into());
+		result.new_collection_action = action.encode_for_slint();
 
 		// make the popup menu
 		Some(result)

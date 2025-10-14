@@ -560,10 +560,10 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	app_window.on_collections_row_pointer_event(move |index, evt, position| {
 		if is_context_menu_event(&evt) {
 			let index = usize::try_from(index).ok();
-			if let Some(context_commands) = model_clone.with_collections_view_model(|x| x.context_commands(index)) {
+			if let Some(context_actions) = model_clone.with_collections_view_model(|x| x.context_actions(index)) {
 				model_clone
 					.app_window()
-					.invoke_show_collection_context_menu(context_commands, position);
+					.invoke_show_collection_context_menu(context_actions, position);
 			}
 		}
 	});
