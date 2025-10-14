@@ -142,8 +142,8 @@ export component AppWindow inherits Window {
 
     // the items view
     in property <string> is-empty-reason;
-    in-out property <int> items-view-selected-index <=> items-table-view.current-row;
-    in-out property <[TableColumn]> items-columns <=> items-table-view.columns;
+    in-out property <int> items-view-selected-index;
+    in-out property <[TableColumn]> items-columns;
     callback items-search-text-changed(string);
     callback items-sort-ascending(int);
     callback items-sort-descending(int);
@@ -151,6 +151,8 @@ export component AppWindow inherits Window {
     callback items-row-pointer-event(int, PointerEvent, Point);
     in property <[[StandardListViewItem]]> items-model;
     public function items-view-select(index: int) {
+        // it is insufficient to update items-view-selected-index; it is necessary that we call
+        // set-current-row() to bring that row into view
         items-table-view.set-current-row(index);
     }
 
@@ -735,6 +737,8 @@ export component AppWindow inherits Window {
             items-table-view := StandardTableView {
                 vertical-stretch: 1;
                 rows: items-model;
+                current-row <=> items-view-selected-index;
+                columns <=> items-columns;
                 sort-ascending(index) => {
                     items-sort-ascending(index)
                 }
@@ -745,10 +749,7 @@ export component AppWindow inherits Window {
                     items-current-row-changed()
                 }
                 row-pointer-event(row, event, point) => {
-                    items-row-pointer-event(row, event, {
-                        x: point.x + items-table-view.absolute-position.x,
-                        y: point.y + items-table-view.absolute-position.y
-                    })
+                    items-row-pointer-event(row, event, { x: point.x + self.absolute-position.x, y: point.y + self.absolute-position.y })
                 }
             }
 
