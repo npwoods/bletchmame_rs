@@ -1,5 +1,5 @@
 import { HorizontalBox, VerticalBox, Button, StandardListView, StandardTableView, LineEdit, ListView, ScrollView, GridBox, Spinner, TextEdit } from "std-widgets.slint";
-import { NavigationDrawer, NavigationItem, FilledIconButton, SearchBar } from "@slint/material.slint";
+import { NavigationDrawer, NavigationItem, FilledIconButton, SearchBar, ListItem } from "@slint/material.slint";
 import { SimpleMenuEntry } from "common.slint";
 import { Icons } from "icons.slint";
 
@@ -19,6 +19,11 @@ struct ItemContextMenuInfo {
     new-folder-action: string,
     remove-from-folder-desc: SimpleMenuEntry,
 }
+
+struct SearchBarItem {
+    icon: image,
+    text: string,
+    action: string}
 
 struct ReportIssue {
     text: string,
@@ -139,6 +144,8 @@ export component AppWindow inherits Window {
     in-out property <string> items-search-text;
     callback history-advance-clicked(int);
     callback bookmark-collection-clicked();
+    pure callback get-searchbar-items(string) -> [SearchBarItem];
+    pure callback translate-searchbar-items([SearchBarItem]) -> [ListItem];
 
     // the items view
     in property <string> is-empty-reason;
@@ -715,11 +722,13 @@ export component AppWindow inherits Window {
                 }
 
                 SearchBar {
+                    property <[SearchBarItem]> my-items: get-searchbar-items(self.text);
                     horizontal-stretch: 1;
                     placeholder-text: "Search " + current-collection-text;
                     text <=> items-search-text;
-                    edited(text) => {
-                        items-search-text-changed(text)
+                    items: translate-searchbar-items(my-items);
+                    changed text => {
+                        items-search-text-changed(self.text)
                     }
                 }
             }
