@@ -553,18 +553,16 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	});
 	let model_clone = model.clone();
 	app_window.on_items_search_text_changed(move |search| {
-		let action = {
-			// hack for other actions
-			let zero_width_space_count = search.chars().rev().take_while(|&c| c == '\u{200B}').count();
-			if zero_width_space_count > 0 {
-				let action_string = model_clone.searchbar_actions.borrow()[zero_width_space_count - 1].clone();
-				println!("action_string={action_string:?}");
-				Action::decode_from_slint(action_string).unwrap()
-			} else {
-				Action::SearchText(search.into())
-			}
-		};
+		let action = Action::SearchText(search.into());
 		handle_action(&model_clone, action);
+	});
+	let model_clone = model.clone();
+	app_window.on_items_search_item_clicked(move |index| {
+		let index = usize::try_from(index).unwrap();
+		let action_string = model_clone.searchbar_actions.borrow()[index].clone();
+		let action = Action::decode_from_slint(action_string).unwrap();
+		handle_action(&model_clone, action);
+		true
 	});
 	app_window.set_items_search_text(preferences.current_history_entry().search.to_shared_string());
 	let model_clone = model.clone();
@@ -1708,15 +1706,8 @@ fn searchbar_items(model: &AppModel, text: &str) -> Vec<SearchBarItem> {
 		.searchbar_actions
 		.replace(items.iter().map(|x| x.action.clone()).collect::<Vec<_>>());
 
-	// hack to use U+200B to signify commands
+	// and return!
 	items
-		.into_iter()
-		.enumerate()
-		.map(|(index, item)| {
-			let text = format!("{}{}", item.text, "\u{200B}".repeat(index + 1)).to_shared_string();
-			SearchBarItem { text, ..item }
-		})
-		.collect()
 }
 
 fn translate_searchbar_items(model: ModelRc<SearchBarItem>) -> ModelRc<ListItem> {

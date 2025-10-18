@@ -152,6 +152,7 @@ export component AppWindow inherits Window {
     in-out property <int> items-view-selected-index;
     in-out property <[TableColumn]> items-columns;
     callback items-search-text-changed(string);
+    callback items-search-item-clicked(int) -> bool;
     callback items-sort-ascending(int);
     callback items-sort-descending(int);
     callback items-current-row-changed();
@@ -729,6 +730,9 @@ export component AppWindow inherits Window {
                     items: translate-searchbar-items(my-items);
                     changed text => {
                         items-search-text-changed(self.text)
+                    }
+                    item_clicked(index) => {
+                        return items-search-item-clicked(index);
                     }
                 }
             }
