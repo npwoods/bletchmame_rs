@@ -422,8 +422,8 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	// attach the menu bar (either natively or with an approximation using Slint); looking forward to Slint having first class menuing support
 	let model_clone = model.clone();
 	app_window.on_menu_item_action(move |command_string| {
-		if let Some(command) = Action::decode_from_slint(command_string) {
-			handle_action(&model_clone, command);
+		if let Some(action) = Action::decode_from_slint(command_string) {
+			handle_action(&model_clone, action);
 		}
 	});
 
@@ -498,8 +498,8 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		let index = index.try_into().unwrap();
 		if let Some(collection) = collections_view_model_clone.get(index) {
 			let collection = Rc::unwrap_or_clone(collection);
-			let command = Action::Browse(collection);
-			handle_action(&model_clone, command);
+			let action = Action::Browse(collection);
+			handle_action(&model_clone, action);
 		}
 	});
 
@@ -553,31 +553,29 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	});
 	let model_clone = model.clone();
 	app_window.on_items_search_text_changed(move |search| {
-		let action = {
-			// hack for other actions
-			let zero_width_space_count = search.chars().rev().take_while(|&c| c == '\u{200B}').count();
-			if zero_width_space_count > 0 {
-				let action_string = model_clone.searchbar_actions.borrow()[zero_width_space_count - 1].clone();
-				println!("action_string={action_string:?}");
-				Action::decode_from_slint(action_string).unwrap()
-			} else {
-				Action::SearchText(search.into())
-			}
-		};
+		let action = Action::SearchText(search.into());
 		handle_action(&model_clone, action);
+	});
+	let model_clone = model.clone();
+	app_window.on_items_search_item_clicked(move |index| {
+		let index = usize::try_from(index).unwrap();
+		let action_string = model_clone.searchbar_actions.borrow()[index].clone();
+		let action = Action::decode_from_slint(action_string).unwrap();
+		handle_action(&model_clone, action);
+		true
 	});
 	app_window.set_items_search_text(preferences.current_history_entry().search.to_shared_string());
 	let model_clone = model.clone();
 	app_window.on_items_current_row_changed(move || {
-		let command = Action::ItemsSelectedChanged;
-		handle_action(&model_clone, command);
+		let action = Action::ItemsSelectedChanged;
+		handle_action(&model_clone, action);
 	});
 
 	// for when we shut down
 	let model_clone = model.clone();
 	app_window.window().on_close_requested(move || {
-		let command = Action::FileExit;
-		handle_action(&model_clone, command);
+		let action = Action::FileExit;
+		handle_action(&model_clone, action);
 		CloseRequestResponse::KeepWindowShown
 	});
 
@@ -630,23 +628,23 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	// report button
 	let model_clone = model.clone();
 	app_window.on_report_button_clicked(move || {
-		let command = {
+		let action = {
 			let state = model_clone.state.borrow();
 			state.report().unwrap().button.unwrap().command
 		};
-		handle_action(&model_clone, command);
+		handle_action(&model_clone, action);
 	});
 
 	// issue button
 	let model_clone = model.clone();
 	app_window.on_issue_button_clicked(move |index| {
 		let index = usize::try_from(index).unwrap();
-		let command = {
+		let action = {
 			let state = model_clone.state.borrow();
 			let issue = state.report().unwrap().issues.into_iter().nth(index).unwrap();
 			issue.button.unwrap().command
 		};
-		handle_action(&model_clone, command);
+		handle_action(&model_clone, action);
 	});
 
 	// throttle menu
@@ -748,9 +746,9 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	// now create the "real initial" state, now that we have a model to work with
 	let paths = model.preferences.borrow().paths.clone();
 	let model_weak = Rc::downgrade(&model);
-	let state = AppState::new(prefs_path, paths, mame_windowing, args.mame_stderr, move |command| {
+	let state = AppState::new(prefs_path, paths, mame_windowing, args.mame_stderr, move |action| {
 		let model = model_weak.upgrade().unwrap();
-		handle_action(&model, command);
+		handle_action(&model, action);
 	});
 
 	// and lets do something with that state; specifically
@@ -765,19 +763,19 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	app_window.show().unwrap();
 }
 
-fn handle_action(model: &Rc<AppModel>, command: Action) {
+fn handle_action(model: &Rc<AppModel>, action: Action) {
 	// tracing
-	let command_str: &'static str = (&command).into();
-	let span = if command.is_frequent() {
-		debug_span!("handle_action", command = command_str)
+	let action_str: &'static str = (&action).into();
+	let span = if action.is_frequent() {
+		debug_span!("handle_action", command = action_str)
 	} else {
-		info_span!("handle_action", command = command_str)
+		info_span!("handle_action", command = action_str)
 	};
 	let _guard = span.enter();
-	info!(command=?&command, "handle_action()");
+	info!(command=?&action, "handle_action()");
 	let start_instant = Instant::now();
 
-	match command {
+	match action {
 		Action::FileStop => {
 			model.issue_command(MameCommand::stop());
 		}
@@ -801,12 +799,12 @@ fn handle_action(model: &Rc<AppModel>, command: Action) {
 			let diconfig = diconfig.update_status(model.state.borrow().status().as_ref().unwrap());
 			let status_update_channel = model.status_changed_channel.clone();
 			let model_clone = model.clone();
-			let invoke_command = move |command| handle_action(&model_clone, command);
+			let invoke_action = move |action| handle_action(&model_clone, action);
 			let fut = dialog_devices_and_images(
 				model.modal_stack.clone(),
 				diconfig,
 				status_update_channel,
-				invoke_command,
+				invoke_action,
 			);
 			spawn_local(fut).unwrap();
 		}
@@ -982,8 +980,8 @@ fn handle_action(model: &Rc<AppModel>, command: Action) {
 				app_window.set_menubar_visible(new_visible);
 
 				if has_input_using_mouse {
-					let command = MameCommand::set_mouse_enabled(!new_visible).into();
-					handle_action(model, command);
+					let action = MameCommand::set_mouse_enabled(!new_visible).into();
+					handle_action(model, action);
 				}
 			}
 		}
@@ -1013,7 +1011,7 @@ fn handle_action(model: &Rc<AppModel>, command: Action) {
 		Action::OptionsCheats => {
 			let status_update_channel = model.status_changed_channel.clone();
 			let model_clone = model.clone();
-			let invoke_command = move |command| handle_action(&model_clone, command);
+			let invoke_action = move |action| handle_action(&model_clone, action);
 			let cheats = model
 				.state
 				.borrow()
@@ -1024,7 +1022,7 @@ fn handle_action(model: &Rc<AppModel>, command: Action) {
 				.unwrap()
 				.cheats
 				.clone();
-			let fut = dialog_cheats(model.modal_stack.clone(), cheats, status_update_channel, invoke_command);
+			let fut = dialog_cheats(model.modal_stack.clone(), cheats, status_update_channel, invoke_action);
 			spawn_local(fut).unwrap();
 		}
 		Action::OptionsClassic => {
@@ -1036,7 +1034,7 @@ fn handle_action(model: &Rc<AppModel>, command: Action) {
 		Action::SettingsInput(class) => {
 			let status_update_channel = model.status_changed_channel.clone();
 			let model_clone = model.clone();
-			let invoke_command = move |command| handle_action(&model_clone, command);
+			let invoke_action = move |action| handle_action(&model_clone, action);
 			let (inputs, input_device_classes, machine_index) = {
 				let state = model.state.borrow();
 				let running = state.status().unwrap().running.as_ref().unwrap();
@@ -1056,7 +1054,7 @@ fn handle_action(model: &Rc<AppModel>, command: Action) {
 						input_device_classes,
 						class,
 						status_update_channel,
-						invoke_command,
+						invoke_action,
 					);
 					spawn_local(fut).unwrap();
 				}
@@ -1069,7 +1067,7 @@ fn handle_action(model: &Rc<AppModel>, command: Action) {
 						class,
 						machine_index,
 						status_update_channel,
-						invoke_command,
+						invoke_action,
 					);
 					spawn_local(fut).unwrap();
 				}
@@ -1134,8 +1132,8 @@ fn handle_action(model: &Rc<AppModel>, command: Action) {
 		}
 		Action::Start(start_args) => match start_args.preflight() {
 			Ok(_) => {
-				let command = MameCommand::start(&start_args).into();
-				handle_action(model, command);
+				let action = MameCommand::start(&start_args).into();
+				handle_action(model, action);
 			}
 			Err(errors) => {
 				let message = errors.into_iter().map(|e| e.to_string()).collect::<String>();
@@ -1194,8 +1192,8 @@ fn handle_action(model: &Rc<AppModel>, command: Action) {
 			let model_clone = model.clone();
 			let fut = async move {
 				if let Some(name) = dialog_new_collection(model_clone.modal_stack.clone(), existing_names).await {
-					let command = Action::AddToNewFolder(name, items);
-					handle_action(&model_clone, command);
+					let action = Action::AddToNewFolder(name, items);
+					handle_action(&model_clone, action);
 				}
 			};
 			spawn_local(fut).unwrap();
@@ -1228,11 +1226,11 @@ fn handle_action(model: &Rc<AppModel>, command: Action) {
 				if dialog_message_box::<OkCancel>(model_clone.modal_stack.clone(), "Delete", message).await
 					== OkCancel::Ok
 				{
-					let command = Action::MoveCollection {
+					let action = Action::MoveCollection {
 						old_index: index,
 						new_index: None,
 					};
-					handle_action(&model_clone, command);
+					handle_action(&model_clone, action);
 				}
 			};
 			spawn_local(fut).unwrap();
@@ -1245,8 +1243,8 @@ fn handle_action(model: &Rc<AppModel>, command: Action) {
 				if let Some(new_name) =
 					dialog_rename_collection(model_clone.modal_stack.clone(), existing_names, old_name).await
 				{
-					let command = Action::RenameCollection { index, new_name };
-					handle_action(&model_clone, command);
+					let action = Action::RenameCollection { index, new_name };
+					handle_action(&model_clone, action);
 				}
 			};
 			spawn_local(fut).unwrap();
@@ -1285,8 +1283,8 @@ fn handle_action(model: &Rc<AppModel>, command: Action) {
 			let model_clone = model.clone();
 			let fut = async move {
 				if let Some(image_desc) = dialog_load_image(model_clone.modal_stack.clone(), &formats).await {
-					let command = MameCommand::load_image(tag, &image_desc).into();
-					handle_action(&model_clone, command);
+					let action = MameCommand::load_image(tag, &image_desc).into();
+					handle_action(&model_clone, action);
 				}
 			};
 			spawn_local(fut).unwrap();
@@ -1298,8 +1296,8 @@ fn handle_action(model: &Rc<AppModel>, command: Action) {
 			let model_clone = model.clone();
 			let fut = async move {
 				if let Some(image_desc) = dialog_connect_to_socket(model_clone.modal_stack.clone()).await {
-					let command = MameCommand::load_image(tag, &image_desc).into();
-					handle_action(&model_clone, command);
+					let action = MameCommand::load_image(tag, &image_desc).into();
+					handle_action(&model_clone, action);
 				}
 			};
 			spawn_local(fut).unwrap();
@@ -1362,7 +1360,7 @@ fn handle_action(model: &Rc<AppModel>, command: Action) {
 				.unwrap_or_default();
 			let status_changed_channel = model.status_changed_channel.clone();
 			let model_clone = model.clone();
-			let invoke_command = move |command| handle_action(&model_clone, command);
+			let invoke_action = move |action| handle_action(&model_clone, action);
 			let fut = dialog_seq_poll(
 				modal_stack,
 				port_tag,
@@ -1372,7 +1370,7 @@ fn handle_action(model: &Rc<AppModel>, command: Action) {
 				inputs,
 				input_device_classes,
 				status_changed_channel,
-				invoke_command,
+				invoke_action,
 			);
 			spawn_local(fut).unwrap();
 		}
@@ -1387,7 +1385,7 @@ fn handle_action(model: &Rc<AppModel>, command: Action) {
 				.unwrap_or_default();
 			let status_changed_channel = model.status_changed_channel.clone();
 			let model_clone = model.clone();
-			let invoke_command = move |command| handle_action(&model_clone, command);
+			let invoke_action = move |action| handle_action(&model_clone, action);
 			let fut = dialog_input_xy(
 				modal_stack,
 				x_input,
@@ -1395,7 +1393,7 @@ fn handle_action(model: &Rc<AppModel>, command: Action) {
 				inputs,
 				input_device_classes,
 				status_changed_channel,
-				invoke_command,
+				invoke_action,
 			);
 			spawn_local(fut).unwrap();
 		}
@@ -1403,9 +1401,9 @@ fn handle_action(model: &Rc<AppModel>, command: Action) {
 			let modal_stack = model.modal_stack.clone();
 			let model = model.clone();
 			let fut = async move {
-				let command = dialog_input_select_multiple(modal_stack, selections).await;
-				if let Some(command) = command {
-					handle_action(&model, command);
+				let action = dialog_input_select_multiple(modal_stack, selections).await;
+				if let Some(action) = action {
+					handle_action(&model, action);
 				}
 			};
 			spawn_local(fut).unwrap();
@@ -1647,8 +1645,8 @@ fn update_empty_reason(model: &AppModel, empty_reason: Option<EmptyReason>) {
 
 fn items_set_sorting(model: &Rc<AppModel>, column: i32, order: SortOrder) {
 	let column = usize::try_from(column).unwrap();
-	let command = Action::ItemsSort(column, order);
-	handle_action(model, command);
+	let action = Action::ItemsSort(column, order);
+	handle_action(model, action);
 }
 
 fn start_load_history_xml(model: &AppModel, path: Option<&str>) {
@@ -1683,7 +1681,7 @@ fn searchbar_items(model: &AppModel, text: &str) -> Vec<SearchBarItem> {
 	let info_db = state.info_db().map(|x| x.as_ref());
 	let prefs = model.preferences.borrow();
 
-	let items = prefs
+	let mut items = prefs
 		.collections
 		.iter()
 		.map(|col| {
@@ -1708,15 +1706,17 @@ fn searchbar_items(model: &AppModel, text: &str) -> Vec<SearchBarItem> {
 		.searchbar_actions
 		.replace(items.iter().map(|x| x.action.clone()).collect::<Vec<_>>());
 
-	// hack to use U+200B to signify commands
+	// add action for searching
+	let (current_collection, _) = prefs.current_collection();
+	let text = format!("Search for \"{}\" in {}", text, current_collection.description(info_db)).to_shared_string();
+	let action = Action::SearchText(text.to_string());
+	let action = action.encode_for_slint();
+	let icon = Icons::get(&component).get_search_text();
+	let item = SearchBarItem { text, icon, action };
+	items.push(item);
+
+	// and return!
 	items
-		.into_iter()
-		.enumerate()
-		.map(|(index, item)| {
-			let text = format!("{}{}", item.text, "\u{200B}".repeat(index + 1)).to_shared_string();
-			SearchBarItem { text, ..item }
-		})
-		.collect()
 }
 
 fn translate_searchbar_items(model: ModelRc<SearchBarItem>) -> ModelRc<ListItem> {
