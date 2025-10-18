@@ -19,7 +19,8 @@ fn main() -> std::io::Result<()> {
 	let slint_material_components_dir = slint_material_components::import_path()
 		.get("slint")
 		.unwrap()
-		.join("..");
+		.join("..")
+		.join("src");
 	let library_paths = HashMap::from([("slint".into(), slint_material_components_dir)]);
 
 	// build Slint stuff
