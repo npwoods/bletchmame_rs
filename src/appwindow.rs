@@ -1681,7 +1681,7 @@ fn searchbar_items(model: &AppModel, text: &str) -> Vec<SearchBarItem> {
 	let info_db = state.info_db().map(|x| x.as_ref());
 	let prefs = model.preferences.borrow();
 
-	let items = prefs
+	let mut items = prefs
 		.collections
 		.iter()
 		.map(|col| {
@@ -1705,6 +1705,15 @@ fn searchbar_items(model: &AppModel, text: &str) -> Vec<SearchBarItem> {
 	model
 		.searchbar_actions
 		.replace(items.iter().map(|x| x.action.clone()).collect::<Vec<_>>());
+
+	// add action for searching
+	let (current_collection, _) = prefs.current_collection();
+	let text = format!("Search for \"{}\" in {}", text, current_collection.description(info_db)).to_shared_string();
+	let action = Action::SearchText(text.to_string());
+	let action = action.encode_for_slint();
+	let icon = Icons::get(&component).get_search_text();
+	let item = SearchBarItem { text, icon, action };
+	items.push(item);
 
 	// and return!
 	items
