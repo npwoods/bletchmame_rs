@@ -282,6 +282,29 @@ impl AppState {
 		Some(new_state)
 	}
 
+	pub fn reset(&self) -> Option<Self> {
+		let live = self
+			.live
+			.as_ref()
+			.and_then(|live| live.session.as_ref().map(|session| (live.info_db.clone(), session)))
+			.map(|(info_db, old_session)| {
+				let new_session = Session {
+					command_sender: None,
+					pending_restart: true,
+					..old_session.clone()
+				};
+				Live {
+					info_db,
+					session: Some(new_session),
+				}
+			});
+		let new_state = Self { live, ..self.clone() };
+
+		// attempt to reactivate and return
+		let new_state = new_state.activate().unwrap_or(new_state);
+		Some(new_state)
+	}
+
 	/// Issues a command to MAME
 	pub fn issue_command(&self, command: MameCommand) {
 		let session = self.live.as_ref().unwrap().session.as_ref().unwrap();

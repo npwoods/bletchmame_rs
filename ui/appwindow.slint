@@ -107,6 +107,7 @@ export component AppWindow inherits Window {
     in property <string> menu-action-settings-paths;
     in property <string> menu-action-settings-reset;
     in property <string> menu-action-settings-import-mame-ini;
+    in property <string> menu-action-help-reset-mame;
     in property <string> menu-action-help-refresh-info-db;
     in property <string> menu-action-help-website;
     in property <string> menu-action-help-about;
@@ -525,12 +526,22 @@ export component AppWindow inherits Window {
         Menu {
             title: @tr("MenuBar" => "Help");
             MenuItem {
-                title: @tr("MenuBar" => "Refresh MAME machine info...");
+                title: @tr("MenuBar" => "Reset MAME");
+                enabled: mode() == "ready";
+                activated => {
+                    menu-item-action(root.menu-action-help-reset-mame);
+                }
+            }
+
+            MenuItem {
+                title: @tr("MenuBar" => "Refresh MAME machine info");
                 enabled: can-refresh-info-db;
                 activated => {
                     menu-item-action(root.menu-action-help-refresh-info-db);
                 }
             }
+
+            MenuSeparator { }
 
             MenuItem {
                 title: @tr("MenuBar" => "BletchMAME web site...");

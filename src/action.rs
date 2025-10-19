@@ -57,6 +57,7 @@ pub enum Action {
 	SettingsImportMameIni,
 
 	// Help menu
+	HelpResetMame,
 	HelpRefreshInfoDb,
 	HelpWebSite,
 	HelpAbout,
