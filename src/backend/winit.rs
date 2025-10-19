@@ -388,6 +388,7 @@ impl WinitAccelerator {
 				}
 			}
 			Key::Unidentified(NativeKey::Windows(0x0058)) => Some(KeyCode::KeyX),
+			Key::Named(NamedKey::Escape) => Some(KeyCode::Escape),
 			Key::Named(NamedKey::F7) => Some(KeyCode::F7),
 			Key::Named(NamedKey::F8) => Some(KeyCode::F8),
 			Key::Named(NamedKey::F9) => Some(KeyCode::F9),
@@ -426,6 +427,7 @@ impl FromStr for WinitAccelerator {
 
 		let key = match value {
 			"X" => Ok(KeyCode::KeyX),
+			"Esc" => Ok(KeyCode::Escape),
 			"F7" => Ok(KeyCode::F7),
 			"F8" => Ok(KeyCode::F8),
 			"F9" => Ok(KeyCode::F9),

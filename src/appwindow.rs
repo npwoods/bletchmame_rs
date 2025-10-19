@@ -441,6 +441,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 
 	// set up the accelerator map
 	let accelerator_command_map = [
+		("Ctrl+Pause", Action::FileStop),
 		("Pause", Action::FilePause),
 		("F7", Action::FileQuickLoadState),
 		("Shift+F7", Action::FileQuickLoadState),
