@@ -722,6 +722,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		app_window.set_menu_action_settings_paths(SettingsPaths(None).encode_for_slint());
 		app_window.set_menu_action_settings_reset(SettingsReset.encode_for_slint());
 		app_window.set_menu_action_settings_import_mame_ini(SettingsImportMameIni.encode_for_slint());
+		app_window.set_menu_action_help_reset_mame(HelpResetMame.encode_for_slint());
 		app_window.set_menu_action_help_refresh_info_db(HelpRefreshInfoDb.encode_for_slint());
 		app_window.set_menu_action_help_website(HelpWebSite.encode_for_slint());
 		app_window.set_menu_action_help_about(HelpAbout.encode_for_slint());
@@ -1104,6 +1105,9 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 				}
 			};
 			spawn_local(fut).unwrap();
+		}
+		Action::HelpResetMame => {
+			model.update_state(|state| state.reset());
 		}
 		Action::HelpRefreshInfoDb => {
 			model.update_state(|state| state.infodb_rebuild());
