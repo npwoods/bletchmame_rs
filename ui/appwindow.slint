@@ -742,7 +742,7 @@ export component AppWindow inherits Window {
                     changed text => {
                         items-search-text-changed(self.text)
                     }
-                    item_clicked(index) => {
+                    item-activated(index) => {
                         return items-search-item-clicked(index);
                     }
                 }

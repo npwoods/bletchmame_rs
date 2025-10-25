@@ -12,13 +12,13 @@ tracing = { version = "0.1.41", features = [
     "release_max_level_info",
 ] }
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
-slint = { git = "https://github.com/npwoods/slint.git", rev = "67b277a42bcc8e491cb335e6940f9f722ceb28f9", features = [
+slint = { git = "https://github.com/npwoods/slint.git", rev = "d180d589d3c6d2732fed2ea0d555553db95d6f79", features = [
     "raw-window-handle-06",
 ] }
-i-slint-core = { git = "https://github.com/npwoods/slint.git", rev = "67b277a42bcc8e491cb335e6940f9f722ceb28f9" }
-i-slint-common = { git = "https://github.com/npwoods/slint.git", rev = "67b277a42bcc8e491cb335e6940f9f722ceb28f9" }
-i-slint-backend-winit = { git = "https://github.com/npwoods/slint.git", rev = "67b277a42bcc8e491cb335e6940f9f722ceb28f9" }
-i-slint-backend-qt = { git = "https://github.com/npwoods/slint.git", rev = "67b277a42bcc8e491cb335e6940f9f722ceb28f9", optional = true }
+i-slint-core = { git = "https://github.com/npwoods/slint.git", rev = "d180d589d3c6d2732fed2ea0d555553db95d6f79" }
+i-slint-common = { git = "https://github.com/npwoods/slint.git", rev = "d180d589d3c6d2732fed2ea0d555553db95d6f79" }
+i-slint-backend-winit = { git = "https://github.com/npwoods/slint.git", rev = "d180d589d3c6d2732fed2ea0d555553db95d6f79" }
+i-slint-backend-qt = { git = "https://github.com/npwoods/slint.git", rev = "d180d589d3c6d2732fed2ea0d555553db95d6f79", optional = true }
 raw-window-handle = "0.6.2"
 rfd = "0.15.1"
 serde = { version = "1.0.219", features = ["rc"] }
@@ -92,8 +92,8 @@ tempdir = "0.3.7"
 [build-dependencies]
 cpp_build = "0.5.10"
 ico = "0.4.0"
-slint-build = { git = "https://github.com/npwoods/slint.git", rev = "67b277a42bcc8e491cb335e6940f9f722ceb28f9" }
-slint-material-components = { git = "https://github.com/npwoods/slint.git", rev = "67b277a42bcc8e491cb335e6940f9f722ceb28f9" }
+slint-build = { git = "https://github.com/npwoods/slint.git", rev = "d180d589d3c6d2732fed2ea0d555553db95d6f79" }
+slint-material-components = { git = "https://github.com/npwoods/slint.git", rev = "d180d589d3c6d2732fed2ea0d555553db95d6f79" }
 winresource = "0.1.20"
 
 [profile.dev]
