@@ -558,7 +558,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		handle_action(&model_clone, action);
 	});
 	let model_clone = model.clone();
-	app_window.on_items_search_item_clicked(move |index| {
+	app_window.on_items_search_item_activated(move |index| {
 		let index = usize::try_from(index).unwrap();
 		let action_string = model_clone.searchbar_actions.borrow()[index].clone();
 		let action = Action::decode_from_slint(action_string).unwrap();
