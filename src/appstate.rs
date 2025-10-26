@@ -35,6 +35,9 @@ use crate::status::ValidationError;
 use crate::threadlocalbubble::ThreadLocalBubble;
 use crate::version::MameVersion;
 
+use crate::runtime::session::Error as SessionError;
+use crate::runtime::session::Result as SessionResult;
+
 #[derive(Clone)]
 pub struct AppState {
 	paths: Rc<PrefsPaths>,
@@ -64,7 +67,7 @@ struct Live {
 /// Represents a session and associated communication
 #[derive(Clone)]
 struct Session {
-	job: Job<Result<()>>,
+	job: Job<SessionResult<()>>,
 	command_sender: Option<Arc<Sender<MameCommand>>>,
 	status: Option<Rc<Status>>,
 	pending_status: Option<Rc<Status>>,
@@ -75,7 +78,7 @@ struct Session {
 #[derive(Debug)]
 enum Failure {
 	Preflight(Vec<PreflightProblem>),
-	SessionError(Error),
+	SessionError(SessionError),
 	StatusValidationProblem(ValidationError),
 	InfoDbBuild(Error),
 	InfoDbBuildCancelled,
@@ -95,6 +98,8 @@ type CommandCallback = Rc<dyn Fn(Action) + 'static>;
 pub struct Report {
 	pub message: SmolStr,
 	pub submessage: Option<SmolStr>,
+	pub mame_stderr_output: Option<SmolStr>,
+	pub mame_exit_code: Option<i32>,
 	pub button: Option<Button>,
 	pub is_spinning: bool,
 	pub issues: Vec<Issue>,
@@ -569,7 +574,7 @@ impl AppState {
 			Resetting,
 			ShuttingDown,
 			PreflightFailure(&'a [PreflightProblem]),
-			SessionError(&'a Error),
+			SessionError(&'a SessionError),
 			InvalidStatusUpdate(&'a [UpdateXmlProblem]),
 			InfoDbBuildFailure(Option<&'a Error>),
 			InfoDbStatusMismatch(&'a MameVersion, &'a MameVersion),
@@ -644,7 +649,7 @@ impl AppState {
 				let issues = preflight_problems
 					.iter()
 					.map(|problem| {
-						let text = problem.to_string().into();
+						let text = problem.to_smolstr();
 						let button = problem.problem_type().map(|path_type| {
 							let text = format_smolstr!("Choose {path_type}");
 							let command = Action::SettingsPaths(Some(path_type));
@@ -665,8 +670,10 @@ impl AppState {
 					command: Action::ReactivateMame
 				};
 				Report {
-					message: "MAME has errored".into(),
+					message: "MAME has errored and shut down".into(),
 					submessage: Some(format!("{error}").into()),
+					mame_stderr_output: error.mame_stderr_text.clone(),
+					mame_exit_code: error.exit_code,
 					button: Some(button),
 					..Default::default()
 				}

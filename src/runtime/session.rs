@@ -18,10 +18,9 @@ use std::sync::mpsc::Sender;
 use std::sync::mpsc::channel;
 use std::time::Duration;
 
-use anyhow::Error;
-use anyhow::Result;
 use itertools::Itertools;
 use slint::invoke_from_event_loop;
+use smol_str::SmolStr;
 use tracing::Level;
 use tracing::error;
 use tracing::info;
@@ -41,13 +40,30 @@ use crate::status::Update;
 use crate::threadlocalbubble::ThreadLocalBubble;
 
 #[derive(thiserror::Error, Debug)]
+#[error("{inner}")]
+pub struct Error {
+	#[source]
+	pub inner: anyhow::Error,
+	pub exit_code: Option<i32>,
+	pub mame_stderr_text: Option<SmolStr>,
+}
+
+pub type Result<T> = std::result::Result<T, Error>;
+
+#[derive(thiserror::Error, Debug)]
 enum ThisError {
 	#[error("MAME Error Response: {0:?}")]
 	MameErrorResponse(String),
 	#[error("Unexpected Response from MAME: {0:?}")]
 	MameResponseNotUnderstood(String),
-	#[error("Unexpected EOF from MAME: {0}")]
-	EofFromMame(String),
+	#[error("Unexpected EOF from MAME")]
+	EofFromMame,
+	#[error("Error launching MAME: {0:?}")]
+	LaunchingMame(anyhow::Error),
+	#[error("Error reading from MAME: {0:?}")]
+	ReadingFromMame(anyhow::Error),
+	#[error("Error writing to MAME: {0:?}")]
+	WritingToMame(anyhow::Error),
 }
 
 #[derive(Debug)]
@@ -107,7 +123,7 @@ fn execute_mame(
 		.stderr(mame_stderr)
 		.create_no_window(create_no_window_flag)
 		.spawn()
-		.map_err(|error| Error::new(error).context("Error launching MAME"))?;
+		.map_err(|e| ThisError::LaunchingMame(e.into()))?;
 
 	// interact with MAME, do our thing
 	let mame_result = interact_with_mame(&mut child, receiver, console, &event_callback);
@@ -128,8 +144,23 @@ fn execute_mame(
 	// notify the host that the session has ended
 	event_callback(MameEvent::SessionEnded);
 
-	// and we're done
-	mame_result
+	// and we're done - if there is an error, we need to map it
+	match mame_result {
+		Ok(()) => Ok(()),
+		Err(inner) => {
+			let mame_stderr_text = child
+				.stderr
+				.take()
+				.map(|mut mame_stderr| read_text_from_reader(&mut mame_stderr));
+			let exit_code = exit_status.as_ref().ok().and_then(ExitStatus::code);
+			let e = Error {
+				inner,
+				exit_code,
+				mame_stderr_text,
+			};
+			Err(e)
+		}
+	}
 }
 
 fn interact_with_mame(
@@ -137,10 +168,9 @@ fn interact_with_mame(
 	receiver: &Receiver<MameCommand>,
 	console: &Mutex<Option<Console>>,
 	event_callback: &impl Fn(MameEvent),
-) -> Result<()> {
+) -> anyhow::Result<()> {
 	// set up what we need to interact with MAME as a child process
 	let mut mame_stdin = BufWriter::new(child.stdin.take().unwrap());
-	let mut mame_stderr = child.stderr.take().map(BufReader::new);
 	let mut mame_stdout = BufReader::new(child.stdout.take().unwrap());
 	let mut line = String::new();
 	let mut is_exiting = false;
@@ -148,7 +178,7 @@ fn interact_with_mame(
 
 	loop {
 		info!("Calling read_response_from_mame()");
-		let (update, is_signal) = read_response_from_mame(&mut mame_stdout, &mut mame_stderr, console, &mut line)?;
+		let (update, is_signal) = read_response_from_mame(&mut mame_stdout, console, &mut line)?;
 
 		if let Some(update) = update {
 			is_running = update.is_running();
@@ -159,20 +189,16 @@ fn interact_with_mame(
 			if is_exiting {
 				break Ok(());
 			}
-			is_exiting = match process_event_from_front_end(receiver, &mut mame_stdin, is_running, console) {
-				Ok(x) => x,
-				Err(e) => break Err(e),
-			};
+			is_exiting = process_event_from_front_end(receiver, &mut mame_stdin, is_running, console)?;
 		}
 	}
 }
 
 fn read_response_from_mame(
 	mame_stdout: &mut impl BufRead,
-	mame_stderr: &mut Option<impl BufRead>,
 	console: &Mutex<Option<Console>>,
 	line: &mut String,
-) -> Result<(Option<Update>, bool)> {
+) -> anyhow::Result<(Option<Update>, bool)> {
 	#[derive(Debug, Clone, Copy, PartialEq)]
 	enum ResponseLine {
 		Ok,
@@ -181,7 +207,7 @@ fn read_response_from_mame(
 		Cruft,
 	}
 
-	let (resp, comment) = match read_line_from_mame(mame_stdout, mame_stderr, line) {
+	let (resp, comment) = match read_line_from_mame(mame_stdout, line) {
 		Ok(()) => {
 			let line_without_eolns = line.trim_end_matches(&['\r', '\n'][..]);
 			if let Some(status_line) = line.strip_prefix("@") {
@@ -219,7 +245,7 @@ fn read_response_from_mame(
 		info!("update" = ?update.as_ref().map(|_| ()), "Parsed update");
 
 		// read until end of line
-		let result = read_line_from_mame(mame_stdout, mame_stderr, line);
+		let result = read_line_from_mame(mame_stdout, line);
 		info!(?line, ?result, "Poststatus eoln");
 		result?;
 		if !line.trim().is_empty() {
@@ -241,28 +267,23 @@ fn read_response_from_mame(
 	Ok((update, is_signal))
 }
 
-fn read_line_from_mame(
-	mame_stdout: &mut impl BufRead,
-	mame_stderr: &mut Option<impl BufRead>,
-	line: &mut String,
-) -> Result<()> {
+fn read_line_from_mame(mame_stdout: &mut impl BufRead, line: &mut String) -> anyhow::Result<()> {
 	line.clear();
 	match mame_stdout.read_line(line) {
-		Ok(0) => {
-			let mame_stderr_text = mame_stderr.as_mut().map(read_text_from_reader).unwrap_or_default();
-			Err(ThisError::EofFromMame(mame_stderr_text).into())
-		}
+		Ok(0) => Err(ThisError::EofFromMame.into()),
 		Ok(_) => Ok(()),
-		Err(error) => Err(Error::new(error).context("Error reading from MAME")),
+		Err(e) => Err(ThisError::ReadingFromMame(e.into()).into()),
 	}
 }
 
-fn read_text_from_reader(read: &mut impl Read) -> String {
+fn read_text_from_reader(read: &mut impl Read) -> SmolStr {
 	let mut buf = Vec::new();
 	if read.read_to_end(&mut buf).is_err() {
 		buf.clear();
 	}
-	String::from_utf8(buf).unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).to_string())
+	String::from_utf8(buf)
+		.unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).to_string())
+		.into()
 }
 
 fn process_event_from_front_end(
@@ -270,7 +291,7 @@ fn process_event_from_front_end(
 	mame_stdin: &mut BufWriter<impl Write>,
 	is_running: bool,
 	console: &Mutex<Option<Console>>,
-) -> Result<bool> {
+) -> anyhow::Result<bool> {
 	let timeout = if is_running {
 		Duration::from_secs(1)
 	} else {
@@ -284,13 +305,9 @@ fn process_event_from_front_end(
 
 	info!(?command);
 
-	fn mame_write_err(e: impl Into<Error>) -> Error {
-		e.into().context("Error writing to MAME")
-	}
-
 	emit_console(console, EmitType::Command, command.text());
-	writeln!(mame_stdin, "{}", command.text()).map_err(mame_write_err)?;
-	mame_stdin.flush().map_err(mame_write_err)?;
+	writeln!(mame_stdin, "{}", command.text()).map_err(|e| ThisError::WritingToMame(e.into()))?;
+	mame_stdin.flush().map_err(|e| ThisError::WritingToMame(e.into()))?;
 
 	Ok(is_exit)
 }
@@ -317,9 +334,20 @@ fn emit_console_command_line(console: &Mutex<Option<Console>>, mame_args: &MameA
 	});
 }
 
-fn with_active_console(console: &Mutex<Option<Console>>, f: impl FnOnce(&mut Console) -> Result<()>) {
+fn with_active_console(console: &Mutex<Option<Console>>, f: impl FnOnce(&mut Console) -> anyhow::Result<()>) {
 	let mut console = console.lock().unwrap();
 	if console.as_mut().is_none_or(|console| f(console).is_err()) {
 		*console = None;
+	}
+}
+
+impl From<ThisError> for Error {
+	fn from(inner: ThisError) -> Self {
+		let inner = inner.into();
+		Error {
+			inner,
+			exit_code: None,
+			mame_stderr_text: None,
+		}
 	}
 }

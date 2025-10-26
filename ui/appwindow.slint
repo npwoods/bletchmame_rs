@@ -1,5 +1,23 @@
-import { HorizontalBox, VerticalBox, Button, StandardListView, StandardTableView, LineEdit, ListView, ScrollView, GridBox, Spinner, TextEdit } from "std-widgets.slint";
-import { NavigationDrawer, NavigationItem, FilledIconButton, SearchBar, ListItem } from "@slint/material.slint";
+import {
+    HorizontalBox,
+    VerticalBox,
+    Button,
+    StandardListView,
+    StandardTableView,
+    LineEdit,
+    ListView,
+    ScrollView,
+    GridBox,
+    Spinner,
+    TextEdit,
+} from "std-widgets.slint";
+import {
+    NavigationDrawer,
+    NavigationItem,
+    FilledIconButton,
+    SearchBar,
+    ListItem,
+} from "@slint/material.slint";
 import { SimpleMenuEntry } from "common.slint";
 import { Icons } from "icons.slint";
 
@@ -184,6 +202,8 @@ export component AppWindow inherits Window {
     // the report view
     in property <string> report-message;
     in property <string> report-submessage;
+    in property <string> report-mame-stderr-output;
+    in property <string> report-mame-exit-code;
     in property <bool> report-spinning;
     in property <string> report-button-text;
     in property <[ReportIssue]> report-issues;
@@ -839,6 +859,22 @@ export component AppWindow inherits Window {
                 horizontal-alignment: center;
                 font-size: 12px;
                 wrap: word-wrap;
+            }
+
+            // report MAME stderr output
+            if root.report-mame-stderr-output != "": TextEdit {
+                width: 600px;
+                height: 300px;
+                text: root.report-mame-stderr-output;
+                font-size: 10px;
+                read-only: true;
+            }
+
+            // report MAME exit code
+            if root.report-mame-exit-code != "": Text {
+                text: "(exit code " + root.report-mame-exit-code + "}";
+                horizontal-alignment: right;
+                font-size: 12px;
             }
 
             // report button

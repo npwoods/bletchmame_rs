@@ -335,6 +335,20 @@ impl AppModel {
 					.map(|r| r.submessage.as_deref().unwrap_or_default().to_shared_string())
 					.unwrap_or_default(),
 			);
+			app_window.set_report_mame_stderr_output(
+				report
+					.as_ref()
+					.and_then(|r| r.mame_stderr_output.as_ref())
+					.map(|s| s.to_shared_string())
+					.unwrap_or_default(),
+			);
+			app_window.set_report_mame_exit_code(
+				report
+					.as_ref()
+					.and_then(|r| r.mame_exit_code.as_ref())
+					.map(|code| code.to_shared_string())
+					.unwrap_or_default(),
+			);
 			app_window.set_report_spinning(report.as_ref().map(|r| r.is_spinning).unwrap_or_default());
 			app_window.set_report_button_text(
 				report
