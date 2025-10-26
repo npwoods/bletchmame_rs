@@ -7,6 +7,7 @@ use std::io::Read;
 use std::io::Write;
 use std::process::Child;
 use std::process::Command;
+use std::process::ExitStatus;
 use std::process::Stdio;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -22,6 +23,7 @@ use anyhow::Result;
 use itertools::Itertools;
 use slint::invoke_from_event_loop;
 use tracing::Level;
+use tracing::error;
 use tracing::info;
 use tracing::span;
 
@@ -117,7 +119,11 @@ fn execute_mame(
 
 	// await the exit status
 	let exit_status = child.wait();
-	info!(?exit_status, "MAME exited");
+	if exit_status.as_ref().is_ok_and(ExitStatus::success) && mame_result.is_ok() {
+		info!(?exit_status, "MAME exited");
+	} else {
+		error!(?exit_status, ?mame_result, "MAME exited");
+	};
 
 	// notify the host that the session has ended
 	event_callback(MameEvent::SessionEnded);
