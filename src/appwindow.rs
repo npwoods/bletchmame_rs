@@ -326,13 +326,13 @@ impl AppModel {
 			app_window.set_report_message(
 				report
 					.as_ref()
-					.map(|r| SharedString::from(r.message.as_ref()))
+					.map(|r| r.message.to_shared_string())
 					.unwrap_or_default(),
 			);
 			app_window.set_report_submessage(
 				report
 					.as_ref()
-					.map(|r| SharedString::from(r.submessage.as_deref().unwrap_or_default()))
+					.map(|r| r.submessage.as_deref().unwrap_or_default().to_shared_string())
 					.unwrap_or_default(),
 			);
 			app_window.set_report_spinning(report.as_ref().map(|r| r.is_spinning).unwrap_or_default());
@@ -340,7 +340,7 @@ impl AppModel {
 				report
 					.as_ref()
 					.and_then(|r| r.button.as_ref())
-					.map(|b| SharedString::from(b.text.as_ref()))
+					.map(|b| b.text.to_shared_string())
 					.unwrap_or_default(),
 			);
 			let issues = report
@@ -348,9 +348,12 @@ impl AppModel {
 				.unwrap_or_default()
 				.iter()
 				.map(|issue| {
-					let text = SharedString::from(issue.text.as_ref());
-					let button_text =
-						SharedString::from(issue.button.as_ref().map(|b| b.text.as_ref()).unwrap_or_default());
+					let text = issue.text.to_shared_string();
+					let button_text = issue
+						.button
+						.as_ref()
+						.map(|b| b.text.to_shared_string())
+						.unwrap_or_default();
 					ReportIssue { text, button_text }
 				})
 				.collect::<Vec<_>>();

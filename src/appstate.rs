@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -12,6 +11,9 @@ use std::time::Duration;
 use anyhow::Error;
 use anyhow::Result;
 use slint::invoke_from_event_loop;
+use smol_str::SmolStr;
+use smol_str::ToSmolStr;
+use smol_str::format_smolstr;
 use strum::VariantArray;
 use throttle::Throttle;
 
@@ -90,9 +92,9 @@ struct Fixed {
 type CommandCallback = Rc<dyn Fn(Action) + 'static>;
 
 #[derive(Default, Debug)]
-pub struct Report<'a> {
-	pub message: Cow<'a, str>,
-	pub submessage: Option<Cow<'a, str>>,
+pub struct Report {
+	pub message: SmolStr,
+	pub submessage: Option<SmolStr>,
 	pub button: Option<Button>,
 	pub is_spinning: bool,
 	pub issues: Vec<Issue>,
@@ -100,13 +102,13 @@ pub struct Report<'a> {
 
 #[derive(Clone, Debug)]
 pub struct Button {
-	pub text: Cow<'static, str>,
+	pub text: SmolStr,
 	pub command: Action,
 }
 
 #[derive(Clone, Debug)]
 pub struct Issue {
-	pub text: Cow<'static, str>,
+	pub text: SmolStr,
 	pub button: Option<Button>,
 }
 
@@ -560,7 +562,7 @@ impl AppState {
 			.unwrap_or_default()
 	}
 
-	pub fn report(&self) -> Option<Report<'_>> {
+	pub fn report(&self) -> Option<Report> {
 		#[derive(Debug)]
 		enum ReportType<'a> {
 			InfoDbBuild(Option<&'a str>),
@@ -612,8 +614,8 @@ impl AppState {
 
 		report_type.map(|report_type| match report_type {
 			ReportType::InfoDbBuild(machine_description) => {
-				let message = Cow::Borrowed("Building MAME machine info database...");
-				let submessage = machine_description.map(Cow::Borrowed).unwrap_or_default();
+				let message = "Building MAME machine info database...".into();
+				let submessage = machine_description.map(|x| x.into()).unwrap_or_default();
 				let button = Button {
 					text: "Cancel".into(),
 					command: Action::InfoDbBuildCancel,
@@ -637,15 +639,14 @@ impl AppState {
 				..Default::default()
 			},
 			ReportType::PreflightFailure(preflight_problems) => {
-				let message = Cow::Borrowed(
-					"BletchMAME requires additional configuration in order to properly interface with MAME",
-				);
+				let message = "BletchMAME requires additional configuration in order to properly interface with MAME".into();
+
 				let issues = preflight_problems
 					.iter()
 					.map(|problem| {
 						let text = problem.to_string().into();
 						let button = problem.problem_type().map(|path_type| {
-							let text = Cow::Owned(format!("Choose {path_type}"));
+							let text = format_smolstr!("Choose {path_type}");
 							let command = Action::SettingsPaths(Some(path_type));
 							Button { text, command }
 						});
@@ -690,13 +691,14 @@ impl AppState {
 				} else {
 					"Processing machine information from MAME was cancelled"
 				};
-				let submessage = error.map(|e| Cow::Owned(e.to_string()));
+				let message = message.into();
+				let submessage = error.map(|e| e.to_smolstr());
 				let button = Button {
 					text: "Retry".into(),
 					command: Action::HelpRefreshInfoDb,
 				};
 				Report {
-					message: Cow::Borrowed(message),
+					message,
 					submessage,
 					button: Some(button),
 					..Default::default()
