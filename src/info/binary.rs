@@ -27,6 +27,9 @@ pub struct Header {
 	pub sizes_hash: U64,
 	pub build_strindex: UsizeDb,
 	pub machine_count: UsizeDb,
+	pub rom_count: UsizeDb,
+	pub disk_count: UsizeDb,
+	pub sample_count: UsizeDb,
 	pub biosset_count: UsizeDb,
 	pub chips_count: UsizeDb,
 	pub config_count: UsizeDb,
@@ -51,6 +54,12 @@ pub struct Machine {
 	pub description_strindex: UsizeDb,
 	pub year_strindex: UsizeDb,
 	pub manufacturer_strindex: UsizeDb,
+	pub roms_start: UsizeDb,
+	pub roms_end: UsizeDb,
+	pub disks_start: UsizeDb,
+	pub disks_end: UsizeDb,
+	pub samples_start: UsizeDb,
+	pub samples_end: UsizeDb,
 	pub biossets_start: UsizeDb,
 	pub biossets_end: UsizeDb,
 	pub default_biosset_index: UsizeDb,
@@ -103,6 +112,39 @@ pub enum ChipType {
 	#[strum(serialize = "audio")]
 	Audio,
 }
+
+#[repr(C, packed)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq)]
+pub struct Rom {
+	pub name_strindex: UsizeDb,
+	pub size: U64,
+	pub crc: [u8; 4],
+	pub sha1: [u8; 20],
+	pub region_strindex: UsizeDb,
+	pub offset: U64,
+	pub flags: u8,
+}
+
+#[repr(C, packed)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq)]
+pub struct Disk {
+	pub name_strindex: UsizeDb,
+	pub merge_strindex: UsizeDb,
+	pub sha1: [u8; 20],
+	pub region_strindex: UsizeDb,
+	pub index: U64,
+	pub flags: u8,
+}
+
+#[repr(C, packed)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq)]
+pub struct Sample {
+	pub name_strindex: UsizeDb,
+}
+
+pub const ASSET_FLAG_HAS_CRC: u8 = 0x01;
+pub const ASSET_FLAG_HAS_SHA1: u8 = 0x02;
+pub const ASSET_FLAG_WRITABLE: u8 = 0x04;
 
 #[repr(C, packed)]
 #[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq)]

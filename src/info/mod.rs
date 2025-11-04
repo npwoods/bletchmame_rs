@@ -53,10 +53,13 @@ pub use self::entities::Configuration;
 pub use self::entities::ConfigurationSetting;
 pub use self::entities::ConfigurationSettingCondition;
 pub use self::entities::Device;
+pub use self::entities::Disk;
 pub use self::entities::Machine;
 pub use self::entities::MachineSoftwareList;
 pub use self::entities::MachinesView;
 pub use self::entities::RamOption;
+pub use self::entities::Rom;
+pub use self::entities::Sample;
 pub use self::entities::Slot;
 pub use self::entities::SlotOption;
 pub use self::entities::SoftwareList;
@@ -80,6 +83,9 @@ enum ThisError {
 pub struct InfoDb {
 	data: Box<[u8]>,
 	machines: RootView<binary::Machine>,
+	roms: RootView<binary::Rom>,
+	disks: RootView<binary::Disk>,
+	samples: RootView<binary::Sample>,
 	biossets: RootView<binary::BiosSet>,
 	chips: RootView<binary::Chip>,
 	configs: RootView<binary::Configuration>,
@@ -108,6 +114,9 @@ impl InfoDb {
 		// now walk the views
 		let mut cursor = size_of::<binary::Header>()..data.len();
 		let machines = next_root_view(&mut cursor, hdr.machine_count)?;
+		let roms = next_root_view(&mut cursor, hdr.rom_count)?;
+		let disks = next_root_view(&mut cursor, hdr.disk_count)?;
+		let samples = next_root_view(&mut cursor, hdr.sample_count)?;
 		let biossets = next_root_view(&mut cursor, hdr.biosset_count)?;
 		let chips = next_root_view(&mut cursor, hdr.chips_count)?;
 		let configs = next_root_view(&mut cursor, hdr.config_count)?;
@@ -129,6 +138,9 @@ impl InfoDb {
 		let result = Self {
 			data,
 			machines,
+			roms,
+			disks,
+			samples,
 			biossets,
 			chips,
 			configs,
@@ -252,6 +264,18 @@ impl InfoDb {
 
 	pub fn machines(&self) -> MachinesView<'_> {
 		self.make_view(&self.machines)
+	}
+
+	pub fn roms(&self) -> impl View<'_, Rom<'_>> {
+		self.make_view(&self.roms)
+	}
+
+	pub fn disks(&self) -> impl View<'_, Disk<'_>> {
+		self.make_view(&self.disks)
+	}
+
+	pub fn samples(&self) -> impl View<'_, Sample<'_>> {
+		self.make_view(&self.samples)
 	}
 
 	pub fn biossets(&self) -> impl View<'_, BiosSet<'_>> {
