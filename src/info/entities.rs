@@ -4,6 +4,7 @@ use anyhow::ensure;
 use binary_search::Direction;
 use binary_search::binary_search;
 
+use crate::assethash::AssetHash;
 use crate::info::ChipType;
 use crate::info::ConditionRelation;
 use crate::info::IndirectView;
@@ -12,9 +13,14 @@ use crate::info::SimpleView;
 use crate::info::Validatable;
 use crate::info::View;
 use crate::info::binary;
+use crate::info::binary::ASSET_FLAG_HAS_CRC;
+use crate::info::binary::ASSET_FLAG_HAS_SHA1;
 
 pub type Machine<'a> = Object<'a, binary::Machine>;
 pub type MachinesView<'a> = SimpleView<'a, binary::Machine>;
+pub type Rom<'a> = Object<'a, binary::Rom>;
+pub type Disk<'a> = Object<'a, binary::Disk>;
+pub type Sample<'a> = Object<'a, binary::Sample>;
 pub type BiosSet<'a> = Object<'a, binary::BiosSet>;
 pub type Chip<'a> = Object<'a, binary::Chip>;
 pub type Configuration<'a> = Object<'a, binary::Configuration>;
@@ -61,6 +67,21 @@ impl<'a> Machine<'a> {
 
 	pub fn runnable(&self) -> bool {
 		self.obj().runnable
+	}
+
+	pub fn roms(&self) -> impl View<'a, Rom<'a>> + use<'a> {
+		let range = self.obj().roms_start.into()..self.obj().roms_end.into();
+		self.db.roms().sub_view(range)
+	}
+
+	pub fn disks(&self) -> impl View<'a, Disk<'a>> + use<'a> {
+		let range = self.obj().disks_start.into()..self.obj().disks_end.into();
+		self.db.disks().sub_view(range)
+	}
+
+	pub fn samples(&self) -> impl View<'a, Sample<'a>> + use<'a> {
+		let range = self.obj().samples_start.into()..self.obj().samples_end.into();
+		self.db.samples().sub_view(range)
 	}
 
 	pub fn biossets(&self) -> impl View<'a, BiosSet<'a>> + use<'a> {
@@ -136,6 +157,71 @@ impl<'a> MachinesView<'a> {
 		let target = target.as_ref();
 		self.find_index(target).map(|index| self.get(index).unwrap())
 	}
+}
+
+impl<'a> Rom<'a> {
+	pub fn name(&self) -> &'a str {
+		self.string(|x| x.name_strindex)
+	}
+
+	pub fn size(&self) -> u64 {
+		self.obj().size.into()
+	}
+
+	pub fn asset_hash(&self) -> AssetHash {
+		let obj = self.obj();
+		let crc = ((obj.flags & ASSET_FLAG_HAS_CRC) != 0).then_some(obj.crc);
+		let sha1 = ((obj.flags & ASSET_FLAG_HAS_SHA1) != 0).then_some(obj.sha1);
+		AssetHash { crc, sha1 }
+	}
+
+	pub fn region(&self) -> &'a str {
+		self.string(|x| x.region_strindex)
+	}
+
+	pub fn offset(&self) -> u64 {
+		self.obj().offset.into()
+	}
+
+	pub fn writable(&self) -> bool {
+		(self.obj().flags & binary::ASSET_FLAG_WRITABLE) != 0
+	}
+}
+
+impl<'a> Disk<'a> {
+	pub fn name(&self) -> &'a str {
+		self.string(|x| x.name_strindex)
+	}
+
+	pub fn asset_hash(&self) -> AssetHash {
+		let obj = self.obj();
+		let sha1 = ((obj.flags & ASSET_FLAG_HAS_SHA1) != 0).then_some(obj.sha1);
+		AssetHash { crc: None, sha1 }
+	}
+
+	pub fn region(&self) -> &'a str {
+		self.string(|x| x.region_strindex)
+	}
+
+	pub fn disk_index(&self) -> u64 {
+		self.obj().index.into()
+	}
+
+	pub fn writable(&self) -> bool {
+		(self.obj().flags & binary::ASSET_FLAG_WRITABLE) != 0
+	}
+}
+
+impl<'a> Sample<'a> {
+	pub fn name(&self) -> &'a str {
+		self.string(|x| x.name_strindex)
+	}
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum AssetType {
+	Rom,
+	Disk,
 }
 
 impl<'a> BiosSet<'a> {

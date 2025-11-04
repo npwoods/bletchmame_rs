@@ -7,9 +7,11 @@ use anyhow::Error;
 use itertools::Itertools;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
+use slint::Global;
 use slint::Model;
 use slint::ModelRc;
 use slint::SharedString;
+use slint::ToSharedString;
 use slint::VecModel;
 use slint::Weak;
 use slint::spawn_local;
@@ -36,9 +38,11 @@ use crate::prefs::PrefsMachineItem;
 use crate::prefs::PrefsPaths;
 use crate::prefs::PrefsSoftwareItem;
 use crate::software::SoftwareListDispenser;
+use crate::ui::Asset;
 use crate::ui::ConfigureDialog;
 use crate::ui::DeviceAndImageEntry;
 use crate::ui::DevicesAndImagesState;
+use crate::ui::Icons;
 use crate::ui::SoftwareMachine;
 
 struct State {
@@ -168,6 +172,13 @@ pub async fn dialog_configure(
 			dialog_weak.unwrap().set_bios_selection_index(current_index);
 		};
 		spawn_local(fut).unwrap();
+	}
+
+	// Asset audit
+	if let Some(assets) = state.assets() {
+		let assets = VecModel::from(assets);
+		let assets = ModelRc::new(assets);
+		modal.dialog().set_audit_assets(assets);
 	}
 
 	// loading error?
@@ -435,6 +446,34 @@ impl State {
 				(bios_option_texts, current_index)
 			})
 		})
+	}
+
+	pub fn assets(&self) -> Option<Vec<Asset>> {
+		let CoreState::Machine { dimodel_state, .. } = &self.core else {
+			return None;
+		};
+		let result = dimodel_state.with_machine(|machine| {
+			let machine = machine.unwrap();
+			let component = self.dialog_weak.unwrap();
+			let icons = Icons::get(&component);
+			let roms = machine.roms().iter().map(|rom| Asset {
+				icon: icons.get_rom(),
+				name: rom.name().into(),
+				size: rom.size().to_shared_string(),
+			});
+			let disks = machine.disks().iter().map(|disk| Asset {
+				icon: icons.get_harddisk(),
+				name: disk.name().into(),
+				..Default::default()
+			});
+			let samples = machine.samples().iter().map(|sample| Asset {
+				icon: icons.get_sample(),
+				name: sample.name().into(),
+				..Default::default()
+			});
+			roms.chain(disks).chain(samples).collect::<Vec<_>>()
+		});
+		Some(result)
 	}
 
 	pub fn error(&self) -> Option<&Error> {

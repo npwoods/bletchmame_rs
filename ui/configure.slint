@@ -1,11 +1,32 @@
-import { Button, HorizontalBox, VerticalBox, TabWidget, ComboBox, GridBox, StandardButton, ListView, CheckBox  } from "std-widgets.slint";
-import { DevicesAndImagesList, DevicesAndImagesState, DevicesAndImagesContextMenuInfo } from "devimageslist.slint";
+import {
+    Button,
+    HorizontalBox,
+    VerticalBox,
+    TabWidget,
+    ComboBox,
+    GridBox,
+    StandardButton,
+    ListView,
+    CheckBox,
+    ScrollView,
+    StandardTableView,
+} from "std-widgets.slint";
+import {
+    DevicesAndImagesList,
+    DevicesAndImagesState,
+    DevicesAndImagesContextMenuInfo,
+} from "devimageslist.slint";
 import { Icons } from "icons.slint";
 
 struct SoftwareMachine {
     machine-index: int,
     description: string,
     checked: bool}
+
+struct Asset {
+    icon: image,
+    name: string,
+    size: string}
 
 export component ConfigureDialog inherits Window {
     title: dialog-title;
@@ -21,6 +42,7 @@ export component ConfigureDialog inherits Window {
     in-out property <int> ram-sizes-index;
     in property <[string]> bios-selection-model;
     in-out property <int> bios-selection-index;
+    in property <[Asset]> audit-assets;
     in property <[SoftwareMachine]> software-machines;
     in property <bool> software-machines-bulk-all-enabled;
     in property <bool> software-machines-bulk-none-enabled;
@@ -106,6 +128,28 @@ export component ConfigureDialog inherits Window {
                                 model: root.bios-selection-model;
                                 enabled: root.bios-selection-model.length >= 2;
                                 current-index <=> bios-selection-index;
+                            }
+                        }
+                    }
+                }
+
+                Tab {
+                    title: "Audit";
+                    ListView {
+                        for asset in root.audit-assets: HorizontalBox {
+                            Image {
+                                source: asset.icon;
+                                width: 24px;
+                                height: 24px;
+                            }
+
+                            Text {
+                                text: asset.name;
+                                horizontal-stretch: 1;
+                            }
+
+                            Text {
+                                text: asset.size;
                             }
                         }
                     }

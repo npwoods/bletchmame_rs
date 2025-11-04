@@ -55,6 +55,9 @@ fn print_stats(info_db: &InfoDb, elapsed_time: Duration) {
 	// these are all of the entry counts and associated labels
 	let entry_counts = [
 		("Machines", info_db.machines().len()),
+		("ROMs", info_db.roms().len()),
+		("Disks", info_db.disks().len()),
+		("Samples", info_db.samples().len()),
 		("BIOS Sets", info_db.biossets().len()),
 		("Chips", info_db.chips().len()),
 		("Configurations", info_db.configurations().len()),

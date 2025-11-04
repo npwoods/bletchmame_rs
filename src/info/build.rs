@@ -14,12 +14,16 @@ use zerocopy::Immutable;
 use zerocopy::IntoBytes;
 use zerocopy::little_endian::U64;
 
+use crate::assethash::AssetHash;
 use crate::info::ChipType;
 use crate::info::MAGIC_HDR;
 use crate::info::SERIAL;
 use crate::info::SoftwareListStatus;
 use crate::info::UsizeDb;
 use crate::info::binary;
+use crate::info::binary::ASSET_FLAG_HAS_CRC;
+use crate::info::binary::ASSET_FLAG_HAS_SHA1;
+use crate::info::binary::ASSET_FLAG_WRITABLE;
 use crate::info::binary::ConfigurationSetting;
 use crate::info::binary::Fixup;
 use crate::info::strings::StringTableBuilder;
@@ -54,6 +58,9 @@ const TEXT_CAPTURE_PHASES: &[Phase] = &[
 struct State {
 	phase_stack: Vec<Phase>,
 	machines: Vec<binary::Machine>,
+	roms: Vec<binary::Rom>,
+	disks: Vec<binary::Disk>,
+	samples: Vec<binary::Sample>,
 	biossets: Vec<binary::BiosSet>,
 	chips: Vec<binary::Chip>,
 	configs: Vec<binary::Configuration>,
@@ -89,6 +96,9 @@ enum ThisError {
 
 // capacity defaults based on MAME 0.280
 //          48893 machines
+//         364836 roms
+//           1378 disks
+//          28642 samples
 //          40220 BIOS sets
 //         191452 chips
 //         146163 configurations
@@ -101,6 +111,9 @@ enum ThisError {
 //           6660 RAM options
 //        2854471 string bytes
 const CAPACITY_MACHINES: usize = 55000;
+const CAPACITY_ROMS: usize = 400000;
+const CAPACITY_DISKS: usize = 1600;
+const CAPACITY_SAMPLES: usize = 30000;
 const CAPACITY_BIOSSETS: usize = 45000;
 const CAPACITY_CHIPS: usize = 240000;
 const CAPACITY_CONFIGS: usize = 180000;
@@ -125,6 +138,9 @@ impl State {
 		Self {
 			phase_stack: Vec::with_capacity(32),
 			machines: Vec::with_capacity(CAPACITY_MACHINES),
+			roms: Vec::with_capacity(CAPACITY_ROMS),
+			disks: Vec::with_capacity(CAPACITY_DISKS),
+			samples: Vec::with_capacity(CAPACITY_SAMPLES),
 			biossets: Vec::with_capacity(CAPACITY_BIOSSETS),
 			chips: Vec::with_capacity(CAPACITY_CHIPS),
 			configs: Vec::with_capacity(CAPACITY_CONFIGS),
@@ -146,7 +162,8 @@ impl State {
 		debug!(self=?self, evt=?evt, "handle_start()");
 
 		let phase = self.phase_stack.last().unwrap_or(&Phase::Root);
-		let new_phase = match (phase, evt.name().as_ref()) {
+		let evt_name = evt.name();
+		let new_phase = match (phase, evt_name.as_ref()) {
 			(Phase::Root, b"mame") => {
 				let [build] = evt.find_attributes([b"build"])?;
 				self.build_strindex = self.strings.lookup(&build.unwrap_or_default());
@@ -172,6 +189,12 @@ impl State {
 					source_file_strindex,
 					clone_of_machine_index,
 					rom_of_machine_index,
+					roms_start: self.roms.len_db(),
+					roms_end: self.roms.len_db(),
+					disks_start: self.disks.len_db(),
+					disks_end: self.disks.len_db(),
+					samples_start: self.samples.len_db(),
+					samples_end: self.samples.len_db(),
 					biossets_start: self.biossets.len_db(),
 					biossets_end: self.biossets.len_db(),
 					default_biosset_index: !UsizeDb::default(),
@@ -196,6 +219,75 @@ impl State {
 			(Phase::Machine, b"description") => Some(Phase::MachineDescription),
 			(Phase::Machine, b"year") => Some(Phase::MachineYear),
 			(Phase::Machine, b"manufacturer") => Some(Phase::MachineManufacturer),
+			(Phase::Machine, b"rom") => {
+				let [name, size, crc, sha1, region, offset] =
+					evt.find_attributes([b"name", b"size", b"crc", b"sha1", b"region", b"offset"])?;
+				let name = name.mandatory("name")?;
+				let size = size.as_deref().map(str::parse::<u64>).transpose()?;
+				let size = size.unwrap_or(!0).into();
+				let asset_hash = AssetHash::from_hex_strings(crc.as_deref(), sha1.as_deref())?;
+				let crc = asset_hash.crc.unwrap_or_default();
+				let sha1 = asset_hash.sha1.unwrap_or_default();
+				let region = region.mandatory("region")?;
+				let offset = offset.as_deref().map(|src| u64::from_str_radix(src, 16)).transpose()?;
+				let offset = offset.unwrap_or(!0).into();
+				let name_strindex = self.strings.lookup(&name);
+				let region_strindex = self.strings.lookup(&region);
+				let flags = (asset_hash.crc.is_some() as u8 * ASSET_FLAG_HAS_CRC)
+					| (asset_hash.sha1.is_some() as u8 * ASSET_FLAG_HAS_SHA1);
+				let rom = binary::Rom {
+					name_strindex,
+					size,
+					crc,
+					sha1,
+					region_strindex,
+					offset,
+					flags,
+				};
+				self.roms.push_db(rom)?;
+				self.machines.last_mut().unwrap().roms_end += 1;
+				None
+			}
+			(Phase::Machine, b"disk") => {
+				let [name, merge, sha1, region, index, writable] =
+					evt.find_attributes([b"name", b"merge", b"sha1", b"region", b"index", b"writable"])?;
+				let name = name.mandatory("name")?;
+				let asset_hash = AssetHash::from_hex_strings(None, sha1.as_deref())?;
+				let sha1 = asset_hash.sha1.unwrap_or_default();
+				let region = region.mandatory("region")?;
+				let index = index.as_deref().map(|src| u64::from_str_radix(src, 16)).transpose()?;
+				let index = index.unwrap_or(!0).into();
+				let writable = writable.map(parse_mame_bool).transpose()?.unwrap_or_default();
+				let name_strindex = self.strings.lookup(&name);
+				let merge_strindex = merge
+					.as_ref()
+					.map(|x| self.strings.lookup(x))
+					.unwrap_or(!UsizeDb::default());
+				let region_strindex = self.strings.lookup(&region);
+				let flags = (asset_hash.crc.is_some() as u8 * ASSET_FLAG_HAS_CRC)
+					| (asset_hash.sha1.is_some() as u8 * ASSET_FLAG_HAS_SHA1)
+					| ((writable as u8) * ASSET_FLAG_WRITABLE);
+				let disk = binary::Disk {
+					name_strindex,
+					merge_strindex,
+					sha1,
+					region_strindex,
+					index,
+					flags,
+				};
+				self.disks.push_db(disk)?;
+				self.machines.last_mut().unwrap().disks_end += 1;
+				None
+			}
+			(Phase::Machine, b"sample") => {
+				let [name] = evt.find_attributes([b"name"])?;
+				let name = name.mandatory("name")?;
+				let name_strindex = self.strings.lookup(&name);
+				let sample = binary::Sample { name_strindex };
+				self.samples.push_db(sample)?;
+				self.machines.last_mut().unwrap().samples_end += 1;
+				None
+			}
 			(Phase::Machine, b"biosset") => {
 				let [name, description, is_default] = evt.find_attributes([b"name", b"description", b"default"])?;
 				let name_strindex = self.strings.lookup(&name.mandatory("name")?);
@@ -577,6 +669,9 @@ impl State {
 			sizes_hash: calculate_sizes_hash(),
 			build_strindex: self.build_strindex,
 			machine_count: machines.len_db(),
+			rom_count: self.roms.len_db(),
+			disk_count: self.disks.len_db(),
+			sample_count: self.samples.len_db(),
 			biosset_count: self.biossets.len_db(),
 			chips_count: self.chips.len_db(),
 			config_count: self.configs.len_db(),
@@ -596,6 +691,9 @@ impl State {
 			.as_bytes()
 			.iter()
 			.chain(machines.iter().flat_map(IntoBytes::as_bytes))
+			.chain(self.roms.iter().flat_map(IntoBytes::as_bytes))
+			.chain(self.disks.iter().flat_map(IntoBytes::as_bytes))
+			.chain(self.samples.iter().flat_map(IntoBytes::as_bytes))
 			.chain(self.biossets.iter().flat_map(IntoBytes::as_bytes))
 			.chain(self.chips.iter().flat_map(IntoBytes::as_bytes))
 			.chain(self.configs.iter().flat_map(IntoBytes::as_bytes))
@@ -818,6 +916,9 @@ pub fn calculate_sizes_hash() -> U64 {
 	[
 		size_of::<binary::Header>(),
 		size_of::<binary::Machine>(),
+		size_of::<binary::Rom>(),
+		size_of::<binary::Disk>(),
+		size_of::<binary::Sample>(),
 		size_of::<binary::BiosSet>(),
 		size_of::<binary::Chip>(),
 		size_of::<binary::Configuration>(),

@@ -2,6 +2,7 @@
 mod action;
 mod appstate;
 mod appwindow;
+mod assethash;
 mod backend;
 mod channel;
 mod collections;
