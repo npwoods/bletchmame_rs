@@ -422,12 +422,13 @@ fn decode_header(data: &[u8]) -> Result<&binary::Header> {
 pub trait View<'a, T>: Clone
 where
 	T: 'a,
+	Self: 'a,
 {
 	fn get(&self, index: usize) -> Option<T>;
 	fn len(&self) -> usize;
 	fn sub_view(&self, range: Range<usize>) -> Self;
 
-	fn iter(&self) -> impl Iterator<Item = T> {
+	fn iter(&self) -> impl Iterator<Item = T> + 'a {
 		ViewIter {
 			view: self.clone(),
 			pos: 0,
