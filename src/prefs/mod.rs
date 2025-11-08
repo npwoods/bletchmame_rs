@@ -67,6 +67,13 @@ pub struct Preferences {
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub history_position: usize,
+
+	#[serde(default = "default_true")]
+	pub show_stop_warning: bool,
+}
+
+fn default_true() -> bool {
+	true
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]

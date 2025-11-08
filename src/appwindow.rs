@@ -69,6 +69,8 @@ use crate::dialogs::namecollection::dialog_rename_collection;
 use crate::dialogs::paths::dialog_paths;
 use crate::dialogs::seqpoll::dialog_seq_poll;
 use crate::dialogs::socket::dialog_connect_to_socket;
+use crate::dialogs::stopwarning::StopWarningResult;
+use crate::dialogs::stopwarning::dialog_stop_warning;
 use crate::dialogs::switches::dialog_switches;
 use crate::guiutils::is_context_menu_event;
 use crate::guiutils::modal::ModalStack;
@@ -796,7 +798,31 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 
 	match action {
 		Action::FileStop => {
-			model.issue_command(MameCommand::stop());
+			let model = model.clone();
+			let show_warning = model.preferences.borrow().show_stop_warning;
+			let fut = async move {
+				let result = if show_warning {
+					dialog_stop_warning(model.modal_stack.clone(), show_warning).await
+				} else {
+					StopWarningResult {
+						stop: true,
+						show_warning: None,
+					}
+				};
+
+				info!("Showed stop warning dialog; result: {:?}", result);
+
+				// stop the emulation if requested
+				if result.stop {
+					model.issue_command(MameCommand::stop());
+				}
+
+				// update the prefs if requested
+				if let Some(show_warning) = result.show_warning {
+					model.modify_prefs(|prefs| prefs.show_stop_warning = show_warning);
+				}
+			};
+			spawn_local(fut).unwrap();
 		}
 		Action::FilePause => {
 			let is_paused = model

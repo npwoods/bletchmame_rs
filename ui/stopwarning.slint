@@ -1,0 +1,47 @@
+import {
+    VerticalBox,
+    HorizontalBox,
+    StandardButton,
+    CheckBox,
+} from "std-widgets.slint";
+import { Icons } from "icons.slint";
+
+export component StopWarningDialog inherits Window {
+    // properties
+    in-out property <bool> show-warning-checked;
+
+    // callbacks
+    callback yes-clicked();
+    callback no-clicked();
+
+    // components
+    title: "BletchMAME";
+    icon: Icons.bletchmame;
+    VerticalBox {
+        Text {
+            text: "Do you really want to stop?\n\nAll data in emulated RAM will be lost";
+            horizontal-alignment: left;
+        }
+
+        CheckBox {
+            text: "Show this warning when ending emulation";
+            checked <=> show-warning-checked;
+        }
+
+        HorizontalBox {
+            StandardButton {
+                kind: yes;
+                clicked => {
+                    root.yes-clicked();
+                }
+            }
+
+            StandardButton {
+                kind: no;
+                clicked => {
+                    root.no-clicked();
+                }
+            }
+        }
+    }
+}
