@@ -207,6 +207,7 @@ export component AppWindow inherits Window {
     in property <bool> report-spinning;
     in property <string> report-button-text;
     in property <[ReportIssue]> report-issues;
+    property <string> monospace-font-family: "Consolas";
     callback report-button-clicked();
     callback issue-button-clicked(int);
 
@@ -867,6 +868,7 @@ export component AppWindow inherits Window {
                 height: 300px;
                 text: root.report-mame-stderr-output;
                 font-size: 10px;
+                font-family: monospace-font-family;
                 read-only: true;
             }
 
