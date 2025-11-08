@@ -44,5 +44,6 @@
       "type": "builtin",
       "subtype": "all"
     }
-  ]
+  ],
+  "showStopWarning": true
 }

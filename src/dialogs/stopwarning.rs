@@ -6,6 +6,7 @@ use crate::dialogs::SenderExt;
 use crate::guiutils::modal::ModalStack;
 use crate::ui::StopWarningDialog;
 
+#[derive(Debug)]
 pub struct StopWarningResult {
 	pub stop: bool,
 	pub show_warning: Option<bool>,
