@@ -69,6 +69,7 @@ use crate::dialogs::namecollection::dialog_rename_collection;
 use crate::dialogs::paths::dialog_paths;
 use crate::dialogs::seqpoll::dialog_seq_poll;
 use crate::dialogs::socket::dialog_connect_to_socket;
+use crate::dialogs::stopwarning::dialog_stop_warning;
 use crate::dialogs::switches::dialog_switches;
 use crate::guiutils::is_context_menu_event;
 use crate::guiutils::modal::ModalStack;
@@ -796,7 +797,15 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 
 	match action {
 		Action::FileStop => {
-			model.issue_command(MameCommand::stop());
+			let model = model.clone();
+			let fut = async move {
+				let show_warning = true;
+				let result = dialog_stop_warning(model.modal_stack.clone(), show_warning).await;
+				if result.stop {
+					model.issue_command(MameCommand::stop());
+				}
+			};
+			spawn_local(fut).unwrap();
 		}
 		Action::FilePause => {
 			let is_paused = model

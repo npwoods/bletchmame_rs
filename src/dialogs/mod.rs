@@ -13,6 +13,7 @@ pub mod namecollection;
 pub mod paths;
 pub mod seqpoll;
 pub mod socket;
+pub mod stopwarning;
 pub mod switches;
 
 #[ext(SenderExt)]
