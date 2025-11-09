@@ -359,6 +359,10 @@ export component AppWindow inherits Window {
                     title: entry.title;
                     checkable: true;
                     checked: index == menu-entries-throttle-current-index;
+                    private property <bool> selected: index == menu-entries-throttle-current-index;
+                    changed selected => {
+                        self.checked = self.selected;
+                    }
                     activated => {
                         menu-item-action(entry.action);
                     }
@@ -399,6 +403,10 @@ export component AppWindow inherits Window {
                     title: entry.title;
                     checkable: true;
                     checked: index == menu-entries-frameskip-current-index;
+                    private property <bool> selected: index == menu-entries-frameskip-current-index;
+                    changed selected => {
+                        self.checked = self.selected;
+                    }
                     activated => {
                         menu-item-action(entry.action);
                     }
