@@ -3,8 +3,6 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
 use std::sync::mpsc::Sender;
 use std::time::Duration;
 
@@ -18,6 +16,7 @@ use strum::VariantArray;
 use throttle::Throttle;
 
 use crate::action::Action;
+use crate::canceller::Canceller;
 use crate::console::Console;
 use crate::info::InfoDb;
 use crate::job::Job;
@@ -53,7 +52,7 @@ pub struct AppState {
 #[derive(Clone)]
 struct InfoDbBuild {
 	job: Job<Result<Option<InfoDb>>>,
-	cancelled: Arc<AtomicBool>,
+	canceller: Canceller,
 	machine_description: Option<String>,
 }
 
@@ -233,10 +232,10 @@ impl AppState {
 			let prefs_path = &self.fixed.prefs_path;
 			let mame_executable_path = self.paths.mame_executable.as_deref().unwrap();
 			let callback = self.fixed.callback.clone();
-			let (job, cancelled) = spawn_infodb_build_thread(prefs_path, mame_executable_path, callback);
+			let (job, canceller) = spawn_infodb_build_thread(prefs_path, mame_executable_path, callback);
 			let info_db_build = InfoDbBuild {
 				job,
-				cancelled,
+				canceller,
 				machine_description: None,
 			};
 			Self {
@@ -347,7 +346,7 @@ impl AppState {
 
 		// if specified, cancel the build
 		if cancel {
-			info_db_build.cancelled.store(true, Ordering::Relaxed);
+			info_db_build.canceller.cancel();
 		}
 
 		// join the job (which we expect to complete) and digest the result
@@ -767,23 +766,23 @@ fn spawn_infodb_build_thread(
 	prefs_path: &Path,
 	mame_executable_path: &str,
 	callback: CommandCallback,
-) -> (Job<Result<Option<InfoDb>>>, Arc<AtomicBool>) {
+) -> (Job<Result<Option<InfoDb>>>, Canceller) {
 	let prefs_path = prefs_path.to_path_buf();
 	let mame_executable_path = mame_executable_path.to_string();
 	let callback_bubble = ThreadLocalBubble::new(callback);
-	let cancelled = Arc::new(AtomicBool::from(false));
+	let canceller = Canceller::default();
 	let job = {
-		let cancelled = cancelled.clone();
-		Job::new(move || infodb_build_thread_proc(&prefs_path, &mame_executable_path, callback_bubble, cancelled))
+		let canceller = canceller.clone();
+		Job::new(move || infodb_build_thread_proc(&prefs_path, &mame_executable_path, callback_bubble, canceller))
 	};
-	(job, cancelled)
+	(job, canceller)
 }
 
 fn infodb_build_thread_proc(
 	prefs_path: &Path,
 	mame_executable_path: &str,
 	callback_bubble: ThreadLocalBubble<CommandCallback>,
-	cancelled: Arc<AtomicBool>,
+	canceller: Canceller,
 ) -> Result<Option<InfoDb>> {
 	// progress messages need to be throttled
 	let mut throttle = Throttle::new(Duration::from_millis(100), 1);
@@ -791,12 +790,12 @@ fn infodb_build_thread_proc(
 	// lambda to invoke a command on the main event loop; there is some nontrivial stuff here
 	// because of the need to put the callback in the "bubble" as well as to ensure that we
 	// don't invoke the command if the user cancelled
-	let cancelled_clone = cancelled.clone();
+	let cancelled_clone = canceller.clone();
 	let invoke_command = move |command| {
 		let callback_bubble = callback_bubble.clone();
 		let cancelled_clone = cancelled_clone.clone();
 		invoke_from_event_loop(move || {
-			if !cancelled_clone.load(Ordering::Relaxed) {
+			if cancelled_clone.status().is_continue() {
 				(callback_bubble.unwrap())(command);
 			}
 		})
@@ -814,7 +813,7 @@ fn infodb_build_thread_proc(
 		}
 
 		// have we cancelled?
-		cancelled.load(Ordering::Relaxed)
+		canceller.status()
 	};
 
 	// invoke MAME with `-listxml`

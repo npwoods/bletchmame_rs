@@ -446,6 +446,7 @@ fn identify_changed_rows(a: &[InternalEntry], b: &[InternalEntry]) -> Option<Vec
 
 #[cfg(test)]
 mod test {
+	use std::ops::ControlFlow;
 	use std::rc::Rc;
 
 	use assert_matches::assert_matches;
@@ -469,7 +470,7 @@ mod test {
 	#[test_case(3, include_str!("info/test_data/listxml_coco.xml"), include_str!("status/test_data/status_mame0270_coco2b_5.xml"))]
 	fn update_status(_index: usize, info_xml: &str, status_xml: &str) {
 		// build the InfoDB
-		let info_db = InfoDb::from_listxml_output(info_xml.as_bytes(), |_| false)
+		let info_db = InfoDb::from_listxml_output(info_xml.as_bytes(), |_| ControlFlow::Continue(()))
 			.unwrap()
 			.unwrap();
 		let info_db = Rc::new(info_db);
@@ -489,7 +490,7 @@ mod test {
 	#[test_case(0, include_str!("info/test_data/listxml_coco.xml"), "coco2b", "ext", Some("multi"))]
 	fn set_slot_option(_index: usize, info_xml: &str, machine_name: &str, tag: &str, new_option_name: Option<&str>) {
 		// build the InfoDB
-		let info_db = InfoDb::from_listxml_output(info_xml.as_bytes(), |_| false)
+		let info_db = InfoDb::from_listxml_output(info_xml.as_bytes(), |_| ControlFlow::Continue(()))
 			.unwrap()
 			.unwrap();
 		let info_db = Rc::new(info_db);
@@ -507,7 +508,7 @@ mod test {
 	#[test_case(2, include_str!("info/test_data/listxml_coco.xml"))]
 	fn access_all_images(_index: usize, info_xml: &str) {
 		// build the InfoDB
-		let info_db = InfoDb::from_listxml_output(info_xml.as_bytes(), |_| false)
+		let info_db = InfoDb::from_listxml_output(info_xml.as_bytes(), |_| ControlFlow::Continue(()))
 			.unwrap()
 			.unwrap();
 		let info_db = Rc::new(info_db);

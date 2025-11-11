@@ -4,6 +4,7 @@ mod appstate;
 mod appwindow;
 mod assethash;
 mod backend;
+mod canceller;
 mod channel;
 mod collections;
 mod console;
