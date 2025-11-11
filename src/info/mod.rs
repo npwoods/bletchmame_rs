@@ -17,6 +17,7 @@ use std::io::Read;
 use std::io::Write;
 use std::marker::PhantomData;
 use std::ops::AddAssign;
+use std::ops::ControlFlow;
 use std::ops::Not;
 use std::ops::Range;
 use std::ops::Sub;
@@ -181,7 +182,10 @@ impl InfoDb {
 		Ok(())
 	}
 
-	pub fn from_listxml_output(reader: impl BufRead, callback: impl FnMut(&str) -> bool) -> Result<Option<Self>> {
+	pub fn from_listxml_output(
+		reader: impl BufRead,
+		callback: impl FnMut(&str) -> ControlFlow<()>,
+	) -> Result<Option<Self>> {
 		// process 'mame -listxml' output
 		let data = data_from_listxml_output(reader, callback)?;
 
@@ -195,7 +199,10 @@ impl InfoDb {
 		Ok(Some(info_db))
 	}
 
-	pub fn from_child_process(mame_executable_path: &str, callback: impl FnMut(&str) -> bool) -> Result<Option<Self>> {
+	pub fn from_child_process(
+		mame_executable_path: &str,
+		callback: impl FnMut(&str) -> ControlFlow<()>,
+	) -> Result<Option<Self>> {
 		// launch the process
 		let mut process = Command::new(mame_executable_path)
 			.arg("-listxml")
@@ -697,6 +704,7 @@ impl Debug for UsizeDb {
 #[cfg(test)]
 mod test {
 	use std::cmp::max;
+	use std::ops::ControlFlow;
 
 	use itertools::Itertools;
 	use test_case::test_case;
@@ -724,7 +732,9 @@ mod test {
 			initial_expected.as_slice(),
 		);
 
-		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
+		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| ControlFlow::Continue(()))
+			.unwrap()
+			.unwrap();
 		let actual_initial_machines = db
 			.machines()
 			.iter()
@@ -767,7 +777,9 @@ mod test {
 			expected_rom_of.map(|x| x.to_string()),
 		);
 
-		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
+		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| ControlFlow::Continue(()))
+			.unwrap()
+			.unwrap();
 		let machine = db.machines().find(name).unwrap();
 		let actual = (
 			machine.name().to_string(),
@@ -786,7 +798,9 @@ mod test {
 	#[test_case(1, include_str!("test_data/listxml_alienar.xml"), 5, Some(("mc6809e", "")))]
 	#[test_case(2, include_str!("test_data/listxml_alienar.xml"), 4242, None)]
 	pub fn machines_get(_index: usize, xml: &str, index: usize, expected: Option<(&str, &str)>) {
-		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
+		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| ControlFlow::Continue(()))
+			.unwrap()
+			.unwrap();
 		let actual = db
 			.machines()
 			.get(index)
@@ -802,7 +816,9 @@ mod test {
 	#[test_case(3, include_str!("test_data/listxml_fake.xml"), "fake", Some(("<Bletch>", "2021")))]
 	#[test_case(4, include_str!("test_data/listxml_fake.xml"), "NONEXISTANT", None)]
 	pub fn machines_find(_index: usize, xml: &str, target: &str, expected: Option<(&str, &str)>) {
-		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
+		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| ControlFlow::Continue(()))
+			.unwrap()
+			.unwrap();
 		let actual = db
 			.machines()
 			.find(target)
@@ -815,7 +831,9 @@ mod test {
 
 	#[test_case(0, include_str!("test_data/listxml_alienar.xml"))]
 	pub fn machines_find_everything(_index: usize, xml: &str) {
-		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
+		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| ControlFlow::Continue(()))
+			.unwrap()
+			.unwrap();
 		for machine in db.machines().iter() {
 			let other_machine = db.machines().find(machine.name()).unwrap();
 			assert_eq!(other_machine.name(), machine.name());
@@ -830,7 +848,9 @@ mod test {
 		expected_default_biosset_index: usize,
 		expected: &[(&str, &str)],
 	) {
-		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
+		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| ControlFlow::Continue(()))
+			.unwrap()
+			.unwrap();
 		let machine = db.machines().find(machine).unwrap();
 		let actual_default_biosset_index = machine.default_biosset_index();
 		let actual = machine
@@ -848,7 +868,9 @@ mod test {
 	#[test_case(0, include_str!("test_data/listxml_alienar.xml"), "alienar", &[(ChipType::Cpu, "maincpu"), (ChipType::Cpu, "soundcpu"), (ChipType::Audio, "speaker"), (ChipType::Audio, "dac")])]
 	#[test_case(1, include_str!("test_data/listxml_fake.xml"), "fake", &[(ChipType::Cpu, "maincpu")])]
 	pub fn chips(_index: usize, xml: &str, machine: &str, expected: &[(ChipType, &str)]) {
-		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
+		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| ControlFlow::Continue(()))
+			.unwrap()
+			.unwrap();
 		let actual = db
 			.machines()
 			.find(machine)
@@ -878,7 +900,9 @@ mod test {
 		expected_interfaces: &[&str],
 		expected_extensions: &[&str],
 	) {
-		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
+		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| ControlFlow::Continue(()))
+			.unwrap()
+			.unwrap();
 		let device = db
 			.machines()
 			.find(machine)
@@ -906,7 +930,9 @@ mod test {
 	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", &["rs232", "ext", "ext:fdc:wd17xx:0", "ext:fdc:wd17xx:1", "ext:fdc:wd17xx:2", "ext:fdc:wd17xx:3"])]
 	#[test_case(1, include_str!("test_data/listxml_fake.xml"), "fake", &["ext", "ext:fdcv11:wd17xx:0", "ext:fdcv11:wd17xx:1"])]
 	pub fn slots(_index: usize, xml: &str, machine: &str, expected: &[&str]) {
-		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
+		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| ControlFlow::Continue(()))
+			.unwrap()
+			.unwrap();
 		let actual = db
 			.machines()
 			.find(machine)
@@ -929,7 +955,9 @@ mod test {
 		expected_default_opt: Option<usize>,
 		expected_options: &[(&str, &str)],
 	) {
-		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
+		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| ControlFlow::Continue(()))
+			.unwrap()
+			.unwrap();
 		let slot = db
 			.machines()
 			.find(machine)
@@ -959,7 +987,9 @@ mod test {
 
 	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", &[("coco_cart_list", "coco_cart"), ("coco_flop_list", "coco_flop"), ("dragon_cart_list", "dragon_cart")])]
 	pub fn machine_software_lists(_index: usize, xml: &str, machine: &str, expected: &[(&str, &str)]) {
-		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
+		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| ControlFlow::Continue(()))
+			.unwrap()
+			.unwrap();
 		let actual = db
 			.machines()
 			.find(machine)
@@ -988,7 +1018,9 @@ mod test {
 		let expected_originals = expected_originals.iter().map(|x| x.to_string()).collect::<Vec<_>>();
 		let expected_compatibles = expected_compatibles.iter().map(|x| x.to_string()).collect::<Vec<_>>();
 
-		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
+		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| ControlFlow::Continue(()))
+			.unwrap()
+			.unwrap();
 		let software_list = db
 			.software_lists()
 			.iter()
@@ -1016,7 +1048,9 @@ mod test {
 	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", &[("beckerport", 1, 0), ("ctrl_sel", 15, 1), ("ctrl_sel", 240, 1), ("dwsock:drivewire_port", 65535, 4), ("hires_intf", 7, 0), ("rs232:rs_printer:RS232_DATABITS", 255, 3), ("rs232:rs_printer:RS232_PARITY", 255, 0), ("rs232:rs_printer:RS232_RXBAUD", 255, 7), ("rs232:rs_printer:RS232_STOPBITS", 255, 1), ("vdg:artifacting", 3, 1)])]
 	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "coco3", &[("beckerport", 1, 0), ("ctrl_sel", 15, 1), ("ctrl_sel", 240, 1), ("dwsock:drivewire_port", 65535, 4), ("gime:artifacting", 3, 1), ("hires_intf", 7, 0), ("rs232:rs_printer:RS232_DATABITS", 255, 3), ("rs232:rs_printer:RS232_PARITY", 255, 0), ("rs232:rs_printer:RS232_RXBAUD", 255, 7), ("rs232:rs_printer:RS232_STOPBITS", 255, 1), ("screen_config", 1, 0)])]
 	fn configurations(_index: usize, xml: &str, machine_name: &str, expected: &[(&str, u32, usize)]) {
-		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| false).unwrap().unwrap();
+		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| ControlFlow::Continue(()))
+			.unwrap()
+			.unwrap();
 		let configs = db.machines().find(machine_name).unwrap().configurations();
 
 		let actual = configs

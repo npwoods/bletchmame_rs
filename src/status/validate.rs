@@ -35,6 +35,7 @@ fn validate_running(running: &Running, info_db: &InfoDb, mut emit: impl FnMut(Up
 #[cfg(test)]
 mod test {
 	use std::io::BufReader;
+	use std::ops::ControlFlow;
 
 	use test_case::test_case;
 
@@ -55,7 +56,7 @@ mod test {
 	#[test_case(1, include_str!("../info/test_data/listxml_alienar.xml"), include_str!("test_data/status_mame0273_c64_1.xml"), Err(VersionMismatch(vers("0.273"), vers("0.229"))))]
 	#[test_case(2, include_str!("../info/test_data/listxml_c64.xml"), include_str!("test_data/status_mame0273_alienar_1.xml"), Err(Invalid(vec![UnknownMachine("alienar".into())])))]
 	pub fn test(_index: usize, info_xml: &str, update_xml: &str, expected: Result<(), ValidationError>) {
-		let info_db = InfoDb::from_listxml_output(info_xml.as_bytes(), |_| false)
+		let info_db = InfoDb::from_listxml_output(info_xml.as_bytes(), |_| ControlFlow::Continue(()))
 			.unwrap()
 			.unwrap();
 		let update_reader = BufReader::new(update_xml.as_bytes());

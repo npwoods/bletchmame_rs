@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::io::BufRead;
+use std::ops::ControlFlow;
 
 use anyhow::Error;
 use anyhow::Result;
@@ -497,7 +498,11 @@ impl State {
 		Ok(new_phase)
 	}
 
-	pub fn handle_end(&mut self, callback: &mut impl FnMut(&str) -> bool, text: Option<String>) -> Result<Option<()>> {
+	pub fn handle_end(
+		&mut self,
+		callback: &mut impl FnMut(&str) -> ControlFlow<()>,
+		text: Option<String>,
+	) -> Result<Option<()>> {
 		debug!(self=?self, "handle_end()");
 
 		match self.phase_stack.last().unwrap_or(&Phase::Root) {
@@ -511,7 +516,7 @@ impl State {
 			}
 			Phase::MachineDescription => {
 				let description = text.unwrap();
-				if !description.is_empty() && callback(&description) {
+				if !description.is_empty() && callback(&description).is_break() {
 					return Ok(None);
 				}
 				let description_strindex = self.strings.lookup(&description);
@@ -866,7 +871,7 @@ fn listxml_err(reader: &XmlReader<impl BufRead>, e: impl Into<Error>) -> Error {
 
 pub fn data_from_listxml_output(
 	reader: impl BufRead,
-	mut callback: impl FnMut(&str) -> bool,
+	mut callback: impl FnMut(&str) -> ControlFlow<()>,
 ) -> Result<Option<Box<[u8]>>> {
 	let mut state = State::new();
 	let mut reader = XmlReader::from_reader(reader, true);
@@ -964,6 +969,7 @@ impl<T> Option<T> {
 #[cfg(test)]
 mod test {
 	use std::io::BufReader;
+	use std::ops::ControlFlow;
 
 	use assert_matches::assert_matches;
 	use test_case::test_case;
@@ -975,7 +981,9 @@ mod test {
 	#[test_case(2, include_str!("test_data/listxml_fake.xml"))]
 	pub fn data_from_listxml_output(_index: usize, xml: &str) {
 		let reader = BufReader::new(xml.as_bytes());
-		let data = super::data_from_listxml_output(reader, |_| false).unwrap().unwrap();
+		let data = super::data_from_listxml_output(reader, |_| ControlFlow::Continue(()))
+			.unwrap()
+			.unwrap();
 		let result = InfoDb::new(data);
 		assert_matches!(result, Ok(_));
 	}

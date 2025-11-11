@@ -4,6 +4,7 @@ use std::io::Read;
 use std::io::Write;
 use std::io::stdin;
 use std::io::stdout;
+use std::ops::ControlFlow;
 use std::path::Path;
 use std::process::ExitCode;
 use std::time::Duration;
@@ -122,7 +123,7 @@ fn internal_info_db_from_xml_file(
 			print!("\x1B[KProcessing {machine_name}...\r");
 			let _ = stdout().flush();
 		}
-		false
+		ControlFlow::Continue(())
 	})
 	.map_err(ThisError::BuildingInfoDb)?;
 
