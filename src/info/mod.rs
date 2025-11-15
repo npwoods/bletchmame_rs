@@ -710,6 +710,7 @@ mod test {
 	use test_case::test_case;
 
 	use crate::assethash::AssetHash;
+	use crate::info::entities::AssetStatus;
 
 	use super::ChipType;
 	use super::InfoDb;
@@ -842,16 +843,33 @@ mod test {
 		}
 	}
 
-	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", "bas13.rom", "d8f4d15e", "28b92bebe35fa4f026a084416d6ea3b1552b63d3")]
-	pub fn roms(_index: usize, xml: &str, machine: &str, rom: &str, expected_crc: &str, expected_sha1: &str) {
-		let expected = AssetHash::from_hex_strings(Some(expected_crc), Some(expected_sha1)).unwrap();
+	#[allow(clippy::too_many_arguments)]
+	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", "bas13.rom", Some("d8f4d15e"), Some("28b92bebe35fa4f026a084416d6ea3b1552b63d3"), AssetStatus::Good, false)]
+	#[test_case(1, include_str!("test_data/listxml_fake.xml"), "blah", "garbage.bin", Some("0faf9fdb"), Some("c27909184ee9170707c1be9a4cfbe83b359672e1"), AssetStatus::Good, true)]
+	#[test_case(2, include_str!("test_data/listxml_fake.xml"), "blah", "nodump.bin", None, None, AssetStatus::NoDump, false)]
+	#[test_case(3, include_str!("test_data/listxml_fake.xml"), "blah", "baddump.bin", None, None, AssetStatus::BadDump, false)]
+	pub fn roms(
+		_index: usize,
+		xml: &str,
+		machine: &str,
+		rom: &str,
+		expected_crc: Option<&str>,
+		expected_sha1: Option<&str>,
+		expected_status: AssetStatus,
+		expected_optional: bool,
+	) {
+		let expected = (
+			AssetHash::from_hex_strings(expected_crc, expected_sha1).unwrap(),
+			expected_status,
+			expected_optional,
+		);
 
 		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| ControlFlow::Continue(()))
 			.unwrap()
 			.unwrap();
 		let machine = db.machines().find(machine).unwrap();
 		let rom = machine.roms().iter().find(|r| r.name() == rom).unwrap();
-		let actual = rom.asset_hash();
+		let actual = (rom.asset_hash(), rom.status(), rom.is_optional());
 		assert_eq!(expected, actual);
 	}
 
