@@ -145,6 +145,9 @@ pub struct Sample {
 pub const ASSET_FLAG_HAS_CRC: u8 = 0x01;
 pub const ASSET_FLAG_HAS_SHA1: u8 = 0x02;
 pub const ASSET_FLAG_WRITABLE: u8 = 0x04;
+pub const ASSET_FLAG_OPTIONAL: u8 = 0x08;
+pub const ASSET_FLAG_BADDUMP: u8 = 0x10;
+pub const ASSET_FLAG_NODUMP: u8 = 0x20;
 
 #[repr(C, packed)]
 #[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq)]

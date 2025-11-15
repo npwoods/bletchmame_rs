@@ -4,6 +4,7 @@ use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::io::BufRead;
 use std::ops::ControlFlow;
+use std::str::FromStr;
 
 use anyhow::Error;
 use anyhow::Result;
@@ -22,11 +23,15 @@ use crate::info::SERIAL;
 use crate::info::SoftwareListStatus;
 use crate::info::UsizeDb;
 use crate::info::binary;
+use crate::info::binary::ASSET_FLAG_BADDUMP;
 use crate::info::binary::ASSET_FLAG_HAS_CRC;
 use crate::info::binary::ASSET_FLAG_HAS_SHA1;
+use crate::info::binary::ASSET_FLAG_NODUMP;
+use crate::info::binary::ASSET_FLAG_OPTIONAL;
 use crate::info::binary::ASSET_FLAG_WRITABLE;
 use crate::info::binary::ConfigurationSetting;
 use crate::info::binary::Fixup;
+use crate::info::entities::AssetStatus;
 use crate::info::strings::StringTableBuilder;
 use crate::parse::normalize_tag;
 use crate::parse::parse_mame_bool;
@@ -221,8 +226,16 @@ impl State {
 			(Phase::Machine, b"year") => Some(Phase::MachineYear),
 			(Phase::Machine, b"manufacturer") => Some(Phase::MachineManufacturer),
 			(Phase::Machine, b"rom") => {
-				let [name, size, crc, sha1, region, offset] =
-					evt.find_attributes([b"name", b"size", b"crc", b"sha1", b"region", b"offset"])?;
+				let [name, size, crc, sha1, region, offset, status, optional] = evt.find_attributes([
+					b"name",
+					b"size",
+					b"crc",
+					b"sha1",
+					b"region",
+					b"offset",
+					b"status",
+					b"optional",
+				])?;
 				let name = name.mandatory("name")?;
 				let size = size.as_deref().map(str::parse::<u64>).transpose()?;
 				let size = size.unwrap_or(!0).into();
@@ -234,8 +247,9 @@ impl State {
 				let offset = offset.unwrap_or(!0).into();
 				let name_strindex = self.strings.lookup(&name);
 				let region_strindex = self.strings.lookup(&region);
-				let flags = (asset_hash.crc.is_some() as u8 * ASSET_FLAG_HAS_CRC)
-					| (asset_hash.sha1.is_some() as u8 * ASSET_FLAG_HAS_SHA1);
+				let optional = optional.map(parse_mame_bool).transpose()?.unwrap_or_default();
+				let status = status.as_deref().map(AssetStatus::from_str).transpose()?;
+				let flags = make_asset_flags(&asset_hash, optional, false, status);
 				let rom = binary::Rom {
 					name_strindex,
 					size,
@@ -250,8 +264,16 @@ impl State {
 				None
 			}
 			(Phase::Machine, b"disk") => {
-				let [name, merge, sha1, region, index, writable] =
-					evt.find_attributes([b"name", b"merge", b"sha1", b"region", b"index", b"writable"])?;
+				let [name, merge, sha1, region, index, writable, status, optional] = evt.find_attributes([
+					b"name",
+					b"merge",
+					b"sha1",
+					b"region",
+					b"index",
+					b"writable",
+					b"status",
+					b"optional",
+				])?;
 				let name = name.mandatory("name")?;
 				let asset_hash = AssetHash::from_hex_strings(None, sha1.as_deref())?;
 				let sha1 = asset_hash.sha1.unwrap_or_default();
@@ -265,9 +287,9 @@ impl State {
 					.map(|x| self.strings.lookup(x))
 					.unwrap_or(!UsizeDb::default());
 				let region_strindex = self.strings.lookup(&region);
-				let flags = (asset_hash.crc.is_some() as u8 * ASSET_FLAG_HAS_CRC)
-					| (asset_hash.sha1.is_some() as u8 * ASSET_FLAG_HAS_SHA1)
-					| ((writable as u8) * ASSET_FLAG_WRITABLE);
+				let optional = optional.map(parse_mame_bool).transpose()?.unwrap_or_default();
+				let status = status.as_deref().map(AssetStatus::from_str).transpose()?;
+				let flags = make_asset_flags(&asset_hash, optional, writable, status);
 				let disk = binary::Disk {
 					name_strindex,
 					merge_strindex,
@@ -964,6 +986,16 @@ impl<T> Option<T> {
 	pub fn mandatory(self, name: &'static str) -> Result<T> {
 		self.ok_or(ThisError::MissingMandatoryAttribute(name).into())
 	}
+}
+
+fn make_asset_flags(asset_hash: &AssetHash, optional: bool, writable: bool, status: Option<AssetStatus>) -> u8 {
+	let status = status.unwrap_or(AssetStatus::Good);
+	(asset_hash.crc.is_some() as u8 * ASSET_FLAG_HAS_CRC)
+		| (asset_hash.sha1.is_some() as u8 * ASSET_FLAG_HAS_SHA1)
+		| (writable as u8 * ASSET_FLAG_WRITABLE)
+		| (optional as u8 * ASSET_FLAG_OPTIONAL)
+		| ((status == AssetStatus::BadDump) as u8 * ASSET_FLAG_BADDUMP)
+		| ((status == AssetStatus::NoDump) as u8 * ASSET_FLAG_NODUMP)
 }
 
 #[cfg(test)]

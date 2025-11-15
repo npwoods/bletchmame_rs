@@ -193,8 +193,9 @@
 		<description>Fake Machine</description>
 		<year>2021</year>
 		<manufacturer>&lt;Bletch&gt;</manufacturer>
-		<rom name="garbage.bin" size="32768" crc="0faf9fdb" sha1="c27909184ee9170707c1be9a4cfbe83b359672e1" region="maincpu" offset="0000"/>
+		<rom name="garbage.bin" size="32768" crc="0faf9fdb" sha1="c27909184ee9170707c1be9a4cfbe83b359672e1" region="maincpu" offset="0000" optional="yes"/>
 		<rom name="nodump.bin" size="32768" status="nodump" region="maincpu" offset="8000"/>
+		<rom name="baddump.bin" size="32768" status="baddump" region="maincpu" offset="8000"/>
 		<disk name="samplechd" sha1="BFEC48AE2439308AC3A547231A13F122EF303C76" region="ata:0:hdd:image" index="0" writable="yes"/>
 		<sample name="fakesample"/>
 		<chip type="cpu" tag="maincpu" name="Motorola MC6809E" clock="1000000"/>

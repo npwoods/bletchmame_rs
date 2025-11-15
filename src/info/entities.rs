@@ -3,6 +3,7 @@ use anyhow::Result;
 use anyhow::ensure;
 use binary_search::Direction;
 use binary_search::binary_search;
+use strum::EnumString;
 
 use crate::assethash::AssetHash;
 use crate::info::ChipType;
@@ -183,8 +184,19 @@ impl<'a> Rom<'a> {
 		self.obj().offset.into()
 	}
 
-	pub fn writable(&self) -> bool {
-		(self.obj().flags & binary::ASSET_FLAG_WRITABLE) != 0
+	pub fn is_optional(&self) -> bool {
+		(self.obj().flags & binary::ASSET_FLAG_OPTIONAL) != 0
+	}
+
+	pub fn status(&self) -> AssetStatus {
+		let flags = self.obj().flags;
+		if flags & binary::ASSET_FLAG_BADDUMP != 0 {
+			AssetStatus::BadDump
+		} else if flags & binary::ASSET_FLAG_NODUMP != 0 {
+			AssetStatus::NoDump
+		} else {
+			AssetStatus::Good
+		}
 	}
 }
 
@@ -210,6 +222,21 @@ impl<'a> Disk<'a> {
 	pub fn writable(&self) -> bool {
 		(self.obj().flags & binary::ASSET_FLAG_WRITABLE) != 0
 	}
+
+	pub fn is_optional(&self) -> bool {
+		(self.obj().flags & binary::ASSET_FLAG_OPTIONAL) != 0
+	}
+
+	pub fn status(&self) -> AssetStatus {
+		let flags = self.obj().flags;
+		if flags & binary::ASSET_FLAG_BADDUMP != 0 {
+			AssetStatus::BadDump
+		} else if flags & binary::ASSET_FLAG_NODUMP != 0 {
+			AssetStatus::NoDump
+		} else {
+			AssetStatus::Good
+		}
+	}
 }
 
 impl<'a> Sample<'a> {
@@ -218,10 +245,14 @@ impl<'a> Sample<'a> {
 	}
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum AssetType {
-	Rom,
-	Disk,
+#[derive(Copy, Clone, Debug, PartialEq, Eq, EnumString)]
+pub enum AssetStatus {
+	#[strum(ascii_case_insensitive)]
+	Good,
+	#[strum(ascii_case_insensitive)]
+	BadDump,
+	#[strum(ascii_case_insensitive)]
+	NoDump,
 }
 
 impl<'a> BiosSet<'a> {
