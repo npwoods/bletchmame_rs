@@ -17,6 +17,7 @@ default-ext = "0.1.0"
 dirs = "6.0.0"
 dpi = "0.1.1"
 easy-ext = "1.0.2"
+hex = "0.4.3"
 hostname-validator = "1.1.1"
 i-slint-backend-qt = { git = "https://github.com/npwoods/slint.git", rev = "0cc5bb9f05d8e4f813154685d8e836fc463baee1", optional = true }
 i-slint-backend-winit = { git = "https://github.com/npwoods/slint.git", rev = "0cc5bb9f05d8e4f813154685d8e836fc463baee1" }

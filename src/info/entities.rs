@@ -170,7 +170,7 @@ impl<'a> Rom<'a> {
 
 	pub fn asset_hash(&self) -> AssetHash {
 		let obj = self.obj();
-		let crc = ((obj.flags & ASSET_FLAG_HAS_CRC) != 0).then_some(obj.crc);
+		let crc = ((obj.flags & ASSET_FLAG_HAS_CRC) != 0).then_some(obj.crc.into());
 		let sha1 = ((obj.flags & ASSET_FLAG_HAS_SHA1) != 0).then_some(obj.sha1);
 		AssetHash { crc, sha1 }
 	}

@@ -227,7 +227,7 @@ impl State {
 				let size = size.as_deref().map(str::parse::<u64>).transpose()?;
 				let size = size.unwrap_or(!0).into();
 				let asset_hash = AssetHash::from_hex_strings(crc.as_deref(), sha1.as_deref())?;
-				let crc = asset_hash.crc.unwrap_or_default();
+				let crc = asset_hash.crc.unwrap_or_default().into();
 				let sha1 = asset_hash.sha1.unwrap_or_default();
 				let region = region.mandatory("region")?;
 				let offset = offset.as_deref().map(|src| u64::from_str_radix(src, 16)).transpose()?;
