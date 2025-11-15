@@ -1,54 +1,87 @@
-use anyhow::Error;
+use std::fmt::Debug;
+use std::fmt::Display;
+use std::fmt::Formatter;
+
 use anyhow::Result;
+use hex::decode_to_slice;
+use hex::encode;
 
-#[derive(thiserror::Error, Debug)]
-enum ThisError {
-	#[error("invalid hex string length for '{s}': expected {expected_len} characters")]
-	InvalidHexStringLength { s: String, expected_len: usize },
-	#[error("invalid hex string '{s}'; non-hex characters at position {position}")]
-	InvalidHexString {
-		s: String,
-		position: usize,
-		#[source]
-		error: Error,
-	},
-}
-
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Default, PartialEq, Eq)]
 pub struct AssetHash {
-	pub crc: Option<[u8; 4]>,
+	pub crc: Option<u32>,
 	pub sha1: Option<[u8; 20]>,
 }
 
 impl AssetHash {
-	pub fn from_hex_strings(crc: Option<&str>, sha1: Option<&str>) -> Result<Self> {
-		let crc = crc.map(parse_hex).transpose()?;
-		let sha1 = sha1.map(parse_hex).transpose()?;
+	pub fn from_hex_strings(crc_string: Option<&str>, sha1_string: Option<&str>) -> Result<Self> {
+		let crc = crc_string.map(parse_hex).transpose()?.map(u32::from_be_bytes);
+		let sha1 = sha1_string.map(parse_hex).transpose()?;
 		Ok(Self { crc, sha1 })
 	}
 }
 
+impl Display for AssetHash {
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		if let Some(crc) = self.crc {
+			write!(f, "CRC({})", encode(crc.to_be_bytes()))?;
+		}
+		if let Some(sha1) = self.sha1 {
+			if self.crc.is_some() {
+				write!(f, " ")?;
+			}
+			write!(f, "SHA1({})", encode(sha1))?;
+		}
+		if self.crc.is_none() && self.sha1.is_none() {
+			write!(f, "<<NONE>>")?;
+		}
+		Ok(())
+	}
+}
+
+impl Debug for AssetHash {
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		Display::fmt(self, f)
+	}
+}
+
 fn parse_hex<const N: usize>(s: &str) -> Result<[u8; N]> {
-	if s.len() != N * 2 {
-		let error = ThisError::InvalidHexStringLength {
-			s: s.to_string(),
-			expected_len: N * 2,
+	let mut result = [0u8; N];
+	decode_to_slice(s, &mut result)?;
+	Ok(result)
+}
+
+#[cfg(test)]
+mod test {
+	use test_case::test_case;
+
+	use super::AssetHash;
+
+	#[test]
+	pub fn from_hex_strings() {
+		let expected_crc = 0xF2345678;
+		let expected_sha1 = [
+			0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00, 0x99, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22,
+			0x11, 0xFF,
+		];
+		let expected = AssetHash {
+			crc: Some(expected_crc),
+			sha1: Some(expected_sha1),
 		};
-		return Err(error.into());
+
+		let crc_string = "F2345678";
+		let sha1_string = "99887766554433221100998877665544332211FF";
+		let actual = AssetHash::from_hex_strings(Some(crc_string), Some(sha1_string)).unwrap();
+		assert_eq!(expected, actual);
 	}
 
-	let result = (0..s.len())
-		.step_by(2)
-		.map(|position| {
-			let src = &s[position..position + 2];
-			u8::from_str_radix(src, 16).map_err(|e| {
-				let s = s.to_string();
-				let error = e.into();
-				ThisError::InvalidHexString { s, position, error }
-			})
-		})
-		.collect::<Result<Vec<_>, _>>()?
-		.try_into()
-		.unwrap();
-	Ok(result)
+	#[rustfmt::skip]
+	#[test_case(0, None, None, "<<NONE>>")]
+	#[test_case(1, None, Some("99887766554433221100998877665544332211FF"), "SHA1(99887766554433221100998877665544332211ff)")]
+	#[test_case(2, Some("ABC45678"), None, "CRC(abc45678)")]
+	#[test_case(3, Some("F2345678"), Some("EDE87766554433221100998877665544332211FF"), "CRC(f2345678) SHA1(ede87766554433221100998877665544332211ff)")]
+	pub fn display(_index: usize, crc_string: Option<&str>, sha1_string: Option<&str>, expected: &str) {
+		let actual = AssetHash::from_hex_strings(crc_string, sha1_string).unwrap();
+		assert_eq!(expected, format!("{actual}"));
+		assert_eq!(expected, format!("{actual:?}"));
+	}
 }

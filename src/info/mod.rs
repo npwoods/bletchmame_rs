@@ -709,6 +709,8 @@ mod test {
 	use itertools::Itertools;
 	use test_case::test_case;
 
+	use crate::assethash::AssetHash;
+
 	use super::ChipType;
 	use super::InfoDb;
 	use super::View;
@@ -838,6 +840,19 @@ mod test {
 			let other_machine = db.machines().find(machine.name()).unwrap();
 			assert_eq!(other_machine.name(), machine.name());
 		}
+	}
+
+	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", "bas13.rom", "d8f4d15e", "28b92bebe35fa4f026a084416d6ea3b1552b63d3")]
+	pub fn roms(_index: usize, xml: &str, machine: &str, rom: &str, expected_crc: &str, expected_sha1: &str) {
+		let expected = AssetHash::from_hex_strings(Some(expected_crc), Some(expected_sha1)).unwrap();
+
+		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| ControlFlow::Continue(()))
+			.unwrap()
+			.unwrap();
+		let machine = db.machines().find(machine).unwrap();
+		let rom = machine.roms().iter().find(|r| r.name() == rom).unwrap();
+		let actual = rom.asset_hash();
+		assert_eq!(expected, actual);
 	}
 
 	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco_scii", 1, &[("cdos", "Disto C-DOS v4.0 for the CoCo 1/2"), ("cdos3", "Disto C-DOS 3 v1.2 for the CoCo 3")])]

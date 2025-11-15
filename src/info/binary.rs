@@ -118,7 +118,7 @@ pub enum ChipType {
 pub struct Rom {
 	pub name_strindex: UsizeDb,
 	pub size: U64,
-	pub crc: [u8; 4],
+	pub crc: U32,
 	pub sha1: [u8; 20],
 	pub region_strindex: UsizeDb,
 	pub offset: U64,

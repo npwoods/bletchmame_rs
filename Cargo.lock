@@ -663,6 +663,7 @@ dependencies = [
  "dirs",
  "dpi",
  "easy-ext",
+ "hex",
  "hostname-validator",
  "i-slint-backend-qt",
  "i-slint-backend-winit",
