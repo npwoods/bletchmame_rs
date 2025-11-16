@@ -3,6 +3,7 @@ mod action;
 mod appstate;
 mod appwindow;
 mod assethash;
+mod audit;
 mod backend;
 mod canceller;
 mod channel;

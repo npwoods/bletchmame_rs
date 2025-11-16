@@ -17,6 +17,7 @@ import {
     DevicesAndImagesContextMenuInfo,
 } from "devimageslist.slint";
 import { Icons } from "icons.slint";
+import { ToolTipArea } from "tooltip.slint";
 
 struct SoftwareMachine {
     machine-index: int,
@@ -25,8 +26,10 @@ struct SoftwareMachine {
 
 struct Asset {
     icon: image,
+    overlay: image,
     name: string,
-    size: string}
+    size: string,
+    tooltip-text: string}
 
 export component ConfigureDialog inherits Window {
     title: dialog-title;
@@ -54,6 +57,7 @@ export component ConfigureDialog inherits Window {
     callback entry-option-changed(int, string);
     callback entry-button-clicked(int, Point);
     callback menu-item-action(string);
+    callback run-audit-clicked();
     callback software-machines-toggle-checked(int);
     callback software-machines-bulk-all-clicked();
     callback software-machines-bulk-none-clicked();
@@ -135,22 +139,49 @@ export component ConfigureDialog inherits Window {
 
                 Tab {
                     title: "Audit";
-                    ListView {
-                        for asset in root.audit-assets: HorizontalBox {
-                            Image {
-                                source: asset.icon;
-                                width: 24px;
-                                height: 24px;
-                            }
+                    VerticalBox {
+                        ListView {
+                            for asset in root.audit-assets: TouchArea {
+                                HorizontalBox {
+                                    Rectangle {
+                                        width: 24px;
+                                        height: 24px;
+                                        Image {
+                                            width: 24px;
+                                            height: 24px;
+                                            source: asset.icon;
+                                        }
 
-                            Text {
-                                text: asset.name;
-                                horizontal-stretch: 1;
-                            }
+                                        Image {
+                                            width: 24px;
+                                            height: 24px;
+                                            source: asset.overlay;
+                                        }
+                                    }
 
-                            Text {
-                                text: asset.size;
+                                    Text {
+                                        text: asset.name;
+                                        horizontal-stretch: 1;
+                                        vertical-alignment: center;
+                                    }
+
+                                    Text {
+                                        text: asset.size;
+                                        vertical-alignment: center;
+                                    }
+                                }
+
+                                changed has-hover => {
+                                    tooltip.show-tooltip(self.has-hover, self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y, asset.tooltip-text);
+                                }
                             }
+                        }
+                    }
+
+                    Button {
+                        text: "Run Audit";
+                        clicked => {
+                            root.run-audit-clicked();
                         }
                     }
                 }
@@ -224,4 +255,6 @@ export component ConfigureDialog inherits Window {
             }
         }
     }
+
+    tooltip := ToolTipArea { }
 }
