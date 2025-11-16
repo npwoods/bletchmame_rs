@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" aria-hidden="true" style="display:block; background:transparent; pointer-events:none;">
+
+  <!-- backing circle -->
+  <circle cx="78" cy="78" r="18" fill="rgba(0,0,0,0.6)"></circle>
+
+  <!-- question mark: hook portion -->
+  <path d="
+      M78 64
+      c -5 0 -9 3.5 -9 8
+      h 6
+      c 0 -1.6 1.5 -3 3 -3
+      c 1.5 0 3 1.4 3 3
+      c 0 2.3 -1.6 3.3 -3.5 4.6
+      c -2.5 1.6 -5.5 3.4 -5.5 7.4
+      v 1
+      h 6
+      v -1
+      c 0 -1.9 1.5 -3 3.5 -4.2
+      c 3.1 -1.9 5.5 -3.9 5.5 -7.9
+      c 0 -4.5 -4 -8 -9 -8
+      z" fill="#ffffff" stroke="rgba(0,0,0,0.4)" stroke-width="1" paint-order="stroke fill"></path>
+
+  <!-- dot: further down, slightly right -->
+  <path d="
+      M75 91
+      m -3 0
+      a 3 3 0 1 0 6 0
+      a 3 3 0 1 0 -6 0
+      " fill="#ffffff" stroke="rgba(0,0,0,0.4)" stroke-width="1" paint-order="stroke fill"></path>
+
+</svg>

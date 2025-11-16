@@ -11,7 +11,6 @@ use slint::Global;
 use slint::Model;
 use slint::ModelRc;
 use slint::SharedString;
-use slint::ToSharedString;
 use slint::VecModel;
 use slint::Weak;
 use slint::spawn_local;
@@ -32,13 +31,13 @@ use crate::info::InfoDb;
 use crate::info::Machine;
 use crate::info::View;
 use crate::mconfig::MachineConfig;
+use crate::models::audit::AuditModel;
 use crate::models::devimages::DevicesAndImagesModel;
 use crate::prefs::PrefsItem;
 use crate::prefs::PrefsMachineItem;
 use crate::prefs::PrefsPaths;
 use crate::prefs::PrefsSoftwareItem;
 use crate::software::SoftwareListDispenser;
-use crate::ui::Asset;
 use crate::ui::ConfigureDialog;
 use crate::ui::DeviceAndImageEntry;
 use crate::ui::DevicesAndImagesState;
@@ -175,10 +174,26 @@ pub async fn dialog_configure(
 	}
 
 	// Asset audit
-	if let Some(assets) = state.assets() {
-		let assets = VecModel::from(assets);
-		let assets = ModelRc::new(assets);
-		modal.dialog().set_audit_assets(assets);
+	if let CoreState::Machine { dimodel_state, .. } = &state.core {
+		dimodel_state.with_machine(|machine| {
+			if let Some(machine) = machine {
+				let icons = Icons::get(modal.dialog());
+				let rom_paths = paths.roms.clone().into();
+				let sample_paths = paths.samples.clone().into();
+				let model = AuditModel::new(machine, rom_paths, sample_paths, icons);
+				let model = ModelRc::new(model);
+				modal.dialog().set_audit_assets(model.clone());
+
+				modal.dialog().on_run_audit_clicked(move || {
+					let model = model.clone();
+					let fut = async move {
+						let model = AuditModel::get_model(&model);
+						model.run_audit().await;
+					};
+					spawn_local(fut).unwrap();
+				});
+			}
+		});
 	}
 
 	// loading error?
@@ -446,34 +461,6 @@ impl State {
 				(bios_option_texts, current_index)
 			})
 		})
-	}
-
-	pub fn assets(&self) -> Option<Vec<Asset>> {
-		let CoreState::Machine { dimodel_state, .. } = &self.core else {
-			return None;
-		};
-		let result = dimodel_state.with_machine(|machine| {
-			let machine = machine.unwrap();
-			let component = self.dialog_weak.unwrap();
-			let icons = Icons::get(&component);
-			let roms = machine.roms().iter().map(|rom| Asset {
-				icon: icons.get_rom(),
-				name: rom.name().into(),
-				size: rom.size().to_shared_string(),
-			});
-			let disks = machine.disks().iter().map(|disk| Asset {
-				icon: icons.get_harddisk(),
-				name: disk.name().into(),
-				..Default::default()
-			});
-			let samples = machine.samples().iter().map(|sample| Asset {
-				icon: icons.get_sample(),
-				name: sample.name().into(),
-				..Default::default()
-			});
-			roms.chain(disks).chain(samples).collect::<Vec<_>>()
-		});
-		Some(result)
 	}
 
 	pub fn error(&self) -> Option<&Error> {

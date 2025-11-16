@@ -1,10 +1,14 @@
 use std::fmt::Debug;
 use std::fmt::Display;
 use std::fmt::Formatter;
+use std::io::Read;
 
 use anyhow::Result;
+use crc32fast::Hasher as Crc32;
 use hex::decode_to_slice;
 use hex::encode;
+use sha1::Digest;
+use sha1::Sha1;
 
 #[derive(Copy, Clone, Default, PartialEq, Eq)]
 pub struct AssetHash {
@@ -17,6 +21,31 @@ impl AssetHash {
 		let crc = crc_string.map(parse_hex).transpose()?.map(u32::from_be_bytes);
 		let sha1 = sha1_string.map(parse_hex).transpose()?;
 		Ok(Self { crc, sha1 })
+	}
+
+	pub fn calculate(mut file: impl Read) -> Result<Self> {
+		let mut buffer = [0u8; 8192];
+
+		let mut crc = Crc32::new();
+		let mut sha1 = Sha1::new();
+
+		loop {
+			let n = file.read(&mut buffer)?;
+			if n == 0 {
+				break;
+			}
+			crc.update(&buffer[..n]);
+			sha1.update(&buffer[..n]);
+		}
+
+		let crc = Some(crc.finalize());
+		let sha1 = Some(sha1.finalize().into());
+		Ok(Self { crc, sha1 })
+	}
+
+	pub fn matches(&self, other: &AssetHash) -> bool {
+		self.crc.is_none_or(|x| other.crc.is_none_or(|y| x == y))
+			&& self.sha1.is_none_or(|x| other.sha1.is_none_or(|y| x == y))
 	}
 }
 
