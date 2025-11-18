@@ -8,9 +8,11 @@ use anyhow::Result;
 use default_ext::DefaultExt;
 use slint::SharedString;
 use smol_str::SmolStr;
+use tracing::debug;
 use zip::ZipArchive;
 
 use crate::assethash::AssetHash;
+use crate::chd::chd_asset_hash;
 use crate::info::AssetStatus;
 use crate::info::Machine;
 use crate::info::View;
@@ -38,11 +40,13 @@ pub enum AuditSeverity {
 	Fail,
 }
 
+#[derive(Debug)]
 pub struct AuditMessage {
 	asset_name: SmolStr,
 	details: AuditMessageDetails,
 }
 
+#[derive(Debug)]
 enum AuditMessageDetails {
 	NotFound,
 	NotFoundNoGoodDump,
@@ -65,7 +69,7 @@ impl Asset {
 		});
 		let disks = machine.disks().iter().map(|disk| Asset {
 			kind: AssetKind::Disk,
-			name: disk.name().into(),
+			name: format!("{}.chd", disk.name()).into(),
 			size: None,
 			asset_hash: disk.asset_hash(),
 			status: disk.status(),
@@ -73,7 +77,7 @@ impl Asset {
 		});
 		let samples = machine.samples().iter().map(|sample| Asset {
 			kind: AssetKind::Sample,
-			name: sample.name().into(),
+			name: format!("{}.wav", sample.name()).into(),
 			size: None,
 			asset_hash: AssetHash::default(),
 			status: AssetStatus::Good,
@@ -82,33 +86,46 @@ impl Asset {
 		roms.chain(disks).chain(samples).collect()
 	}
 
-	pub fn run_audit(
+	pub fn run_audit<P>(
 		&self,
 		machine_names: &[impl AsRef<str>],
-		rom_paths: &[impl AsRef<Path>],
-		sample_paths: &[impl AsRef<Path>],
-	) -> Vec<AuditMessage> {
-		match self.kind {
-			AssetKind::Rom => audit_single(
-				&self.name,
-				self.size,
-				&self.asset_hash,
-				self.status,
-				self.is_optional,
-				machine_names,
-				rom_paths,
-			),
-			AssetKind::Disk => todo!(),
-			AssetKind::Sample => audit_single(
-				&self.name,
-				self.size,
-				&self.asset_hash,
-				self.status,
-				self.is_optional,
-				machine_names,
-				sample_paths,
-			),
+		rom_paths: &[P],
+		sample_paths: &[P],
+	) -> Vec<AuditMessage>
+	where
+		P: AsRef<Path>,
+	{
+		// wrap these up in a uniform signature
+		type HashFunc = fn(&mut dyn Read) -> Result<AssetHash>;
+		fn hash_func_rom(file: &mut dyn Read) -> Result<AssetHash> {
+			AssetHash::calculate(file)
 		}
+		fn hash_func_sample(_file: &mut dyn Read) -> Result<AssetHash> {
+			unreachable!("Samples don't get hashed");
+		}
+		fn hash_func_disk(file: &mut dyn Read) -> Result<AssetHash> {
+			chd_asset_hash(file)
+		}
+
+		// do different things based on the `AssetKind`
+		let (asset_paths, support_archives, hash_func) = match self.kind {
+			AssetKind::Rom => (rom_paths, true, hash_func_rom as HashFunc),
+			AssetKind::Sample => (sample_paths, true, hash_func_sample as HashFunc),
+			AssetKind::Disk => (rom_paths, false, hash_func_disk as HashFunc),
+		};
+
+		// now do the heavy lifting
+		audit_single(
+			&self.name,
+			self.size,
+			&self.asset_hash,
+			self.status,
+			self.is_optional,
+			machine_names,
+			asset_paths,
+			support_archives,
+			hash_func,
+		)
 	}
 }
 
@@ -153,11 +170,13 @@ impl Display for AuditMessageDetails {
 	}
 }
 
+#[derive(Copy, Clone, Debug)]
 enum PathType {
-	Dir,
+	File,
 	Zip,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn audit_single(
 	asset_name: &str,
 	expected_size: Option<u64>,
@@ -166,11 +185,19 @@ fn audit_single(
 	is_optional: bool,
 	machine_names: &[impl AsRef<str>],
 	paths: &[impl AsRef<Path>],
+	support_archives: bool,
+	hash_func: fn(&mut dyn Read) -> Result<AssetHash>,
 ) -> Vec<AuditMessage> {
+	let path_types = if support_archives {
+		[PathType::File, PathType::Zip].as_slice()
+	} else {
+		[PathType::File].as_slice()
+	};
+
 	machine_names
 		.iter()
 		.flat_map(|machine_name| paths.iter().map(|path| (machine_name.as_ref(), path.as_ref())))
-		.flat_map(|(machine_name, path)| [(machine_name, path, PathType::Dir), (machine_name, path, PathType::Zip)])
+		.flat_map(|(machine_name, path)| path_types.iter().map(move |path_type| (machine_name, path, *path_type)))
 		.filter_map(|(machine_name, path, path_type)| {
 			try_audit(
 				asset_name,
@@ -180,6 +207,7 @@ fn audit_single(
 				machine_name,
 				path,
 				path_type,
+				hash_func,
 			)
 			.ok()
 		})
@@ -200,6 +228,7 @@ fn audit_single(
 		.collect::<Vec<_>>()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn try_audit(
 	asset_name: &str,
 	expected_size: Option<u64>,
@@ -208,40 +237,35 @@ fn try_audit(
 	machine_name: &str,
 	path: &Path,
 	path_type: PathType,
+	hash_func: fn(&mut dyn Read) -> Result<AssetHash>,
 ) -> Result<Vec<AuditMessageDetails>> {
-	let mut results = match path_type {
-		PathType::Dir => {
+	let (actual_size, actual_hash) = match path_type {
+		PathType::File => {
 			let path = path.join(machine_name).join(asset_name);
-			let mut file = File::open(path)?;
+			let file_result = File::open(&path);
+			debug!(?path_type, ?path, ?file_result, "try_audit(): Invoked File::open()");
+			let mut file = file_result?;
 			let actual_size = file.metadata()?.len();
-			audit_loaded_file(&mut file, expected_size, expected_asset_hash, actual_size)
+			let actual_hash = (!expected_asset_hash.is_default())
+				.then(|| hash_func(&mut file))
+				.transpose()?;
+			(actual_size, actual_hash)
 		}
 		PathType::Zip => {
 			let mut path = path.join(machine_name);
 			path.set_extension("zip");
-			let file = File::open(path)?;
-			let mut zip_archive = ZipArchive::new(file)?;
+			let file_result = File::open(&path);
+			debug!(?path_type, ?path, ?file_result, "try_audit(): Invoked File::open()");
+			let mut zip_archive = ZipArchive::new(file_result?)?;
 			let mut zip_file = zip_archive.by_name(asset_name)?;
 			let actual_size = zip_file.size();
-			audit_loaded_file(&mut zip_file, expected_size, expected_asset_hash, actual_size)
+			let actual_hash = (!expected_asset_hash.is_default())
+				.then(|| hash_func(&mut zip_file))
+				.transpose()?;
+			(actual_size, actual_hash)
 		}
-	}?;
+	};
 
-	match status {
-		AssetStatus::Good => {}
-		AssetStatus::BadDump => results.push(AuditMessageDetails::NeedsRedump),
-		AssetStatus::NoDump => results.push(AuditMessageDetails::NoGoodDump),
-	}
-
-	Ok(results)
-}
-
-fn audit_loaded_file(
-	file: &mut dyn Read,
-	expected_size: Option<u64>,
-	expected_asset_hash: &AssetHash,
-	actual_size: u64,
-) -> Result<Vec<AuditMessageDetails>> {
 	let mut results: Vec<AuditMessageDetails> = Vec::new();
 
 	if let Some(expected) = expected_size
@@ -254,15 +278,20 @@ fn audit_loaded_file(
 		results.push(msg);
 	}
 
-	if !expected_asset_hash.is_default() {
-		let found = AssetHash::calculate(file)?;
-		if *expected_asset_hash != found {
-			let msg = AuditMessageDetails::WrongChecksums {
-				expected: *expected_asset_hash,
-				found,
-			};
-			results.push(msg);
-		}
+	if let Some(actual_hash) = actual_hash
+		&& !actual_hash.matches(expected_asset_hash)
+	{
+		let msg = AuditMessageDetails::WrongChecksums {
+			expected: *expected_asset_hash,
+			found: actual_hash,
+		};
+		results.push(msg);
+	}
+
+	match status {
+		AssetStatus::Good => {}
+		AssetStatus::BadDump => results.push(AuditMessageDetails::NeedsRedump),
+		AssetStatus::NoDump => results.push(AuditMessageDetails::NoGoodDump),
 	}
 
 	Ok(results)
