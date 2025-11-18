@@ -88,20 +88,17 @@ impl AuditModel {
 
 		// now audit each of the assets
 		for row in 0..self.assets.len() {
-			// disk is not supported yet
-			if self.assets[row].kind != AssetKind::Disk {
-				let assets = self.assets.clone();
-				let machine_names = self.machine_names.clone();
-				let rom_paths = self.rom_paths.clone();
-				let sample_paths = self.sample_paths.clone();
-				let single_results =
-					spawn_blocking(move || assets[row].run_audit(&machine_names, &rom_paths, &sample_paths))
-						.await
-						.unwrap();
+			let assets = self.assets.clone();
+			let machine_names = self.machine_names.clone();
+			let rom_paths = self.rom_paths.clone();
+			let sample_paths = self.sample_paths.clone();
+			let single_results =
+				spawn_blocking(move || assets[row].run_audit(&machine_names, &rom_paths, &sample_paths))
+					.await
+					.unwrap();
 
-				self.audit_results.borrow_mut()[row] = Some(single_results.into());
-				self.notify.row_changed(row);
-			}
+			self.audit_results.borrow_mut()[row] = Some(single_results.into());
+			self.notify.row_changed(row);
 		}
 	}
 
