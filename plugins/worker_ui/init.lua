@@ -1137,6 +1137,22 @@ function command_set_cheat_state(args)
 	emit_status()
 end
 
+-- DEBUG_COMMAND command
+function command_debug_command(args)
+	if not machine_debugger() then
+		print("@ERROR ### Debugger not present")
+		return
+	end
+
+	-- loop; this is a batch command
+	for i = 2,#args do
+		machine_debugger():command(args[i])
+	end
+
+	print("@OK STATUS ### Debugger commands executed")
+	emit_status()
+end
+
 -- DUMP_STATUS command
 function command_dump_status(args)
 	local filename = args[2]
@@ -1210,6 +1226,7 @@ local commands =
 	["set_mouse_enabled"]			= command_set_mouse_enabled,
 	["show_profiler"]				= command_show_profiler,
 	["set_cheat_state"]				= command_set_cheat_state,
+	["debug_command"]				= command_debug_command,
 	["dump_status"]					= command_dump_status
 }
 
