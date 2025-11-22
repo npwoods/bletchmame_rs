@@ -299,6 +299,9 @@ fn context_menu_command(state: &Rc<State>, command: Action) {
 		Action::UnloadImage { tag } => {
 			state.set_image_imagedesc(tag, None);
 		}
+		Action::Launch(path) => {
+			let _ = open::that(path);
+		}
 		_ => unreachable!(),
 	}
 }
