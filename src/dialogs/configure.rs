@@ -185,14 +185,21 @@ pub async fn dialog_configure(
 				let model = ModelRc::new(model);
 				modal.dialog().set_audit_assets(model.clone());
 
-				modal.dialog().on_run_audit_clicked(move || {
+				// lambda to run the audit
+				let run_audit = move || {
 					let model = model.clone();
 					let fut = async move {
 						let model = AuditModel::get_model(&model);
 						model.run_audit().await;
 					};
 					spawn_local(fut).unwrap();
-				});
+				};
+
+				// set up the click handler
+				modal.dialog().on_run_audit_clicked(run_audit.clone());
+
+				// and run an audit now!
+				run_audit();
 			}
 		});
 	}
