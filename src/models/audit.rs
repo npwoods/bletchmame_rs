@@ -14,7 +14,7 @@ use tokio::task::spawn_blocking;
 
 use crate::audit::Asset;
 use crate::audit::AssetKind;
-use crate::audit::AuditMessage;
+use crate::audit::AuditResult;
 use crate::audit::AuditSeverity;
 use crate::info::Machine;
 use crate::ui::Icons;
@@ -24,9 +24,7 @@ pub struct AuditModel {
 	assets: Arc<[Asset]>,
 	rom_paths: Arc<[SmolStr]>,
 	sample_paths: Arc<[SmolStr]>,
-
-	#[allow(clippy::type_complexity)]
-	audit_results: RefCell<Box<[Option<Box<[AuditMessage]>>]>>,
+	audit_results: RefCell<Box<[Option<AuditResult>]>>,
 
 	icon_rom: Image,
 	icon_disk: Image,
@@ -92,12 +90,12 @@ impl AuditModel {
 			let machine_names = self.machine_names.clone();
 			let rom_paths = self.rom_paths.clone();
 			let sample_paths = self.sample_paths.clone();
-			let single_results =
+			let single_result =
 				spawn_blocking(move || assets[row].run_audit(&machine_names, &rom_paths, &sample_paths))
 					.await
 					.unwrap();
 
-			self.audit_results.borrow_mut()[row] = Some(single_results.into());
+			self.audit_results.borrow_mut()[row] = Some(single_result);
 			self.notify.row_changed(row);
 		}
 	}
@@ -118,17 +116,14 @@ impl Model for AuditModel {
 		let asset = self.assets.get(row)?;
 		let (max_severity, tooltip_text) = {
 			let audit_results = self.audit_results.borrow();
-			let audit_result = audit_results[row].as_deref();
-			let max_severity = audit_result.map(|r| {
-				r.iter()
-					.map(AuditMessage::severity)
-					.max()
-					.unwrap_or(AuditSeverity::Info)
-			});
+			let audit_result = &audit_results[row];
+			let max_severity = audit_result.as_ref().map(AuditResult::severity);
 			let tooltip_text = audit_result
+				.as_ref()
+				.map(|r| r.messages.as_ref())
 				.unwrap_or_default()
 				.iter()
-				.map(|r| r.to_string())
+				.map(|r| format!("{} {}", &asset.name, r))
 				.join("\n")
 				.into();
 			(max_severity, tooltip_text)
