@@ -5,6 +5,7 @@ use std::rc::Rc;
 
 use anyhow::Error;
 use itertools::Itertools;
+use showfile::show_path_in_file_manager;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
 use slint::Global;
@@ -298,6 +299,12 @@ fn context_menu_command(state: &Rc<State>, command: Action) {
 		}
 		Action::UnloadImage { tag } => {
 			state.set_image_imagedesc(tag, None);
+		}
+		Action::Launch(path) => {
+			let _ = open::that(path);
+		}
+		Action::ShowFile(path) => {
+			show_path_in_file_manager(&path);
 		}
 		_ => unreachable!(),
 	}

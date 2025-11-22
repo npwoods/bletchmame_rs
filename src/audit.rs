@@ -3,11 +3,11 @@ use std::fmt::Formatter;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use std::path::PathBuf;
 
 use anyhow::Result;
 use default_ext::DefaultExt;
 use slint::SharedString;
-use smol_str::SmolStr;
 use tracing::debug;
 use zip::ZipArchive;
 
@@ -40,14 +40,14 @@ pub enum AuditSeverity {
 	Fail,
 }
 
-#[derive(Debug)]
-pub struct AuditMessage {
-	asset_name: SmolStr,
-	details: AuditMessageDetails,
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct AuditResult {
+	pub path: Option<(PathBuf, PathType)>,
+	pub messages: Box<[AuditMessage]>,
 }
 
-#[derive(Debug)]
-enum AuditMessageDetails {
+#[derive(Debug, PartialEq, Eq)]
+pub enum AuditMessage {
 	NotFound,
 	NotFoundNoGoodDump,
 	NotFoundButOptional,
@@ -86,12 +86,7 @@ impl Asset {
 		roms.chain(disks).chain(samples).collect()
 	}
 
-	pub fn run_audit<P>(
-		&self,
-		machine_names: &[impl AsRef<str>],
-		rom_paths: &[P],
-		sample_paths: &[P],
-	) -> Vec<AuditMessage>
+	pub fn run_audit<P>(&self, machine_names: &[impl AsRef<str>], rom_paths: &[P], sample_paths: &[P]) -> AuditResult
 	where
 		P: AsRef<Path>,
 	{
@@ -129,19 +124,17 @@ impl Asset {
 	}
 }
 
-impl AuditMessage {
+impl AuditResult {
 	pub fn severity(&self) -> AuditSeverity {
-		self.details.severity()
+		self.messages
+			.iter()
+			.map(|m| m.severity())
+			.max()
+			.unwrap_or(AuditSeverity::Info)
 	}
 }
 
-impl Display for AuditMessage {
-	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{} {}", self.asset_name, self.details)
-	}
-}
-
-impl AuditMessageDetails {
+impl AuditMessage {
 	pub fn severity(&self) -> AuditSeverity {
 		match self {
 			Self::NotFoundButOptional | Self::NeedsRedump | Self::NoGoodDump => AuditSeverity::Info,
@@ -151,7 +144,7 @@ impl AuditMessageDetails {
 	}
 }
 
-impl Display for AuditMessageDetails {
+impl Display for AuditMessage {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Self::NotFound => writeln!(f, "NOT FOUND")?,
@@ -170,8 +163,8 @@ impl Display for AuditMessageDetails {
 	}
 }
 
-#[derive(Copy, Clone, Debug)]
-enum PathType {
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum PathType {
 	File,
 	Zip,
 }
@@ -187,7 +180,7 @@ fn audit_single(
 	paths: &[impl AsRef<Path>],
 	support_archives: bool,
 	hash_func: fn(&mut dyn Read) -> Result<AssetHash>,
-) -> Vec<AuditMessage> {
+) -> AuditResult {
 	let path_types = if support_archives {
 		[PathType::File, PathType::Zip].as_slice()
 	} else {
@@ -213,19 +206,14 @@ fn audit_single(
 		})
 		.next()
 		.unwrap_or_else(|| {
-			let result = match (status, is_optional) {
-				(AssetStatus::NoDump, _) => AuditMessageDetails::NotFoundNoGoodDump,
-				(_, false) => AuditMessageDetails::NotFound,
-				(_, true) => AuditMessageDetails::NotFoundButOptional,
+			let message = match (status, is_optional) {
+				(AssetStatus::NoDump, _) => AuditMessage::NotFoundNoGoodDump,
+				(_, false) => AuditMessage::NotFound,
+				(_, true) => AuditMessage::NotFoundButOptional,
 			};
-			vec![result]
+			let messages = [message].into();
+			AuditResult { path: None, messages }
 		})
-		.into_iter()
-		.map(|details| {
-			let asset_name = asset_name.into();
-			AuditMessage { asset_name, details }
-		})
-		.collect::<Vec<_>>()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -238,8 +226,8 @@ fn try_audit(
 	path: &Path,
 	path_type: PathType,
 	hash_func: fn(&mut dyn Read) -> Result<AssetHash>,
-) -> Result<Vec<AuditMessageDetails>> {
-	let (actual_size, actual_hash) = match path_type {
+) -> Result<AuditResult> {
+	let (path, actual_size, actual_hash) = match path_type {
 		PathType::File => {
 			let path = path.join(machine_name).join(asset_name);
 			let file_result = File::open(&path);
@@ -249,7 +237,7 @@ fn try_audit(
 			let actual_hash = (!expected_asset_hash.is_default())
 				.then(|| hash_func(&mut file))
 				.transpose()?;
-			(actual_size, actual_hash)
+			(path, actual_size, actual_hash)
 		}
 		PathType::Zip => {
 			let mut path = path.join(machine_name);
@@ -262,37 +250,39 @@ fn try_audit(
 			let actual_hash = (!expected_asset_hash.is_default())
 				.then(|| hash_func(&mut zip_file))
 				.transpose()?;
-			(actual_size, actual_hash)
+			(path, actual_size, actual_hash)
 		}
 	};
 
-	let mut results: Vec<AuditMessageDetails> = Vec::new();
+	let mut messages = Vec::new();
 
 	if let Some(expected) = expected_size
 		&& expected != actual_size
 	{
-		let msg = AuditMessageDetails::WrongLength {
+		let msg = AuditMessage::WrongLength {
 			expected,
 			found: actual_size,
 		};
-		results.push(msg);
+		messages.push(msg);
 	}
 
 	if let Some(actual_hash) = actual_hash
 		&& !actual_hash.matches(expected_asset_hash)
 	{
-		let msg = AuditMessageDetails::WrongChecksums {
+		let msg = AuditMessage::WrongChecksums {
 			expected: *expected_asset_hash,
 			found: actual_hash,
 		};
-		results.push(msg);
+		messages.push(msg);
 	}
 
 	match status {
 		AssetStatus::Good => {}
-		AssetStatus::BadDump => results.push(AuditMessageDetails::NeedsRedump),
-		AssetStatus::NoDump => results.push(AuditMessageDetails::NoGoodDump),
+		AssetStatus::BadDump => messages.push(AuditMessage::NeedsRedump),
+		AssetStatus::NoDump => messages.push(AuditMessage::NoGoodDump),
 	}
 
-	Ok(results)
+	let path = Some((path, path_type));
+	let messages = messages.into();
+	Ok(AuditResult { path, messages })
 }

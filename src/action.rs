@@ -1,3 +1,5 @@
+use std::ffi::OsStr;
+use std::path::Path;
 use std::str::FromStr;
 
 use serde::Deserialize;
@@ -59,7 +61,6 @@ pub enum Action {
 	// Help menu
 	HelpResetMame,
 	HelpRefreshInfoDb,
-	HelpWebSite,
 	HelpAbout,
 
 	// MAME communication
@@ -129,6 +130,8 @@ pub enum Action {
 		selections: Vec<(SmolStr, Vec<(SmolStr, u32, SeqType, SmolStr)>)>,
 	},
 	HistoryLoadCompleted,
+	Launch(Box<OsStr>),
+	ShowFile(Box<Path>),
 }
 
 const MENU_PREFIX: &str = "MENU_";

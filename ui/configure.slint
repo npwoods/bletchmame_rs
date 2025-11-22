@@ -29,7 +29,9 @@ struct Asset {
     overlay: image,
     name: string,
     size: string,
-    tooltip-text: string}
+    tooltip-text: string,
+    browse-command: string,
+}
 
 export component ConfigureDialog inherits Window {
     title: dialog-title;
@@ -46,6 +48,7 @@ export component ConfigureDialog inherits Window {
     in property <[string]> bios-selection-model;
     in-out property <int> bios-selection-index;
     in property <[Asset]> audit-assets;
+    in property <string> audit-context-menu-browse-command;
     in property <[SoftwareMachine]> software-machines;
     in property <bool> software-machines-bulk-all-enabled;
     in property <bool> software-machines-bulk-none-enabled;
@@ -142,32 +145,44 @@ export component ConfigureDialog inherits Window {
                     VerticalBox {
                         ListView {
                             for asset in root.audit-assets: TouchArea {
-                                HorizontalBox {
-                                    Rectangle {
-                                        width: 24px;
-                                        height: 24px;
-                                        Image {
-                                            width: 24px;
-                                            height: 24px;
-                                            source: asset.icon;
-                                        }
-
-                                        Image {
-                                            width: 24px;
-                                            height: 24px;
-                                            source: asset.overlay;
+                                ContextMenuArea {
+                                    Menu {
+                                        MenuItem {
+                                            title: "Browse...";
+                                            enabled: asset.browse-command != "";
+                                            activated => {
+                                                root.menu-item-action(asset.browse-command);
+                                            }
                                         }
                                     }
 
-                                    Text {
-                                        text: asset.name;
-                                        horizontal-stretch: 1;
-                                        vertical-alignment: center;
-                                    }
+                                    HorizontalBox {
+                                        Rectangle {
+                                            width: 24px;
+                                            height: 24px;
+                                            Image {
+                                                width: 24px;
+                                                height: 24px;
+                                                source: asset.icon;
+                                            }
 
-                                    Text {
-                                        text: asset.size;
-                                        vertical-alignment: center;
+                                            Image {
+                                                width: 24px;
+                                                height: 24px;
+                                                source: asset.overlay;
+                                            }
+                                        }
+
+                                        Text {
+                                            text: asset.name;
+                                            horizontal-stretch: 1;
+                                            vertical-alignment: center;
+                                        }
+
+                                        Text {
+                                            text: asset.size;
+                                            vertical-alignment: center;
+                                        }
                                     }
                                 }
 

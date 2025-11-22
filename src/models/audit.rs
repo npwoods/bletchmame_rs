@@ -1,5 +1,6 @@
 use std::any::Any;
 use std::cell::RefCell;
+use std::ffi::OsString;
 use std::sync::Arc;
 
 use itertools::Itertools;
@@ -12,10 +13,12 @@ use slint::ToSharedString;
 use smol_str::SmolStr;
 use tokio::task::spawn_blocking;
 
+use crate::action::Action;
 use crate::audit::Asset;
 use crate::audit::AssetKind;
-use crate::audit::AuditMessage;
+use crate::audit::AuditResult;
 use crate::audit::AuditSeverity;
+use crate::audit::PathType;
 use crate::info::Machine;
 use crate::ui::Icons;
 
@@ -24,9 +27,7 @@ pub struct AuditModel {
 	assets: Arc<[Asset]>,
 	rom_paths: Arc<[SmolStr]>,
 	sample_paths: Arc<[SmolStr]>,
-
-	#[allow(clippy::type_complexity)]
-	audit_results: RefCell<Box<[Option<Box<[AuditMessage]>>]>>,
+	audit_results: RefCell<Box<[Option<AuditResult>]>>,
 
 	icon_rom: Image,
 	icon_disk: Image,
@@ -92,12 +93,12 @@ impl AuditModel {
 			let machine_names = self.machine_names.clone();
 			let rom_paths = self.rom_paths.clone();
 			let sample_paths = self.sample_paths.clone();
-			let single_results =
+			let single_result =
 				spawn_blocking(move || assets[row].run_audit(&machine_names, &rom_paths, &sample_paths))
 					.await
 					.unwrap();
 
-			self.audit_results.borrow_mut()[row] = Some(single_results.into());
+			self.audit_results.borrow_mut()[row] = Some(single_result);
 			self.notify.row_changed(row);
 		}
 	}
@@ -116,22 +117,30 @@ impl Model for AuditModel {
 
 	fn row_data(&self, row: usize) -> Option<Self::Data> {
 		let asset = self.assets.get(row)?;
-		let (max_severity, tooltip_text) = {
+		let (browse_command, max_severity, tooltip_text) = {
 			let audit_results = self.audit_results.borrow();
-			let audit_result = audit_results[row].as_deref();
-			let max_severity = audit_result.map(|r| {
-				r.iter()
-					.map(AuditMessage::severity)
-					.max()
-					.unwrap_or(AuditSeverity::Info)
-			});
+			let audit_result = &audit_results[row];
+			let max_severity = audit_result.as_ref().map(AuditResult::severity);
 			let tooltip_text = audit_result
+				.as_ref()
+				.map(|r| r.messages.as_ref())
 				.unwrap_or_default()
 				.iter()
-				.map(|r| r.to_string())
+				.map(|r| format!("{} {}", &asset.name, r))
 				.join("\n")
 				.into();
-			(max_severity, tooltip_text)
+			let browse_command = audit_result
+				.as_ref()
+				.and_then(|r| r.path.as_ref())
+				.map(|(path, path_type)| {
+					let action = match path_type {
+						PathType::File => Action::ShowFile(path.clone().into()),
+						PathType::Zip => Action::Launch(OsString::from(path).into()),
+					};
+					action.encode_for_slint()
+				})
+				.unwrap_or_default();
+			(browse_command, max_severity, tooltip_text)
 		};
 
 		let icon = match asset.kind {
@@ -154,6 +163,7 @@ impl Model for AuditModel {
 			name,
 			size,
 			tooltip_text,
+			browse_command,
 		};
 		Some(data)
 	}

@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::ffi::OsString;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -12,6 +13,7 @@ use std::time::Instant;
 use itertools::Itertools;
 use levenshtein::levenshtein;
 use nu_utils::IgnoreCaseExt;
+use showfile::show_path_in_file_manager;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
 use slint::Global;
@@ -711,6 +713,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	// menu commands
 	{
 		use Action::*;
+		let web_site_url = OsString::from("https://www.bletchmame.org").into();
 		app_window.set_menu_action_file_stop(FileStop.encode_for_slint());
 		app_window.set_menu_action_file_pause(FilePause.encode_for_slint());
 		app_window.set_menu_action_file_devices_and_images(FileDevicesAndImages.encode_for_slint());
@@ -743,7 +746,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		app_window.set_menu_action_settings_import_mame_ini(SettingsImportMameIni.encode_for_slint());
 		app_window.set_menu_action_help_reset_mame(HelpResetMame.encode_for_slint());
 		app_window.set_menu_action_help_refresh_info_db(HelpRefreshInfoDb.encode_for_slint());
-		app_window.set_menu_action_help_website(HelpWebSite.encode_for_slint());
+		app_window.set_menu_action_help_website(Launch(web_site_url).encode_for_slint());
 		app_window.set_menu_action_help_about(HelpAbout.encode_for_slint());
 	}
 
@@ -1155,9 +1158,6 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 		Action::HelpRefreshInfoDb => {
 			model.update_state(|state| state.infodb_rebuild());
 		}
-		Action::HelpWebSite => {
-			let _ = open::that("https://www.bletchmame.org");
-		}
 		Action::HelpAbout => {
 			let modal = model.modal_stack.modal(|| AboutDialog::new().unwrap());
 			modal.launch();
@@ -1469,6 +1469,12 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 				})
 				.ok();
 			set_history_xml(model, history, false);
+		}
+		Action::Launch(path) => {
+			let _ = open::that(path);
+		}
+		Action::ShowFile(path) => {
+			show_path_in_file_manager(&path);
 		}
 	};
 
