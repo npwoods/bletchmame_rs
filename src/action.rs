@@ -1,4 +1,5 @@
 use std::ffi::OsStr;
+use std::path::Path;
 use std::str::FromStr;
 
 use serde::Deserialize;
@@ -130,6 +131,7 @@ pub enum Action {
 	},
 	HistoryLoadCompleted,
 	Launch(Box<OsStr>),
+	ShowFile(Box<Path>),
 }
 
 const MENU_PREFIX: &str = "MENU_";

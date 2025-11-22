@@ -13,6 +13,7 @@ use std::time::Instant;
 use itertools::Itertools;
 use levenshtein::levenshtein;
 use nu_utils::IgnoreCaseExt;
+use showfile::show_path_in_file_manager;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
 use slint::Global;
@@ -1471,6 +1472,9 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 		}
 		Action::Launch(path) => {
 			let _ = open::that(path);
+		}
+		Action::ShowFile(path) => {
+			show_path_in_file_manager(&path);
 		}
 	};
 
