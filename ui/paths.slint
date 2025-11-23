@@ -1,4 +1,15 @@
-import { AboutSlint, Button, VerticalBox, HorizontalBox, ComboBox, StandardListView, StandardButton, ListView, LineEdit, Palette } from "std-widgets.slint";
+import {
+    AboutSlint,
+    Button,
+    VerticalBox,
+    HorizontalBox,
+    ComboBox,
+    StandardListView,
+    StandardButton,
+    ListView,
+    LineEdit,
+    Palette,
+} from "std-widgets.slint";
 import { Icons } from "icons.slint";
 
 struct PathsListViewItem {
@@ -60,6 +71,13 @@ component PathsListView {
                 accepted(text) => {
                     item.text = text;
                     editing = false;
+                }
+
+                // if we're no longer visible, commit any changes
+                changed visible => {
+                    if (!self.visible) {
+                        item.text = self.text;
+                    }
                 }
 
                 // crude focus trick
