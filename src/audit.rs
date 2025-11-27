@@ -4,10 +4,12 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use anyhow::Result;
 use default_ext::DefaultExt;
 use slint::SharedString;
+use smol_str::SmolStr;
 use tracing::debug;
 use zip::ZipArchive;
 
@@ -21,6 +23,7 @@ pub struct Asset {
 	pub kind: AssetKind,
 	pub name: SharedString,
 	pub size: Option<u64>,
+	machine_names: Arc<[SmolStr]>,
 	asset_hash: AssetHash,
 	status: AssetStatus,
 	is_optional: bool,
@@ -59,10 +62,23 @@ pub enum AuditMessage {
 
 impl Asset {
 	pub fn from_machine(machine: Machine<'_>) -> Vec<Self> {
+		let mut results = Vec::new();
+		Self::from_machine_internal(&mut results, machine);
+		results
+	}
+
+	fn from_machine_internal(results: &mut Vec<Self>, machine: Machine<'_>) {
+		let machine_names = [Some(machine.name()), machine.clone_of().map(|x| x.name())]
+			.iter()
+			.flatten()
+			.copied()
+			.map(SmolStr::from)
+			.collect::<Arc<[_]>>();
 		let roms = machine.roms().iter().map(|rom| Asset {
 			kind: AssetKind::Rom,
 			name: rom.name().into(),
 			size: rom.size().into(),
+			machine_names: machine_names.clone(),
 			asset_hash: rom.asset_hash(),
 			status: rom.status(),
 			is_optional: rom.is_optional(),
@@ -71,6 +87,7 @@ impl Asset {
 			kind: AssetKind::Disk,
 			name: format!("{}.chd", disk.name()).into(),
 			size: None,
+			machine_names: machine_names.clone(),
 			asset_hash: disk.asset_hash(),
 			status: disk.status(),
 			is_optional: disk.is_optional(),
@@ -79,14 +96,19 @@ impl Asset {
 			kind: AssetKind::Sample,
 			name: format!("{}.wav", sample.name()).into(),
 			size: None,
+			machine_names: machine_names.clone(),
 			asset_hash: AssetHash::default(),
 			status: AssetStatus::Good,
 			is_optional: false,
 		});
-		roms.chain(disks).chain(samples).collect()
+		results.extend(roms.chain(disks).chain(samples));
+
+		for machine in machine.device_refs().iter().filter_map(|dr| dr.machine()) {
+			Self::from_machine_internal(results, machine);
+		}
 	}
 
-	pub fn run_audit<P>(&self, machine_names: &[impl AsRef<str>], rom_paths: &[P], sample_paths: &[P]) -> AuditResult
+	pub fn run_audit<P>(&self, rom_paths: &[P], sample_paths: &[P]) -> AuditResult
 	where
 		P: AsRef<Path>,
 	{
@@ -116,7 +138,7 @@ impl Asset {
 			&self.asset_hash,
 			self.status,
 			self.is_optional,
-			machine_names,
+			self.machine_names.as_ref(),
 			asset_paths,
 			support_archives,
 			hash_func,

@@ -28,6 +28,7 @@ pub type Configuration<'a> = Object<'a, binary::Configuration>;
 pub type ConfigurationSetting<'a> = Object<'a, binary::ConfigurationSetting>;
 pub type ConfigurationSettingCondition<'a> = Object<'a, binary::ConfigurationSettingCondition>;
 pub type Device<'a> = Object<'a, binary::Device>;
+pub type DeviceRef<'a> = Object<'a, binary::DeviceRef>;
 pub type Slot<'a> = Object<'a, binary::Slot>;
 pub type SlotOption<'a> = Object<'a, binary::SlotOption>;
 pub type SoftwareList<'a> = Object<'a, binary::SoftwareList>;
@@ -114,6 +115,11 @@ impl<'a> Machine<'a> {
 	pub fn devices(&self) -> impl View<'a, Device<'a>> + use<'a> {
 		let range = self.obj().devices_start.into()..self.obj().devices_end.into();
 		self.db.devices().sub_view(range)
+	}
+
+	pub fn device_refs(&self) -> impl View<'a, DeviceRef<'a>> + use<'a> {
+		let range = self.obj().device_refs_start.into()..self.obj().device_refs_end.into();
+		self.db.device_refs().sub_view(range)
 	}
 
 	pub fn slots(&self) -> impl View<'a, Slot<'a>> + use<'a> {
@@ -355,6 +361,17 @@ impl<'a> Device<'a> {
 
 	pub fn extensions(&self) -> impl Iterator<Item = &'a str> + use<'a> {
 		self.string(|x| x.extensions_strindex).split('\0')
+	}
+}
+
+impl<'a> DeviceRef<'a> {
+	pub fn machine(&self) -> Option<Machine<'a>> {
+		let machine_index = self.obj().machine_index.into();
+		self.db.machines().get(machine_index)
+	}
+
+	pub fn count(&self) -> usize {
+		self.obj().count.into()
 	}
 }
 

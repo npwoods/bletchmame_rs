@@ -73,6 +73,7 @@ struct State {
 	config_settings: Vec<binary::ConfigurationSetting>,
 	config_setting_conditions: Vec<binary::ConfigurationSettingCondition>,
 	devices: Vec<binary::Device>,
+	device_refs: Vec<binary::DeviceRef>,
 	slots: Vec<binary::Slot>,
 	slot_options: Vec<binary::SlotOption>,
 	machine_software_lists: Vec<binary::MachineSoftwareList>,
@@ -98,6 +99,8 @@ struct SoftwareListBuild {
 enum ThisError {
 	#[error("Missing mandatory attribute {0} when parsing InfoDB")]
 	MissingMandatoryAttribute(&'static str),
+	#[error("Bad machine reference in MAME -listxml output: {0}")]
+	BadMachineReference(String),
 }
 
 // capacity defaults based on MAME 0.280
@@ -111,6 +114,7 @@ enum ThisError {
 //         129371 configuration settings
 //            280 configuration setting configurations
 //           3101 devices
+//         136889 device refs
 //           9118 slots
 //           5646 slot options
 //           7038 links
@@ -126,6 +130,7 @@ const CAPACITY_CONFIGS: usize = 13000;
 const CAPACITY_CONFIG_SETTINGS: usize = 160000;
 const CAPACITY_CONFIG_SETTING_CONDITIONS: usize = 400;
 const CAPACITY_DEVICES: usize = 4000;
+const CAPACITY_DEVICE_REFS: usize = 160000;
 const CAPACITY_SLOTS: usize = 12000;
 const CAPACITY_SLOT_OPTIONS: usize = 9000;
 const CAPACITY_MACHINE_SOFTWARE_LISTS: usize = 7500;
@@ -153,6 +158,7 @@ impl State {
 			config_settings: Vec::with_capacity(CAPACITY_CONFIG_SETTINGS),
 			config_setting_conditions: Vec::with_capacity(CAPACITY_CONFIG_SETTING_CONDITIONS),
 			devices: Vec::with_capacity(CAPACITY_DEVICES),
+			device_refs: Vec::with_capacity(CAPACITY_DEVICE_REFS),
 			slots: Vec::with_capacity(CAPACITY_SLOTS),
 			slot_options: Vec::with_capacity(CAPACITY_SLOT_OPTIONS),
 			machine_software_lists: Vec::with_capacity(CAPACITY_MACHINE_SOFTWARE_LISTS),
@@ -210,6 +216,8 @@ impl State {
 					configs_end: self.configs.len_db(),
 					devices_start: self.devices.len_db(),
 					devices_end: self.devices.len_db(),
+					device_refs_start: self.device_refs.len_db(),
+					device_refs_end: self.device_refs.len_db(),
 					slots_start: self.slots.len_db(),
 					slots_end: self.slots.len_db(),
 					machine_software_lists_start: self.machine_software_lists.len_db(),
@@ -432,6 +440,28 @@ impl State {
 				self.phase_specific = Some(PhaseSpecificState::Extensions(String::with_capacity(1024)));
 				Some(Phase::MachineDevice)
 			}
+			(Phase::Machine, b"device_ref") => {
+				let [name] = evt.find_attributes([b"name"])?;
+				let name = name.mandatory("name")?;
+				let name_strindex = self.strings.lookup(&name);
+
+				let current_machine = self.machines.last_mut().unwrap();
+				let device_ref = self.device_refs
+					[current_machine.device_refs_start.into()..current_machine.device_refs_end.into()]
+					.iter_mut()
+					.find(|dr| dr.machine_index == name_strindex);
+				if let Some(device_ref) = device_ref {
+					device_ref.count += 1;
+				} else {
+					let device_ref = binary::DeviceRef {
+						machine_index: name_strindex,
+						count: 1,
+					};
+					self.device_refs.push_db(device_ref)?;
+					current_machine.device_refs_end += 1;
+				}
+				None
+			}
 			(Phase::Machine, b"slot") => {
 				let [name] = evt.find_attributes([b"name"])?;
 				let name = name.mandatory("slot")?;
@@ -541,6 +571,11 @@ impl State {
 				try_reuse_existing_collection(&mut machine.chips_start, &mut machine.chips_end, &mut self.chips);
 				try_reuse_existing_collection(&mut machine.configs_start, &mut machine.configs_end, &mut self.configs);
 				try_reuse_existing_collection(&mut machine.devices_start, &mut machine.devices_end, &mut self.devices);
+				try_reuse_existing_collection(
+					&mut machine.device_refs_start,
+					&mut machine.device_refs_end,
+					&mut self.device_refs,
+				);
 				try_reuse_existing_collection(&mut machine.slots_start, &mut machine.slots_end, &mut self.slots);
 				try_reuse_existing_collection(
 					&mut machine.ram_options_start,
@@ -715,6 +750,12 @@ impl State {
 		// and run the fixups
 		fixup(&mut machines, &self.strings, machines_indexmap, software_list_indexmap)?;
 		fixup(
+			&mut self.device_refs,
+			&self.strings,
+			machines_indexmap,
+			software_list_indexmap,
+		)?;
+		fixup(
 			&mut self.machine_software_lists,
 			&self.strings,
 			machines_indexmap,
@@ -737,6 +778,7 @@ impl State {
 			config_setting_count: self.config_settings.len_db(),
 			config_setting_condition_count: self.config_setting_conditions.len_db(),
 			device_count: self.devices.len_db(),
+			device_ref_count: self.device_refs.len_db(),
 			slot_count: self.slots.len_db(),
 			slot_option_count: self.slot_options.len_db(),
 			software_list_count: software_lists.len_db(),
@@ -759,6 +801,7 @@ impl State {
 			.chain(self.config_settings.iter().flat_map(IntoBytes::as_bytes))
 			.chain(self.config_setting_conditions.iter().flat_map(IntoBytes::as_bytes))
 			.chain(self.devices.iter().flat_map(IntoBytes::as_bytes))
+			.chain(self.device_refs.iter().flat_map(IntoBytes::as_bytes))
 			.chain(self.slots.iter().flat_map(IntoBytes::as_bytes))
 			.chain(self.slot_options.iter().flat_map(IntoBytes::as_bytes))
 			.chain(software_lists.iter().flat_map(IntoBytes::as_bytes))
@@ -792,16 +835,16 @@ fn fixup(
 		for machine_index in x.identify_machine_indexes() {
 			let new_machine_index = if *machine_index != UsizeDb::default() {
 				machines_indexmap(*machine_index).ok_or_else(|| {
-					let message = format!(
-						"Bad machine reference in MAME -listxml output: {}",
-						strings.index(*machine_index)
-					);
-					Error::msg(message)
+					let machine_name = strings.index(*machine_index).into();
+					ThisError::BadMachineReference(machine_name)
 				})?
 			} else {
 				!UsizeDb::default()
 			};
 			*machine_index = new_machine_index;
+		}
+		for machine_index in x.identify_optional_machine_indexes() {
+			*machine_index = machines_indexmap(*machine_index).unwrap_or_else(|| !UsizeDb::default());
 		}
 		for software_list_index in x.identify_software_list_indexes() {
 			*software_list_index = software_list_indexmap(*software_list_index);
@@ -906,6 +949,7 @@ pub fn calculate_sizes_hash() -> U64 {
 		size_of::<binary::ConfigurationSetting>(),
 		size_of::<binary::ConfigurationSettingCondition>(),
 		size_of::<binary::Device>(),
+		size_of::<binary::DeviceRef>(),
 		size_of::<binary::Slot>(),
 		size_of::<binary::SlotOption>(),
 		size_of::<binary::SoftwareList>(),
