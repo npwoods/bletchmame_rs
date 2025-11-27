@@ -114,37 +114,37 @@ enum ThisError {
 
 // capacity defaults based on MAME 0.280
 //          48893 machines
-//         361092 roms
+//         360102 roms
 //           1240 disks
 //            472 samples
-//           4588 BIOS sets
-//          46351 chips
-//         109965 configurations
-//         129371 configuration settings
+//           4221 BIOS sets
+//          24594 chips
+//          78106 configurations
+//          47581 configuration settings
 //            280 configuration setting configurations
-//           3101 devices
-//         136889 device refs
-//           9118 slots
-//           5646 slot options
+//           2890 devices
+//          74788 device refs
+//           7938 slots
+//           3113 slot options
 //           7038 links
 //           1128 RAM options
-//        2854471 string bytes
+//        4997834 string bytes
 const CAPACITY_MACHINES: usize = 55000;
 const CAPACITY_ROMS: usize = 400000;
 const CAPACITY_DISKS: usize = 1600;
 const CAPACITY_SAMPLES: usize = 1000;
 const CAPACITY_BIOSSETS: usize = 6000;
-const CAPACITY_CHIPS: usize = 55000;
-const CAPACITY_CONFIGS: usize = 13000;
-const CAPACITY_CONFIG_SETTINGS: usize = 160000;
+const CAPACITY_CHIPS: usize = 30000;
+const CAPACITY_CONFIGS: usize = 90000;
+const CAPACITY_CONFIG_SETTINGS: usize = 52000;
 const CAPACITY_CONFIG_SETTING_CONDITIONS: usize = 400;
-const CAPACITY_DEVICES: usize = 4000;
-const CAPACITY_DEVICE_REFS: usize = 160000;
-const CAPACITY_SLOTS: usize = 12000;
-const CAPACITY_SLOT_OPTIONS: usize = 9000;
+const CAPACITY_DEVICES: usize = 3500;
+const CAPACITY_DEVICE_REFS: usize = 80000;
+const CAPACITY_SLOTS: usize = 9000;
+const CAPACITY_SLOT_OPTIONS: usize = 3500;
 const CAPACITY_MACHINE_SOFTWARE_LISTS: usize = 7500;
 const CAPACITY_RAM_OPTIONS: usize = 1500;
-const CAPACITY_STRING_TABLE: usize = 3000000;
+const CAPACITY_STRING_TABLE: usize = 5500000;
 
 impl State {
 	pub fn new() -> Self {
