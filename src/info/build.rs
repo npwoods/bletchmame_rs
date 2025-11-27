@@ -10,6 +10,7 @@ use anyhow::Error;
 use anyhow::Result;
 use easy_ext::ext;
 use itertools::Itertools;
+use more_asserts::assert_le;
 use more_asserts::assert_lt;
 use tracing::debug;
 use zerocopy::Immutable;
@@ -29,7 +30,6 @@ use crate::info::binary::ASSET_FLAG_HAS_SHA1;
 use crate::info::binary::ASSET_FLAG_NODUMP;
 use crate::info::binary::ASSET_FLAG_OPTIONAL;
 use crate::info::binary::ASSET_FLAG_WRITABLE;
-use crate::info::binary::ConfigurationSetting;
 use crate::info::binary::Fixup;
 use crate::info::entities::AssetStatus;
 use crate::info::strings::StringTableBuilder;
@@ -102,34 +102,34 @@ enum ThisError {
 
 // capacity defaults based on MAME 0.280
 //          48893 machines
-//         364836 roms
-//           1378 disks
-//          28642 samples
-//          40220 BIOS sets
-//         191452 chips
-//         146163 configurations
-//         441057 configuration settings
-//           5001 configuration setting configurations
-//          11975 devices
-//          24670 slots
-//         470150 slot options
+//         361092 roms
+//           1240 disks
+//            472 samples
+//           4588 BIOS sets
+//          46351 chips
+//         109965 configurations
+//         129371 configuration settings
+//            280 configuration setting configurations
+//           3101 devices
+//           9118 slots
+//           5646 slot options
 //           7038 links
-//           6660 RAM options
+//           1128 RAM options
 //        2854471 string bytes
 const CAPACITY_MACHINES: usize = 55000;
 const CAPACITY_ROMS: usize = 400000;
 const CAPACITY_DISKS: usize = 1600;
-const CAPACITY_SAMPLES: usize = 30000;
-const CAPACITY_BIOSSETS: usize = 45000;
-const CAPACITY_CHIPS: usize = 240000;
-const CAPACITY_CONFIGS: usize = 180000;
-const CAPACITY_CONFIG_SETTINGS: usize = 500000;
-const CAPACITY_CONFIG_SETTING_CONDITIONS: usize = 5500;
-const CAPACITY_DEVICES: usize = 14000;
-const CAPACITY_SLOTS: usize = 26000;
-const CAPACITY_SLOT_OPTIONS: usize = 490000;
+const CAPACITY_SAMPLES: usize = 1000;
+const CAPACITY_BIOSSETS: usize = 6000;
+const CAPACITY_CHIPS: usize = 55000;
+const CAPACITY_CONFIGS: usize = 13000;
+const CAPACITY_CONFIG_SETTINGS: usize = 160000;
+const CAPACITY_CONFIG_SETTING_CONDITIONS: usize = 400;
+const CAPACITY_DEVICES: usize = 4000;
+const CAPACITY_SLOTS: usize = 12000;
+const CAPACITY_SLOT_OPTIONS: usize = 9000;
 const CAPACITY_MACHINE_SOFTWARE_LISTS: usize = 7500;
-const CAPACITY_RAM_OPTIONS: usize = 7200;
+const CAPACITY_RAM_OPTIONS: usize = 1500;
 const CAPACITY_STRING_TABLE: usize = 3000000;
 
 impl State {
@@ -529,10 +529,38 @@ impl State {
 
 		match self.phase_stack.last().unwrap_or(&Phase::Root) {
 			Phase::Machine => {
-				try_consolidate_last_machine_configuration(
-					&mut self.machines,
-					&mut self.configs,
+				let machine = self.machines.last_mut().unwrap();
+				try_reuse_existing_collection(&mut machine.roms_start, &mut machine.roms_end, &mut self.roms);
+				try_reuse_existing_collection(&mut machine.disks_start, &mut machine.disks_end, &mut self.disks);
+				try_reuse_existing_collection(&mut machine.samples_start, &mut machine.samples_end, &mut self.samples);
+				try_reuse_existing_collection(
+					&mut machine.biossets_start,
+					&mut machine.biossets_end,
+					&mut self.biossets,
+				);
+				try_reuse_existing_collection(&mut machine.chips_start, &mut machine.chips_end, &mut self.chips);
+				try_reuse_existing_collection(&mut machine.configs_start, &mut machine.configs_end, &mut self.configs);
+				try_reuse_existing_collection(&mut machine.devices_start, &mut machine.devices_end, &mut self.devices);
+				try_reuse_existing_collection(&mut machine.slots_start, &mut machine.slots_end, &mut self.slots);
+				try_reuse_existing_collection(
+					&mut machine.ram_options_start,
+					&mut machine.ram_options_end,
+					&mut self.ram_options,
+				);
+			}
+			Phase::MachineConfiguration => {
+				let config = self.configs.last_mut().unwrap();
+				try_reuse_existing_collection(
+					&mut config.settings_start,
+					&mut config.settings_end,
 					&mut self.config_settings,
+				);
+			}
+			Phase::MachineConfigurationSetting => {
+				let setting = self.config_settings.last_mut().unwrap();
+				try_reuse_existing_collection(
+					&mut setting.conditions_start,
+					&mut setting.conditions_end,
 					&mut self.config_setting_conditions,
 				);
 			}
@@ -559,6 +587,10 @@ impl State {
 				let extensions = extensions.split('\0').sorted().join("\0");
 				let extensions_strindex = self.strings.lookup(&extensions);
 				self.devices.last_mut().unwrap().extensions_strindex = extensions_strindex;
+			}
+			Phase::MachineSlot => {
+				let slot = self.slots.last_mut().unwrap();
+				try_reuse_existing_collection(&mut slot.options_start, &mut slot.options_end, &mut self.slot_options);
 			}
 			Phase::MachineRamOption => {
 				let PhaseSpecificState::RamOption(is_default) = self.phase_specific.take().unwrap() else {
@@ -778,108 +810,30 @@ fn fixup(
 	Ok(())
 }
 
-fn try_consolidate_last_machine_configuration(
-	machines: &mut [binary::Machine],
-	configs: &mut Vec<binary::Configuration>,
-	config_settings: &mut Vec<binary::ConfigurationSetting>,
-	config_setting_conditions: &mut Vec<binary::ConfigurationSettingCondition>,
-) {
-	fn compare_collection<T>(
-		collection: &[T],
-		a_start: UsizeDb,
-		a_end: UsizeDb,
-		b_start: UsizeDb,
-		b_end: UsizeDb,
-		make_proxy: impl Fn(&T) -> T,
-		supplemental_compare: impl Fn(&T, &T) -> bool,
-	) -> bool
-	where
-		T: PartialEq,
-	{
-		let a_slice = &collection[a_start.into()..a_end.into()];
-		let b_slice = &collection[b_start.into()..b_end.into()];
-		if a_slice.len() != b_slice.len() {
-			return false;
+fn try_reuse_existing_collection(start: &mut UsizeDb, end: &mut UsizeDb, collection: &mut Vec<impl PartialEq>) {
+	// sanity checks
+	assert_le!(*start, *end);
+	assert_eq!(*end, collection.len_db());
+
+	let target_range = usize::from(*start)..usize::from(*end);
+	let target = &collection[target_range.clone()];
+	if !target.is_empty() {
+		let pos = collection[..collection.len().saturating_sub(1)]
+			.windows(target.len())
+			.enumerate()
+			.rev()
+			.take(1536) // arbitrary limit to prevent excessive searching
+			.find(|(_, window)| window == &target)
+			.map(|(pos, _)| pos);
+		if let Some(pos) = pos {
+			*start = pos.try_into().unwrap();
+			*end = (pos + target.len()).try_into().unwrap();
+			collection.truncate(target_range.start);
 		}
-		a_slice
-			.iter()
-			.zip(b_slice.iter())
-			.all(|(a, b)| make_proxy(a) == make_proxy(b) && supplemental_compare(a, b))
-	}
-
-	// find the last two machines
-	if machines.len() < 2 {
-		return;
-	}
-	let (a_machine, b_machine) = {
-		let machines_len = machines.len();
-		let (a, b) = machines.split_at_mut(machines_len - 1);
-		(&a[a.len() - 1], &mut b[0])
-	};
-
-	let can_consolidate = a_machine.configs_end == b_machine.configs_start
-		&& compare_collection(
-			configs.as_slice(),
-			a_machine.configs_start,
-			a_machine.configs_end,
-			b_machine.configs_start,
-			b_machine.configs_end,
-			|x| binary::Configuration {
-				settings_start: Default::default(),
-				settings_end: Default::default(),
-				..*x
-			},
-			|a, b| {
-				compare_collection(
-					config_settings.as_slice(),
-					a.settings_start,
-					a.settings_end,
-					b.settings_start,
-					b.settings_end,
-					|x| ConfigurationSetting {
-						conditions_start: Default::default(),
-						conditions_end: Default::default(),
-						..*x
-					},
-					|a, b| {
-						compare_collection(
-							config_setting_conditions.as_slice(),
-							a.conditions_start,
-							a.conditions_end,
-							b.conditions_start,
-							b.conditions_end,
-							|x| *x,
-							|_, _| true,
-						)
-					},
-				)
-			},
-		);
-
-	// can we consolidate?
-	if can_consolidate {
-		// if so, find the new ends of each collection
-		let configs_end = a_machine.configs_end.into();
-		let config_settings_end = configs[a_machine.configs_start.into()..configs_end]
-			.iter()
-			.map(|x| x.settings_end.into())
-			.max()
-			.unwrap_or(config_settings.len());
-		let config_setting_conditions_end = configs[a_machine.configs_start.into()..configs_end]
-			.iter()
-			.flat_map(|x| &config_settings[x.settings_start.into()..x.settings_end.into()])
-			.map(|x| x.conditions_end.into())
-			.max()
-			.unwrap_or(config_setting_conditions.len());
-
-		// and with those numbers, truncate the collections
-		configs.truncate(configs_end);
-		config_settings.truncate(config_settings_end);
-		config_setting_conditions.truncate(config_setting_conditions_end);
-
-		// and make the second machine use the first machine's configuration
-		b_machine.configs_start = a_machine.configs_start;
-		b_machine.configs_end = a_machine.configs_end;
+	} else {
+		// target range is empty; lets change start/end to be zeroes
+		*start = UsizeDb::default();
+		*end = UsizeDb::default();
 	}
 }
 

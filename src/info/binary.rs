@@ -87,14 +87,14 @@ impl Fixup for Machine {
 }
 
 #[repr(C, packed)]
-#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq)]
 pub struct BiosSet {
 	pub name_strindex: UsizeDb,
 	pub description_strindex: UsizeDb,
 }
 
 #[repr(C, packed)]
-#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq)]
 pub struct Chip {
 	pub clock: U64,
 	pub tag_strindex: UsizeDb,
@@ -198,7 +198,7 @@ pub enum ConditionRelation {
 }
 
 #[repr(C, packed)]
-#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq)]
 pub struct Device {
 	pub type_strindex: UsizeDb,
 	pub tag_strindex: UsizeDb,
@@ -208,7 +208,7 @@ pub struct Device {
 }
 
 #[repr(C, packed)]
-#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq)]
 pub struct Slot {
 	pub name_strindex: UsizeDb,
 	pub options_start: UsizeDb,
@@ -217,7 +217,7 @@ pub struct Slot {
 }
 
 #[repr(C, packed)]
-#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq)]
 pub struct SlotOption {
 	pub name_strindex: UsizeDb,
 	pub devname_strindex: UsizeDb,
@@ -233,7 +233,7 @@ pub struct MachineSoftwareList {
 }
 
 #[repr(C, packed)]
-#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq)]
 pub struct RamOption {
 	pub size: U64,
 	pub is_default: bool,
