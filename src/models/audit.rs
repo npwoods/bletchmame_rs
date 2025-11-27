@@ -23,7 +23,6 @@ use crate::info::Machine;
 use crate::ui::Icons;
 
 pub struct AuditModel {
-	machine_names: Arc<[SmolStr]>,
 	assets: Arc<[Asset]>,
 	rom_paths: Arc<[SmolStr]>,
 	sample_paths: Arc<[SmolStr]>,
@@ -46,19 +45,11 @@ impl AuditModel {
 		sample_paths: Arc<[SmolStr]>,
 		icons: Icons<'_>,
 	) -> Self {
-		let machine_names = [Some(machine.name()), machine.clone_of().map(|x| x.name())]
-			.iter()
-			.flatten()
-			.copied()
-			.map(SmolStr::from)
-			.collect::<Arc<[_]>>();
-
 		let assets = Asset::from_machine(machine).into_iter().collect::<Arc<[_]>>();
 		let audit_results = (0..assets.len()).map(|_| None).collect::<Box<_>>();
 		let audit_results = RefCell::new(audit_results);
 
 		Self {
-			machine_names,
 			assets,
 			rom_paths,
 			sample_paths,
@@ -90,13 +81,11 @@ impl AuditModel {
 		// now audit each of the assets
 		for row in 0..self.assets.len() {
 			let assets = self.assets.clone();
-			let machine_names = self.machine_names.clone();
 			let rom_paths = self.rom_paths.clone();
 			let sample_paths = self.sample_paths.clone();
-			let single_result =
-				spawn_blocking(move || assets[row].run_audit(&machine_names, &rom_paths, &sample_paths))
-					.await
-					.unwrap();
+			let single_result = spawn_blocking(move || assets[row].run_audit(&rom_paths, &sample_paths))
+				.await
+				.unwrap();
 
 			self.audit_results.borrow_mut()[row] = Some(single_result);
 			self.notify.row_changed(row);
