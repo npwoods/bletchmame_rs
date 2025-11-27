@@ -98,6 +98,8 @@ struct SoftwareListBuild {
 enum ThisError {
 	#[error("Missing mandatory attribute {0} when parsing InfoDB")]
 	MissingMandatoryAttribute(&'static str),
+	#[error("Bad machine reference in MAME -listxml output: {0}")]
+	BadMachineReference(String),
 }
 
 // capacity defaults based on MAME 0.280
@@ -792,11 +794,8 @@ fn fixup(
 		for machine_index in x.identify_machine_indexes() {
 			let new_machine_index = if *machine_index != UsizeDb::default() {
 				machines_indexmap(*machine_index).ok_or_else(|| {
-					let message = format!(
-						"Bad machine reference in MAME -listxml output: {}",
-						strings.index(*machine_index)
-					);
-					Error::msg(message)
+					let machine_name = strings.index(*machine_index).into();
+					ThisError::BadMachineReference(machine_name)
 				})?
 			} else {
 				!UsizeDb::default()
