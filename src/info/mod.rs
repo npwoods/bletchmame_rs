@@ -55,6 +55,7 @@ pub use self::entities::Configuration;
 pub use self::entities::ConfigurationSetting;
 pub use self::entities::ConfigurationSettingCondition;
 pub use self::entities::Device;
+pub use self::entities::DeviceRef;
 pub use self::entities::Disk;
 pub use self::entities::Machine;
 pub use self::entities::MachineSoftwareList;
@@ -94,6 +95,7 @@ pub struct InfoDb {
 	config_settings: RootView<binary::ConfigurationSetting>,
 	config_setting_conditions: RootView<binary::ConfigurationSettingCondition>,
 	devices: RootView<binary::Device>,
+	device_refs: RootView<binary::DeviceRef>,
 	slots: RootView<binary::Slot>,
 	slot_options: RootView<binary::SlotOption>,
 	software_lists: RootView<binary::SoftwareList>,
@@ -125,6 +127,7 @@ impl InfoDb {
 		let config_settings = next_root_view(&mut cursor, hdr.config_setting_count)?;
 		let config_setting_conditions = next_root_view(&mut cursor, hdr.config_setting_condition_count)?;
 		let devices = next_root_view(&mut cursor, hdr.device_count)?;
+		let device_refs = next_root_view(&mut cursor, hdr.device_ref_count)?;
 		let slots = next_root_view(&mut cursor, hdr.slot_count)?;
 		let slot_options = next_root_view(&mut cursor, hdr.slot_option_count)?;
 		let software_lists = next_root_view(&mut cursor, hdr.software_list_count)?;
@@ -149,6 +152,7 @@ impl InfoDb {
 			config_settings,
 			config_setting_conditions,
 			devices,
+			device_refs,
 			slots,
 			slot_options,
 			software_lists,
@@ -308,6 +312,10 @@ impl InfoDb {
 
 	pub fn devices(&self) -> impl View<'_, Device<'_>> {
 		self.make_view(&self.devices)
+	}
+
+	pub fn device_refs(&self) -> impl View<'_, DeviceRef<'_>> {
+		self.make_view(&self.device_refs)
 	}
 
 	pub fn slots(&self) -> impl View<'_, Slot<'_>> {
@@ -959,6 +967,22 @@ mod test {
 			expected_extensions.iter().map(|x| x.to_string()).collect::<Vec<_>>(),
 		);
 		assert_eq!(expected, actual);
+	}
+
+	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", "mc6809e", 1)]
+	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "coco2b", "pia6821", 2)]
+	#[test_case(2, include_str!("test_data/listxml_coco.xml"), "coco2b", "floppy_connector", 4)]
+	pub fn device_refs(_index: usize, xml: &str, machine: &str, device_ref_name: &str, expected_count: usize) {
+		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| ControlFlow::Continue(()))
+			.unwrap()
+			.unwrap();
+		let device_refs = db.machines().find(machine).unwrap().device_refs();
+		let actual_count = device_refs
+			.iter()
+			.find(|x| x.machine().map(|m| m.name()) == Some(device_ref_name))
+			.unwrap()
+			.count();
+		assert_eq!(expected_count, actual_count);
 	}
 
 	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", &["rs232", "ext", "ext:fdc:wd17xx:0", "ext:fdc:wd17xx:1", "ext:fdc:wd17xx:2", "ext:fdc:wd17xx:3"])]

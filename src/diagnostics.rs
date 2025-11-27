@@ -68,6 +68,7 @@ fn print_stats(info_db: &InfoDb, elapsed_time: Duration) {
 			info_db.configuration_setting_conditions().len(),
 		),
 		("Devices", info_db.devices().len()),
+		("Device Refs", info_db.device_refs().len()),
 		("Slots", info_db.slots().len()),
 		("Slots Options", info_db.slot_options().len()),
 		("Software Lists", info_db.software_lists().len()),

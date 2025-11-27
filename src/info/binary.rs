@@ -14,6 +14,9 @@ pub trait Fixup {
 	fn identify_machine_indexes(&mut self) -> impl IntoIterator<Item = &mut UsizeDb> {
 		[]
 	}
+	fn identify_optional_machine_indexes(&mut self) -> impl IntoIterator<Item = &mut UsizeDb> {
+		[]
+	}
 	fn identify_software_list_indexes(&mut self) -> impl IntoIterator<Item = &mut UsizeDb> {
 		[]
 	}
@@ -36,6 +39,7 @@ pub struct Header {
 	pub config_setting_count: UsizeDb,
 	pub config_setting_condition_count: UsizeDb,
 	pub device_count: UsizeDb,
+	pub device_ref_count: UsizeDb,
 	pub slot_count: UsizeDb,
 	pub slot_option_count: UsizeDb,
 	pub software_list_count: UsizeDb,
@@ -69,6 +73,8 @@ pub struct Machine {
 	pub configs_end: UsizeDb,
 	pub devices_start: UsizeDb,
 	pub devices_end: UsizeDb,
+	pub device_refs_start: UsizeDb,
+	pub device_refs_end: UsizeDb,
 	pub slots_start: UsizeDb,
 	pub slots_end: UsizeDb,
 	pub slot_options_start: UsizeDb,
@@ -205,6 +211,19 @@ pub struct Device {
 	pub mandatory: bool,
 	pub interfaces_strindex: UsizeDb,
 	pub extensions_strindex: UsizeDb,
+}
+
+#[repr(C, packed)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq)]
+pub struct DeviceRef {
+	pub machine_index: UsizeDb,
+	pub count: u8,
+}
+
+impl Fixup for DeviceRef {
+	fn identify_optional_machine_indexes(&mut self) -> impl IntoIterator<Item = &mut UsizeDb> {
+		[&mut self.machine_index]
+	}
 }
 
 #[repr(C, packed)]
