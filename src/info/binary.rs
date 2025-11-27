@@ -49,7 +49,7 @@ pub struct Header {
 }
 
 #[repr(C, packed)]
-#[derive(Clone, Copy, Debug, Default, TryFromBytes, IntoBytes, Immutable, KnownLayout)]
+#[derive(Clone, Copy, Debug, Default, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq, Eq, Hash)]
 pub struct Machine {
 	pub name_strindex: UsizeDb,
 	pub source_file_strindex: UsizeDb,
@@ -93,14 +93,14 @@ impl Fixup for Machine {
 }
 
 #[repr(C, packed)]
-#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq, Eq, Hash)]
 pub struct BiosSet {
 	pub name_strindex: UsizeDb,
 	pub description_strindex: UsizeDb,
 }
 
 #[repr(C, packed)]
-#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq, Eq, Hash)]
 pub struct Chip {
 	pub clock: U64,
 	pub tag_strindex: UsizeDb,
@@ -110,7 +110,7 @@ pub struct Chip {
 
 #[repr(u8)]
 #[derive(
-	Clone, Copy, Debug, Deserialize, TryFromBytes, IntoBytes, Immutable, KnownLayout, EnumString, PartialEq, Eq,
+	Clone, Copy, Debug, Deserialize, TryFromBytes, IntoBytes, Immutable, KnownLayout, EnumString, PartialEq, Eq, Hash,
 )]
 pub enum ChipType {
 	#[strum(serialize = "cpu")]
@@ -120,7 +120,7 @@ pub enum ChipType {
 }
 
 #[repr(C, packed)]
-#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq, Eq, Hash)]
 pub struct Rom {
 	pub name_strindex: UsizeDb,
 	pub size: U64,
@@ -132,7 +132,7 @@ pub struct Rom {
 }
 
 #[repr(C, packed)]
-#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq, Eq, Hash)]
 pub struct Disk {
 	pub name_strindex: UsizeDb,
 	pub merge_strindex: UsizeDb,
@@ -143,7 +143,7 @@ pub struct Disk {
 }
 
 #[repr(C, packed)]
-#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq, Eq, Hash)]
 pub struct Sample {
 	pub name_strindex: UsizeDb,
 }
@@ -156,7 +156,7 @@ pub const ASSET_FLAG_BADDUMP: u8 = 0x10;
 pub const ASSET_FLAG_NODUMP: u8 = 0x20;
 
 #[repr(C, packed)]
-#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq, Eq, Hash)]
 pub struct Configuration {
 	pub name_strindex: UsizeDb,
 	pub tag_strindex: UsizeDb,
@@ -167,7 +167,7 @@ pub struct Configuration {
 }
 
 #[repr(C, packed)]
-#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq, Eq, Hash)]
 pub struct ConfigurationSetting {
 	pub name_strindex: UsizeDb,
 	pub value: U32,
@@ -176,7 +176,7 @@ pub struct ConfigurationSetting {
 }
 
 #[repr(C, packed)]
-#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq, Eq, Hash)]
 pub struct ConfigurationSettingCondition {
 	pub tag_strindex: UsizeDb,
 	pub condition_relation: ConditionRelation,
@@ -186,7 +186,7 @@ pub struct ConfigurationSettingCondition {
 
 #[repr(u8)]
 #[derive(
-	Clone, Copy, Debug, Deserialize, TryFromBytes, IntoBytes, Immutable, KnownLayout, EnumString, PartialEq, Eq,
+	Clone, Copy, Debug, Deserialize, TryFromBytes, IntoBytes, Immutable, KnownLayout, EnumString, PartialEq, Eq, Hash,
 )]
 pub enum ConditionRelation {
 	#[strum(serialize = "eq")]
@@ -204,7 +204,7 @@ pub enum ConditionRelation {
 }
 
 #[repr(C, packed)]
-#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq, Eq, Hash)]
 pub struct Device {
 	pub type_strindex: UsizeDb,
 	pub tag_strindex: UsizeDb,
@@ -214,7 +214,7 @@ pub struct Device {
 }
 
 #[repr(C, packed)]
-#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq, Eq, Hash)]
 pub struct DeviceRef {
 	pub machine_index: UsizeDb,
 	pub count: u8,
@@ -227,7 +227,7 @@ impl Fixup for DeviceRef {
 }
 
 #[repr(C, packed)]
-#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq, Eq, Hash)]
 pub struct Slot {
 	pub name_strindex: UsizeDb,
 	pub options_start: UsizeDb,
@@ -236,14 +236,14 @@ pub struct Slot {
 }
 
 #[repr(C, packed)]
-#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq, Eq, Hash)]
 pub struct SlotOption {
 	pub name_strindex: UsizeDb,
 	pub devname_strindex: UsizeDb,
 }
 
 #[repr(C, packed)]
-#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq, Eq, Hash)]
 pub struct MachineSoftwareList {
 	pub tag_strindex: UsizeDb,
 	pub software_list_index: UsizeDb,
@@ -252,7 +252,7 @@ pub struct MachineSoftwareList {
 }
 
 #[repr(C, packed)]
-#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq, Eq, Hash)]
 pub struct RamOption {
 	pub size: U64,
 	pub is_default: bool,
@@ -266,7 +266,7 @@ impl Fixup for MachineSoftwareList {
 
 #[repr(u8)]
 #[derive(
-	Clone, Copy, Debug, Deserialize, TryFromBytes, IntoBytes, Immutable, KnownLayout, EnumString, PartialEq, Eq,
+	Clone, Copy, Debug, Deserialize, TryFromBytes, IntoBytes, Immutable, KnownLayout, EnumString, PartialEq, Eq, Hash,
 )]
 pub enum SoftwareListStatus {
 	#[strum(serialize = "original")]
