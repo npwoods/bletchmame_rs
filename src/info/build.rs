@@ -2,8 +2,13 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Formatter;
+use std::hash::DefaultHasher;
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::io::BufRead;
 use std::ops::ControlFlow;
+use std::ops::Index;
+use std::ops::Range;
 use std::str::FromStr;
 
 use anyhow::Error;
@@ -12,6 +17,7 @@ use easy_ext::ext;
 use itertools::Itertools;
 use more_asserts::assert_le;
 use more_asserts::assert_lt;
+use primal::is_prime;
 use tracing::debug;
 use zerocopy::Immutable;
 use zerocopy::IntoBytes;
@@ -63,25 +69,26 @@ const TEXT_CAPTURE_PHASES: &[Phase] = &[
 
 struct State {
 	phase_stack: Vec<Phase>,
-	machines: Vec<binary::Machine>,
-	roms: Vec<binary::Rom>,
-	disks: Vec<binary::Disk>,
-	samples: Vec<binary::Sample>,
-	biossets: Vec<binary::BiosSet>,
-	chips: Vec<binary::Chip>,
-	configs: Vec<binary::Configuration>,
-	config_settings: Vec<binary::ConfigurationSetting>,
-	config_setting_conditions: Vec<binary::ConfigurationSettingCondition>,
-	devices: Vec<binary::Device>,
-	device_refs: Vec<binary::DeviceRef>,
-	slots: Vec<binary::Slot>,
-	slot_options: Vec<binary::SlotOption>,
-	machine_software_lists: Vec<binary::MachineSoftwareList>,
+	machines: TableBuilder<binary::Machine>,
+	roms: TableBuilder<binary::Rom>,
+	disks: TableBuilder<binary::Disk>,
+	samples: TableBuilder<binary::Sample>,
+	biossets: TableBuilder<binary::BiosSet>,
+	chips: TableBuilder<binary::Chip>,
+	configs: TableBuilder<binary::Configuration>,
+	config_settings: TableBuilder<binary::ConfigurationSetting>,
+	config_setting_conditions: TableBuilder<binary::ConfigurationSettingCondition>,
+	devices: TableBuilder<binary::Device>,
+	device_refs: TableBuilder<binary::DeviceRef>,
+	slots: TableBuilder<binary::Slot>,
+	slot_options: TableBuilder<binary::SlotOption>,
+	machine_software_lists: TableBuilder<binary::MachineSoftwareList>,
 	strings: StringTableBuilder,
 	software_lists: BTreeMap<String, SoftwareListBuild>,
-	ram_options: Vec<binary::RamOption>,
+	ram_options: TableBuilder<binary::RamOption>,
 	build_strindex: UsizeDb,
 	phase_specific: Option<PhaseSpecificState>,
+	current_device_refs: Option<Vec<UsizeDb>>,
 }
 
 enum PhaseSpecificState {
@@ -101,41 +108,43 @@ enum ThisError {
 	MissingMandatoryAttribute(&'static str),
 	#[error("Bad machine reference in MAME -listxml output: {0}")]
 	BadMachineReference(String),
+	#[error("Too many records")]
+	TooManyRecords,
 }
 
 // capacity defaults based on MAME 0.280
 //          48893 machines
-//         361092 roms
+//         360102 roms
 //           1240 disks
 //            472 samples
-//           4588 BIOS sets
-//          46351 chips
-//         109965 configurations
-//         129371 configuration settings
+//           4221 BIOS sets
+//          24594 chips
+//          78106 configurations
+//          47581 configuration settings
 //            280 configuration setting configurations
-//           3101 devices
-//         136889 device refs
-//           9118 slots
-//           5646 slot options
+//           2890 devices
+//          74788 device refs
+//           7938 slots
+//           3113 slot options
 //           7038 links
 //           1128 RAM options
-//        2854471 string bytes
+//        4997834 string bytes
 const CAPACITY_MACHINES: usize = 55000;
 const CAPACITY_ROMS: usize = 400000;
 const CAPACITY_DISKS: usize = 1600;
 const CAPACITY_SAMPLES: usize = 1000;
 const CAPACITY_BIOSSETS: usize = 6000;
-const CAPACITY_CHIPS: usize = 55000;
-const CAPACITY_CONFIGS: usize = 13000;
-const CAPACITY_CONFIG_SETTINGS: usize = 160000;
+const CAPACITY_CHIPS: usize = 30000;
+const CAPACITY_CONFIGS: usize = 90000;
+const CAPACITY_CONFIG_SETTINGS: usize = 52000;
 const CAPACITY_CONFIG_SETTING_CONDITIONS: usize = 400;
-const CAPACITY_DEVICES: usize = 4000;
-const CAPACITY_DEVICE_REFS: usize = 160000;
-const CAPACITY_SLOTS: usize = 12000;
-const CAPACITY_SLOT_OPTIONS: usize = 9000;
+const CAPACITY_DEVICES: usize = 3500;
+const CAPACITY_DEVICE_REFS: usize = 80000;
+const CAPACITY_SLOTS: usize = 9000;
+const CAPACITY_SLOT_OPTIONS: usize = 3500;
 const CAPACITY_MACHINE_SOFTWARE_LISTS: usize = 7500;
 const CAPACITY_RAM_OPTIONS: usize = 1500;
-const CAPACITY_STRING_TABLE: usize = 3000000;
+const CAPACITY_STRING_TABLE: usize = 5500000;
 
 impl State {
 	pub fn new() -> Self {
@@ -148,25 +157,26 @@ impl State {
 		// reserve space based the same MAME version as above
 		Self {
 			phase_stack: Vec::with_capacity(32),
-			machines: Vec::with_capacity(CAPACITY_MACHINES),
-			roms: Vec::with_capacity(CAPACITY_ROMS),
-			disks: Vec::with_capacity(CAPACITY_DISKS),
-			samples: Vec::with_capacity(CAPACITY_SAMPLES),
-			biossets: Vec::with_capacity(CAPACITY_BIOSSETS),
-			chips: Vec::with_capacity(CAPACITY_CHIPS),
-			configs: Vec::with_capacity(CAPACITY_CONFIGS),
-			config_settings: Vec::with_capacity(CAPACITY_CONFIG_SETTINGS),
-			config_setting_conditions: Vec::with_capacity(CAPACITY_CONFIG_SETTING_CONDITIONS),
-			devices: Vec::with_capacity(CAPACITY_DEVICES),
-			device_refs: Vec::with_capacity(CAPACITY_DEVICE_REFS),
-			slots: Vec::with_capacity(CAPACITY_SLOTS),
-			slot_options: Vec::with_capacity(CAPACITY_SLOT_OPTIONS),
-			machine_software_lists: Vec::with_capacity(CAPACITY_MACHINE_SOFTWARE_LISTS),
-			ram_options: Vec::with_capacity(CAPACITY_RAM_OPTIONS),
+			machines: TableBuilder::with_capacity(CAPACITY_MACHINES),
+			roms: TableBuilder::with_capacity(CAPACITY_ROMS),
+			disks: TableBuilder::with_capacity(CAPACITY_DISKS),
+			samples: TableBuilder::with_capacity(CAPACITY_SAMPLES),
+			biossets: TableBuilder::with_capacity(CAPACITY_BIOSSETS),
+			chips: TableBuilder::with_capacity(CAPACITY_CHIPS),
+			configs: TableBuilder::with_capacity(CAPACITY_CONFIGS),
+			config_settings: TableBuilder::with_capacity(CAPACITY_CONFIG_SETTINGS),
+			config_setting_conditions: TableBuilder::with_capacity(CAPACITY_CONFIG_SETTING_CONDITIONS),
+			devices: TableBuilder::with_capacity(CAPACITY_DEVICES),
+			device_refs: TableBuilder::with_capacity(CAPACITY_DEVICE_REFS),
+			slots: TableBuilder::with_capacity(CAPACITY_SLOTS),
+			slot_options: TableBuilder::with_capacity(CAPACITY_SLOT_OPTIONS),
+			machine_software_lists: TableBuilder::with_capacity(CAPACITY_MACHINE_SOFTWARE_LISTS),
+			ram_options: TableBuilder::with_capacity(CAPACITY_RAM_OPTIONS),
 			software_lists: BTreeMap::new(),
 			strings,
 			build_strindex,
 			phase_specific: None,
+			current_device_refs: None,
 		}
 	}
 
@@ -228,6 +238,7 @@ impl State {
 					..Default::default()
 				};
 				self.machines.push_db(machine)?;
+				self.current_device_refs = Some(Vec::new());
 				Some(Phase::Machine)
 			}
 			(Phase::Machine, b"description") => Some(Phase::MachineDescription),
@@ -268,7 +279,9 @@ impl State {
 					flags,
 				};
 				self.roms.push_db(rom)?;
-				self.machines.last_mut().unwrap().roms_end += 1;
+				self.machines.modify_last(|machine| {
+					machine.roms_end += 1;
+				});
 				None
 			}
 			(Phase::Machine, b"disk") => {
@@ -307,7 +320,9 @@ impl State {
 					flags,
 				};
 				self.disks.push_db(disk)?;
-				self.machines.last_mut().unwrap().disks_end += 1;
+				self.machines.modify_last(|machine| {
+					machine.disks_end += 1;
+				});
 				None
 			}
 			(Phase::Machine, b"sample") => {
@@ -316,7 +331,9 @@ impl State {
 				let name_strindex = self.strings.lookup(&name);
 				let sample = binary::Sample { name_strindex };
 				self.samples.push_db(sample)?;
-				self.machines.last_mut().unwrap().samples_end += 1;
+				self.machines.modify_last(|machine| {
+					machine.samples_end += 1;
+				});
 				None
 			}
 			(Phase::Machine, b"biosset") => {
@@ -326,8 +343,9 @@ impl State {
 				let is_default = is_default.map(parse_mame_bool).transpose()?.unwrap_or(false);
 
 				if is_default {
-					let machine = self.machines.last_mut().unwrap();
-					machine.default_biosset_index = machine.biossets_end - machine.biossets_start;
+					self.machines.modify_last(|machine| {
+						machine.default_biosset_index = machine.biossets_end - machine.biossets_start;
+					});
 				}
 
 				let biosset = binary::BiosSet {
@@ -335,7 +353,9 @@ impl State {
 					description_strindex,
 				};
 				self.biossets.push_db(biosset)?;
-				self.machines.last_mut().unwrap().biossets_end += 1;
+				self.machines.modify_last(|machine| {
+					machine.biossets_end += 1;
+				});
 				None
 			}
 			(Phase::Machine, b"chip") => {
@@ -354,7 +374,9 @@ impl State {
 					clock,
 				};
 				self.chips.push_db(chip)?;
-				self.machines.last_mut().unwrap().chips_end += 1;
+				self.machines.modify_last(|machine| {
+					machine.chips_end += 1;
+				});
 				None
 			}
 			(Phase::Machine, b"configuration" | b"dipswitch") => {
@@ -373,7 +395,9 @@ impl State {
 					default_setting_index: !UsizeDb::default(),
 				};
 				self.configs.push_db(config)?;
-				self.machines.last_mut().unwrap().configs_end += 1;
+				self.machines.modify_last(|machine| {
+					machine.configs_end += 1;
+				});
 				Some(Phase::MachineConfiguration)
 			}
 			(Phase::MachineConfiguration, b"confsetting" | b"dipvalue") => {
@@ -383,8 +407,9 @@ impl State {
 				let is_default = is_default.map(parse_mame_bool).transpose()?.unwrap_or(false);
 
 				if is_default {
-					let config = self.configs.last_mut().unwrap();
-					config.default_setting_index = config.settings_end - config.settings_start;
+					self.configs.modify_last(|config| {
+						config.default_setting_index = config.settings_end - config.settings_start;
+					});
 				}
 
 				let config_setting = binary::ConfigurationSetting {
@@ -394,7 +419,9 @@ impl State {
 					conditions_end: self.config_setting_conditions.len_db(),
 				};
 				self.config_settings.push_db(config_setting)?;
-				self.configs.last_mut().unwrap().settings_end += 1;
+				self.configs.modify_last(|machine| {
+					machine.settings_end += 1;
+				});
 				Some(Phase::MachineConfigurationSetting)
 			}
 			(Phase::MachineConfigurationSetting, b"condition") => {
@@ -415,7 +442,9 @@ impl State {
 					value,
 				};
 				self.config_setting_conditions.push_db(condition)?;
-				self.config_settings.last_mut().unwrap().conditions_end += 1;
+				self.config_settings.modify_last(|machine| {
+					machine.conditions_end += 1;
+				});
 				None
 			}
 			(Phase::Machine, b"device") => {
@@ -436,7 +465,9 @@ impl State {
 					extensions_strindex: UsizeDb::default(),
 				};
 				self.devices.push_db(device)?;
-				self.machines.last_mut().unwrap().devices_end += 1;
+				self.machines.modify_last(|machine| {
+					machine.devices_end += 1;
+				});
 				self.phase_specific = Some(PhaseSpecificState::Extensions(String::with_capacity(1024)));
 				Some(Phase::MachineDevice)
 			}
@@ -444,22 +475,7 @@ impl State {
 				let [name] = evt.find_attributes([b"name"])?;
 				let name = name.mandatory("name")?;
 				let name_strindex = self.strings.lookup(&name);
-
-				let current_machine = self.machines.last_mut().unwrap();
-				let device_ref = self.device_refs
-					[current_machine.device_refs_start.into()..current_machine.device_refs_end.into()]
-					.iter_mut()
-					.find(|dr| dr.machine_index == name_strindex);
-				if let Some(device_ref) = device_ref {
-					device_ref.count += 1;
-				} else {
-					let device_ref = binary::DeviceRef {
-						machine_index: name_strindex,
-						count: 1,
-					};
-					self.device_refs.push_db(device_ref)?;
-					current_machine.device_refs_end += 1;
-				}
+				self.current_device_refs.as_mut().unwrap().push(name_strindex);
 				None
 			}
 			(Phase::Machine, b"slot") => {
@@ -475,7 +491,9 @@ impl State {
 					default_option_index: !UsizeDb::default(),
 				};
 				self.slots.push_db(slot)?;
-				self.machines.last_mut().unwrap().slots_end += 1;
+				self.machines.modify_last(|machine| {
+					machine.slots_end += 1;
+				});
 				Some(Phase::MachineSlot)
 			}
 			(Phase::Machine, b"softwarelist") => {
@@ -496,7 +514,10 @@ impl State {
 					filter_strindex,
 				};
 				self.machine_software_lists.push_db(machine_software_list)?;
-				self.machines.last_mut().unwrap().machine_software_lists_end += 1;
+				let machine_name_strindex = self.machines.modify_last(|machine| {
+					machine.machine_software_lists_end += 1;
+					machine.name_strindex
+				});
 
 				// add this machine to the global software list
 				let software_list = self.software_lists.entry(name.to_string()).or_default();
@@ -504,7 +525,7 @@ impl State {
 					SoftwareListStatus::Original => &mut software_list.originals,
 					SoftwareListStatus::Compatible => &mut software_list.compatibles,
 				};
-				list.push(self.machines.last_mut().unwrap().name_strindex);
+				list.push(machine_name_strindex);
 				None
 			}
 			(Phase::Machine, b"ramoption") => {
@@ -534,14 +555,17 @@ impl State {
 				let devname_strindex = self.strings.lookup(&devname);
 				let is_default = is_default.map(parse_mame_bool).transpose()?.unwrap_or_default();
 				if is_default {
-					let slot = self.slots.last_mut().unwrap();
-					slot.default_option_index = slot.options_end - slot.options_start;
+					self.slots.modify_last(|slot| {
+						slot.default_option_index = slot.options_end - slot.options_start;
+					});
 				}
 				let slot_option = binary::SlotOption {
 					name_strindex,
 					devname_strindex,
 				};
-				self.slots.last_mut().unwrap().options_end += 1;
+				self.slots.modify_last(|slot| {
+					slot.options_end += 1;
+				});
 				self.slot_options.push_db(slot_option)?;
 				None
 			}
@@ -559,45 +583,70 @@ impl State {
 
 		match self.phase_stack.last().unwrap_or(&Phase::Root) {
 			Phase::Machine => {
-				let machine = self.machines.last_mut().unwrap();
-				try_reuse_existing_collection(&mut machine.roms_start, &mut machine.roms_end, &mut self.roms);
-				try_reuse_existing_collection(&mut machine.disks_start, &mut machine.disks_end, &mut self.disks);
-				try_reuse_existing_collection(&mut machine.samples_start, &mut machine.samples_end, &mut self.samples);
-				try_reuse_existing_collection(
-					&mut machine.biossets_start,
-					&mut machine.biossets_end,
-					&mut self.biossets,
-				);
-				try_reuse_existing_collection(&mut machine.chips_start, &mut machine.chips_end, &mut self.chips);
-				try_reuse_existing_collection(&mut machine.configs_start, &mut machine.configs_end, &mut self.configs);
-				try_reuse_existing_collection(&mut machine.devices_start, &mut machine.devices_end, &mut self.devices);
-				try_reuse_existing_collection(
-					&mut machine.device_refs_start,
-					&mut machine.device_refs_end,
-					&mut self.device_refs,
-				);
-				try_reuse_existing_collection(&mut machine.slots_start, &mut machine.slots_end, &mut self.slots);
-				try_reuse_existing_collection(
-					&mut machine.ram_options_start,
-					&mut machine.ram_options_end,
-					&mut self.ram_options,
-				);
+				let device_ref_map = self.current_device_refs.take().unwrap().into_iter().counts();
+				for (machine_index, count) in device_ref_map.into_iter().sorted_by_key(|(k, _)| *k) {
+					let count = count.try_into()?;
+					let device_ref = binary::DeviceRef { machine_index, count };
+					self.device_refs.push_db(device_ref)?;
+					self.machines.modify_last(|machine| {
+						machine.device_refs_end += 1;
+					});
+				}
+
+				self.machines.modify_last(|machine| {
+					try_reuse_existing_collection(&mut machine.roms_start, &mut machine.roms_end, &mut self.roms);
+					try_reuse_existing_collection(&mut machine.disks_start, &mut machine.disks_end, &mut self.disks);
+					try_reuse_existing_collection(
+						&mut machine.samples_start,
+						&mut machine.samples_end,
+						&mut self.samples,
+					);
+					try_reuse_existing_collection(
+						&mut machine.biossets_start,
+						&mut machine.biossets_end,
+						&mut self.biossets,
+					);
+					try_reuse_existing_collection(&mut machine.chips_start, &mut machine.chips_end, &mut self.chips);
+					try_reuse_existing_collection(
+						&mut machine.configs_start,
+						&mut machine.configs_end,
+						&mut self.configs,
+					);
+					try_reuse_existing_collection(
+						&mut machine.devices_start,
+						&mut machine.devices_end,
+						&mut self.devices,
+					);
+					try_reuse_existing_collection(
+						&mut machine.device_refs_start,
+						&mut machine.device_refs_end,
+						&mut self.device_refs,
+					);
+					try_reuse_existing_collection(&mut machine.slots_start, &mut machine.slots_end, &mut self.slots);
+					try_reuse_existing_collection(
+						&mut machine.ram_options_start,
+						&mut machine.ram_options_end,
+						&mut self.ram_options,
+					);
+				});
 			}
 			Phase::MachineConfiguration => {
-				let config = self.configs.last_mut().unwrap();
-				try_reuse_existing_collection(
-					&mut config.settings_start,
-					&mut config.settings_end,
-					&mut self.config_settings,
-				);
+				self.configs.modify_last(|config| {
+					try_reuse_existing_collection(
+						&mut config.settings_start,
+						&mut config.settings_end,
+						&mut self.config_settings,
+					);
+				});
 			}
 			Phase::MachineConfigurationSetting => {
-				let setting = self.config_settings.last_mut().unwrap();
-				try_reuse_existing_collection(
-					&mut setting.conditions_start,
-					&mut setting.conditions_end,
-					&mut self.config_setting_conditions,
-				);
+				self.config_settings.modify_last(|setting| {
+					try_reuse_existing_collection(
+						&mut setting.conditions_start,
+						&mut setting.conditions_end,
+						&mut self.config_setting_conditions,
+					);
+				});
 			}
 			Phase::MachineDescription => {
 				let description = text.unwrap();
@@ -605,15 +654,21 @@ impl State {
 					return Ok(None);
 				}
 				let description_strindex = self.strings.lookup(&description);
-				self.machines.last_mut().unwrap().description_strindex = description_strindex;
+				self.machines.modify_last(|machine| {
+					machine.description_strindex = description_strindex;
+				});
 			}
 			Phase::MachineYear => {
 				let year_strindex = self.strings.lookup(&text.unwrap());
-				self.machines.last_mut().unwrap().year_strindex = year_strindex;
+				self.machines.modify_last(|machine| {
+					machine.year_strindex = year_strindex;
+				});
 			}
 			Phase::MachineManufacturer => {
 				let manufacturer_strindex = self.strings.lookup(&text.unwrap());
-				self.machines.last_mut().unwrap().manufacturer_strindex = manufacturer_strindex;
+				self.machines.modify_last(|machine| {
+					machine.manufacturer_strindex = manufacturer_strindex;
+				});
 			}
 			Phase::MachineDevice => {
 				let PhaseSpecificState::Extensions(extensions) = self.phase_specific.take().unwrap() else {
@@ -621,11 +676,18 @@ impl State {
 				};
 				let extensions = extensions.split('\0').sorted().join("\0");
 				let extensions_strindex = self.strings.lookup(&extensions);
-				self.devices.last_mut().unwrap().extensions_strindex = extensions_strindex;
+				self.devices.modify_last(|device| {
+					device.extensions_strindex = extensions_strindex;
+				});
 			}
 			Phase::MachineSlot => {
-				let slot = self.slots.last_mut().unwrap();
-				try_reuse_existing_collection(&mut slot.options_start, &mut slot.options_end, &mut self.slot_options);
+				self.slots.modify_last(|slot| {
+					try_reuse_existing_collection(
+						&mut slot.options_start,
+						&mut slot.options_end,
+						&mut self.slot_options,
+					);
+				});
 			}
 			Phase::MachineRamOption => {
 				let PhaseSpecificState::RamOption(is_default) = self.phase_specific.take().unwrap() else {
@@ -635,7 +697,9 @@ impl State {
 					let size = size.into();
 					let ram_option = binary::RamOption { size, is_default };
 					self.ram_options.push_db(ram_option)?;
-					self.machines.last_mut().unwrap().ram_options_end += 1;
+					self.machines.modify_last(|machine| {
+						machine.ram_options_end += 1;
+					});
 				}
 			}
 			_ => {}
@@ -643,11 +707,13 @@ impl State {
 		Ok(Some(()))
 	}
 
-	pub fn into_data(mut self) -> Result<Box<[u8]>> {
+	pub fn into_data(self) -> Result<Box<[u8]>> {
 		// we need to do processing on machines, namely to  canonicalize name_strindex, so we
 		// don't have both inline and indexed small sting references, and sort it
+		let machine_count = self.machines.len_db();
 		let mut machines = self
 			.machines
+			.into_vec()
 			.into_iter()
 			.map(|machine| {
 				let old_strindex = machine.name_strindex;
@@ -670,7 +736,6 @@ impl State {
 			.enumerate()
 			.map(|(index, obj)| (obj.name_strindex, index.try_into().unwrap()))
 			.collect::<HashMap<_, _>>();
-		let machine_count = machines.len_db();
 		let machines_indexmap = |strindex| {
 			let result = machines_indexmap
 				.get(&strindex)
@@ -748,15 +813,17 @@ impl State {
 		};
 
 		// and run the fixups
+		let mut device_refs = self.device_refs.into_vec();
+		let mut machine_software_lists = self.machine_software_lists.into_vec();
 		fixup(&mut machines, &self.strings, machines_indexmap, software_list_indexmap)?;
 		fixup(
-			&mut self.device_refs,
+			&mut device_refs,
 			&self.strings,
 			machines_indexmap,
 			software_list_indexmap,
 		)?;
 		fixup(
-			&mut self.machine_software_lists,
+			&mut machine_software_lists,
 			&self.strings,
 			machines_indexmap,
 			software_list_indexmap,
@@ -778,12 +845,12 @@ impl State {
 			config_setting_count: self.config_settings.len_db(),
 			config_setting_condition_count: self.config_setting_conditions.len_db(),
 			device_count: self.devices.len_db(),
-			device_ref_count: self.device_refs.len_db(),
+			device_ref_count: device_refs.len_db(),
 			slot_count: self.slots.len_db(),
 			slot_option_count: self.slot_options.len_db(),
 			software_list_count: software_lists.len_db(),
 			software_list_machine_count: software_list_machine_indexes.len_db(),
-			machine_software_lists_count: self.machine_software_lists.len_db(),
+			machine_software_lists_count: machine_software_lists.len_db(),
 			ram_option_count: self.ram_options.len_db(),
 		};
 
@@ -792,22 +859,27 @@ impl State {
 			.as_bytes()
 			.iter()
 			.chain(machines.iter().flat_map(IntoBytes::as_bytes))
-			.chain(self.roms.iter().flat_map(IntoBytes::as_bytes))
-			.chain(self.disks.iter().flat_map(IntoBytes::as_bytes))
-			.chain(self.samples.iter().flat_map(IntoBytes::as_bytes))
-			.chain(self.biossets.iter().flat_map(IntoBytes::as_bytes))
-			.chain(self.chips.iter().flat_map(IntoBytes::as_bytes))
-			.chain(self.configs.iter().flat_map(IntoBytes::as_bytes))
-			.chain(self.config_settings.iter().flat_map(IntoBytes::as_bytes))
-			.chain(self.config_setting_conditions.iter().flat_map(IntoBytes::as_bytes))
-			.chain(self.devices.iter().flat_map(IntoBytes::as_bytes))
-			.chain(self.device_refs.iter().flat_map(IntoBytes::as_bytes))
-			.chain(self.slots.iter().flat_map(IntoBytes::as_bytes))
-			.chain(self.slot_options.iter().flat_map(IntoBytes::as_bytes))
+			.chain(self.roms.into_vec().iter().flat_map(IntoBytes::as_bytes))
+			.chain(self.disks.into_vec().iter().flat_map(IntoBytes::as_bytes))
+			.chain(self.samples.into_vec().iter().flat_map(IntoBytes::as_bytes))
+			.chain(self.biossets.into_vec().iter().flat_map(IntoBytes::as_bytes))
+			.chain(self.chips.into_vec().iter().flat_map(IntoBytes::as_bytes))
+			.chain(self.configs.into_vec().iter().flat_map(IntoBytes::as_bytes))
+			.chain(self.config_settings.into_vec().iter().flat_map(IntoBytes::as_bytes))
+			.chain(
+				self.config_setting_conditions
+					.into_vec()
+					.iter()
+					.flat_map(IntoBytes::as_bytes),
+			)
+			.chain(self.devices.into_vec().iter().flat_map(IntoBytes::as_bytes))
+			.chain(device_refs.iter().flat_map(IntoBytes::as_bytes))
+			.chain(self.slots.into_vec().iter().flat_map(IntoBytes::as_bytes))
+			.chain(self.slot_options.into_vec().iter().flat_map(IntoBytes::as_bytes))
 			.chain(software_lists.iter().flat_map(IntoBytes::as_bytes))
 			.chain(software_list_machine_indexes.iter().flat_map(IntoBytes::as_bytes))
-			.chain(self.machine_software_lists.iter().flat_map(IntoBytes::as_bytes))
-			.chain(self.ram_options.iter().flat_map(IntoBytes::as_bytes))
+			.chain(machine_software_lists.iter().flat_map(IntoBytes::as_bytes))
+			.chain(self.ram_options.into_vec().iter().flat_map(IntoBytes::as_bytes))
 			.copied()
 			.chain(self.strings.into_iter())
 			.collect();
@@ -853,30 +925,19 @@ fn fixup(
 	Ok(())
 }
 
-fn try_reuse_existing_collection(start: &mut UsizeDb, end: &mut UsizeDb, collection: &mut Vec<impl PartialEq>) {
+fn try_reuse_existing_collection(
+	start: &mut UsizeDb,
+	end: &mut UsizeDb,
+	table_builder: &mut TableBuilder<impl Eq + Hash>,
+) {
 	// sanity checks
 	assert_le!(*start, *end);
-	assert_eq!(*end, collection.len_db());
+	assert_eq!(*end, table_builder.len_db());
 
-	let target_range = usize::from(*start)..usize::from(*end);
-	let target = &collection[target_range.clone()];
-	if !target.is_empty() {
-		let pos = collection[..collection.len().saturating_sub(1)]
-			.windows(target.len())
-			.enumerate()
-			.rev()
-			.take(1536) // arbitrary limit to prevent excessive searching
-			.find(|(_, window)| window == &target)
-			.map(|(pos, _)| pos);
-		if let Some(pos) = pos {
-			*start = pos.try_into().unwrap();
-			*end = (pos + target.len()).try_into().unwrap();
-			collection.truncate(target_range.start);
-		}
-	} else {
-		// target range is empty; lets change start/end to be zeroes
-		*start = UsizeDb::default();
-		*end = UsizeDb::default();
+	let count = usize::from(*end) - usize::from(*start);
+	if let Some(pos) = table_builder.try_recycle_tail(count) {
+		*start = pos.try_into().unwrap();
+		*end = (pos + count).try_into().unwrap();
 	}
 }
 
@@ -963,19 +1024,103 @@ pub fn calculate_sizes_hash() -> U64 {
 	.into()
 }
 
-#[ext]
-impl<T> Vec<T> {
-	pub fn push_db(&mut self, value: T) -> Result<()> {
-		self.push(value);
-		self.try_len_db().map(|_| ())
+struct TableBuilder<T> {
+	data: Vec<T>,
+	buckets: Box<[Vec<usize>]>,
+}
+
+impl<T> TableBuilder<T>
+where
+	T: Hash + Eq,
+{
+	pub fn with_capacity(capacity: usize) -> Self {
+		let bucket_count = ((capacity / 32 + 100)..)
+			.find(|&n| is_prime(n.try_into().unwrap()))
+			.unwrap();
+		let data = Vec::with_capacity(capacity);
+		let buckets = (0..bucket_count).map(|_| Vec::new()).collect::<Box<[_]>>();
+		Self { data, buckets }
 	}
 
+	pub fn push_db(&mut self, value: T) -> Result<()> {
+		self.buckets[self.bucket_index(&value)].push(self.data.len());
+		self.data.push(value);
+		self.data.try_len_db().map(|_| ())
+	}
+
+	pub fn pop(&mut self) -> Option<T> {
+		let value = self.data.pop()?;
+		self.buckets[self.bucket_index(&value)].pop().unwrap();
+		Some(value)
+	}
+
+	pub fn modify_last<R>(&mut self, f: impl FnOnce(&mut T) -> R) -> R {
+		let mut value = self.pop().unwrap();
+		let result = f(&mut value);
+		self.push_db(value).unwrap();
+		result
+	}
+
+	pub fn try_recycle_tail(&mut self, tail_len: usize) -> Option<usize> {
+		// separate out the 'tail' and the 'body'; after this they
+		// will be treated distinctly
+		let tail_pos = self.data.len() - tail_len;
+		let tail = &self.data[tail_pos..];
+		let body = &self.data[..tail_pos];
+
+		if tail.is_empty() {
+			Some(0)
+		} else {
+			let index = self.buckets[self.bucket_index(&tail[0])]
+				.iter()
+				.rev()
+				.copied()
+				.find(|index| body.get(*index..(*index + tail_len)) == Some(tail));
+
+			if index.is_some() {
+				for _ in 0..tail_len {
+					self.pop();
+				}
+			}
+			index
+		}
+	}
+
+	pub fn len(&self) -> usize {
+		self.data.len()
+	}
+
+	pub fn len_db(&self) -> UsizeDb {
+		self.data.len_db()
+	}
+
+	pub fn into_vec(self) -> Vec<T> {
+		self.data
+	}
+
+	fn bucket_index(&self, value: &T) -> usize {
+		let mut hasher = DefaultHasher::new();
+		value.hash(&mut hasher);
+		(hasher.finish() as usize) % self.buckets.len()
+	}
+}
+
+impl<T> Index<Range<usize>> for TableBuilder<T> {
+	type Output = [T];
+
+	fn index(&self, range: Range<usize>) -> &Self::Output {
+		&self.data[range]
+	}
+}
+
+#[ext]
+impl<T> Vec<T> {
 	pub fn len_db(&self) -> UsizeDb {
 		self.try_len_db().unwrap()
 	}
 
 	pub fn try_len_db(&self) -> Result<UsizeDb> {
-		self.len().try_into().map_err(|_| Error::msg("too many records"))
+		self.len().try_into().map_err(|_| ThisError::TooManyRecords.into())
 	}
 }
 
@@ -1016,5 +1161,30 @@ mod test {
 			.unwrap();
 		let result = InfoDb::new(data);
 		assert_matches!(result, Ok(_));
+	}
+
+	#[test_case(0, &[], 0, &[], Some(0))]
+	#[test_case(1, &[10, 11, 12, 13, 14, 15], 0, &[10, 11, 12, 13, 14, 15], Some(0))]
+	#[test_case(2, &[10, 11, 12, 13, 14, 15], 3, &[10, 11, 12, 13, 14, 15], None)]
+	#[test_case(3, &[10, 11, 12, 13, 14, 15, 13, 14, 15], 2, &[10, 11, 12, 13, 14, 15, 13], Some(4))]
+	#[test_case(4, &[10, 11, 12, 13, 14, 15, 13, 14, 15], 3, &[10, 11, 12, 13, 14, 15], Some(3))]
+	#[test_case(5, &[99, 99, 99, 99, 98], 2, &[99, 99, 99, 99, 98], None)]
+	#[test_case(6, &[99, 99, 99, 99, 99], 2, &[99, 99, 99], Some(1))]
+	#[test_case(7, &[99, 99, 11, 99, 99], 2, &[99, 99, 11], Some(0))]
+	pub fn try_recycle_tail(
+		_index: usize,
+		initial_table: &[u32],
+		tail_len: usize,
+		expected_table: &[u32],
+		expected_pos: Option<usize>,
+	) {
+		let mut table_builder = super::TableBuilder::with_capacity(initial_table.len());
+		for &value in initial_table {
+			table_builder.push_db(value).unwrap();
+		}
+		let pos = table_builder.try_recycle_tail(tail_len);
+		let vec = table_builder.into_vec();
+		let actual = (vec.as_slice(), pos);
+		assert_eq!((expected_table, expected_pos), actual);
 	}
 }
