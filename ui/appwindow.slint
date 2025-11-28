@@ -771,6 +771,9 @@ export component AppWindow inherits Window {
                     changed text => {
                         items-search-text-changed(self.text)
                     }
+                    accepted(text) => {
+                        self.close-popup();
+                    }
                     item-activated(index) => {
                         return items-search-item-activated(index);
                     }
