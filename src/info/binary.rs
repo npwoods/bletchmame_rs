@@ -123,6 +123,7 @@ pub enum ChipType {
 #[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq, Eq, Hash)]
 pub struct Rom {
 	pub name_strindex: UsizeDb,
+	pub bios_strindex: UsizeDb,
 	pub size: U64,
 	pub crc: U32,
 	pub sha1: [u8; 20],

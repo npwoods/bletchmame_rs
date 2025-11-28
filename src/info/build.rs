@@ -245,8 +245,9 @@ impl State {
 			(Phase::Machine, b"year") => Some(Phase::MachineYear),
 			(Phase::Machine, b"manufacturer") => Some(Phase::MachineManufacturer),
 			(Phase::Machine, b"rom") => {
-				let [name, size, crc, sha1, region, offset, status, optional] = evt.find_attributes([
+				let [name, bios, size, crc, sha1, region, offset, status, optional] = evt.find_attributes([
 					b"name",
+					b"bios",
 					b"size",
 					b"crc",
 					b"sha1",
@@ -265,12 +266,16 @@ impl State {
 				let offset = offset.as_deref().map(|src| u64::from_str_radix(src, 16)).transpose()?;
 				let offset = offset.unwrap_or(!0).into();
 				let name_strindex = self.strings.lookup(&name);
+				let bios_strindex = bios
+					.map(|bios| self.strings.lookup(&bios))
+					.unwrap_or(!UsizeDb::default());
 				let region_strindex = self.strings.lookup(&region);
 				let optional = optional.map(parse_mame_bool).transpose()?.unwrap_or_default();
 				let status = status.as_deref().map(AssetStatus::from_str).transpose()?;
 				let flags = make_asset_flags(&asset_hash, optional, false, status);
 				let rom = binary::Rom {
 					name_strindex,
+					bios_strindex,
 					size,
 					crc,
 					sha1,

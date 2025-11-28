@@ -11,6 +11,7 @@ use crate::info::ConditionRelation;
 use crate::info::IndirectView;
 use crate::info::Object;
 use crate::info::SimpleView;
+use crate::info::UsizeDb;
 use crate::info::Validatable;
 use crate::info::View;
 use crate::info::binary;
@@ -169,6 +170,11 @@ impl<'a> MachinesView<'a> {
 impl<'a> Rom<'a> {
 	pub fn name(&self) -> &'a str {
 		self.string(|x| x.name_strindex)
+	}
+
+	pub fn bios(&self) -> Option<&'a str> {
+		let bios_strindex = self.obj().bios_strindex;
+		(bios_strindex != !UsizeDb::default()).then(|| self.string(|x| x.bios_strindex))
 	}
 
 	pub fn size(&self) -> u64 {
