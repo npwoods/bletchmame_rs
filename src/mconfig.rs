@@ -369,6 +369,8 @@ impl MachineConfig {
 	}
 
 	pub fn changed_slots(&self, base: Option<&Self>) -> Vec<(String, Option<String>)> {
+		debug!(?self, ?base, "MachineConfig::changed_slots()");
+
 		let mut results = Vec::new();
 		self.internal_changed_slots(base, "", &mut |slot, opt| {
 			results.push((slot.to_string(), opt.map(str::to_string)));
