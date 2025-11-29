@@ -195,7 +195,7 @@ impl DevicesImagesConfig {
 		diconfig_from_machine_configs_and_images(self.info_db.clone(), machine_configs, images)
 	}
 
-	pub fn changed_slots(&self, from_original: bool) -> Vec<(String, Option<String>)> {
+	pub fn changed_slots(&self, from_original: bool) -> Vec<(String, Option<&'_ str>)> {
 		self.machine_config()
 			.map(|machine_config| {
 				machine_config
@@ -561,12 +561,12 @@ mod test {
 		}
 
 		// get the changed slots
-		let actual: Vec<(String, Option<String>)> = config.changed_slots(from_original);
+		let actual = config.changed_slots(from_original);
 
 		// and compare against expected
 		let expected = expected
 			.iter()
-			.map(|(tag, option_name)| (tag.to_string(), option_name.map(|x| x.to_string())))
+			.map(|(tag, option_name)| (tag.to_string(), *option_name))
 			.collect::<Vec<_>>();
 		assert_eq!(expected, actual);
 	}

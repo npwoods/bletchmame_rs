@@ -651,6 +651,10 @@ fn make_prefs_item(_info_db: &InfoDb, item: &Item) -> PrefsItem {
 		} => {
 			let machine_name = machine_config.machine().name().to_string();
 			let slots = machine_config.changed_slots(None);
+			let slots = slots
+				.into_iter()
+				.map(|(slot, option_name)| (slot.to_string(), option_name.map(str::to_string)))
+				.collect::<Vec<_>>();
 			let images = images.clone();
 			let ram_size = *ram_size;
 			let bios = bios.clone();
