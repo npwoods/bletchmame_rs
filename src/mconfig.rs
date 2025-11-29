@@ -1,10 +1,13 @@
 use std::borrow::Cow;
+use std::fmt::Debug;
+use std::fmt::Formatter;
 use std::ops::ControlFlow;
 use std::rc::Rc;
 
 use anyhow::Error;
 use anyhow::Result;
 use more_asserts::assert_le;
+use tracing::debug;
 use tracing::info;
 
 use crate::info::Device;
@@ -13,7 +16,7 @@ use crate::info::Machine;
 use crate::info::Slot;
 use crate::info::View;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct MachineConfig {
 	pub info_db: Rc<InfoDb>,
 	pub machine_index: usize,
@@ -366,6 +369,8 @@ impl MachineConfig {
 	}
 
 	pub fn changed_slots(&self, base: Option<&Self>) -> Vec<(String, Option<String>)> {
+		debug!(?self, ?base, "MachineConfig::changed_slots()");
+
 		let mut results = Vec::new();
 		self.internal_changed_slots(base, "", &mut |slot, opt| {
 			results.push((slot.to_string(), opt.map(str::to_string)));
@@ -421,6 +426,27 @@ impl MachineConfig {
 				child_config.internal_changed_slots(child_base_config, &slot_tag, emit)
 			}
 		}
+	}
+}
+
+impl Debug for MachineConfig {
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		let machine = self.machine();
+		let mut debug = f.debug_struct("MachineConfig");
+		debug.field("machine", &machine.name());
+
+		for (slot, slot_data) in machine.slots().iter().zip(self.slots.iter()) {
+			match slot_data {
+				SlotData::Unset => debug.field(slot.name(), &"<<unset>>"),
+				SlotData::Set { option_index, config } => {
+					let option = slot.options().get(*option_index).unwrap();
+					debug.field(slot.name(), &(option.name(), config.as_ref()))
+				}
+				SlotData::Ignore => debug.field(slot.name(), &"<<ignore>>"),
+			};
+		}
+
+		debug.finish()
 	}
 }
 

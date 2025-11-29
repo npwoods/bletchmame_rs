@@ -196,13 +196,10 @@ impl DevicesImagesConfig {
 	}
 
 	pub fn changed_slots(&self, from_original: bool) -> Vec<(String, Option<String>)> {
-		self.core
-			.as_ref()
-			.and_then(|core| {
-				core.machine_configs
-					.dirty
-					.as_ref()
-					.map(|dirty| dirty.changed_slots(from_original.then_some(&core.machine_configs.clean)))
+		self.machine_config()
+			.map(|machine_config| {
+				machine_config
+					.changed_slots(from_original.then_some(&self.core.as_ref().unwrap().machine_configs.clean))
 			})
 			.unwrap_or_default()
 	}
@@ -454,6 +451,7 @@ mod test {
 
 	use crate::info::InfoDb;
 	use crate::info::View;
+	use crate::mconfig::MachineConfig;
 	use crate::status::Status;
 	use crate::status::Update;
 
@@ -528,5 +526,48 @@ mod test {
 				);
 			}
 		}
+	}
+
+	#[test_case(0, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[], &[], false, &[])]
+	#[test_case(1, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[], &[], true, &[])]
+	#[test_case(2, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[], false, &[("ext", Some("multi"))])]
+	#[test_case(3, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[], true, &[])]
+	#[test_case(4, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[("ext", None)], false, &[("ext", None)])]
+	#[test_case(5, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[("ext", None)], true, &[("ext", None)])]
+	#[test_case(6, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[("ext", Some("fdc"))], false, &[])]
+	#[test_case(7, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[("ext", Some("fdc"))], true, &[("ext", Some("fdc"))])]
+	fn changed_slots(
+		_index: usize,
+		info_xml: &str,
+		machine_name: &str,
+		clean_options: &[(&str, Option<&str>)],
+		dirty_options: &[(&str, Option<&str>)],
+		from_original: bool,
+		expected: &[(&str, Option<&str>)],
+	) {
+		// build the InfoDB
+		let info_db = InfoDb::from_listxml_output(info_xml.as_bytes(), |_| ControlFlow::Continue(()))
+			.unwrap()
+			.unwrap();
+		let info_db = Rc::new(info_db);
+
+		// build the clean config
+		let machine_config = MachineConfig::from_machine_name_and_slots(info_db, machine_name, clean_options).unwrap();
+		let mut config = DevicesImagesConfig::from(machine_config);
+
+		// make it dirty by setting options
+		for (tag, option_name) in dirty_options {
+			config = config.set_slot_option(tag, *option_name);
+		}
+
+		// get the changed slots
+		let actual: Vec<(String, Option<String>)> = config.changed_slots(from_original);
+
+		// and compare against expected
+		let expected = expected
+			.iter()
+			.map(|(tag, option_name)| (tag.to_string(), option_name.map(|x| x.to_string())))
+			.collect::<Vec<_>>();
+		assert_eq!(expected, actual);
 	}
 }
