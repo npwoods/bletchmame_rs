@@ -21,6 +21,7 @@ use tokio::sync::mpsc;
 use crate::action::Action;
 use crate::devimageconfig::DevicesImagesConfig;
 use crate::devimageconfig::EntryDetails;
+use crate::devimageconfig::ListSlots;
 use crate::dialogs::SenderExt;
 use crate::dialogs::devimages::entry_popup_menu;
 use crate::dialogs::image::Format;
@@ -532,7 +533,11 @@ impl State {
 			CoreState::Machine { .. } => self.with_diconfig(|diconfig| {
 				let machine = diconfig.machine().unwrap();
 				let machine_name = machine.name().to_string();
-				let slots = diconfig.changed_slots(false);
+				let slots = diconfig.list_slots(ListSlots::NonDefault);
+				let slots = slots
+					.into_iter()
+					.map(|(slot, option_name)| (slot.to_string(), option_name.map(str::to_string)))
+					.collect::<Vec<_>>();
 				let images = diconfig
 					.images()
 					.filter_map(|(tag, filename)| filename.map(|image_desc| (tag.to_string(), image_desc.clone())))

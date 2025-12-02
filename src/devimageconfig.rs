@@ -66,6 +66,12 @@ pub struct EntryOption<'a> {
 	pub description: Option<Cow<'a, str>>,
 }
 
+#[derive(Copy, Clone, Debug)]
+pub enum ListSlots {
+	NonDefault, // options that are not the default values
+	Dirty,      // "dirty" options changed from the clean version
+}
+
 impl DevicesImagesConfig {
 	pub fn new(info_db: Rc<InfoDb>) -> Self {
 		Self::with_machine_name(info_db, None).unwrap()
@@ -195,12 +201,14 @@ impl DevicesImagesConfig {
 		diconfig_from_machine_configs_and_images(self.info_db.clone(), machine_configs, images)
 	}
 
-	pub fn changed_slots(&self, from_original: bool) -> Vec<(String, Option<String>)> {
+	pub fn list_slots(&self, disposition: ListSlots) -> Vec<(String, Option<&'_ str>)> {
+		let base = match disposition {
+			ListSlots::NonDefault => None,
+			ListSlots::Dirty => Some(&self.core.as_ref().unwrap().machine_configs.clean),
+		};
+
 		self.machine_config()
-			.map(|machine_config| {
-				machine_config
-					.changed_slots(from_original.then_some(&self.core.as_ref().unwrap().machine_configs.clean))
-			})
+			.map(|machine_config| machine_config.changed_slots(base))
 			.unwrap_or_default()
 	}
 
@@ -456,6 +464,7 @@ mod test {
 	use crate::status::Update;
 
 	use super::DevicesImagesConfig;
+	use super::ListSlots;
 
 	fn smoke_test_config(config: DevicesImagesConfig) {
 		let count = config.entry_count();
@@ -528,21 +537,21 @@ mod test {
 		}
 	}
 
-	#[test_case(0, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[], &[], false, &[])]
-	#[test_case(1, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[], &[], true, &[])]
-	#[test_case(2, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[], false, &[("ext", Some("multi"))])]
-	#[test_case(3, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[], true, &[])]
-	#[test_case(4, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[("ext", None)], false, &[("ext", None)])]
-	#[test_case(5, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[("ext", None)], true, &[("ext", None)])]
-	#[test_case(6, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[("ext", Some("fdc"))], false, &[])]
-	#[test_case(7, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[("ext", Some("fdc"))], true, &[("ext", Some("fdc"))])]
-	fn changed_slots(
+	#[test_case(0, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[], &[], ListSlots::NonDefault, &[])]
+	#[test_case(1, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[], &[], ListSlots::Dirty, &[])]
+	#[test_case(2, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[], ListSlots::NonDefault, &[("ext", Some("multi"))])]
+	#[test_case(3, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[], ListSlots::Dirty, &[])]
+	#[test_case(4, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[("ext", None)], ListSlots::NonDefault, &[("ext", None)])]
+	#[test_case(5, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[("ext", None)], ListSlots::Dirty, &[("ext", None)])]
+	#[test_case(6, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[("ext", Some("fdc"))], ListSlots::NonDefault, &[])]
+	#[test_case(7, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[("ext", Some("fdc"))], ListSlots::Dirty, &[("ext", Some("fdc"))])]
+	fn list_slots(
 		_index: usize,
 		info_xml: &str,
 		machine_name: &str,
 		clean_options: &[(&str, Option<&str>)],
 		dirty_options: &[(&str, Option<&str>)],
-		from_original: bool,
+		disposition: ListSlots,
 		expected: &[(&str, Option<&str>)],
 	) {
 		// build the InfoDB
@@ -561,12 +570,12 @@ mod test {
 		}
 
 		// get the changed slots
-		let actual: Vec<(String, Option<String>)> = config.changed_slots(from_original);
+		let actual = config.list_slots(disposition);
 
 		// and compare against expected
 		let expected = expected
 			.iter()
-			.map(|(tag, option_name)| (tag.to_string(), option_name.map(|x| x.to_string())))
+			.map(|(tag, option_name)| (tag.to_string(), *option_name))
 			.collect::<Vec<_>>();
 		assert_eq!(expected, actual);
 	}

@@ -368,17 +368,22 @@ impl MachineConfig {
 		}
 	}
 
-	pub fn changed_slots(&self, base: Option<&Self>) -> Vec<(String, Option<String>)> {
+	pub fn changed_slots<'a>(&'a self, base: Option<&Self>) -> Vec<(String, Option<&'a str>)> {
 		debug!(?self, ?base, "MachineConfig::changed_slots()");
 
 		let mut results = Vec::new();
 		self.internal_changed_slots(base, "", &mut |slot, opt| {
-			results.push((slot.to_string(), opt.map(str::to_string)));
+			results.push((slot, opt));
 		});
 		results
 	}
 
-	fn internal_changed_slots(&self, base: Option<&Self>, base_tag: &str, emit: &mut impl FnMut(&str, Option<&str>)) {
+	fn internal_changed_slots<'a>(
+		&'a self,
+		base: Option<&Self>,
+		base_tag: &str,
+		emit: &mut impl FnMut(String, Option<&'a str>),
+	) {
 		// if we were not passed a `base`, we're being asked to check against the default configuration; it
 		// needs to be constructed
 		let base = if let Some(base) = base {
@@ -407,7 +412,7 @@ impl MachineConfig {
 			// is this particular slot changed when compared with the base?  if so, emit it
 			if ent.option_index() != base_ent.option_index() {
 				let option = ent.option_index().map(|x| slot.options().get(x).unwrap().name());
-				emit(&slot_tag, option);
+				emit(slot_tag.clone(), option);
 			}
 
 			// if an option is specified, we need to recurse into that slot
@@ -591,7 +596,7 @@ mod test {
 		// and validate the changes
 		let expected = expected
 			.iter()
-			.map(|(slot, opt)| (slot.to_string(), opt.map(|x| x.to_string())))
+			.map(|(slot, opt)| (slot.to_string(), *opt))
 			.collect::<Vec<_>>();
 		assert_eq!(expected, actual);
 	}

@@ -8,6 +8,7 @@ use crate::action::Action;
 use crate::channel::Channel;
 use crate::devimageconfig::DevicesImagesConfig;
 use crate::devimageconfig::EntryDetails;
+use crate::devimageconfig::ListSlots;
 use crate::dialogs::SenderExt;
 use crate::guiutils::modal::ModalStack;
 use crate::models::devimages::DevicesAndImagesModel;
@@ -48,8 +49,10 @@ pub async fn dialog_devices_and_images(
 	let invoke_command_clone = invoke_command.clone();
 	modal.dialog().on_apply_changes_clicked(move || {
 		let model = DevicesAndImagesModel::get_model(&model_clone);
-		let changed_slots = model.with_diconfig(|diconfig| diconfig.changed_slots(true));
-		let command = MameCommand::change_slots(&changed_slots).into();
+		let command = model.with_diconfig(|diconfig| {
+			let changed_slots = diconfig.list_slots(ListSlots::Dirty);
+			MameCommand::change_slots(&changed_slots).into()
+		});
 		invoke_command_clone(command);
 	});
 
