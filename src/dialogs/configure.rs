@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::iter::once;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use anyhow::Error;
 use itertools::Itertools;
@@ -49,6 +50,8 @@ use crate::ui::SoftwareMachine;
 struct State {
 	dialog_weak: Weak<ConfigureDialog>,
 	modal_stack: ModalStack,
+	rom_paths: Arc<[SmolStr]>,
+	sample_paths: Arc<[SmolStr]>,
 	core: CoreState,
 }
 
@@ -91,7 +94,7 @@ pub async fn dialog_configure(
 	// get the state
 	let dialog_weak = modal.dialog().as_weak();
 	let modal_stack = modal_stack.clone();
-	let state: State = State::new(dialog_weak, modal_stack, &info_db, item);
+	let state = State::new(dialog_weak, modal_stack, paths, &info_db, item);
 	let state = Rc::new(state);
 
 	// set the title
@@ -175,35 +178,11 @@ pub async fn dialog_configure(
 		spawn_local(fut).unwrap();
 	}
 
-	// Asset audit
-	if let CoreState::Machine { dimodel_state, .. } = &state.core {
-		dimodel_state.with_machine(|machine| {
-			if let Some(machine) = machine {
-				let icons = Icons::get(modal.dialog());
-				let rom_paths = paths.roms.clone().into();
-				let sample_paths = paths.samples.clone().into();
-				let model = AuditModel::new(machine, rom_paths, sample_paths, icons);
-				let model = ModelRc::new(model);
-				modal.dialog().set_audit_assets(model.clone());
-
-				// lambda to run the audit
-				let run_audit = move || {
-					let model = model.clone();
-					let fut = async move {
-						let model = AuditModel::get_model(&model);
-						model.run_audit().await;
-					};
-					spawn_local(fut).unwrap();
-				};
-
-				// set up the click handler
-				modal.dialog().on_run_audit_clicked(run_audit.clone());
-
-				// and run an audit now!
-				run_audit();
-			}
-		});
-	}
+	// asset audit button
+	let state_clone = state.clone();
+	modal.dialog().on_run_audit_clicked(move || {
+		state_clone.start_run_audit();
+	});
 
 	// loading error?
 	if let Some(error) = state.error() {
@@ -322,6 +301,7 @@ impl State {
 	pub fn new(
 		dialog_weak: Weak<ConfigureDialog>,
 		modal_stack: ModalStack,
+		paths: &PrefsPaths,
 		info_db: &Rc<InfoDb>,
 		item: PrefsItem,
 	) -> Self {
@@ -388,10 +368,13 @@ impl State {
 		let state = Self {
 			dialog_weak,
 			modal_stack,
+			rom_paths: paths.roms.clone().into(),
+			sample_paths: paths.samples.clone().into(),
 			core,
 		};
 		if matches!(&state.core, CoreState::Machine { .. }) {
 			state.update_images();
+			state.update_audit();
 		}
 		state
 	}
@@ -526,6 +509,34 @@ impl State {
 		});
 	}
 
+	pub fn update_audit(&self) {
+		let CoreState::Machine { dimodel_state, .. } = &self.core else {
+			unreachable!()
+		};
+
+		let dialog = self.dialog_weak.unwrap();
+		let audit_model = dimodel_state.with_machine_config(|machine_config| {
+			let rom_paths = self.rom_paths.clone();
+			let sample_paths = self.sample_paths.clone();
+			let icons = Icons::get(&dialog);
+			AuditModel::new(machine_config, rom_paths, sample_paths, icons)
+		});
+		let audit_model = audit_model.map(ModelRc::new).unwrap_or_default();
+		dialog.set_audit_assets(audit_model);
+
+		// start running the audit!
+		self.start_run_audit();
+	}
+
+	pub fn start_run_audit(&self) {
+		let audit_model = self.dialog_weak.unwrap().get_audit_assets();
+		let fut = async move {
+			let audit_model = AuditModel::get_model(&audit_model);
+			audit_model.run_audit().await;
+		};
+		spawn_local(fut).unwrap();
+	}
+
 	pub fn get_prefs_item(&self) -> PrefsItem {
 		let dialog = self.dialog_weak.unwrap();
 
@@ -606,6 +617,7 @@ impl State {
 		let dimodel = DevicesAndImagesModel::get_model(dimodel);
 		dimodel.set_slot_entry_option(entry_index, new_option_name);
 		self.update_images();
+		self.update_audit();
 	}
 
 	pub fn set_image_imagedesc(&self, tag: String, image_desc: Option<ImageDesc>) {
@@ -737,6 +749,21 @@ impl DiModelState {
 			} => {
 				let machine = info_db.machines().get(*machine_index).unwrap();
 				callback(Some(machine))
+			}
+		}
+	}
+
+	pub fn with_machine_config<R>(&self, callback: impl FnOnce(&MachineConfig) -> R) -> Option<R> {
+		match self {
+			Self::Ok { dimodel, .. } => {
+				let dimodel = DevicesAndImagesModel::get_model(dimodel);
+				dimodel.with_diconfig(|diconfig| diconfig.machine_config().map(callback))
+			}
+			Self::Error {
+				info_db, machine_index, ..
+			} => {
+				let machine_config = MachineConfig::from_machine_index(info_db.clone(), *machine_index);
+				Some(callback(&machine_config))
 			}
 		}
 	}

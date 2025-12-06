@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use default_ext::DefaultExt;
+use itertools::Itertools;
 use slint::SharedString;
 use smol_str::SmolStr;
 use tracing::debug;
@@ -18,7 +19,9 @@ use crate::chd::chd_asset_hash;
 use crate::info::AssetStatus;
 use crate::info::Machine;
 use crate::info::View;
+use crate::mconfig::MachineConfig;
 
+#[derive(Debug)]
 pub struct Asset {
 	pub kind: AssetKind,
 	pub name: SharedString,
@@ -29,7 +32,7 @@ pub struct Asset {
 	is_optional: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AssetKind {
 	Rom,
 	Disk,
@@ -60,29 +63,67 @@ pub enum AuditMessage {
 	NoGoodDump,
 }
 
+/// Used for diagnostic purposes
+#[derive(Copy, Clone, Debug)]
+enum MachineType {
+	Root,
+	Slot,
+	DeviceRef,
+}
+
 impl Asset {
-	pub fn from_machine(machine: Machine<'_>) -> Vec<Self> {
+	pub fn from_machine_config(machine_config: &MachineConfig) -> Vec<Self> {
+		debug!(?machine_config, "Asset::from_machine_config()");
+
 		let mut results = Vec::new();
-		Self::from_machine_internal(&mut results, machine);
+		Self::from_machine_internal(&mut results, machine_config.machine(), None, MachineType::Root);
+		machine_config.visit_slots(|_, _, _, _, slot_data| {
+			if let Some(machine) = slot_data.map(|(_, machine_config)| machine_config.machine()) {
+				Self::from_machine_internal(&mut results, machine, None, MachineType::Slot);
+			}
+		});
+
+		// remove duplicates and return
 		results
+			.into_iter()
+			.unique_by(|x| (x.kind, x.name.clone(), x.machine_names.clone()))
+			.collect()
 	}
 
-	fn from_machine_internal(results: &mut Vec<Self>, machine: Machine<'_>) {
+	fn from_machine_internal(
+		results: &mut Vec<Self>,
+		machine: Machine<'_>,
+		bios: Option<&str>,
+		machine_type: MachineType,
+	) {
+		// we were passed a BIOS; if `None` was specified use the machine's default BIOS
+		let bios = bios.or_else(|| {
+			machine
+				.default_biosset_index()
+				.map(|index| machine.biossets().get(index).unwrap().name())
+		});
+
+		debug!(machine=?machine.name(), ?bios, ?machine_type, "Asset::from_machine_internal()");
+
 		let machine_names = [Some(machine.name()), machine.clone_of().map(|x| x.name())]
 			.iter()
 			.flatten()
 			.copied()
 			.map(SmolStr::from)
 			.collect::<Arc<[_]>>();
-		let roms = machine.roms().iter().map(|rom| Asset {
-			kind: AssetKind::Rom,
-			name: rom.name().into(),
-			size: rom.size().into(),
-			machine_names: machine_names.clone(),
-			asset_hash: rom.asset_hash(),
-			status: rom.status(),
-			is_optional: rom.is_optional(),
-		});
+		let roms = machine
+			.roms()
+			.iter()
+			.filter(|r| r.bios().is_none_or(|b| bios == Some(b)))
+			.map(|rom| Asset {
+				kind: AssetKind::Rom,
+				name: rom.name().into(),
+				size: rom.size().into(),
+				machine_names: machine_names.clone(),
+				asset_hash: rom.asset_hash(),
+				status: rom.status(),
+				is_optional: rom.is_optional(),
+			});
 		let disks = machine.disks().iter().map(|disk| Asset {
 			kind: AssetKind::Disk,
 			name: format!("{}.chd", disk.name()).into(),
@@ -103,8 +144,9 @@ impl Asset {
 		});
 		results.extend(roms.chain(disks).chain(samples));
 
+		// add devices references
 		for machine in machine.device_refs().iter().filter_map(|dr| dr.machine()) {
-			Self::from_machine_internal(results, machine);
+			Self::from_machine_internal(results, machine, None, MachineType::DeviceRef);
 		}
 	}
 
