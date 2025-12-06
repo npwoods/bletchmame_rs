@@ -339,28 +339,37 @@ impl MachineConfig {
 		Ok(result)
 	}
 
-	pub fn visit_slots<'a>(&'a self, mut callback: impl FnMut(usize, &str, Machine<'a>, Slot<'a>, Option<usize>)) {
+	pub fn visit_slots<'a>(
+		&'a self,
+		mut callback: impl FnMut(usize, &str, Machine<'a>, Slot<'a>, Option<(usize, &Self)>),
+	) {
 		self.internal_visit_slots(&mut callback, "", 0);
 	}
 
 	fn internal_visit_slots<'a>(
 		&'a self,
-		callback: &mut impl FnMut(usize, &str, Machine<'a>, Slot<'a>, Option<usize>),
+		callback: &mut impl FnMut(usize, &str, Machine<'a>, Slot<'a>, Option<(usize, &Self)>),
 		base_tag: &str,
 		depth: usize,
 	) {
 		let machine = self.machine();
 		for (slot, slot_data) in machine.slots().iter().zip(self.slots.iter()) {
-			if !matches!(slot_data, SlotData::Ignore) {
+			let slot_data = match slot_data {
+				SlotData::Unset => Some(None),
+				SlotData::Set { option_index, config } => Some(Some((*option_index, config.as_ref()))),
+				SlotData::Ignore => None,
+			};
+			if let Some(slot_data) = slot_data {
 				// invoke the callback
-				callback(depth, base_tag, machine, slot, slot_data.option_index());
+				callback(depth, base_tag, machine, slot, slot_data);
 
-				if let SlotData::Set { option_index, config } = &slot_data {
+				// recurse if appropriate
+				if let Some((option_index, config)) = slot_data {
 					let base_tag = format!(
 						"{}{}:{}:",
 						base_tag,
 						slot.name(),
-						slot.options().get(*option_index).unwrap().name()
+						slot.options().get(option_index).unwrap().name()
 					);
 					config.internal_visit_slots(callback, &base_tag, depth + 1);
 				}

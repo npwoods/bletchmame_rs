@@ -19,7 +19,7 @@ use crate::audit::AssetKind;
 use crate::audit::AuditResult;
 use crate::audit::AuditSeverity;
 use crate::audit::PathType;
-use crate::info::Machine;
+use crate::mconfig::MachineConfig;
 use crate::ui::Icons;
 
 pub struct AuditModel {
@@ -40,12 +40,14 @@ pub struct AuditModel {
 
 impl AuditModel {
 	pub fn new(
-		machine: Machine<'_>,
+		machine_config: &MachineConfig,
 		rom_paths: Arc<[SmolStr]>,
 		sample_paths: Arc<[SmolStr]>,
 		icons: Icons<'_>,
 	) -> Self {
-		let assets = Asset::from_machine(machine).into_iter().collect::<Arc<[_]>>();
+		let assets = Asset::from_machine_config(machine_config)
+			.into_iter()
+			.collect::<Arc<[_]>>();
 		let audit_results = (0..assets.len()).map(|_| None).collect::<Box<_>>();
 		let audit_results = RefCell::new(audit_results);
 

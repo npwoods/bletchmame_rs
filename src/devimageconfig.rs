@@ -374,7 +374,9 @@ fn diconfig_from_machine_configs_and_images(
 	let mut entries = Vec::new();
 	machine_configs
 		.current_config()
-		.visit_slots(|indent, base_tag, _, slot, current_option_index| {
+		.visit_slots(|indent, base_tag, _, slot, slot_data| {
+			let current_option_index = slot_data.map(|(x, _)| x);
+
 			// add this slot
 			let tag = format!("{}{}", base_tag, slot.name());
 			let subtag_start = base_tag.len();
