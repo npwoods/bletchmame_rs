@@ -2,6 +2,7 @@ import {
     HorizontalBox,
     VerticalBox,
     Button,
+    Palette,
     StandardListView,
     StandardTableView,
     LineEdit,
@@ -55,15 +56,6 @@ export component AppWindow inherits Window {
     max-height: 10000px;
     icon: Icons.bletchmame;
     title: @tr("BletchMAME 3.0 prototype") + (running-machine-desc != "" ? ": " + running-machine-desc : "");
-
-    // width and height
-    changed width => {
-        self.size-changed();
-    }
-    changed height => {
-        self.size-changed();
-    }
-    callback size-changed();
 
     // the currently running machine (empty if no emulation is running)
     in property <string> running-machine-desc;
@@ -130,10 +122,24 @@ export component AppWindow inherits Window {
     in property <string> menu-action-help-website;
     in property <string> menu-action-help-about;
 
-    // height of the menubar
-    public function menubar-height() -> length {
-        return hbox.absolute-position.y;
+    // content area position
+    out property <length> content-area-x: content-area.absolute-position.x;
+    out property <length> content-area-y: content-area.absolute-position.y;
+    out property <length> content-area-width: content-area.width;
+    out property <length> content-area-height: content-area.height;
+    changed content-area-x => {
+        self.content-area-changed();
     }
+    changed content-area-y => {
+        self.content-area-changed();
+    }
+    changed content-area-width => {
+        self.content-area-changed();
+    }
+    changed content-area-height => {
+        self.content-area-changed();
+    }
+    callback content-area-changed();
 
     // collections context menu
     in-out property <CollectionContextMenuInfo> collection-context-menu-info;
@@ -697,223 +703,230 @@ export component AppWindow inherits Window {
         }
     }
 
-    hbox := HorizontalBox {
-        alignment: stretch;
-        preferred-width: 100%;
-        preferred-height: 100%;
-        visible: root.mode() == "ready";
+    VerticalBox {
+        padding: 0px;
 
-        // collections list view on the left
-        VerticalBox {
-            alignment: start;
-            preferred-height: 100%;
-            NavigationDrawer {
-                vertical-stretch: 0;
-                width: 250px;
-                groups: [{ title: 0, items: collections-model }];
-                current-index <=> collections-view-selected-index;
-                selected(group-index, index) => {
-                    collections-view-selected(index)
-                }
-                item-pointer-event(group-index, item-index, event, point) => {
-                    collections-row-pointer-event(item-index, event, { x: point.x + self.absolute-position.x, y: point.y + self.absolute-position.y })
-                }
-            }
+        // the main content area (containing the UI and the report view)
+        content-area := Rectangle {
+            vertical-stretch: 1;
 
-            Rectangle {
-                vertical-stretch: 1;
-                background: green;
-            }
-        }
-
-        VerticalBox {
-            alignment: stretch;
-                
-            // toolbar below the current collection
+            // main UI view
             HorizontalBox {
-                vertical-stretch: 0;
                 alignment: stretch;
-                height: 50px;
-                preferred-width: 100%;
-                FilledIconButton {
-                    horizontal-stretch: 0;
-                    icon: Icons.arrow-back;
-                    enabled: history-can-go-back;
-                    clicked => {
-                        history-advance-clicked(-1)
+                visible: root.mode() == "ready";
+
+                // collections list view on the left
+                VerticalBox {
+                    alignment: start;
+                    min-height: 0px;
+                    NavigationDrawer {
+                        vertical-stretch: 0;
+                        preferred-height: 100%;
+                        width: 250px;
+                        groups: [{ title: 0, items: collections-model }];
+                        current-index <=> collections-view-selected-index;
+                        selected(group-index, index) => {
+                            collections-view-selected(index)
+                        }
+                        item-pointer-event(group-index, item-index, event, point) => {
+                            collections-row-pointer-event(item-index, event, { x: point.x + self.absolute-position.x, y: point.y + self.absolute-position.y })
+                        }
                     }
                 }
 
-                FilledIconButton {
-                    horizontal-stretch: 0;
-                    icon: Icons.book;
-                    enabled: bookmark-collection-enabled;
-                    clicked => {
-                        bookmark-collection-clicked();
+                VerticalBox {
+                    alignment: stretch;
+                        
+                    // toolbar below the current collection
+                    HorizontalBox {
+                        vertical-stretch: 0;
+                        alignment: stretch;
+                        height: 50px;
+                        preferred-width: 100%;
+                        FilledIconButton {
+                            horizontal-stretch: 0;
+                            icon: Icons.arrow-back;
+                            enabled: history-can-go-back;
+                            clicked => {
+                                history-advance-clicked(-1)
+                            }
+                        }
+
+                        FilledIconButton {
+                            horizontal-stretch: 0;
+                            icon: Icons.book;
+                            enabled: bookmark-collection-enabled;
+                            clicked => {
+                                bookmark-collection-clicked();
+                            }
+                        }
+
+                        FilledIconButton {
+                            horizontal-stretch: 0;
+                            icon: Icons.arrow-forward;
+                            enabled: history-can-go-forward;
+                            clicked => {
+                                history-advance-clicked(+1)
+                            }
+                        }
+
+                        SearchBar {
+                            property <[SearchBarItem]> my-items: get-searchbar-items(self.text);
+                            horizontal-stretch: 1;
+                            placeholder-text: "Search " + current-collection-text;
+                            text <=> items-search-text;
+                            items: translate-searchbar-items(my-items);
+                            changed text => {
+                                items-search-text-changed(self.text)
+                            }
+                            accepted(text) => {
+                                self.close-popup();
+                            }
+                            item-activated(index) => {
+                                return items-search-item-activated(index);
+                            }
+                        }
+                    }
+                        
+                    // current collection label
+                    Text {
+                        vertical-stretch: 0;
+                        horizontal-alignment: left;
+                        text: current-collection-text;
+                        font-size: 16px;
+                        height: 20px;
+                    }
+
+                    // items table
+                    items-table-view := StandardTableView {
+                        vertical-stretch: 1;
+                        rows: items-model;
+                        current-row <=> items-view-selected-index;
+                        columns <=> items-columns;
+                        min-height: 0px;
+                        sort-ascending(index) => {
+                            items-sort-ascending(index)
+                        }
+                        sort-descending(index) => {
+                            items-sort-descending(index)
+                        }
+                        current-row-changed(index) => {
+                            items-current-row-changed()
+                        }
+                        row-pointer-event(row, event, point) => {
+                            items-row-pointer-event(row, event, { x: point.x + self.absolute-position.x, y: point.y + self.absolute-position.y })
+                        }
+                    }
+
+                    // items empty text
+                    Text {
+                        visible: root.mode() == "ready" && is-empty-reason != "";
+                        text: is-empty-reason;
                     }
                 }
 
-                FilledIconButton {
-                    horizontal-stretch: 0;
-                    icon: Icons.arrow-forward;
-                    enabled: history-can-go-forward;
-                    clicked => {
-                        history-advance-clicked(+1)
+                VerticalBox {
+                    alignment: center;
+                    Image {
+                        source: get-snap-image-func();
+                        width: 300px;
+                        min-height: 0px;
+                        preferred-height: 300px;
+                    }
+
+                    Rectangle {
+                        width: 300px;
+                        min-height: 0px;
+                        preferred-height: 300px;
+                        TextEdit {
+                            text: get-history-text-func();
+                            visible: get-history-text(current-snap-view) != "";
+                            read-only: true;
+                        }
+
+                        Spinner {
+                            visible: root.history-xml-is-loading;
+                            indeterminate: true;
+                        }
                     }
                 }
-
-                SearchBar {
-                    property <[SearchBarItem]> my-items: get-searchbar-items(self.text);
-                    horizontal-stretch: 1;
-                    placeholder-text: "Search " + current-collection-text;
-                    text <=> items-search-text;
-                    items: translate-searchbar-items(my-items);
-                    changed text => {
-                        items-search-text-changed(self.text)
-                    }
-                    accepted(text) => {
-                        self.close-popup();
-                    }
-                    item-activated(index) => {
-                        return items-search-item-activated(index);
-                    }
-                }
-            }
-                
-            // current collection label
-            Text {
-                vertical-stretch: 0;
-                horizontal-alignment: left;
-                text: current-collection-text;
-                font-size: 16px;
-                height: 20px;
             }
 
-            // items table
-            items-table-view := StandardTableView {
-                vertical-stretch: 1;
-                rows: items-model;
-                current-row <=> items-view-selected-index;
-                columns <=> items-columns;
-                sort-ascending(index) => {
-                    items-sort-ascending(index)
-                }
-                sort-descending(index) => {
-                    items-sort-descending(index)
-                }
-                current-row-changed(index) => {
-                    items-current-row-changed()
-                }
-                row-pointer-event(row, event, point) => {
-                    items-row-pointer-event(row, event, { x: point.x + self.absolute-position.x, y: point.y + self.absolute-position.y })
-                }
-            }
-
-            // items empty text
-            Text {
-                visible: root.mode() == "ready" && is-empty-reason != "";
-                text: is-empty-reason;
-            }
-        }
-
-        VerticalBox {
-            alignment: center;
-            Image {
-                source: get-snap-image-func();
-                width: 300px;
-                height: 300px;
-            }
-
-            TextEdit {
-                width: 300px;
-                height: 300px;
-                text: get-history-text-func();
-                visible: get-history-text(current-snap-view) != "";
-                read-only: true;
-            }
-
-            Spinner {
-                width: 300px;
-                height: 300px;
-                visible: root.history-xml-is-loading;
-                indeterminate: true;
-            }
-        }
-    }
-
-    // report view
-    HorizontalBox {
-        visible: root.mode() == "report";
-        alignment: center;
-        if root.report-spinning: VerticalBox {
-            // spinner
-            alignment: center;
-            Spinner {
-                width: 150px;
-                height: 150px;
-                indeterminate: true;
-            }
-        }
-        VerticalBox {
-            alignment: center;
-
-            // report message
-            Text {
-                text: root.report-message;
-                horizontal-alignment: center;
-                font-size: 24px;
-                wrap: word-wrap;
-            }
-
-            // report submessage
-            if root.report-submessage != "": Text {
-                text: root.report-submessage;
-                horizontal-alignment: center;
-                font-size: 12px;
-                wrap: word-wrap;
-            }
-
-            // report MAME stderr output
-            if root.report-mame-stderr-output != "": TextEdit {
-                width: 600px;
-                height: 300px;
-                text: root.report-mame-stderr-output;
-                font-size: 10px;
-                font-family: monospace-font-family;
-                read-only: true;
-            }
-
-            // report MAME exit code
-            if root.report-mame-exit-code != "": Text {
-                text: "(exit code " + root.report-mame-exit-code + "}";
-                horizontal-alignment: right;
-                font-size: 12px;
-            }
-
-            // report button
-            if root.report-button-text != "": HorizontalBox {
+            // report view
+            HorizontalBox {
+                visible: root.mode() == "report";
                 alignment: center;
-                Button {
-                    text: root.report-button-text;
-                    width: 50px;
-                    clicked => {
-                        root.report-button-clicked();
+                if root.report-spinning: VerticalBox {
+                    // spinner
+                    alignment: center;
+                    Spinner {
+                        width: 150px;
+                        height: 150px;
+                        indeterminate: true;
                     }
                 }
-            }
+                VerticalBox {
+                    alignment: center;
 
-            // report issues
-            for issue[index] in report-issues: HorizontalBox {
-                Text {
-                    horizontal-alignment: left;
-                    text: issue.text;
-                }
+                    // report message
+                    Text {
+                        text: root.report-message;
+                        horizontal-alignment: center;
+                        font-size: 24px;
+                        wrap: word-wrap;
+                    }
 
-                Button {
-                    visible: issue.button-text != "";
-                    text: issue.button-text;
-                    clicked => {
-                        root.issue-button-clicked(index);
+                    // report submessage
+                    if root.report-submessage != "": Text {
+                        text: root.report-submessage;
+                        horizontal-alignment: center;
+                        font-size: 12px;
+                        wrap: word-wrap;
+                    }
+
+                    // report MAME stderr output
+                    if root.report-mame-stderr-output != "": TextEdit {
+                        width: 600px;
+                        height: 300px;
+                        text: root.report-mame-stderr-output;
+                        font-size: 10px;
+                        font-family: monospace-font-family;
+                        read-only: true;
+                    }
+
+                    // report MAME exit code
+                    if root.report-mame-exit-code != "": Text {
+                        text: "(exit code " + root.report-mame-exit-code + "}";
+                        horizontal-alignment: right;
+                        font-size: 12px;
+                    }
+
+                    // report button
+                    if root.report-button-text != "": HorizontalBox {
+                        alignment: center;
+                        Button {
+                            text: root.report-button-text;
+                            width: 50px;
+                            clicked => {
+                                root.report-button-clicked();
+                            }
+                        }
+                    }
+
+                    // report issues
+                    for issue[index] in report-issues: HorizontalBox {
+                        Text {
+                            horizontal-alignment: left;
+                            text: issue.text;
+                        }
+
+                        Button {
+                            visible: issue.button-text != "";
+                            text: issue.button-text;
+                            clicked => {
+                                root.issue-button-clicked(index);
+                            }
+                        }
                     }
                 }
             }

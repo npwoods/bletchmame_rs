@@ -40,6 +40,7 @@ impl Status {
 
 			let machine_name = running.machine_name;
 			let is_paused = running.is_paused.unwrap_or(status_running.is_paused);
+			let speed_percent = running.speed_percent.unwrap_or(status_running.speed_percent);
 			let is_throttled = running.is_throttled.unwrap_or(status_running.is_throttled);
 			let throttle_rate = running.throttle_rate.unwrap_or(status_running.throttle_rate);
 			let frameskip = running.frameskip.unwrap_or(status_running.frameskip);
@@ -82,6 +83,7 @@ impl Status {
 			Running {
 				machine_name,
 				is_paused,
+				speed_percent,
 				is_throttled,
 				throttle_rate,
 				frameskip,
@@ -122,6 +124,7 @@ impl Debug for Status {
 pub struct Running {
 	pub machine_name: SmolStr,
 	pub is_paused: bool,
+	pub speed_percent: f32,
 	pub is_throttled: bool,
 	pub throttle_rate: f32,
 	pub frameskip: Option<u8>,
@@ -222,6 +225,7 @@ impl Debug for Update {
 struct RunningUpdate {
 	pub machine_name: SmolStr,
 	pub is_paused: Option<bool>,
+	pub speed_percent: Option<f32>,
 	pub is_throttled: Option<bool>,
 	pub throttle_rate: Option<f32>,
 	pub frameskip: Option<Option<u8>>,
@@ -436,26 +440,26 @@ mod test {
 		// status after running
 		let status = Status::new(Some(&status), update(xml1));
 		let run = status.running.as_ref().unwrap();
-		let actual = (run.is_paused, run.is_throttled, run.throttle_rate);
-		assert_eq!((true, true, 1.0), actual);
+		let actual = (run.speed_percent, run.is_paused, run.is_throttled, run.throttle_rate);
+		assert_eq!((1.0, true, true, 1.0), actual);
 
 		// unpaused...
 		let status = Status::new(Some(&status), update(xml2));
 		let run = status.running.as_ref().unwrap();
-		let actual = (run.is_paused, run.is_throttled, run.throttle_rate);
-		assert_eq!((false, true, 1.0), actual);
+		let actual = (run.speed_percent, run.is_paused, run.is_throttled, run.throttle_rate);
+		assert_eq!((0.9999857, false, true, 1.0), actual);
 
 		// null update
 		let status = Status::new(Some(&status), update(xml3));
 		let run = status.running.as_ref().unwrap();
-		let actual = (run.is_paused, run.is_throttled, run.throttle_rate);
-		assert_eq!((false, true, 1.0), actual);
+		let actual = (run.speed_percent, run.is_paused, run.is_throttled, run.throttle_rate);
+		assert_eq!((0.9999857, false, true, 1.0), actual);
 
 		// speed it up!
 		let status = Status::new(Some(&status), update(xml4));
 		let run = status.running.as_ref().unwrap();
-		let actual = (run.is_paused, run.is_throttled, run.throttle_rate);
-		assert_eq!((false, false, 3.0), actual);
+		let actual = (run.speed_percent, run.is_paused, run.is_throttled, run.throttle_rate);
+		assert_eq!((50.812424, false, false, 3.0), actual);
 
 		// and apply the same update again!
 		let old_run = run;

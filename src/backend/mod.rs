@@ -8,8 +8,8 @@ use std::rc::Rc;
 use anyhow::Result;
 use easy_ext::ext;
 use i_slint_backend_winit::WinitWindowAccessor;
-use slint::PhysicalPosition;
-use slint::PhysicalSize;
+use slint::LogicalPosition;
+use slint::LogicalSize;
 use slint::Window;
 use strum::EnumString;
 use tracing::debug;
@@ -133,13 +133,9 @@ impl ChildWindow {
 		}
 	}
 
-	pub fn update_bounds(&self, container: &Window, top: f32) {
-		let position = PhysicalPosition {
-			x: 0,
-			y: (top * container.scale_factor()) as i32,
-		};
-		let size = container.size();
-		let size = PhysicalSize::new(size.width, size.height - (position.y as u32));
+	pub fn update_bounds(&self, container: &Window, position: LogicalPosition, size: LogicalSize) {
+		let position = position.to_physical(container.scale_factor());
+		let size = size.to_physical(container.scale_factor());
 		debug!(position=?position, size=?size, "ChildWindow::update_bounds()");
 
 		let position =

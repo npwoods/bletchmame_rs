@@ -117,8 +117,14 @@ impl State {
 				Some(Phase::Status)
 			}
 			(Phase::Status, b"video") => {
-				let [throttled, throttle_rate, frameskip, is_recording] =
-					evt.find_attributes([b"throttled", b"throttle_rate", b"frameskip", b"is_recording"])?;
+				let [speed_percent, throttled, throttle_rate, frameskip, is_recording] = evt.find_attributes([
+					b"speed_percent",
+					b"throttled",
+					b"throttle_rate",
+					b"frameskip",
+					b"is_recording",
+				])?;
+				let speed_percent = speed_percent.map(|x| x.parse::<f32>()).transpose()?;
 				let throttled = throttled.map(parse_mame_bool).transpose()?;
 				let throttle_rate = throttle_rate.map(|x| x.parse::<f32>()).transpose()?;
 				let frameskip = frameskip
@@ -133,6 +139,7 @@ impl State {
 					"status State::handle_start()"
 				);
 
+				self.running.speed_percent = speed_percent.or(self.running.speed_percent);
 				self.running.is_throttled = throttled.or(self.running.is_throttled);
 				self.running.throttle_rate = throttle_rate.or(self.running.throttle_rate);
 				self.running.frameskip = frameskip.or(self.running.frameskip);
