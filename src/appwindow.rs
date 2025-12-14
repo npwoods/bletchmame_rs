@@ -397,6 +397,34 @@ impl AppModel {
 			.and_then(|s| s.running.as_ref())
 			.map(|r| format!("{}.{}", r.machine_name, extension))
 	}
+
+	pub fn maybe_stop_warning(self: &Rc<Self>, f: impl FnOnce(&Rc<Self>) + 'static) {
+		let model = self.clone();
+		let show_warning = model.preferences.borrow().show_stop_warning;
+		let fut = async move {
+			let result = if show_warning && model.state.borrow().status().is_some_and(|s| s.running.is_some()) {
+				dialog_stop_warning(model.modal_stack.clone(), show_warning).await
+			} else {
+				StopWarningResult {
+					stop: true,
+					show_warning: None,
+				}
+			};
+
+			info!("Showed stop warning dialog; result: {:?}", result);
+
+			// stop the emulation if requested
+			if result.stop {
+				f(&model);
+			}
+
+			// update the prefs if requested
+			if let Some(show_warning) = result.show_warning {
+				model.modify_prefs(|prefs| prefs.show_stop_warning = show_warning);
+			}
+		};
+		spawn_local(fut).unwrap();
+	}
 }
 
 pub async fn start(app_window: &AppWindow, args: AppArgs) {
@@ -810,31 +838,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 
 	match action {
 		Action::FileStop => {
-			let model = model.clone();
-			let show_warning = model.preferences.borrow().show_stop_warning;
-			let fut = async move {
-				let result = if show_warning {
-					dialog_stop_warning(model.modal_stack.clone(), show_warning).await
-				} else {
-					StopWarningResult {
-						stop: true,
-						show_warning: None,
-					}
-				};
-
-				info!("Showed stop warning dialog; result: {:?}", result);
-
-				// stop the emulation if requested
-				if result.stop {
-					model.issue_command(MameCommand::stop());
-				}
-
-				// update the prefs if requested
-				if let Some(show_warning) = result.show_warning {
-					model.modify_prefs(|prefs| prefs.show_stop_warning = show_warning);
-				}
-			};
-			spawn_local(fut).unwrap();
+			model.maybe_stop_warning(|model| model.issue_command(MameCommand::stop()));
 		}
 		Action::FilePause => {
 			let is_paused = model
@@ -976,7 +980,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 			model.issue_command(MameCommand::hard_reset());
 		}
 		Action::FileExit => {
-			model.update_state(AppState::shutdown);
+			model.maybe_stop_warning(|model| model.update_state(AppState::shutdown));
 		}
 		Action::OptionsThrottleRate(throttle) => {
 			model.issue_command(MameCommand::throttle_rate(throttle));
