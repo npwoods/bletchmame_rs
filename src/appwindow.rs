@@ -17,6 +17,7 @@ use showfile::show_path_in_file_manager;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
 use slint::Global;
+use slint::LogicalPosition;
 use slint::LogicalSize;
 use slint::Model;
 use slint::ModelRc;
@@ -448,15 +449,23 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		}
 	});
 
-	// create a repeating future that will update the child window forever
+	// if the content area changes, update the child window
 	let model_weak = Rc::downgrade(&model);
-	app_window.on_size_changed(move || {
+	app_window.on_content_area_changed(move || {
 		if let Some(model) = model_weak.upgrade().as_deref()
 			&& let Some(child_window) = model.child_window.borrow().as_ref()
 		{
 			// set the child window size
-			let top = model.app_window().invoke_menubar_height();
-			child_window.update_bounds(model.app_window().window(), top);
+			let app_window = model.app_window();
+			let position = LogicalPosition {
+				x: app_window.get_content_area_x(),
+				y: app_window.get_content_area_y(),
+			};
+			let size = LogicalSize {
+				width: app_window.get_content_area_width(),
+				height: app_window.get_content_area_height(),
+			};
+			child_window.update_bounds(model.app_window().window(), position, size);
 		}
 	});
 
