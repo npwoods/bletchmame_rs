@@ -376,8 +376,9 @@ impl<'a> DeviceRef<'a> {
 		self.db.machines().get(machine_index)
 	}
 
-	pub fn count(&self) -> usize {
-		self.obj().count.into()
+	pub fn tag(&self) -> Option<&'a str> {
+		let tag_strindex = self.obj().tag_strindex;
+		(tag_strindex != !UsizeDb::default()).then(|| self.string(|x| x.tag_strindex))
 	}
 }
 

@@ -218,7 +218,7 @@ pub struct Device {
 #[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq, Eq, Hash)]
 pub struct DeviceRef {
 	pub machine_index: UsizeDb,
-	pub count: u8,
+	pub tag_strindex: UsizeDb,
 }
 
 impl Fixup for DeviceRef {

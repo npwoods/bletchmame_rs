@@ -732,7 +732,7 @@ mod test {
 
 	#[test_case(0, include_str!("test_data/listxml_alienar.xml"), "0.229 (mame0229)", 13, 1, &["alienar", "ipt_merge_any_hi", "ls157"])]
 	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "0.273 (mame0273)", 121, 10, &["acia6850", "address_map_bank", "ata_interface"])]
-	#[test_case(2, include_str!("test_data/listxml_fake.xml"), "<<fake build>>", 4, 3, &["blah", "fake", "fakefake", "mc6809e"])]
+	#[test_case(2, include_str!("test_data/listxml_fake.xml"), "<<fake build>>", 6, 3, &["blah", "fake", "fakefake", "floppy_525_dd", "floppy_connector", "mc6809e"])]
 	pub fn test(
 		_index: usize,
 		xml: &str,
@@ -977,6 +977,9 @@ mod test {
 	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", "mc6809e", 1)]
 	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "coco2b", "pia6821", 2)]
 	#[test_case(2, include_str!("test_data/listxml_coco.xml"), "coco2b", "floppy_connector", 4)]
+	#[test_case(3, include_str!("test_data/listxml_fake.xml"), "fake", "mc6809e", 1)]
+	#[test_case(4, include_str!("test_data/listxml_fake.xml"), "fake", "floppy_connector", 0)]
+	#[test_case(5, include_str!("test_data/listxml_fake.xml"), "fake", "floppy_525_dd", 0)]
 	pub fn device_refs(_index: usize, xml: &str, machine: &str, device_ref_name: &str, expected_count: usize) {
 		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| ControlFlow::Continue(()))
 			.unwrap()
@@ -984,8 +987,7 @@ mod test {
 		let device_refs = db.machines().find(machine).unwrap().device_refs();
 		let actual_count = device_refs
 			.iter()
-			.find(|x| x.machine().map(|m| m.name()) == Some(device_ref_name))
-			.unwrap()
+			.filter(|x| x.machine().map(|m| m.name()) == Some(device_ref_name))
 			.count();
 		assert_eq!(expected_count, actual_count);
 	}

@@ -89,7 +89,6 @@ struct State {
 	ram_options: TableBuilder<binary::RamOption>,
 	build_strindex: UsizeDb,
 	phase_specific: Option<PhaseSpecificState>,
-	current_device_refs: Option<Vec<UsizeDb>>,
 }
 
 enum PhaseSpecificState {
@@ -115,7 +114,7 @@ enum ThisError {
 
 // capacity defaults based on MAME 0.280
 //          48893 machines
-//         360102 roms
+//         360116 roms
 //           1240 disks
 //            472 samples
 //           4221 BIOS sets
@@ -124,8 +123,8 @@ enum ThisError {
 //          47581 configuration settings
 //            280 configuration setting configurations
 //           2890 devices
-//          74788 device refs
-//           7938 slots
+//          99687 device refs
+//           7183 slots
 //           3113 slot options
 //           7038 links
 //           1128 RAM options
@@ -140,8 +139,8 @@ const CAPACITY_CONFIGS: usize = 90000;
 const CAPACITY_CONFIG_SETTINGS: usize = 52000;
 const CAPACITY_CONFIG_SETTING_CONDITIONS: usize = 400;
 const CAPACITY_DEVICES: usize = 3500;
-const CAPACITY_DEVICE_REFS: usize = 80000;
-const CAPACITY_SLOTS: usize = 9000;
+const CAPACITY_DEVICE_REFS: usize = 120000;
+const CAPACITY_SLOTS: usize = 8500;
 const CAPACITY_SLOT_OPTIONS: usize = 3500;
 const CAPACITY_MACHINE_SOFTWARE_LISTS: usize = 7500;
 const CAPACITY_RAM_OPTIONS: usize = 1500;
@@ -177,7 +176,6 @@ impl State {
 			strings,
 			build_strindex,
 			phase_specific: None,
-			current_device_refs: None,
 		}
 	}
 
@@ -239,7 +237,6 @@ impl State {
 					..Default::default()
 				};
 				self.machines.push_db(machine)?;
-				self.current_device_refs = Some(Vec::new());
 				Some(Phase::Machine)
 			}
 			(Phase::Machine, b"description") => Some(Phase::MachineDescription),
@@ -478,10 +475,19 @@ impl State {
 				Some(Phase::MachineDevice)
 			}
 			(Phase::Machine, b"device_ref") => {
-				let [name] = evt.find_attributes([b"name"])?;
+				let [name, tag] = evt.find_attributes([b"name", b"tag"])?;
 				let name = name.mandatory("name")?;
 				let name_strindex = self.strings.lookup(&name);
-				self.current_device_refs.as_mut().unwrap().push(name_strindex);
+				let tag = tag.map(normalize_tag);
+				let tag_strindex = tag.map(|tag| self.strings.lookup(&tag)).unwrap_or(!UsizeDb::default());
+				let device_ref = binary::DeviceRef {
+					machine_index: name_strindex,
+					tag_strindex,
+				};
+				self.device_refs.push_db(device_ref)?;
+				self.machines.modify_last(|machine| {
+					machine.device_refs_end += 1;
+				});
 				None
 			}
 			(Phase::Machine, b"slot") => {
@@ -589,16 +595,6 @@ impl State {
 
 		match self.phase_stack.last().unwrap_or(&Phase::Root) {
 			Phase::Machine => {
-				let device_ref_map = self.current_device_refs.take().unwrap().into_iter().counts();
-				for (machine_index, count) in device_ref_map.into_iter().sorted_by_key(|(k, _)| *k) {
-					let count = count.try_into()?;
-					let device_ref = binary::DeviceRef { machine_index, count };
-					self.device_refs.push_db(device_ref)?;
-					self.machines.modify_last(|machine| {
-						machine.device_refs_end += 1;
-					});
-				}
-
 				self.machines.modify_last(|machine| {
 					// MAME will emit "phantom" slots pertaining to the default configuration; while this is considered to be a
 					// feature and not a bug (see https://github.com/mamedev/mame/pull/14639#issuecomment-3620541605), this is bad
@@ -613,6 +609,19 @@ impl State {
 							.iter()
 							.any(|x| strip_tag_prefix(slot_name, x).is_some_and(|t| !t.is_empty()))
 					});
+					filter_tail(
+						machine.device_refs_start,
+						&mut machine.device_refs_end,
+						&mut self.device_refs,
+						|dr| {
+							dr.tag_strindex == !UsizeDb::default() || {
+								let tag = self.strings.index(dr.tag_strindex);
+								!slot_tags
+									.iter()
+									.any(|x| strip_tag_prefix(tag, x).is_some_and(|t| !t.is_empty()))
+							}
+						},
+					);
 
 					// lots of machines look similar, and their collections are similar - attempt to reuse
 					// existing collections
