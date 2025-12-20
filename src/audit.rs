@@ -65,10 +65,11 @@ pub enum AuditMessage {
 
 /// Used for diagnostic purposes
 #[derive(Copy, Clone, Debug)]
-enum MachineType {
+#[allow(dead_code)]
+enum MachineType<'a> {
 	Root,
 	Slot,
-	DeviceRef,
+	DeviceRef(Option<&'a str>),
 }
 
 impl Asset {
@@ -94,7 +95,7 @@ impl Asset {
 		results: &mut Vec<Self>,
 		machine: Machine<'_>,
 		bios: Option<&str>,
-		machine_type: MachineType,
+		machine_type: MachineType<'_>,
 	) {
 		// we were passed a BIOS; if `None` was specified use the machine's default BIOS
 		let bios = bios.or_else(|| {
@@ -145,8 +146,11 @@ impl Asset {
 		results.extend(roms.chain(disks).chain(samples));
 
 		// add devices references
-		for machine in machine.device_refs().iter().filter_map(|dr| dr.machine()) {
-			Self::from_machine_internal(results, machine, None, MachineType::DeviceRef);
+		for device_ref in machine.device_refs().iter() {
+			if let Some(machine) = device_ref.machine() {
+				let machine_type = MachineType::DeviceRef(device_ref.tag());
+				Self::from_machine_internal(results, machine, None, machine_type);
+			}
 		}
 	}
 
