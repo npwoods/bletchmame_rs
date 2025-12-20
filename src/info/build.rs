@@ -89,7 +89,6 @@ struct State {
 	ram_options: TableBuilder<binary::RamOption>,
 	build_strindex: UsizeDb,
 	phase_specific: Option<PhaseSpecificState>,
-	current_device_refs: Option<Vec<UsizeDb>>,
 }
 
 enum PhaseSpecificState {
@@ -177,7 +176,6 @@ impl State {
 			strings,
 			build_strindex,
 			phase_specific: None,
-			current_device_refs: None,
 		}
 	}
 
@@ -239,7 +237,6 @@ impl State {
 					..Default::default()
 				};
 				self.machines.push_db(machine)?;
-				self.current_device_refs = Some(Vec::new());
 				Some(Phase::Machine)
 			}
 			(Phase::Machine, b"description") => Some(Phase::MachineDescription),
@@ -478,10 +475,19 @@ impl State {
 				Some(Phase::MachineDevice)
 			}
 			(Phase::Machine, b"device_ref") => {
-				let [name] = evt.find_attributes([b"name"])?;
+				let [name, tag] = evt.find_attributes([b"name", b"tag"])?;
 				let name = name.mandatory("name")?;
 				let name_strindex = self.strings.lookup(&name);
-				self.current_device_refs.as_mut().unwrap().push(name_strindex);
+				let tag = tag.map(normalize_tag);
+				let tag_strindex = tag.map(|tag| self.strings.lookup(&tag)).unwrap_or(!UsizeDb::default());
+				let device_ref = binary::DeviceRef {
+					machine_index: name_strindex,
+					tag_strindex,
+				};
+				self.device_refs.push_db(device_ref)?;
+				self.machines.modify_last(|machine| {
+					machine.device_refs_end += 1;
+				});
 				None
 			}
 			(Phase::Machine, b"slot") => {
@@ -589,16 +595,6 @@ impl State {
 
 		match self.phase_stack.last().unwrap_or(&Phase::Root) {
 			Phase::Machine => {
-				let device_ref_map = self.current_device_refs.take().unwrap().into_iter().counts();
-				for (machine_index, count) in device_ref_map.into_iter().sorted_by_key(|(k, _)| *k) {
-					let count = count.try_into()?;
-					let device_ref = binary::DeviceRef { machine_index, count };
-					self.device_refs.push_db(device_ref)?;
-					self.machines.modify_last(|machine| {
-						machine.device_refs_end += 1;
-					});
-				}
-
 				self.machines.modify_last(|machine| {
 					// MAME will emit "phantom" slots pertaining to the default configuration; while this is considered to be a
 					// feature and not a bug (see https://github.com/mamedev/mame/pull/14639#issuecomment-3620541605), this is bad

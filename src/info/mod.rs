@@ -984,8 +984,7 @@ mod test {
 		let device_refs = db.machines().find(machine).unwrap().device_refs();
 		let actual_count = device_refs
 			.iter()
-			.find(|x| x.machine().map(|m| m.name()) == Some(device_ref_name))
-			.unwrap()
+			.filter(|x| x.machine().map(|m| m.name()) == Some(device_ref_name))
 			.count();
 		assert_eq!(expected_count, actual_count);
 	}
