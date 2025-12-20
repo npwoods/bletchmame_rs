@@ -15,6 +15,7 @@ use crate::info::InfoDb;
 use crate::info::Machine;
 use crate::info::Slot;
 use crate::info::View;
+use crate::info::strip_tag_prefix;
 
 #[derive(Clone)]
 pub struct MachineConfig {
@@ -30,7 +31,6 @@ enum SlotData {
 		option_index: usize,
 		config: Rc<MachineConfig>,
 	},
-	Ignore,
 }
 
 impl SlotData {
@@ -38,7 +38,6 @@ impl SlotData {
 		match self {
 			Self::Unset => None,
 			Self::Set { option_index, .. } => Some(*option_index),
-			Self::Ignore => unreachable!(),
 		}
 	}
 }
@@ -87,32 +86,22 @@ impl MachineConfig {
 			.slots()
 			.iter()
 			.map(|slot| {
-				// the InfoDB contains child slots (e.g. - `ext:fdc:wd17xx:0` on `coco2b`), and we want to skip
-				// over these
-				let ignore = machine
-					.slots()
-					.iter()
-					.any(|x| strip_tag_prefix(slot.name(), x.name()).is_some_and(|x| !x.is_empty()));
-				if ignore {
-					SlotData::Ignore
-				} else {
-					// when we get the default index, we need to ensure that it references an actual machine
-					let option_and_machine_index = slot.default_option_index().and_then(|option_index| {
-						let machine_name = slot.options().get(option_index).unwrap().devname();
-						info_db
-							.machines()
-							.find_index(machine_name)
-							.ok()
-							.map(|machine_index| (option_index, machine_index))
-					});
+				// when we get the default index, we need to ensure that it references an actual machine
+				let option_and_machine_index = slot.default_option_index().and_then(|option_index| {
+					let machine_name = slot.options().get(option_index).unwrap().devname();
+					info_db
+						.machines()
+						.find_index(machine_name)
+						.ok()
+						.map(|machine_index| (option_index, machine_index))
+				});
 
-					if let Some((option_index, machine_index)) = option_and_machine_index {
-						let config = Self::new(info_db.clone(), machine_index);
-						let config = Rc::new(config);
-						SlotData::Set { option_index, config }
-					} else {
-						SlotData::Unset
-					}
+				if let Some((option_index, machine_index)) = option_and_machine_index {
+					let config = Self::new(info_db.clone(), machine_index);
+					let config = Rc::new(config);
+					SlotData::Set { option_index, config }
+				} else {
+					SlotData::Unset
 				}
 			})
 			.collect();
@@ -355,24 +344,22 @@ impl MachineConfig {
 		let machine = self.machine();
 		for (slot, slot_data) in machine.slots().iter().zip(self.slots.iter()) {
 			let slot_data = match slot_data {
-				SlotData::Unset => Some(None),
-				SlotData::Set { option_index, config } => Some(Some((*option_index, config.as_ref()))),
-				SlotData::Ignore => None,
+				SlotData::Unset => None,
+				SlotData::Set { option_index, config } => Some((*option_index, config.as_ref())),
 			};
-			if let Some(slot_data) = slot_data {
-				// invoke the callback
-				callback(depth, base_tag, machine, slot, slot_data);
 
-				// recurse if appropriate
-				if let Some((option_index, config)) = slot_data {
-					let base_tag = format!(
-						"{}{}:{}:",
-						base_tag,
-						slot.name(),
-						slot.options().get(option_index).unwrap().name()
-					);
-					config.internal_visit_slots(callback, &base_tag, depth + 1);
-				}
+			// invoke the callback
+			callback(depth, base_tag, machine, slot, slot_data);
+
+			// recurse if appropriate
+			if let Some((option_index, config)) = slot_data {
+				let base_tag = format!(
+					"{}{}:{}:",
+					base_tag,
+					slot.name(),
+					slot.options().get(option_index).unwrap().name()
+				);
+				config.internal_visit_slots(callback, &base_tag, depth + 1);
 			}
 		}
 	}
@@ -409,7 +396,6 @@ impl MachineConfig {
 			.iter()
 			.zip(base.slots.as_ref())
 			.zip(self.machine().slots().iter())
-			.filter(|((ent, _), _)| !matches!(ent, SlotData::Ignore))
 		{
 			// determine the tag
 			let slot_tag = if !base_tag.is_empty() {
@@ -456,17 +442,11 @@ impl Debug for MachineConfig {
 					let option = slot.options().get(*option_index).unwrap();
 					debug.field(slot.name(), &(option.name(), config.as_ref()))
 				}
-				SlotData::Ignore => debug.field(slot.name(), &"<<ignore>>"),
 			};
 		}
 
 		debug.finish()
 	}
-}
-
-fn strip_tag_prefix<'a>(tag: &'a str, target: &str) -> Option<&'a str> {
-	tag.strip_prefix(target)
-		.and_then(|x| if x.is_empty() { Some(x) } else { x.strip_prefix(":") })
 }
 
 #[cfg(test)]
@@ -607,17 +587,6 @@ mod test {
 			.iter()
 			.map(|(slot, opt)| (slot.to_string(), *opt))
 			.collect::<Vec<_>>();
-		assert_eq!(expected, actual);
-	}
-
-	#[test_case(0, "alpha:bravo:charlie", "alpha", Some("bravo:charlie"))]
-	#[test_case(1, "alpha:bravo:charlie", "alpha:bravo", Some("charlie"))]
-	#[test_case(2, "alpha:bravo:charlie", "alpha:bravo:charlie", Some(""))]
-	#[test_case(3, "alpha:bravo:charlie", "delta", None)]
-	#[test_case(4, "alpha:bravo:charlie", "alp", None)]
-	#[test_case(5, "alpha:bravo:charlie", "alpha:bra", None)]
-	pub fn strip_tag_prefix(_index: usize, tag: &str, target: &str, expected: Option<&str>) {
-		let actual = super::strip_tag_prefix(tag, target);
 		assert_eq!(expected, actual);
 	}
 }

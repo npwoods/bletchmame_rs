@@ -39,6 +39,7 @@ use crate::info::binary::ASSET_FLAG_WRITABLE;
 use crate::info::binary::Fixup;
 use crate::info::entities::AssetStatus;
 use crate::info::strings::StringTableBuilder;
+use crate::info::strip_tag_prefix;
 use crate::parse::normalize_tag;
 use crate::parse::parse_mame_bool;
 use crate::xml::XmlElement;
@@ -599,6 +600,22 @@ impl State {
 				}
 
 				self.machines.modify_last(|machine| {
+					// MAME will emit "phantom" slots pertaining to the default configuration; while this is considered to be a
+					// feature and not a bug (see https://github.com/mamedev/mame/pull/14639#issuecomment-3620541605), this is bad
+					// for us; therefore we need to prune them
+					let slot_tags = self.slots[usize::from(machine.slots_start)..usize::from(machine.slots_end)]
+						.iter()
+						.map(|s| self.strings.index(s.name_strindex))
+						.collect::<Vec<_>>();
+					filter_tail(machine.slots_start, &mut machine.slots_end, &mut self.slots, |s| {
+						let slot_name = self.strings.index(s.name_strindex);
+						!slot_tags
+							.iter()
+							.any(|x| strip_tag_prefix(slot_name, x).is_some_and(|t| !t.is_empty()))
+					});
+
+					// lots of machines look similar, and their collections are similar - attempt to reuse
+					// existing collections
 					try_reuse_existing_collection(&mut machine.roms_start, &mut machine.roms_end, &mut self.roms);
 					try_reuse_existing_collection(&mut machine.disks_start, &mut machine.disks_end, &mut self.disks);
 					try_reuse_existing_collection(
@@ -930,6 +947,23 @@ fn fixup(
 	Ok(())
 }
 
+fn filter_tail<T>(
+	start: UsizeDb,
+	end: &mut UsizeDb,
+	table_builder: &mut TableBuilder<T>,
+	predicate: impl Fn(&T) -> bool,
+) where
+	T: Eq + Hash,
+{
+	// sanity checks
+	assert_le!(start, *end);
+	assert_eq!(*end, table_builder.len_db());
+
+	let count = usize::from(*end) - usize::from(start);
+	let new_count = table_builder.filter_tail(count, predicate);
+	*end = (usize::from(start) + new_count).try_into().unwrap();
+}
+
 fn try_reuse_existing_collection(
 	start: &mut UsizeDb,
 	end: &mut UsizeDb,
@@ -1034,10 +1068,7 @@ struct TableBuilder<T> {
 	buckets: Box<[Vec<usize>]>,
 }
 
-impl<T> TableBuilder<T>
-where
-	T: Hash + Eq,
-{
+impl<T> TableBuilder<T> {
 	pub fn with_capacity(capacity: usize) -> Self {
 		let bucket_count = ((capacity / 32 + 100)..)
 			.find(|&n| is_prime(n.try_into().unwrap()))
@@ -1047,6 +1078,23 @@ where
 		Self { data, buckets }
 	}
 
+	pub fn len(&self) -> usize {
+		self.data.len()
+	}
+
+	pub fn len_db(&self) -> UsizeDb {
+		self.data.len_db()
+	}
+
+	pub fn into_vec(self) -> Vec<T> {
+		self.data
+	}
+}
+
+impl<T> TableBuilder<T>
+where
+	T: Hash + Eq,
+{
 	pub fn push_db(&mut self, value: T) -> Result<()> {
 		self.buckets[self.bucket_index(&value)].push(self.data.len());
 		self.data.push(value);
@@ -1064,6 +1112,24 @@ where
 		let result = f(&mut value);
 		self.push_db(value).unwrap();
 		result
+	}
+
+	pub fn filter_tail(&mut self, tail_len: usize, predicate: impl Fn(&T) -> bool) -> usize {
+		let mut tail = Vec::new();
+		for _ in 0..tail_len {
+			if let Some(x) = self.pop()
+				&& predicate(&x)
+			{
+				tail.push(x);
+			}
+		}
+
+		let new_tail_len = tail.len();
+		for x in tail.into_iter().rev() {
+			self.push_db(x).unwrap();
+		}
+
+		new_tail_len
 	}
 
 	pub fn try_recycle_tail(&mut self, tail_len: usize) -> Option<usize> {
@@ -1089,18 +1155,6 @@ where
 			}
 			index
 		}
-	}
-
-	pub fn len(&self) -> usize {
-		self.data.len()
-	}
-
-	pub fn len_db(&self) -> UsizeDb {
-		self.data.len_db()
-	}
-
-	pub fn into_vec(self) -> Vec<T> {
-		self.data
 	}
 
 	fn bucket_index(&self, value: &T) -> usize {
