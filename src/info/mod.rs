@@ -977,6 +977,9 @@ mod test {
 	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", "mc6809e", 1)]
 	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "coco2b", "pia6821", 2)]
 	#[test_case(2, include_str!("test_data/listxml_coco.xml"), "coco2b", "floppy_connector", 4)]
+	#[test_case(3, include_str!("test_data/listxml_fake.xml"), "fake", "mc6809e", 1)]
+	#[test_case(4, include_str!("test_data/listxml_fake.xml"), "fake", "floppy_connector", 0)]
+	#[test_case(5, include_str!("test_data/listxml_fake.xml"), "fake", "floppy_525_dd", 0)]
 	pub fn device_refs(_index: usize, xml: &str, machine: &str, device_ref_name: &str, expected_count: usize) {
 		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| ControlFlow::Continue(()))
 			.unwrap()

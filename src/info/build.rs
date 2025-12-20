@@ -609,6 +609,19 @@ impl State {
 							.iter()
 							.any(|x| strip_tag_prefix(slot_name, x).is_some_and(|t| !t.is_empty()))
 					});
+					filter_tail(
+						machine.device_refs_start,
+						&mut machine.device_refs_end,
+						&mut self.device_refs,
+						|dr| {
+							dr.tag_strindex == !UsizeDb::default() || {
+								let tag = self.strings.index(dr.tag_strindex);
+								!slot_tags
+									.iter()
+									.any(|x| strip_tag_prefix(tag, x).is_some_and(|t| !t.is_empty()))
+							}
+						},
+					);
 
 					// lots of machines look similar, and their collections are similar - attempt to reuse
 					// existing collections
