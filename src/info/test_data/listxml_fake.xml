@@ -188,6 +188,12 @@
 		<slot name="ext:fdcv11:wd17xx:1">
 			<slotoption name="qd" devname="floppy_525_qd" default="yes"/>
 		</slot>
+		<device_ref name="mc6809e"/>
+		<device_ref name="floppy_connector" tag=":ext:fdc:wd17xx:0"/>
+		<device_ref name="floppy_525_dd" tag=":ext:fdc:wd17xx:0:525dd"/>
+		<device_ref name="floppy_connector" tag=":ext:fdc:wd17xx:1"/>
+		<device_ref name="floppy_525_dd" tag=":ext:fdc:wd17xx:1:525dd"/>
+		<device_ref name="<<INVALID>>"/>
 	</machine>
 	<machine name="blah" sourcefile="fake_machine.cpp" cloneof="fake">
 		<description>Fake Machine</description>
@@ -228,5 +234,16 @@
 	</machine>
 	<machine name="mc6809e" sourcefile="src/devices/cpu/m6809/m6809.cpp" isdevice="yes" runnable="no">
 		<description>Motorola MC6809E</description>
+	</machine>
+	<machine name="floppy_connector" sourcefile="devices/imagedev/floppy.cpp" isdevice="yes" runnable="no">
+		<description>Floppy drive connector abstraction</description>
+	</machine>
+	<machine name="floppy_525_dd" sourcefile="devices/imagedev/floppy.cpp" isdevice="yes" runnable="no">
+		<description>5.25&quot; double density floppy drive</description>
+		<device_ref name="speaker"/>
+		<device_ref name="flopsnd"/>
+		<chip type="audio" tag=":flopsndout" name="Speaker"/>
+		<chip type="audio" tag=":floppysound" name="Floppy sound" clock="44100"/>
+		<sound channels="1"/>
 	</machine>
 </mame>
