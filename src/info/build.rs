@@ -114,7 +114,7 @@ enum ThisError {
 
 // capacity defaults based on MAME 0.280
 //          48893 machines
-//         360102 roms
+//         360116 roms
 //           1240 disks
 //            472 samples
 //           4221 BIOS sets
@@ -123,8 +123,8 @@ enum ThisError {
 //          47581 configuration settings
 //            280 configuration setting configurations
 //           2890 devices
-//          74788 device refs
-//           7938 slots
+//          99687 device refs
+//           7183 slots
 //           3113 slot options
 //           7038 links
 //           1128 RAM options
@@ -139,8 +139,8 @@ const CAPACITY_CONFIGS: usize = 90000;
 const CAPACITY_CONFIG_SETTINGS: usize = 52000;
 const CAPACITY_CONFIG_SETTING_CONDITIONS: usize = 400;
 const CAPACITY_DEVICES: usize = 3500;
-const CAPACITY_DEVICE_REFS: usize = 80000;
-const CAPACITY_SLOTS: usize = 9000;
+const CAPACITY_DEVICE_REFS: usize = 120000;
+const CAPACITY_SLOTS: usize = 8500;
 const CAPACITY_SLOT_OPTIONS: usize = 3500;
 const CAPACITY_MACHINE_SOFTWARE_LISTS: usize = 7500;
 const CAPACITY_RAM_OPTIONS: usize = 1500;
