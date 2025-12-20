@@ -17,6 +17,7 @@ export component StopWarningDialog inherits Window {
     // components
     title: "BletchMAME";
     icon: Icons.bletchmame;
+    forward-focus: no-button;
     VerticalBox {
         Text {
             text: "Do you really want to stop?\n\nAll data in emulated RAM will be lost";
@@ -36,7 +37,7 @@ export component StopWarningDialog inherits Window {
                 }
             }
 
-            StandardButton {
+            no-button := StandardButton {
                 kind: no;
                 clicked => {
                     root.no-clicked();
