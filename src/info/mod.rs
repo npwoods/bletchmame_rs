@@ -710,6 +710,11 @@ impl Debug for UsizeDb {
 	}
 }
 
+pub fn strip_tag_prefix<'a>(tag: &'a str, target: &str) -> Option<&'a str> {
+	tag.strip_prefix(target)
+		.and_then(|x| if x.is_empty() { Some(x) } else { x.strip_prefix(":") })
+}
+
 #[cfg(test)]
 mod test {
 	use std::cmp::max;
@@ -1116,5 +1121,16 @@ mod test {
 			.map(|c| (c.tag(), c.mask(), c.default_setting_index().unwrap()))
 			.collect::<Vec<_>>();
 		assert_eq!(expected, actual.as_slice());
+	}
+
+	#[test_case(0, "alpha:bravo:charlie", "alpha", Some("bravo:charlie"))]
+	#[test_case(1, "alpha:bravo:charlie", "alpha:bravo", Some("charlie"))]
+	#[test_case(2, "alpha:bravo:charlie", "alpha:bravo:charlie", Some(""))]
+	#[test_case(3, "alpha:bravo:charlie", "delta", None)]
+	#[test_case(4, "alpha:bravo:charlie", "alp", None)]
+	#[test_case(5, "alpha:bravo:charlie", "alpha:bra", None)]
+	pub fn strip_tag_prefix(_index: usize, tag: &str, target: &str, expected: Option<&str>) {
+		let actual = super::strip_tag_prefix(tag, target);
+		assert_eq!(expected, actual);
 	}
 }
