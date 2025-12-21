@@ -835,10 +835,13 @@ export component AppWindow inherits Window {
                     }
 
                     Rectangle {
+                        vertical-stretch: 1;
                         width: 300px;
                         min-height: 0px;
                         preferred-height: 300px;
                         TextEdit {
+                            width: 100%;
+                            height: 100%;
                             text: get-history-text-func();
                             visible: get-history-text(current-snap-view) != "";
                             read-only: true;
