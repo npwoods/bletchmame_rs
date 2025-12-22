@@ -18,30 +18,54 @@ export component StopWarningDialog inherits Window {
     title: "BletchMAME";
     icon: Icons.bletchmame;
     forward-focus: no-button;
-    VerticalBox {
-        Text {
-            text: "Do you really want to stop?\n\nAll data in emulated RAM will be lost";
-            horizontal-alignment: left;
-        }
-
-        CheckBox {
-            text: "Show this warning when ending emulation";
-            checked <=> show-warning-checked;
-        }
-
-        HorizontalBox {
-            StandardButton {
-                kind: yes;
-                clicked => {
-                    root.yes-clicked();
-                }
+    FocusScope {
+        VerticalBox {
+            Text {
+                text: "Do you really want to stop?\n\nAll data in emulated RAM will be lost";
+                horizontal-alignment: left;
             }
 
-            no-button := StandardButton {
-                kind: no;
-                clicked => {
-                    root.no-clicked();
+            warning-checkbox := CheckBox {
+                text: "Show this warning when ending emulation";
+                checked <=> show-warning-checked;
+            }
+
+            HorizontalBox {
+                yes-button := StandardButton {
+                    kind: yes;
+                    clicked => {
+                        root.yes-clicked();
+                    }
                 }
+
+                no-button := StandardButton {
+                    kind: no;
+                    clicked => {
+                        root.no-clicked();
+                    }
+                }
+            }
+        }
+
+        // the only purpose of this FocusScope is to handle key presses (see https://github.com/slint-ui/slint/discussions/10311)
+        key-pressed(event) => {
+            if (event.text == Key.Escape) {
+                root.no-clicked();
+                accept
+            } else if (event.text == Key.LeftArrow && no-button.has-focus) {
+                yes-button.focus();
+                accept
+            } else if (event.text == Key.RightArrow && yes-button.has-focus) {
+                no-button.focus();
+                accept
+            } else if (event.text == Key.UpArrow && (no-button.has-focus || yes-button.has-focus)) {
+                warning-checkbox.focus();
+                accept
+            } else if (event.text == Key.DownArrow && warning-checkbox.has-focus) {
+                no-button.focus();
+                accept
+            } else {
+                reject
             }
         }
     }
