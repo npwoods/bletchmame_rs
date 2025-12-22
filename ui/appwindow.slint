@@ -596,6 +596,7 @@ export component AppWindow inherits Window {
         }
     }
     collection-context-menu := ContextMenuArea {
+        enabled: false;
         Menu {
             MenuItem {
                 title: @tr("CollectionContextMenu" => "Move Up");
@@ -642,6 +643,7 @@ export component AppWindow inherits Window {
     }
 
     item-context-menu := ContextMenuArea {
+        enabled: false;
         Menu {
             if item-context-menu-info.run-descs.length == 1: MenuItem {
                 title: item-context-menu-info.run-title;
