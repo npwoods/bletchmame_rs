@@ -52,6 +52,7 @@ use crate::collections::get_folder_collections;
 use crate::collections::remove_items_from_folder_collection;
 use crate::collections::toggle_builtin_collection;
 use crate::devimageconfig::DevicesImagesConfig;
+use crate::dialogs::about::dialog_about;
 use crate::dialogs::cheats::dialog_cheats;
 use crate::dialogs::configure::dialog_configure;
 use crate::dialogs::devimages::dialog_devices_and_images;
@@ -100,7 +101,6 @@ use crate::snapview::snap_view_string;
 use crate::status::InputClass;
 use crate::status::Status;
 use crate::threadlocalbubble::ThreadLocalBubble;
-use crate::ui::AboutDialog;
 use crate::ui::AppWindow;
 use crate::ui::Icons;
 use crate::ui::ListItem;
@@ -1172,8 +1172,8 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 			model.update_state(|state| state.infodb_rebuild());
 		}
 		Action::HelpAbout => {
-			let modal = model.modal_stack.modal(|| AboutDialog::new().unwrap());
-			modal.launch();
+			let fut = dialog_about(model.modal_stack.clone());
+			spawn_local(fut).unwrap();
 		}
 		Action::MameSessionEnded => {
 			model.update_state(|state| Some(state.session_ended()));

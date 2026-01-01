@@ -2,7 +2,6 @@ use std::cell::RefCell;
 use std::future::Future;
 use std::rc::Rc;
 
-use slint::CloseRequestResponse;
 use slint::ComponentHandle;
 use slint::PhysicalPosition;
 use slint::Window;
@@ -103,18 +102,6 @@ where
 
 	pub fn window(&self) -> &'_ Window {
 		self.dialog.window()
-	}
-
-	pub fn launch(self) {
-		// stow a callback to reenable the parent here
-		let bookmark_clone = self.bookmark.clone();
-		self.window().on_close_requested(move || {
-			bookmark_clone.reenable_parent();
-			CloseRequestResponse::HideWindow
-		});
-
-		// show the dialog
-		self.dialog.show().unwrap();
 	}
 
 	pub async fn run<R>(self, fut: impl Future<Output = R>) -> R {
