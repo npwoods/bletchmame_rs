@@ -71,6 +71,7 @@ i-slint-core = { git = "https://github.com/npwoods/slint.git", rev = "1b8c1cac24
 slint = { git = "https://github.com/npwoods/slint.git", rev = "1b8c1cac249321fb268779c788357c00a5da6509", features = [
     "raw-window-handle-06",
 ] }
+serialport = "4.8.1"
 
 [target.'cfg(target_os = "windows")'.dependencies.windows]
 features = [

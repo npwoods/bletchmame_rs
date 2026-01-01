@@ -1,8 +1,12 @@
+use serialport::available_ports;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
 use slint::LogicalPosition;
 use slint::ModelRc;
+use slint::ToSharedString;
+use slint::VecModel;
 use tokio::sync::mpsc;
+use tracing::error;
 
 use crate::action::Action;
 use crate::channel::Channel;
@@ -11,12 +15,14 @@ use crate::devimageconfig::EntryDetails;
 use crate::devimageconfig::ListSlots;
 use crate::dialogs::SenderExt;
 use crate::guiutils::modal::ModalStack;
+use crate::imagedesc::ImageDesc;
 use crate::models::devimages::DevicesAndImagesModel;
 use crate::runtime::command::MameCommand;
 use crate::status::Status;
 use crate::ui::DevicesAndImagesContextMenuInfo;
 use crate::ui::DevicesAndImagesDialog;
 use crate::ui::DevicesAndImagesState;
+use crate::ui::SimpleMenuEntry;
 
 pub async fn dialog_devices_and_images(
 	modal_stack: ModalStack,
@@ -125,27 +131,46 @@ pub fn entry_popup_menu(
 			let tag = entry.tag.to_string();
 			Some(Action::LoadImageDialog { tag })
 		};
+		let load_image_action = load_image_action
+			.as_ref()
+			.map(Action::encode_for_slint)
+			.unwrap_or_default();
+
+		let connect_to_serial_port_actions = available_ports()
+			.inspect_err(|e| error!("Failed to get available ports: {}", e))
+			.unwrap_or_default()
+			.into_iter()
+			.map(|spi| {
+				let title = spi.port_name.to_shared_string();
+				let image_desc = ImageDesc::File(spi.port_name.into());
+				let action = Action::from(MameCommand::load_image(entry.tag, &image_desc));
+				let action = Action::encode_for_slint(&action);
+				SimpleMenuEntry { title, action }
+			})
+			.collect::<Vec<_>>();
+		let connect_to_serial_port_actions = VecModel::from(connect_to_serial_port_actions);
+		let connect_to_serial_port_actions = ModelRc::new(connect_to_serial_port_actions);
 
 		let connect_to_socket_action = {
 			let tag = entry.tag.to_string();
 			Some(Action::ConnectToSocketDialog { tag })
 		};
+		let connect_to_socket_action = connect_to_socket_action
+			.as_ref()
+			.map(Action::encode_for_slint)
+			.unwrap_or_default();
 
 		let unload_action = {
 			let tag = entry.tag.to_string();
 			Some(Action::UnloadImage { tag })
 		};
+		let unload_action = unload_action.as_ref().map(Action::encode_for_slint).unwrap_or_default();
 
 		DevicesAndImagesContextMenuInfo {
-			load_image_action: load_image_action
-				.as_ref()
-				.map(Action::encode_for_slint)
-				.unwrap_or_default(),
-			connect_to_socket_action: connect_to_socket_action
-				.as_ref()
-				.map(Action::encode_for_slint)
-				.unwrap_or_default(),
-			unload_action: unload_action.as_ref().map(Action::encode_for_slint).unwrap_or_default(),
+			load_image_action,
+			connect_to_serial_port_actions,
+			connect_to_socket_action,
+			unload_action,
 		}
 	});
 

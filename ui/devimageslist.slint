@@ -7,6 +7,8 @@ import {
     LineEdit,
 } from "std-widgets.slint";
 
+import { SimpleMenuEntry } from "common.slint";
+
 export struct DeviceAndImageEntry {
     indent: int,
     display-tag: string,
@@ -21,6 +23,7 @@ export struct DevicesAndImagesState {
 
 export struct DevicesAndImagesContextMenuInfo {
     load-image-action: string,
+    connect-to-serial-port-actions: [SimpleMenuEntry],
     connect-to-socket-action: string,
     unload-action: string}
 
@@ -61,6 +64,21 @@ export component DevicesAndImagesList {
             MenuItem {
                 title: @tr("DevicesAndImages" => "Load Software List Part...");
                 enabled: false;
+            }
+
+            Menu {
+                title: @tr("DevicesAndImages" => "Connect To Serial Port");
+                for entry in root.context-menu-info.connect-to-serial-port-actions: MenuItem {
+                    title: entry.title;
+                    enabled: entry.action != "";
+                    activated => {
+                        menu-item-action(entry.action);
+                    }
+                }
+                if root.context-menu-info.connect-to-serial-port-actions.length == 0: MenuItem {
+                    title: @tr("DevicesAndImages" => "(no serial ports found)");
+                    enabled: false;
+                }
             }
 
             MenuItem {
