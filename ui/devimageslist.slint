@@ -1,4 +1,13 @@
-import { Button, VerticalBox, HorizontalBox, ComboBox, ListView, LineEdit } from "std-widgets.slint";
+import {
+    Button,
+    VerticalBox,
+    HorizontalBox,
+    ComboBox,
+    ListView,
+    LineEdit,
+} from "std-widgets.slint";
+
+import { SimpleMenuEntry } from "common.slint";
 
 export struct DeviceAndImageEntry {
     indent: int,
@@ -13,9 +22,10 @@ export struct DevicesAndImagesState {
     none-string: string}
 
 export struct DevicesAndImagesContextMenuInfo {
-    load-image-command: string,
-    connect-to-socket-command: string,
-    unload-command: string}
+    load-image-action: string,
+    connect-to-serial-port-actions: [SimpleMenuEntry],
+    connect-to-socket-action: string,
+    unload-action: string}
 
 export component DevicesAndImagesList {
     // properties
@@ -45,9 +55,9 @@ export component DevicesAndImagesList {
 
             MenuItem {
                 title: @tr("DevicesAndImages" => "Load Image...");
-                enabled: root.context-menu-info.load-image-command != "";
+                enabled: root.context-menu-info.load-image-action != "";
                 activated => {
-                    menu-item-action(root.context-menu-info.load-image-command);
+                    menu-item-action(root.context-menu-info.load-image-action);
                 }
             }
 
@@ -56,19 +66,34 @@ export component DevicesAndImagesList {
                 enabled: false;
             }
 
+            Menu {
+                title: @tr("DevicesAndImages" => "Connect To Serial Port");
+                for entry in root.context-menu-info.connect-to-serial-port-actions: MenuItem {
+                    title: entry.title;
+                    enabled: entry.action != "";
+                    activated => {
+                        menu-item-action(entry.action);
+                    }
+                }
+                if root.context-menu-info.connect-to-serial-port-actions.length == 0: MenuItem {
+                    title: @tr("DevicesAndImages" => "(no serial ports found)");
+                    enabled: false;
+                }
+            }
+
             MenuItem {
                 title: @tr("DevicesAndImages" => "Connect To Socket...");
-                enabled: root.context-menu-info.connect-to-socket-command != "";
+                enabled: root.context-menu-info.connect-to-socket-action != "";
                 activated => {
-                    menu-item-action(root.context-menu-info.connect-to-socket-command);
+                    menu-item-action(root.context-menu-info.connect-to-socket-action);
                 }
             }
 
             MenuItem {
                 title: @tr("DevicesAndImages" => "Unload");
-                enabled: root.context-menu-info.unload-command != "";
+                enabled: root.context-menu-info.unload-action != "";
                 activated => {
-                    menu-item-action(root.context-menu-info.unload-command);
+                    menu-item-action(root.context-menu-info.unload-action);
                 }
             }
         }
