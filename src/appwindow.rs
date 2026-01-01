@@ -52,6 +52,7 @@ use crate::collections::get_folder_collections;
 use crate::collections::remove_items_from_folder_collection;
 use crate::collections::toggle_builtin_collection;
 use crate::devimageconfig::DevicesImagesConfig;
+use crate::dialogs::about::dialog_about;
 use crate::dialogs::cheats::dialog_cheats;
 use crate::dialogs::configure::dialog_configure;
 use crate::dialogs::devimages::dialog_devices_and_images;
@@ -100,7 +101,6 @@ use crate::snapview::snap_view_string;
 use crate::status::InputClass;
 use crate::status::Status;
 use crate::threadlocalbubble::ThreadLocalBubble;
-use crate::ui::AboutDialog;
 use crate::ui::AppWindow;
 use crate::ui::Icons;
 use crate::ui::ListItem;
@@ -403,7 +403,8 @@ impl AppModel {
 		let show_warning = model.preferences.borrow().show_stop_warning;
 		let fut = async move {
 			let result = if show_warning && model.state.borrow().status().is_some_and(|s| s.running.is_some()) {
-				dialog_stop_warning(model.modal_stack.clone(), show_warning).await
+				let fut = dialog_stop_warning(model.modal_stack.clone(), show_warning);
+				model.maybe_pause(fut).await
 			} else {
 				StopWarningResult {
 					stop: true,
@@ -422,6 +423,35 @@ impl AppModel {
 			if let Some(show_warning) = result.show_warning {
 				model.modify_prefs(|prefs| prefs.show_stop_warning = show_warning);
 			}
+		};
+		spawn_local(fut).unwrap();
+	}
+
+	pub async fn maybe_pause<F>(&self, fut: F) -> F::Output
+	where
+		F: Future,
+	{
+		let is_unpaused = self
+			.state
+			.borrow()
+			.status()
+			.is_some_and(|s| s.running.as_ref().is_some_and(|r| !r.is_paused));
+		if is_unpaused {
+			self.issue_command(MameCommand::pause());
+		}
+
+		let result = fut.await;
+
+		if is_unpaused {
+			self.issue_command(MameCommand::resume());
+		}
+
+		result
+	}
+
+	pub fn spawn_maybe_pause(self: Rc<Self>, fut: impl Future<Output = ()> + 'static) {
+		let fut = async move {
+			self.maybe_pause(fut).await;
 		};
 		spawn_local(fut).unwrap();
 	}
@@ -867,7 +897,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 				status_update_channel,
 				invoke_action,
 			);
-			spawn_local(fut).unwrap();
+			model.clone().spawn_maybe_pause(fut);
 		}
 		Action::FileQuickLoadState => {
 			let last_save_state = model.state.borrow().last_save_state().unwrap();
@@ -892,7 +922,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 					model_clone.update_state(|state| Some(state.set_last_save_state(Some(filename.into()))));
 				}
 			};
-			spawn_local(fut).unwrap();
+			model.clone().spawn_maybe_pause(fut);
 		}
 		Action::FileSaveState => {
 			let model_clone = model.clone();
@@ -919,7 +949,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 					model_clone.update_state(|state| Some(state.set_last_save_state(Some(filename.into()))));
 				}
 			};
-			spawn_local(fut).unwrap();
+			model.clone().spawn_maybe_pause(fut);
 		}
 		Action::FileSaveScreenshot => {
 			let model_clone = model.clone();
@@ -935,7 +965,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 					model.issue_command(MameCommand::save_snapshot(0, &filename));
 				}
 			};
-			spawn_local(fut).unwrap();
+			model.clone().spawn_maybe_pause(fut);
 		}
 		Action::FileRecordMovie => {
 			let is_recording = model
@@ -967,7 +997,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 						model.issue_command(MameCommand::begin_recording(&filename, movie_format));
 					}
 				};
-				spawn_local(fut).unwrap();
+				model.clone().spawn_maybe_pause(fut);
 			}
 		}
 		Action::FileDebugger => {
@@ -1084,7 +1114,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 				.cheats
 				.clone();
 			let fut = dialog_cheats(model.modal_stack.clone(), cheats, status_update_channel, invoke_action);
-			spawn_local(fut).unwrap();
+			model.clone().spawn_maybe_pause(fut);
 		}
 		Action::OptionsClassic => {
 			model.issue_command(MameCommand::classic_menu());
@@ -1117,7 +1147,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 						status_update_channel,
 						invoke_action,
 					);
-					spawn_local(fut).unwrap();
+					model.clone().spawn_maybe_pause(fut);
 				}
 				InputClass::Config | InputClass::DipSwitch => {
 					let info_db = model.state.borrow().info_db().unwrap().clone();
@@ -1130,7 +1160,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 						status_update_channel,
 						invoke_action,
 					);
-					spawn_local(fut).unwrap();
+					model.clone().spawn_maybe_pause(fut);
 				}
 			};
 		}
@@ -1172,8 +1202,8 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 			model.update_state(|state| state.infodb_rebuild());
 		}
 		Action::HelpAbout => {
-			let modal = model.modal_stack.modal(|| AboutDialog::new().unwrap());
-			modal.launch();
+			let fut = dialog_about(model.modal_stack.clone());
+			model.clone().spawn_maybe_pause(fut);
 		}
 		Action::MameSessionEnded => {
 			model.update_state(|state| Some(state.session_ended()));
