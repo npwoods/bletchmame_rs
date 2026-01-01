@@ -731,7 +731,7 @@ mod test {
 	use super::View;
 
 	#[test_case(0, include_str!("test_data/listxml_alienar.xml"), "0.229 (mame0229)", 13, 1, &["alienar", "ipt_merge_any_hi", "ls157"])]
-	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "0.273 (mame0273)", 121, 10, &["acia6850", "address_map_bank", "ata_interface"])]
+	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "0.284 (mame0284)", 211, 10, &["93c06_16", "acia6850", "adaptator_multitap"])]
 	#[test_case(2, include_str!("test_data/listxml_fake.xml"), "<<fake build>>", 6, 3, &["blah", "fake", "fakefake", "floppy_525_dd", "floppy_connector", "mc6809e"])]
 	pub fn test(
 		_index: usize,
@@ -976,7 +976,7 @@ mod test {
 
 	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", "mc6809e", 1)]
 	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "coco2b", "pia6821", 2)]
-	#[test_case(2, include_str!("test_data/listxml_coco.xml"), "coco2b", "floppy_connector", 4)]
+	#[test_case(2, include_str!("test_data/listxml_coco.xml"), "coco2b", "floppy_connector", 0)]
 	#[test_case(3, include_str!("test_data/listxml_fake.xml"), "fake", "mc6809e", 1)]
 	#[test_case(4, include_str!("test_data/listxml_fake.xml"), "fake", "floppy_connector", 0)]
 	#[test_case(5, include_str!("test_data/listxml_fake.xml"), "fake", "floppy_525_dd", 0)]
@@ -1011,7 +1011,7 @@ mod test {
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", "ext", Some(16), &[("scii", "coco_scii"), ("cp450_fdc", "cp450_fdc"), ("cd6809_fdc", "cd6809_fdc"), ("sym12", "coco_symphony_twelve")])]
+	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", "ext", Some(17), &[("scii", "coco_scii"), ("cp450_fdc", "cp450_fdc"), ("cd6809_fdc", "cd6809_fdc"), ("sym12", "coco_symphony_twelve")])]
 	pub fn slot_options(
 		_index: usize,
 		xml: &str,

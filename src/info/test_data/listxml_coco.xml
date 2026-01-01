@@ -42,6 +42,7 @@
 			<!ATTLIST disk status (baddump|nodump|good) "good">
 			<!ATTLIST disk optional (yes|no) "no">
 		<!ELEMENT device_ref EMPTY>
+			<!ATTLIST device_ref tag CDATA #REQUIRED>
 			<!ATTLIST device_ref name CDATA #REQUIRED>
 		<!ELEMENT sample EMPTY>
 			<!ATTLIST sample name CDATA #REQUIRED>
@@ -81,7 +82,6 @@
 				<!ATTLIST control type CDATA #REQUIRED>
 				<!ATTLIST control player CDATA #IMPLIED>
 				<!ATTLIST control buttons CDATA #IMPLIED>
-				<!ATTLIST control reqbuttons CDATA #IMPLIED>
 				<!ATTLIST control minimum CDATA #IMPLIED>
 				<!ATTLIST control maximum CDATA #IMPLIED>
 				<!ATTLIST control sensitivity CDATA #IMPLIED>
@@ -161,7 +161,7 @@
 			<!ATTLIST ramoption default CDATA #IMPLIED>
 ]>
 
-<mame build="0.273 (mame0273)" debug="no" mameconfig="10">
+<mame build="0.284 (mame0284)" debug="no" mameconfig="10">
 	<machine name="coco" sourcefile="trs/coco12.cpp">
 		<description>Color Computer 1/2</description>
 		<year>1980</year>
@@ -190,42 +190,42 @@
 		<rom name="extbas10.rom" bios="b12e10" size="8192" crc="6111a086" sha1="8aa58f2eb3e8bcfd5470e3e35e2b359e9a72848e" region="maincpu" offset="0"/>
 		<rom name="bas12.rom" bios="b12e11" size="8192" crc="54368805" sha1="0f14dc46c647510eb0b7bd3f53e33da07907d04f" region="maincpu" offset="2000"/>
 		<rom name="extbas11.rom" bios="b12e11" size="8192" crc="a82a6254" sha1="ad927fb4f30746d820cb8b860ebb585e7f095dea" region="maincpu" offset="0"/>
-		<device_ref name="mc6809e"/>
-		<device_ref name="ipt_merge_any_hi"/>
-		<device_ref name="ipt_merge_any_hi"/>
-		<device_ref name="pia6821"/>
-		<device_ref name="pia6821"/>
-		<device_ref name="sam6883"/>
-		<device_ref name="coco_dwsock"/>
-		<device_ref name="speaker"/>
-		<device_ref name="dac_6bit_bw"/>
-		<device_ref name="dac"/>
-		<device_ref name="cassette_image"/>
-		<device_ref name="rs232"/>
-		<device_ref name="rs_serial_printer"/>
-		<device_ref name="printer_image"/>
-		<device_ref name="screen"/>
-		<device_ref name="mc6847_ntsc"/>
-		<device_ref name="ram"/>
-		<device_ref name="address_map_bank"/>
-		<device_ref name="cococart_slot"/>
-		<device_ref name="coco_fdc"/>
-		<device_ref name="wd1773"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_525_dd"/>
-		<device_ref name="speaker"/>
-		<device_ref name="flopsnd"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_525_dd"/>
-		<device_ref name="speaker"/>
-		<device_ref name="flopsnd"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="software_list"/>
-		<device_ref name="software_list"/>
-		<device_ref name="software_list"/>
-		<device_ref name="coco_vhd_image"/>
-		<device_ref name="coco_vhd_image"/>
+		<device_ref tag=":maincpu" name="mc6809e"/>
+		<device_ref tag=":irqs" name="ipt_merge_any_hi"/>
+		<device_ref tag=":firqs" name="ipt_merge_any_hi"/>
+		<device_ref tag=":pia0" name="pia6821"/>
+		<device_ref tag=":pia1" name="pia6821"/>
+		<device_ref tag=":sam" name="sam6883"/>
+		<device_ref tag=":dwsock" name="coco_dwsock"/>
+		<device_ref tag=":speaker" name="speaker"/>
+		<device_ref tag=":dac" name="dac_6bit_bw"/>
+		<device_ref tag=":sbs" name="dac"/>
+		<device_ref tag=":cassette" name="cassette_image"/>
+		<device_ref tag=":rs232" name="rs232"/>
+		<device_ref tag=":rs232:rs_printer" name="rs_serial_printer"/>
+		<device_ref tag=":rs232:rs_printer:printer" name="printer_image"/>
+		<device_ref tag=":screen" name="screen"/>
+		<device_ref tag=":vdg" name="mc6847"/>
+		<device_ref tag=":ram" name="ram"/>
+		<device_ref tag=":floating" name="address_map_bank"/>
+		<device_ref tag=":ext" name="cococart_slot"/>
+		<device_ref tag=":ext:fdc" name="coco_fdc"/>
+		<device_ref tag=":ext:fdc:wd17xx" name="wd1773"/>
+		<device_ref tag=":ext:fdc:wd17xx:0" name="floppy_connector"/>
+		<device_ref tag=":ext:fdc:wd17xx:0:525dd" name="floppy_525_dd"/>
+		<device_ref tag=":ext:fdc:wd17xx:0:525dd:flopsndout" name="speaker"/>
+		<device_ref tag=":ext:fdc:wd17xx:0:525dd:floppysound" name="flopsnd"/>
+		<device_ref tag=":ext:fdc:wd17xx:1" name="floppy_connector"/>
+		<device_ref tag=":ext:fdc:wd17xx:1:525dd" name="floppy_525_dd"/>
+		<device_ref tag=":ext:fdc:wd17xx:1:525dd:flopsndout" name="speaker"/>
+		<device_ref tag=":ext:fdc:wd17xx:1:525dd:floppysound" name="flopsnd"/>
+		<device_ref tag=":ext:fdc:wd17xx:2" name="floppy_connector"/>
+		<device_ref tag=":ext:fdc:wd17xx:3" name="floppy_connector"/>
+		<device_ref tag=":coco_cart_list" name="software_list"/>
+		<device_ref tag=":coco_flop_list" name="software_list"/>
+		<device_ref tag=":dragon_cart_list" name="software_list"/>
+		<device_ref tag=":vhd0" name="coco_vhd_image"/>
+		<device_ref tag=":vhd1" name="coco_vhd_image"/>
 		<chip type="cpu" tag="maincpu" name="Motorola MC6809E" clock="894886"/>
 		<chip type="audio" tag="speaker" name="Speaker"/>
 		<chip type="audio" tag="dac" name="6-Bit Binary Weighted DAC"/>
@@ -328,6 +328,8 @@
 			<confsetting name="28800" value="10"/>
 			<confsetting name="38400" value="11"/>
 			<confsetting name="57600" value="12"/>
+			<confsetting name="76800" value="23"/>
+			<confsetting name="78125" value="24"/>
 			<confsetting name="111900" value="22"/>
 			<confsetting name="115200" value="13"/>
 		</configuration>
@@ -455,7 +457,10 @@
 		<slot name="rs232">
 			<slotoption name="terminal" devname="serial_terminal"/>
 			<slotoption name="sunkbd" devname="sunkbd_adaptor"/>
+			<slotoption name="votraxtnt" devname="serial_votraxtnt"/>
+			<slotoption name="rs_printer" devname="rs_serial_printer" default="yes"/>
 			<slotoption name="dec_loopback" devname="dec_rs232_loopback"/>
+			<slotoption name="h19" devname="serial_heath_h19"/>
 			<slotoption name="ie15" devname="ie15_terminal"/>
 			<slotoption name="null_modem" devname="null_modem"/>
 			<slotoption name="keyboard" devname="serial_keyboard"/>
@@ -469,7 +474,6 @@
 			<slotoption name="nss_tvi" devname="nss_tvinterface"/>
 			<slotoption name="rs232_sync_io" devname="rs232_sync_io"/>
 			<slotoption name="pty" devname="pseudo_terminal"/>
-			<slotoption name="rs_printer" devname="rs_serial_printer" default="yes"/>
 		</slot>
 		<slot name="ext">
 			<slotoption name="scii" devname="coco_scii"/>
@@ -477,6 +481,7 @@
 			<slotoption name="cd6809_fdc" devname="cd6809_fdc"/>
 			<slotoption name="sym12" devname="coco_symphony_twelve"/>
 			<slotoption name="multi" devname="coco_multipack"/>
+			<slotoption name="xsid" devname="coco_xsid"/>
 			<slotoption name="stecomp" devname="coco_stereo_composer"/>
 			<slotoption name="rs232" devname="coco_rs232"/>
 			<slotoption name="wpkrs" devname="coco_wpkrs"/>
@@ -529,42 +534,42 @@
 		<manufacturer>Tandy Radio Shack</manufacturer>
 		<rom name="bas13.rom" size="8192" crc="d8f4d15e" sha1="28b92bebe35fa4f026a084416d6ea3b1552b63d3" region="maincpu" offset="2000"/>
 		<rom name="extbas11.rom" merge="extbas11.rom" size="8192" crc="a82a6254" sha1="ad927fb4f30746d820cb8b860ebb585e7f095dea" region="maincpu" offset="0"/>
-		<device_ref name="mc6809e"/>
-		<device_ref name="ipt_merge_any_hi"/>
-		<device_ref name="ipt_merge_any_hi"/>
-		<device_ref name="pia6821"/>
-		<device_ref name="pia6821"/>
-		<device_ref name="sam6883"/>
-		<device_ref name="coco_dwsock"/>
-		<device_ref name="speaker"/>
-		<device_ref name="dac_6bit_bw"/>
-		<device_ref name="dac"/>
-		<device_ref name="cassette_image"/>
-		<device_ref name="rs232"/>
-		<device_ref name="rs_serial_printer"/>
-		<device_ref name="printer_image"/>
-		<device_ref name="screen"/>
-		<device_ref name="mc6847t1_ntsc"/>
-		<device_ref name="ram"/>
-		<device_ref name="address_map_bank"/>
-		<device_ref name="cococart_slot"/>
-		<device_ref name="coco_fdc"/>
-		<device_ref name="wd1773"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_525_dd"/>
-		<device_ref name="speaker"/>
-		<device_ref name="flopsnd"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_525_dd"/>
-		<device_ref name="speaker"/>
-		<device_ref name="flopsnd"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="software_list"/>
-		<device_ref name="software_list"/>
-		<device_ref name="software_list"/>
-		<device_ref name="coco_vhd_image"/>
-		<device_ref name="coco_vhd_image"/>
+		<device_ref tag=":maincpu" name="mc6809e"/>
+		<device_ref tag=":irqs" name="ipt_merge_any_hi"/>
+		<device_ref tag=":firqs" name="ipt_merge_any_hi"/>
+		<device_ref tag=":pia0" name="pia6821"/>
+		<device_ref tag=":pia1" name="pia6821"/>
+		<device_ref tag=":sam" name="sam6883"/>
+		<device_ref tag=":dwsock" name="coco_dwsock"/>
+		<device_ref tag=":speaker" name="speaker"/>
+		<device_ref tag=":dac" name="dac_6bit_bw"/>
+		<device_ref tag=":sbs" name="dac"/>
+		<device_ref tag=":cassette" name="cassette_image"/>
+		<device_ref tag=":rs232" name="rs232"/>
+		<device_ref tag=":rs232:rs_printer" name="rs_serial_printer"/>
+		<device_ref tag=":rs232:rs_printer:printer" name="printer_image"/>
+		<device_ref tag=":screen" name="screen"/>
+		<device_ref tag=":vdg" name="mc6847t1"/>
+		<device_ref tag=":ram" name="ram"/>
+		<device_ref tag=":floating" name="address_map_bank"/>
+		<device_ref tag=":ext" name="cococart_slot"/>
+		<device_ref tag=":ext:fdc" name="coco_fdc"/>
+		<device_ref tag=":ext:fdc:wd17xx" name="wd1773"/>
+		<device_ref tag=":ext:fdc:wd17xx:0" name="floppy_connector"/>
+		<device_ref tag=":ext:fdc:wd17xx:0:525dd" name="floppy_525_dd"/>
+		<device_ref tag=":ext:fdc:wd17xx:0:525dd:flopsndout" name="speaker"/>
+		<device_ref tag=":ext:fdc:wd17xx:0:525dd:floppysound" name="flopsnd"/>
+		<device_ref tag=":ext:fdc:wd17xx:1" name="floppy_connector"/>
+		<device_ref tag=":ext:fdc:wd17xx:1:525dd" name="floppy_525_dd"/>
+		<device_ref tag=":ext:fdc:wd17xx:1:525dd:flopsndout" name="speaker"/>
+		<device_ref tag=":ext:fdc:wd17xx:1:525dd:floppysound" name="flopsnd"/>
+		<device_ref tag=":ext:fdc:wd17xx:2" name="floppy_connector"/>
+		<device_ref tag=":ext:fdc:wd17xx:3" name="floppy_connector"/>
+		<device_ref tag=":coco_cart_list" name="software_list"/>
+		<device_ref tag=":coco_flop_list" name="software_list"/>
+		<device_ref tag=":dragon_cart_list" name="software_list"/>
+		<device_ref tag=":vhd0" name="coco_vhd_image"/>
+		<device_ref tag=":vhd1" name="coco_vhd_image"/>
 		<chip type="cpu" tag="maincpu" name="Motorola MC6809E" clock="894886"/>
 		<chip type="audio" tag="speaker" name="Speaker"/>
 		<chip type="audio" tag="dac" name="6-Bit Binary Weighted DAC"/>
@@ -667,6 +672,8 @@
 			<confsetting name="28800" value="10"/>
 			<confsetting name="38400" value="11"/>
 			<confsetting name="57600" value="12"/>
+			<confsetting name="76800" value="23"/>
+			<confsetting name="78125" value="24"/>
 			<confsetting name="111900" value="22"/>
 			<confsetting name="115200" value="13"/>
 		</configuration>
@@ -794,7 +801,10 @@
 		<slot name="rs232">
 			<slotoption name="terminal" devname="serial_terminal"/>
 			<slotoption name="sunkbd" devname="sunkbd_adaptor"/>
+			<slotoption name="votraxtnt" devname="serial_votraxtnt"/>
+			<slotoption name="rs_printer" devname="rs_serial_printer" default="yes"/>
 			<slotoption name="dec_loopback" devname="dec_rs232_loopback"/>
+			<slotoption name="h19" devname="serial_heath_h19"/>
 			<slotoption name="ie15" devname="ie15_terminal"/>
 			<slotoption name="null_modem" devname="null_modem"/>
 			<slotoption name="keyboard" devname="serial_keyboard"/>
@@ -808,7 +818,6 @@
 			<slotoption name="nss_tvi" devname="nss_tvinterface"/>
 			<slotoption name="rs232_sync_io" devname="rs232_sync_io"/>
 			<slotoption name="pty" devname="pseudo_terminal"/>
-			<slotoption name="rs_printer" devname="rs_serial_printer" default="yes"/>
 		</slot>
 		<slot name="ext">
 			<slotoption name="scii" devname="coco_scii"/>
@@ -816,6 +825,7 @@
 			<slotoption name="cd6809_fdc" devname="cd6809_fdc"/>
 			<slotoption name="sym12" devname="coco_symphony_twelve"/>
 			<slotoption name="multi" devname="coco_multipack"/>
+			<slotoption name="xsid" devname="coco_xsid"/>
 			<slotoption name="stecomp" devname="coco_stereo_composer"/>
 			<slotoption name="rs232" devname="coco_rs232"/>
 			<slotoption name="wpkrs" devname="coco_wpkrs"/>
@@ -868,42 +878,42 @@
 		<manufacturer>Tandy Radio Shack</manufacturer>
 		<rom name="bas13.rom" size="8192" crc="d8f4d15e" sha1="28b92bebe35fa4f026a084416d6ea3b1552b63d3" region="maincpu" offset="2000"/>
 		<rom name="extbas11.rom" merge="extbas11.rom" size="8192" crc="a82a6254" sha1="ad927fb4f30746d820cb8b860ebb585e7f095dea" region="maincpu" offset="0"/>
-		<device_ref name="hd6309e"/>
-		<device_ref name="ipt_merge_any_hi"/>
-		<device_ref name="ipt_merge_any_hi"/>
-		<device_ref name="pia6821"/>
-		<device_ref name="pia6821"/>
-		<device_ref name="sam6883"/>
-		<device_ref name="coco_dwsock"/>
-		<device_ref name="speaker"/>
-		<device_ref name="dac_6bit_bw"/>
-		<device_ref name="dac"/>
-		<device_ref name="cassette_image"/>
-		<device_ref name="rs232"/>
-		<device_ref name="rs_serial_printer"/>
-		<device_ref name="printer_image"/>
-		<device_ref name="screen"/>
-		<device_ref name="mc6847t1_ntsc"/>
-		<device_ref name="ram"/>
-		<device_ref name="address_map_bank"/>
-		<device_ref name="cococart_slot"/>
-		<device_ref name="coco_fdc"/>
-		<device_ref name="wd1773"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_525_dd"/>
-		<device_ref name="speaker"/>
-		<device_ref name="flopsnd"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_525_dd"/>
-		<device_ref name="speaker"/>
-		<device_ref name="flopsnd"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="software_list"/>
-		<device_ref name="software_list"/>
-		<device_ref name="software_list"/>
-		<device_ref name="coco_vhd_image"/>
-		<device_ref name="coco_vhd_image"/>
+		<device_ref tag=":maincpu" name="hd6309e"/>
+		<device_ref tag=":irqs" name="ipt_merge_any_hi"/>
+		<device_ref tag=":firqs" name="ipt_merge_any_hi"/>
+		<device_ref tag=":pia0" name="pia6821"/>
+		<device_ref tag=":pia1" name="pia6821"/>
+		<device_ref tag=":sam" name="sam6883"/>
+		<device_ref tag=":dwsock" name="coco_dwsock"/>
+		<device_ref tag=":speaker" name="speaker"/>
+		<device_ref tag=":dac" name="dac_6bit_bw"/>
+		<device_ref tag=":sbs" name="dac"/>
+		<device_ref tag=":cassette" name="cassette_image"/>
+		<device_ref tag=":rs232" name="rs232"/>
+		<device_ref tag=":rs232:rs_printer" name="rs_serial_printer"/>
+		<device_ref tag=":rs232:rs_printer:printer" name="printer_image"/>
+		<device_ref tag=":screen" name="screen"/>
+		<device_ref tag=":vdg" name="mc6847t1"/>
+		<device_ref tag=":ram" name="ram"/>
+		<device_ref tag=":floating" name="address_map_bank"/>
+		<device_ref tag=":ext" name="cococart_slot"/>
+		<device_ref tag=":ext:fdc" name="coco_fdc"/>
+		<device_ref tag=":ext:fdc:wd17xx" name="wd1773"/>
+		<device_ref tag=":ext:fdc:wd17xx:0" name="floppy_connector"/>
+		<device_ref tag=":ext:fdc:wd17xx:0:525dd" name="floppy_525_dd"/>
+		<device_ref tag=":ext:fdc:wd17xx:0:525dd:flopsndout" name="speaker"/>
+		<device_ref tag=":ext:fdc:wd17xx:0:525dd:floppysound" name="flopsnd"/>
+		<device_ref tag=":ext:fdc:wd17xx:1" name="floppy_connector"/>
+		<device_ref tag=":ext:fdc:wd17xx:1:525dd" name="floppy_525_dd"/>
+		<device_ref tag=":ext:fdc:wd17xx:1:525dd:flopsndout" name="speaker"/>
+		<device_ref tag=":ext:fdc:wd17xx:1:525dd:floppysound" name="flopsnd"/>
+		<device_ref tag=":ext:fdc:wd17xx:2" name="floppy_connector"/>
+		<device_ref tag=":ext:fdc:wd17xx:3" name="floppy_connector"/>
+		<device_ref tag=":coco_cart_list" name="software_list"/>
+		<device_ref tag=":coco_flop_list" name="software_list"/>
+		<device_ref tag=":dragon_cart_list" name="software_list"/>
+		<device_ref tag=":vhd0" name="coco_vhd_image"/>
+		<device_ref tag=":vhd1" name="coco_vhd_image"/>
 		<chip type="cpu" tag="maincpu" name="Hitachi HD6309E" clock="894886"/>
 		<chip type="audio" tag="speaker" name="Speaker"/>
 		<chip type="audio" tag="dac" name="6-Bit Binary Weighted DAC"/>
@@ -1006,6 +1016,8 @@
 			<confsetting name="28800" value="10"/>
 			<confsetting name="38400" value="11"/>
 			<confsetting name="57600" value="12"/>
+			<confsetting name="76800" value="23"/>
+			<confsetting name="78125" value="24"/>
 			<confsetting name="111900" value="22"/>
 			<confsetting name="115200" value="13"/>
 		</configuration>
@@ -1133,7 +1145,10 @@
 		<slot name="rs232">
 			<slotoption name="terminal" devname="serial_terminal"/>
 			<slotoption name="sunkbd" devname="sunkbd_adaptor"/>
+			<slotoption name="votraxtnt" devname="serial_votraxtnt"/>
+			<slotoption name="rs_printer" devname="rs_serial_printer" default="yes"/>
 			<slotoption name="dec_loopback" devname="dec_rs232_loopback"/>
+			<slotoption name="h19" devname="serial_heath_h19"/>
 			<slotoption name="ie15" devname="ie15_terminal"/>
 			<slotoption name="null_modem" devname="null_modem"/>
 			<slotoption name="keyboard" devname="serial_keyboard"/>
@@ -1147,7 +1162,6 @@
 			<slotoption name="nss_tvi" devname="nss_tvinterface"/>
 			<slotoption name="rs232_sync_io" devname="rs232_sync_io"/>
 			<slotoption name="pty" devname="pseudo_terminal"/>
-			<slotoption name="rs_printer" devname="rs_serial_printer" default="yes"/>
 		</slot>
 		<slot name="ext">
 			<slotoption name="scii" devname="coco_scii"/>
@@ -1155,6 +1169,7 @@
 			<slotoption name="cd6809_fdc" devname="cd6809_fdc"/>
 			<slotoption name="sym12" devname="coco_symphony_twelve"/>
 			<slotoption name="multi" devname="coco_multipack"/>
+			<slotoption name="xsid" devname="coco_xsid"/>
 			<slotoption name="stecomp" devname="coco_stereo_composer"/>
 			<slotoption name="rs232" devname="coco_rs232"/>
 			<slotoption name="wpkrs" devname="coco_wpkrs"/>
@@ -1206,40 +1221,40 @@
 		<year>1986</year>
 		<manufacturer>Tandy Radio Shack</manufacturer>
 		<rom name="coco3.rom" size="32768" crc="b4c88d6c" sha1="e0d82953fb6fd03768604933df1ce8bc51fc427d" region="maincpu" offset="0"/>
-		<device_ref name="mc6809e"/>
-		<device_ref name="ipt_merge_any_hi"/>
-		<device_ref name="ipt_merge_any_hi"/>
-		<device_ref name="pia6821"/>
-		<device_ref name="pia6821"/>
-		<device_ref name="coco_dwsock"/>
-		<device_ref name="speaker"/>
-		<device_ref name="dac_6bit_bw"/>
-		<device_ref name="dac"/>
-		<device_ref name="cassette_image"/>
-		<device_ref name="rs232"/>
-		<device_ref name="rs_serial_printer"/>
-		<device_ref name="printer_image"/>
-		<device_ref name="coco_vhd_image"/>
-		<device_ref name="coco_vhd_image"/>
-		<device_ref name="gime_ntsc"/>
-		<device_ref name="screen"/>
-		<device_ref name="ram"/>
-		<device_ref name="address_map_bank"/>
-		<device_ref name="cococart_slot"/>
-		<device_ref name="coco_fdc"/>
-		<device_ref name="wd1773"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_525_dd"/>
-		<device_ref name="speaker"/>
-		<device_ref name="flopsnd"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_525_dd"/>
-		<device_ref name="speaker"/>
-		<device_ref name="flopsnd"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="software_list"/>
-		<device_ref name="software_list"/>
+		<device_ref tag=":maincpu" name="mc6809e"/>
+		<device_ref tag=":irqs" name="ipt_merge_any_hi"/>
+		<device_ref tag=":firqs" name="ipt_merge_any_hi"/>
+		<device_ref tag=":gime" name="gime_ntsc"/>
+		<device_ref tag=":pia0" name="pia6821"/>
+		<device_ref tag=":pia1" name="pia6821"/>
+		<device_ref tag=":dwsock" name="coco_dwsock"/>
+		<device_ref tag=":speaker" name="speaker"/>
+		<device_ref tag=":dac" name="dac_6bit_bw"/>
+		<device_ref tag=":sbs" name="dac"/>
+		<device_ref tag=":cassette" name="cassette_image"/>
+		<device_ref tag=":rs232" name="rs232"/>
+		<device_ref tag=":rs232:rs_printer" name="rs_serial_printer"/>
+		<device_ref tag=":rs232:rs_printer:printer" name="printer_image"/>
+		<device_ref tag=":vhd0" name="coco_vhd_image"/>
+		<device_ref tag=":vhd1" name="coco_vhd_image"/>
+		<device_ref tag=":screen" name="screen"/>
+		<device_ref tag=":ram" name="ram"/>
+		<device_ref tag=":floating" name="address_map_bank"/>
+		<device_ref tag=":ext" name="cococart_slot"/>
+		<device_ref tag=":ext:fdc" name="coco_fdc"/>
+		<device_ref tag=":ext:fdc:wd17xx" name="wd1773"/>
+		<device_ref tag=":ext:fdc:wd17xx:0" name="floppy_connector"/>
+		<device_ref tag=":ext:fdc:wd17xx:0:525dd" name="floppy_525_dd"/>
+		<device_ref tag=":ext:fdc:wd17xx:0:525dd:flopsndout" name="speaker"/>
+		<device_ref tag=":ext:fdc:wd17xx:0:525dd:floppysound" name="flopsnd"/>
+		<device_ref tag=":ext:fdc:wd17xx:1" name="floppy_connector"/>
+		<device_ref tag=":ext:fdc:wd17xx:1:525dd" name="floppy_525_dd"/>
+		<device_ref tag=":ext:fdc:wd17xx:1:525dd:flopsndout" name="speaker"/>
+		<device_ref tag=":ext:fdc:wd17xx:1:525dd:floppysound" name="flopsnd"/>
+		<device_ref tag=":ext:fdc:wd17xx:2" name="floppy_connector"/>
+		<device_ref tag=":ext:fdc:wd17xx:3" name="floppy_connector"/>
+		<device_ref tag=":cart_list" name="software_list"/>
+		<device_ref tag=":flop_list" name="software_list"/>
 		<chip type="cpu" tag="maincpu" name="Motorola MC6809E" clock="894886"/>
 		<chip type="audio" tag="speaker" name="Speaker"/>
 		<chip type="audio" tag="dac" name="6-Bit Binary Weighted DAC"/>
@@ -1350,6 +1365,8 @@
 			<confsetting name="28800" value="10"/>
 			<confsetting name="38400" value="11"/>
 			<confsetting name="57600" value="12"/>
+			<confsetting name="76800" value="23"/>
+			<confsetting name="78125" value="24"/>
 			<confsetting name="111900" value="22"/>
 			<confsetting name="115200" value="13"/>
 		</configuration>
@@ -1506,7 +1523,10 @@
 		<slot name="rs232">
 			<slotoption name="terminal" devname="serial_terminal"/>
 			<slotoption name="sunkbd" devname="sunkbd_adaptor"/>
+			<slotoption name="votraxtnt" devname="serial_votraxtnt"/>
+			<slotoption name="rs_printer" devname="rs_serial_printer" default="yes"/>
 			<slotoption name="dec_loopback" devname="dec_rs232_loopback"/>
+			<slotoption name="h19" devname="serial_heath_h19"/>
 			<slotoption name="ie15" devname="ie15_terminal"/>
 			<slotoption name="null_modem" devname="null_modem"/>
 			<slotoption name="keyboard" devname="serial_keyboard"/>
@@ -1520,7 +1540,6 @@
 			<slotoption name="nss_tvi" devname="nss_tvinterface"/>
 			<slotoption name="rs232_sync_io" devname="rs232_sync_io"/>
 			<slotoption name="pty" devname="pseudo_terminal"/>
-			<slotoption name="rs_printer" devname="rs_serial_printer" default="yes"/>
 		</slot>
 		<slot name="ext">
 			<slotoption name="scii" devname="coco_scii"/>
@@ -1528,6 +1547,7 @@
 			<slotoption name="cd6809_fdc" devname="cd6809_fdc"/>
 			<slotoption name="sym12" devname="coco_symphony_twelve"/>
 			<slotoption name="multi" devname="coco_multipack"/>
+			<slotoption name="xsid" devname="coco_xsid"/>
 			<slotoption name="stecomp" devname="coco_stereo_composer"/>
 			<slotoption name="rs232" devname="coco_rs232"/>
 			<slotoption name="wpkrs" devname="coco_wpkrs"/>
@@ -1578,40 +1598,40 @@
 		<year>19??</year>
 		<manufacturer>Tandy Radio Shack</manufacturer>
 		<rom name="coco3.rom" size="32768" crc="b4c88d6c" sha1="e0d82953fb6fd03768604933df1ce8bc51fc427d" region="maincpu" offset="0"/>
-		<device_ref name="hd6309e"/>
-		<device_ref name="ipt_merge_any_hi"/>
-		<device_ref name="ipt_merge_any_hi"/>
-		<device_ref name="pia6821"/>
-		<device_ref name="pia6821"/>
-		<device_ref name="coco_dwsock"/>
-		<device_ref name="speaker"/>
-		<device_ref name="dac_6bit_bw"/>
-		<device_ref name="dac"/>
-		<device_ref name="cassette_image"/>
-		<device_ref name="rs232"/>
-		<device_ref name="rs_serial_printer"/>
-		<device_ref name="printer_image"/>
-		<device_ref name="coco_vhd_image"/>
-		<device_ref name="coco_vhd_image"/>
-		<device_ref name="gime_ntsc"/>
-		<device_ref name="screen"/>
-		<device_ref name="ram"/>
-		<device_ref name="address_map_bank"/>
-		<device_ref name="cococart_slot"/>
-		<device_ref name="coco_fdc"/>
-		<device_ref name="wd1773"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_525_dd"/>
-		<device_ref name="speaker"/>
-		<device_ref name="flopsnd"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_525_dd"/>
-		<device_ref name="speaker"/>
-		<device_ref name="flopsnd"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="software_list"/>
-		<device_ref name="software_list"/>
+		<device_ref tag=":maincpu" name="hd6309e"/>
+		<device_ref tag=":irqs" name="ipt_merge_any_hi"/>
+		<device_ref tag=":firqs" name="ipt_merge_any_hi"/>
+		<device_ref tag=":gime" name="gime_ntsc"/>
+		<device_ref tag=":pia0" name="pia6821"/>
+		<device_ref tag=":pia1" name="pia6821"/>
+		<device_ref tag=":dwsock" name="coco_dwsock"/>
+		<device_ref tag=":speaker" name="speaker"/>
+		<device_ref tag=":dac" name="dac_6bit_bw"/>
+		<device_ref tag=":sbs" name="dac"/>
+		<device_ref tag=":cassette" name="cassette_image"/>
+		<device_ref tag=":rs232" name="rs232"/>
+		<device_ref tag=":rs232:rs_printer" name="rs_serial_printer"/>
+		<device_ref tag=":rs232:rs_printer:printer" name="printer_image"/>
+		<device_ref tag=":vhd0" name="coco_vhd_image"/>
+		<device_ref tag=":vhd1" name="coco_vhd_image"/>
+		<device_ref tag=":screen" name="screen"/>
+		<device_ref tag=":ram" name="ram"/>
+		<device_ref tag=":floating" name="address_map_bank"/>
+		<device_ref tag=":ext" name="cococart_slot"/>
+		<device_ref tag=":ext:fdc" name="coco_fdc"/>
+		<device_ref tag=":ext:fdc:wd17xx" name="wd1773"/>
+		<device_ref tag=":ext:fdc:wd17xx:0" name="floppy_connector"/>
+		<device_ref tag=":ext:fdc:wd17xx:0:525dd" name="floppy_525_dd"/>
+		<device_ref tag=":ext:fdc:wd17xx:0:525dd:flopsndout" name="speaker"/>
+		<device_ref tag=":ext:fdc:wd17xx:0:525dd:floppysound" name="flopsnd"/>
+		<device_ref tag=":ext:fdc:wd17xx:1" name="floppy_connector"/>
+		<device_ref tag=":ext:fdc:wd17xx:1:525dd" name="floppy_525_dd"/>
+		<device_ref tag=":ext:fdc:wd17xx:1:525dd:flopsndout" name="speaker"/>
+		<device_ref tag=":ext:fdc:wd17xx:1:525dd:floppysound" name="flopsnd"/>
+		<device_ref tag=":ext:fdc:wd17xx:2" name="floppy_connector"/>
+		<device_ref tag=":ext:fdc:wd17xx:3" name="floppy_connector"/>
+		<device_ref tag=":cart_list" name="software_list"/>
+		<device_ref tag=":flop_list" name="software_list"/>
 		<chip type="cpu" tag="maincpu" name="Hitachi HD6309E" clock="894886"/>
 		<chip type="audio" tag="speaker" name="Speaker"/>
 		<chip type="audio" tag="dac" name="6-Bit Binary Weighted DAC"/>
@@ -1722,6 +1742,8 @@
 			<confsetting name="28800" value="10"/>
 			<confsetting name="38400" value="11"/>
 			<confsetting name="57600" value="12"/>
+			<confsetting name="76800" value="23"/>
+			<confsetting name="78125" value="24"/>
 			<confsetting name="111900" value="22"/>
 			<confsetting name="115200" value="13"/>
 		</configuration>
@@ -1878,7 +1900,10 @@
 		<slot name="rs232">
 			<slotoption name="terminal" devname="serial_terminal"/>
 			<slotoption name="sunkbd" devname="sunkbd_adaptor"/>
+			<slotoption name="votraxtnt" devname="serial_votraxtnt"/>
+			<slotoption name="rs_printer" devname="rs_serial_printer" default="yes"/>
 			<slotoption name="dec_loopback" devname="dec_rs232_loopback"/>
+			<slotoption name="h19" devname="serial_heath_h19"/>
 			<slotoption name="ie15" devname="ie15_terminal"/>
 			<slotoption name="null_modem" devname="null_modem"/>
 			<slotoption name="keyboard" devname="serial_keyboard"/>
@@ -1892,7 +1917,6 @@
 			<slotoption name="nss_tvi" devname="nss_tvinterface"/>
 			<slotoption name="rs232_sync_io" devname="rs232_sync_io"/>
 			<slotoption name="pty" devname="pseudo_terminal"/>
-			<slotoption name="rs_printer" devname="rs_serial_printer" default="yes"/>
 		</slot>
 		<slot name="ext">
 			<slotoption name="scii" devname="coco_scii"/>
@@ -1900,6 +1924,7 @@
 			<slotoption name="cd6809_fdc" devname="cd6809_fdc"/>
 			<slotoption name="sym12" devname="coco_symphony_twelve"/>
 			<slotoption name="multi" devname="coco_multipack"/>
+			<slotoption name="xsid" devname="coco_xsid"/>
 			<slotoption name="stecomp" devname="coco_stereo_composer"/>
 			<slotoption name="rs232" devname="coco_rs232"/>
 			<slotoption name="wpkrs" devname="coco_wpkrs"/>
@@ -1950,40 +1975,40 @@
 		<year>1986</year>
 		<manufacturer>Tandy Radio Shack</manufacturer>
 		<rom name="coco3p.rom" size="32768" crc="ff050d80" sha1="631e383068b1f52a8f419f4114b69501b21cf379" region="maincpu" offset="0"/>
-		<device_ref name="mc6809e"/>
-		<device_ref name="ipt_merge_any_hi"/>
-		<device_ref name="ipt_merge_any_hi"/>
-		<device_ref name="pia6821"/>
-		<device_ref name="pia6821"/>
-		<device_ref name="coco_dwsock"/>
-		<device_ref name="speaker"/>
-		<device_ref name="dac_6bit_bw"/>
-		<device_ref name="dac"/>
-		<device_ref name="cassette_image"/>
-		<device_ref name="rs232"/>
-		<device_ref name="rs_serial_printer"/>
-		<device_ref name="printer_image"/>
-		<device_ref name="coco_vhd_image"/>
-		<device_ref name="coco_vhd_image"/>
-		<device_ref name="gime_pal"/>
-		<device_ref name="screen"/>
-		<device_ref name="ram"/>
-		<device_ref name="address_map_bank"/>
-		<device_ref name="cococart_slot"/>
-		<device_ref name="coco_fdc"/>
-		<device_ref name="wd1773"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_525_dd"/>
-		<device_ref name="speaker"/>
-		<device_ref name="flopsnd"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_525_dd"/>
-		<device_ref name="speaker"/>
-		<device_ref name="flopsnd"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="software_list"/>
-		<device_ref name="software_list"/>
+		<device_ref tag=":maincpu" name="mc6809e"/>
+		<device_ref tag=":irqs" name="ipt_merge_any_hi"/>
+		<device_ref tag=":firqs" name="ipt_merge_any_hi"/>
+		<device_ref tag=":gime" name="gime_pal"/>
+		<device_ref tag=":pia0" name="pia6821"/>
+		<device_ref tag=":pia1" name="pia6821"/>
+		<device_ref tag=":dwsock" name="coco_dwsock"/>
+		<device_ref tag=":speaker" name="speaker"/>
+		<device_ref tag=":dac" name="dac_6bit_bw"/>
+		<device_ref tag=":sbs" name="dac"/>
+		<device_ref tag=":cassette" name="cassette_image"/>
+		<device_ref tag=":rs232" name="rs232"/>
+		<device_ref tag=":rs232:rs_printer" name="rs_serial_printer"/>
+		<device_ref tag=":rs232:rs_printer:printer" name="printer_image"/>
+		<device_ref tag=":vhd0" name="coco_vhd_image"/>
+		<device_ref tag=":vhd1" name="coco_vhd_image"/>
+		<device_ref tag=":screen" name="screen"/>
+		<device_ref tag=":ram" name="ram"/>
+		<device_ref tag=":floating" name="address_map_bank"/>
+		<device_ref tag=":ext" name="cococart_slot"/>
+		<device_ref tag=":ext:fdc" name="coco_fdc"/>
+		<device_ref tag=":ext:fdc:wd17xx" name="wd1773"/>
+		<device_ref tag=":ext:fdc:wd17xx:0" name="floppy_connector"/>
+		<device_ref tag=":ext:fdc:wd17xx:0:525dd" name="floppy_525_dd"/>
+		<device_ref tag=":ext:fdc:wd17xx:0:525dd:flopsndout" name="speaker"/>
+		<device_ref tag=":ext:fdc:wd17xx:0:525dd:floppysound" name="flopsnd"/>
+		<device_ref tag=":ext:fdc:wd17xx:1" name="floppy_connector"/>
+		<device_ref tag=":ext:fdc:wd17xx:1:525dd" name="floppy_525_dd"/>
+		<device_ref tag=":ext:fdc:wd17xx:1:525dd:flopsndout" name="speaker"/>
+		<device_ref tag=":ext:fdc:wd17xx:1:525dd:floppysound" name="flopsnd"/>
+		<device_ref tag=":ext:fdc:wd17xx:2" name="floppy_connector"/>
+		<device_ref tag=":ext:fdc:wd17xx:3" name="floppy_connector"/>
+		<device_ref tag=":cart_list" name="software_list"/>
+		<device_ref tag=":flop_list" name="software_list"/>
 		<chip type="cpu" tag="maincpu" name="Motorola MC6809E" clock="889843"/>
 		<chip type="audio" tag="speaker" name="Speaker"/>
 		<chip type="audio" tag="dac" name="6-Bit Binary Weighted DAC"/>
@@ -2094,6 +2119,8 @@
 			<confsetting name="28800" value="10"/>
 			<confsetting name="38400" value="11"/>
 			<confsetting name="57600" value="12"/>
+			<confsetting name="76800" value="23"/>
+			<confsetting name="78125" value="24"/>
 			<confsetting name="111900" value="22"/>
 			<confsetting name="115200" value="13"/>
 		</configuration>
@@ -2250,7 +2277,10 @@
 		<slot name="rs232">
 			<slotoption name="terminal" devname="serial_terminal"/>
 			<slotoption name="sunkbd" devname="sunkbd_adaptor"/>
+			<slotoption name="votraxtnt" devname="serial_votraxtnt"/>
+			<slotoption name="rs_printer" devname="rs_serial_printer" default="yes"/>
 			<slotoption name="dec_loopback" devname="dec_rs232_loopback"/>
+			<slotoption name="h19" devname="serial_heath_h19"/>
 			<slotoption name="ie15" devname="ie15_terminal"/>
 			<slotoption name="null_modem" devname="null_modem"/>
 			<slotoption name="keyboard" devname="serial_keyboard"/>
@@ -2264,7 +2294,6 @@
 			<slotoption name="nss_tvi" devname="nss_tvinterface"/>
 			<slotoption name="rs232_sync_io" devname="rs232_sync_io"/>
 			<slotoption name="pty" devname="pseudo_terminal"/>
-			<slotoption name="rs_printer" devname="rs_serial_printer" default="yes"/>
 		</slot>
 		<slot name="ext">
 			<slotoption name="scii" devname="coco_scii"/>
@@ -2272,6 +2301,7 @@
 			<slotoption name="cd6809_fdc" devname="cd6809_fdc"/>
 			<slotoption name="sym12" devname="coco_symphony_twelve"/>
 			<slotoption name="multi" devname="coco_multipack"/>
+			<slotoption name="xsid" devname="coco_xsid"/>
 			<slotoption name="stecomp" devname="coco_stereo_composer"/>
 			<slotoption name="rs232" devname="coco_rs232"/>
 			<slotoption name="wpkrs" devname="coco_wpkrs"/>
@@ -2345,42 +2375,42 @@
 		<rom name="extbas10.rom" merge="extbas10.rom" bios="b12e10" size="8192" crc="6111a086" sha1="8aa58f2eb3e8bcfd5470e3e35e2b359e9a72848e" region="maincpu" offset="0"/>
 		<rom name="bas12.rom" merge="bas12.rom" bios="b12e11" size="8192" crc="54368805" sha1="0f14dc46c647510eb0b7bd3f53e33da07907d04f" region="maincpu" offset="2000"/>
 		<rom name="extbas11.rom" merge="extbas11.rom" bios="b12e11" size="8192" crc="a82a6254" sha1="ad927fb4f30746d820cb8b860ebb585e7f095dea" region="maincpu" offset="0"/>
-		<device_ref name="hd6309e"/>
-		<device_ref name="ipt_merge_any_hi"/>
-		<device_ref name="ipt_merge_any_hi"/>
-		<device_ref name="pia6821"/>
-		<device_ref name="pia6821"/>
-		<device_ref name="sam6883"/>
-		<device_ref name="coco_dwsock"/>
-		<device_ref name="speaker"/>
-		<device_ref name="dac_6bit_bw"/>
-		<device_ref name="dac"/>
-		<device_ref name="cassette_image"/>
-		<device_ref name="rs232"/>
-		<device_ref name="rs_serial_printer"/>
-		<device_ref name="printer_image"/>
-		<device_ref name="screen"/>
-		<device_ref name="mc6847_ntsc"/>
-		<device_ref name="ram"/>
-		<device_ref name="address_map_bank"/>
-		<device_ref name="cococart_slot"/>
-		<device_ref name="coco_fdc"/>
-		<device_ref name="wd1773"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_525_dd"/>
-		<device_ref name="speaker"/>
-		<device_ref name="flopsnd"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_525_dd"/>
-		<device_ref name="speaker"/>
-		<device_ref name="flopsnd"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="software_list"/>
-		<device_ref name="software_list"/>
-		<device_ref name="software_list"/>
-		<device_ref name="coco_vhd_image"/>
-		<device_ref name="coco_vhd_image"/>
+		<device_ref tag=":maincpu" name="hd6309e"/>
+		<device_ref tag=":irqs" name="ipt_merge_any_hi"/>
+		<device_ref tag=":firqs" name="ipt_merge_any_hi"/>
+		<device_ref tag=":pia0" name="pia6821"/>
+		<device_ref tag=":pia1" name="pia6821"/>
+		<device_ref tag=":sam" name="sam6883"/>
+		<device_ref tag=":dwsock" name="coco_dwsock"/>
+		<device_ref tag=":speaker" name="speaker"/>
+		<device_ref tag=":dac" name="dac_6bit_bw"/>
+		<device_ref tag=":sbs" name="dac"/>
+		<device_ref tag=":cassette" name="cassette_image"/>
+		<device_ref tag=":rs232" name="rs232"/>
+		<device_ref tag=":rs232:rs_printer" name="rs_serial_printer"/>
+		<device_ref tag=":rs232:rs_printer:printer" name="printer_image"/>
+		<device_ref tag=":screen" name="screen"/>
+		<device_ref tag=":vdg" name="mc6847"/>
+		<device_ref tag=":ram" name="ram"/>
+		<device_ref tag=":floating" name="address_map_bank"/>
+		<device_ref tag=":ext" name="cococart_slot"/>
+		<device_ref tag=":ext:fdc" name="coco_fdc"/>
+		<device_ref tag=":ext:fdc:wd17xx" name="wd1773"/>
+		<device_ref tag=":ext:fdc:wd17xx:0" name="floppy_connector"/>
+		<device_ref tag=":ext:fdc:wd17xx:0:525dd" name="floppy_525_dd"/>
+		<device_ref tag=":ext:fdc:wd17xx:0:525dd:flopsndout" name="speaker"/>
+		<device_ref tag=":ext:fdc:wd17xx:0:525dd:floppysound" name="flopsnd"/>
+		<device_ref tag=":ext:fdc:wd17xx:1" name="floppy_connector"/>
+		<device_ref tag=":ext:fdc:wd17xx:1:525dd" name="floppy_525_dd"/>
+		<device_ref tag=":ext:fdc:wd17xx:1:525dd:flopsndout" name="speaker"/>
+		<device_ref tag=":ext:fdc:wd17xx:1:525dd:floppysound" name="flopsnd"/>
+		<device_ref tag=":ext:fdc:wd17xx:2" name="floppy_connector"/>
+		<device_ref tag=":ext:fdc:wd17xx:3" name="floppy_connector"/>
+		<device_ref tag=":coco_cart_list" name="software_list"/>
+		<device_ref tag=":coco_flop_list" name="software_list"/>
+		<device_ref tag=":dragon_cart_list" name="software_list"/>
+		<device_ref tag=":vhd0" name="coco_vhd_image"/>
+		<device_ref tag=":vhd1" name="coco_vhd_image"/>
 		<chip type="cpu" tag="maincpu" name="Hitachi HD6309E" clock="894886"/>
 		<chip type="audio" tag="speaker" name="Speaker"/>
 		<chip type="audio" tag="dac" name="6-Bit Binary Weighted DAC"/>
@@ -2483,6 +2513,8 @@
 			<confsetting name="28800" value="10"/>
 			<confsetting name="38400" value="11"/>
 			<confsetting name="57600" value="12"/>
+			<confsetting name="76800" value="23"/>
+			<confsetting name="78125" value="24"/>
 			<confsetting name="111900" value="22"/>
 			<confsetting name="115200" value="13"/>
 		</configuration>
@@ -2610,7 +2642,10 @@
 		<slot name="rs232">
 			<slotoption name="terminal" devname="serial_terminal"/>
 			<slotoption name="sunkbd" devname="sunkbd_adaptor"/>
+			<slotoption name="votraxtnt" devname="serial_votraxtnt"/>
+			<slotoption name="rs_printer" devname="rs_serial_printer" default="yes"/>
 			<slotoption name="dec_loopback" devname="dec_rs232_loopback"/>
+			<slotoption name="h19" devname="serial_heath_h19"/>
 			<slotoption name="ie15" devname="ie15_terminal"/>
 			<slotoption name="null_modem" devname="null_modem"/>
 			<slotoption name="keyboard" devname="serial_keyboard"/>
@@ -2624,7 +2659,6 @@
 			<slotoption name="nss_tvi" devname="nss_tvinterface"/>
 			<slotoption name="rs232_sync_io" devname="rs232_sync_io"/>
 			<slotoption name="pty" devname="pseudo_terminal"/>
-			<slotoption name="rs_printer" devname="rs_serial_printer" default="yes"/>
 		</slot>
 		<slot name="ext">
 			<slotoption name="scii" devname="coco_scii"/>
@@ -2632,6 +2666,7 @@
 			<slotoption name="cd6809_fdc" devname="cd6809_fdc"/>
 			<slotoption name="sym12" devname="coco_symphony_twelve"/>
 			<slotoption name="multi" devname="coco_multipack"/>
+			<slotoption name="xsid" devname="coco_xsid"/>
 			<slotoption name="stecomp" devname="coco_stereo_composer"/>
 			<slotoption name="rs232" devname="coco_rs232"/>
 			<slotoption name="wpkrs" devname="coco_wpkrs"/>
@@ -2689,16 +2724,16 @@
 		<rom name="coco1-g.e1" size="2048" crc="454fbc8e" sha1="edf22d1939a3a14f30f14c021e47aa9404fa4c75" region="maincpu" offset="f000"/>
 		<rom name="coco1-h.e1" size="2048" crc="b6d0ebea" sha1="a8f09558f71dfe0d300a6bb946dcb3bf6393c02b" region="maincpu" offset="f800"/>
 		<rom name="prom.c10" size="256" crc="fea8a821" sha1="c744cac6af7621524fc3a2b0a9a135a32b33c81b" region="proms" offset="0"/>
-		<device_ref name="m6502"/>
-		<device_ref name="screen"/>
-		<device_ref name="palette"/>
-		<device_ref name="speaker"/>
-		<device_ref name="ay8910"/>
-		<device_ref name="netlist_sound"/>
-		<device_ref name="nl_stream_in"/>
-		<device_ref name="nl_stream_in"/>
-		<device_ref name="nl_stream_in"/>
-		<device_ref name="nl_stream_out"/>
+		<device_ref tag=":maincpu" name="m6502"/>
+		<device_ref tag=":screen" name="screen"/>
+		<device_ref tag=":palette" name="palette"/>
+		<device_ref tag=":mono" name="speaker"/>
+		<device_ref tag=":ay8910" name="ay8910"/>
+		<device_ref tag=":snd_nl" name="netlist_sound"/>
+		<device_ref tag=":snd_nl:cin0" name="nl_stream_in"/>
+		<device_ref tag=":snd_nl:cin1" name="nl_stream_in"/>
+		<device_ref tag=":snd_nl:cin2" name="nl_stream_in"/>
+		<device_ref tag=":snd_nl:cout0" name="nl_stream_out"/>
 		<chip type="cpu" tag="maincpu" name="MOS Technology 6502" clock="1250000"/>
 		<chip type="audio" tag="mono" name="Speaker"/>
 		<chip type="audio" tag="ay8910" name="AY-3-8910A PSG" clock="2500000"/>
@@ -2779,16 +2814,16 @@
 		<rom name="coco1-g1.de1" size="2048" crc="481616ce" sha1="5e2c7ba4a098094da0adbfaeaba095cd54ae0268" region="maincpu" offset="f000"/>
 		<rom name="coco1-h1.e1" size="2048" crc="16613f90" sha1="f16032ba36970686d1534658d54e5bc55735d0b8" region="maincpu" offset="f800"/>
 		<rom name="tbp28l22.bin" size="256" crc="3bf3ccb0" sha1="d61d19d38045f42a9adecf295e479fee239bed48" region="proms" offset="0"/>
-		<device_ref name="m6502"/>
-		<device_ref name="screen"/>
-		<device_ref name="palette"/>
-		<device_ref name="speaker"/>
-		<device_ref name="ay8910"/>
-		<device_ref name="netlist_sound"/>
-		<device_ref name="nl_stream_in"/>
-		<device_ref name="nl_stream_in"/>
-		<device_ref name="nl_stream_in"/>
-		<device_ref name="nl_stream_out"/>
+		<device_ref tag=":maincpu" name="m6502"/>
+		<device_ref tag=":screen" name="screen"/>
+		<device_ref tag=":palette" name="palette"/>
+		<device_ref tag=":mono" name="speaker"/>
+		<device_ref tag=":ay8910" name="ay8910"/>
+		<device_ref tag=":snd_nl" name="netlist_sound"/>
+		<device_ref tag=":snd_nl:cin0" name="nl_stream_in"/>
+		<device_ref tag=":snd_nl:cin1" name="nl_stream_in"/>
+		<device_ref tag=":snd_nl:cin2" name="nl_stream_in"/>
+		<device_ref tag=":snd_nl:cout0" name="nl_stream_out"/>
 		<chip type="cpu" tag="maincpu" name="MOS Technology 6502" clock="1250000"/>
 		<chip type="audio" tag="mono" name="Speaker"/>
 		<chip type="audio" tag="ay8910" name="AY-3-8910A PSG" clock="2500000"/>
@@ -2871,16 +2906,16 @@
 		<rom name="d-e1.bin" size="2048" crc="db93f941" sha1="b827341e408b5dc50acdfd3586f829f7bb2bb915" region="maincpu" offset="f000"/>
 		<rom name="e1.bin" size="2048" crc="4e5705f0" sha1="271d6c8eff331327dc1a75f7a4b0c64d3e363e3d" region="maincpu" offset="f800"/>
 		<rom name="tbp18s22n.bin" size="256" crc="3bf3ccb0" sha1="d61d19d38045f42a9adecf295e479fee239bed48" region="proms" offset="0"/>
-		<device_ref name="m6502"/>
-		<device_ref name="screen"/>
-		<device_ref name="palette"/>
-		<device_ref name="speaker"/>
-		<device_ref name="ay8910"/>
-		<device_ref name="netlist_sound"/>
-		<device_ref name="nl_stream_in"/>
-		<device_ref name="nl_stream_in"/>
-		<device_ref name="nl_stream_in"/>
-		<device_ref name="nl_stream_out"/>
+		<device_ref tag=":maincpu" name="m6502"/>
+		<device_ref tag=":screen" name="screen"/>
+		<device_ref tag=":palette" name="palette"/>
+		<device_ref tag=":mono" name="speaker"/>
+		<device_ref tag=":ay8910" name="ay8910"/>
+		<device_ref tag=":snd_nl" name="netlist_sound"/>
+		<device_ref tag=":snd_nl:cin0" name="nl_stream_in"/>
+		<device_ref tag=":snd_nl:cin1" name="nl_stream_in"/>
+		<device_ref tag=":snd_nl:cin2" name="nl_stream_in"/>
+		<device_ref tag=":snd_nl:cout0" name="nl_stream_out"/>
 		<chip type="cpu" tag="maincpu" name="MOS Technology 6502" clock="1250000"/>
 		<chip type="audio" tag="mono" name="Speaker"/>
 		<chip type="audio" tag="ay8910" name="AY-3-8910A PSG" clock="2500000"/>
@@ -2958,8 +2993,8 @@
 	</machine>
 	<machine name="ata_interface" sourcefile="devices/bus/ata/ataintf.cpp" isdevice="yes" runnable="no">
 		<description>ATA Interface</description>
-		<device_ref name="ata_slot"/>
-		<device_ref name="ata_slot"/>
+		<device_ref tag=":_tmp:0" name="ata_slot"/>
+		<device_ref tag=":_tmp:1" name="ata_slot"/>
 		<slot name=":0">
 		</slot>
 		<slot name=":1">
@@ -2990,11 +3025,11 @@
 	<machine name="cd6809_fdc" sourcefile="devices/bus/coco/coco_fdc.cpp" isdevice="yes" runnable="no">
 		<description>Codimex CD-6809 Disk BASIC (1986)</description>
 		<rom name="cd6809dsk.u16" size="8192" crc="3c35bda8" sha1="9b2eec25188bed4326b84739a666435884e4ddf4" region="eprom" offset="0"/>
-		<device_ref name="wd1773"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_connector"/>
+		<device_ref tag=":_tmp:wd17xx" name="wd1773"/>
+		<device_ref tag=":_tmp:wd17xx:0" name="floppy_connector"/>
+		<device_ref tag=":_tmp:wd17xx:1" name="floppy_connector"/>
+		<device_ref tag=":_tmp:wd17xx:2" name="floppy_connector"/>
+		<device_ref tag=":_tmp:wd17xx:3" name="floppy_connector"/>
 		<slot name=":wd17xx:0">
 			<slotoption name="35dd" devname="floppy_35_dd"/>
 			<slotoption name="525dd" devname="floppy_525_dd" default="yes"/>
@@ -3022,13 +3057,16 @@
 	<machine name="coco_dcmodem" sourcefile="devices/bus/coco/coco_dcmodem.cpp" isdevice="yes" runnable="no">
 		<description>CoCo Direct Connect Modem PAK</description>
 		<rom name="direct connect modem pak,1985,26-2228,tandy.rom" size="8192" crc="667bc55d" sha1="703fe0aba4a603591078cb675ffd26a67c02df88" region="eprom" offset="0"/>
-		<device_ref name="mos6551"/>
-		<device_ref name="clock"/>
-		<device_ref name="rs232"/>
+		<device_ref tag=":_tmp:uart" name="mos6551"/>
+		<device_ref tag=":_tmp:uart:clock" name="clock"/>
+		<device_ref tag=":_tmp:port" name="rs232"/>
 		<slot name=":port">
 			<slotoption name="terminal" devname="serial_terminal"/>
 			<slotoption name="sunkbd" devname="sunkbd_adaptor"/>
+			<slotoption name="votraxtnt" devname="serial_votraxtnt"/>
+			<slotoption name="rs_printer" devname="rs_serial_printer"/>
 			<slotoption name="dec_loopback" devname="dec_rs232_loopback"/>
+			<slotoption name="h19" devname="serial_heath_h19"/>
 			<slotoption name="ie15" devname="ie15_terminal"/>
 			<slotoption name="null_modem" devname="null_modem"/>
 			<slotoption name="keyboard" devname="serial_keyboard"/>
@@ -3042,7 +3080,6 @@
 			<slotoption name="nss_tvi" devname="nss_tvinterface"/>
 			<slotoption name="rs232_sync_io" devname="rs232_sync_io"/>
 			<slotoption name="pty" devname="pseudo_terminal"/>
-			<slotoption name="rs_printer" devname="rs_serial_printer"/>
 		</slot>
 	</machine>
 	<machine name="coco_dwsock" sourcefile="devices/bus/coco/coco_dwsock.cpp" isdevice="yes" runnable="no">
@@ -3082,11 +3119,11 @@
 		<rom name="rgbdos_mess.rom" bios="rgbdos" size="8192" crc="0b0e64db" sha1="062ffab14dc788ec7744e528bf9bb425c3ec60ed" region="eprom" offset="0"/>
 		<rom name="hdbdw3bck.rom" bios="hdbk12" size="8192" crc="867a3f42" sha1="8fd64f1c246489e0bf2b3743ae76332ff324716a" region="eprom" offset="0"/>
 		<rom name="hdbdw3bc3.rom" bios="hdbk3" size="8192" crc="309a9efd" sha1="671605d61811953860466f771c1594bbade331f4" region="eprom" offset="0"/>
-		<device_ref name="wd1773"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_connector"/>
+		<device_ref tag=":_tmp:wd17xx" name="wd1773"/>
+		<device_ref tag=":_tmp:wd17xx:0" name="floppy_connector"/>
+		<device_ref tag=":_tmp:wd17xx:1" name="floppy_connector"/>
+		<device_ref tag=":_tmp:wd17xx:2" name="floppy_connector"/>
+		<device_ref tag=":_tmp:wd17xx:3" name="floppy_connector"/>
 		<slot name=":wd17xx:0">
 			<slotoption name="35dd" devname="floppy_35_dd"/>
 			<slotoption name="525dd" devname="floppy_525_dd" default="yes"/>
@@ -3110,10 +3147,10 @@
 	</machine>
 	<machine name="coco_ide" sourcefile="devices/bus/coco/coco_ide.cpp" isdevice="yes" runnable="no">
 		<description>Glenside IDE Adapter</description>
-		<device_ref name="ata_interface"/>
-		<device_ref name="ata_slot"/>
-		<device_ref name="ata_slot"/>
-		<device_ref name="cococart_slot"/>
+		<device_ref tag=":_tmp:ata" name="ata_interface"/>
+		<device_ref tag=":_tmp:ata:0" name="ata_slot"/>
+		<device_ref tag=":_tmp:ata:1" name="ata_slot"/>
+		<device_ref tag=":_tmp:slot" name="cococart_slot"/>
 		<configuration name="J2 Base Address" tag=":JUMPERS" mask="1">
 			<confsetting name="$FF5x" value="0" default="yes"/>
 			<confsetting name="$FF7x" value="1"/>
@@ -3148,6 +3185,7 @@
 			<slotoption name="cp450_fdc" devname="cp450_fdc"/>
 			<slotoption name="cd6809_fdc" devname="cd6809_fdc"/>
 			<slotoption name="sym12" devname="coco_symphony_twelve"/>
+			<slotoption name="xsid" devname="coco_xsid"/>
 			<slotoption name="stecomp" devname="coco_stereo_composer"/>
 			<slotoption name="rs232" devname="coco_rs232"/>
 			<slotoption name="wpkrs" devname="coco_wpkrs"/>
@@ -3169,11 +3207,11 @@
 	</machine>
 	<machine name="coco_midi" sourcefile="devices/bus/coco/coco_midi.cpp" isdevice="yes" runnable="no">
 		<description>CoCo MIDI PAK</description>
-		<device_ref name="acia6850"/>
-		<device_ref name="midi_port"/>
-		<device_ref name="midi_port"/>
-		<device_ref name="midi_port"/>
-		<device_ref name="clock"/>
+		<device_ref tag=":_tmp:mc6850" name="acia6850"/>
+		<device_ref tag=":_tmp:mdin" name="midi_port"/>
+		<device_ref tag=":_tmp:mdthru" name="midi_port"/>
+		<device_ref tag=":_tmp:mdout" name="midi_port"/>
+		<device_ref tag=":_tmp:acia_clock" name="clock"/>
 		<slot name=":mdin">
 			<slotoption name="midiin" devname="midiin_port" default="yes"/>
 		</slot>
@@ -3186,10 +3224,10 @@
 	</machine>
 	<machine name="coco_multipack" sourcefile="devices/bus/coco/coco_multi.cpp" isdevice="yes" runnable="no">
 		<description>CoCo Multi-Pak Interface</description>
-		<device_ref name="cococart_slot"/>
-		<device_ref name="cococart_slot"/>
-		<device_ref name="cococart_slot"/>
-		<device_ref name="cococart_slot"/>
+		<device_ref tag=":_tmp:slot1" name="cococart_slot"/>
+		<device_ref tag=":_tmp:slot2" name="cococart_slot"/>
+		<device_ref tag=":_tmp:slot3" name="cococart_slot"/>
+		<device_ref tag=":_tmp:slot4" name="cococart_slot"/>
 		<configuration name="Multi-Pak Slot Switch" tag=":switch" mask="3">
 			<confsetting name="Slot 1" value="0"/>
 			<confsetting name="Slot 2" value="1"/>
@@ -3218,6 +3256,7 @@
 		</device>
 		<slot name=":slot1">
 			<slotoption name="sym12" devname="coco_symphony_twelve"/>
+			<slotoption name="xsid" devname="coco_xsid"/>
 			<slotoption name="stecomp" devname="coco_stereo_composer"/>
 			<slotoption name="rs232" devname="coco_rs232"/>
 			<slotoption name="wpkrs" devname="coco_wpkrs"/>
@@ -3237,6 +3276,7 @@
 		</slot>
 		<slot name=":slot2">
 			<slotoption name="sym12" devname="coco_symphony_twelve"/>
+			<slotoption name="xsid" devname="coco_xsid"/>
 			<slotoption name="stecomp" devname="coco_stereo_composer"/>
 			<slotoption name="rs232" devname="coco_rs232"/>
 			<slotoption name="wpkrs" devname="coco_wpkrs"/>
@@ -3256,6 +3296,7 @@
 		</slot>
 		<slot name=":slot3">
 			<slotoption name="sym12" devname="coco_symphony_twelve"/>
+			<slotoption name="xsid" devname="coco_xsid"/>
 			<slotoption name="stecomp" devname="coco_stereo_composer"/>
 			<slotoption name="rs232" devname="coco_rs232"/>
 			<slotoption name="wpkrs" devname="coco_wpkrs"/>
@@ -3278,6 +3319,7 @@
 			<slotoption name="cp450_fdc" devname="cp450_fdc"/>
 			<slotoption name="cd6809_fdc" devname="cd6809_fdc"/>
 			<slotoption name="sym12" devname="coco_symphony_twelve"/>
+			<slotoption name="xsid" devname="coco_xsid"/>
 			<slotoption name="stecomp" devname="coco_stereo_composer"/>
 			<slotoption name="rs232" devname="coco_rs232"/>
 			<slotoption name="wpkrs" devname="coco_wpkrs"/>
@@ -3300,22 +3342,20 @@
 	<machine name="coco_orch90" sourcefile="devices/bus/coco/coco_orch90.cpp" isdevice="yes" runnable="no">
 		<description>CoCo Orch-90 PAK</description>
 		<rom name="orchestra 90,1984,26 - 3143,tandy.rom" size="8192" crc="15fb39af" sha1="6a20fee9c70b36a6435ac8378f31d5b626017df0" region="eprom" offset="0"/>
-		<device_ref name="speaker"/>
-		<device_ref name="speaker"/>
-		<device_ref name="dac_8bit_r2r"/>
-		<device_ref name="dac_8bit_r2r"/>
-		<chip type="audio" tag=":lspeaker" name="Speaker"/>
-		<chip type="audio" tag=":rspeaker" name="Speaker"/>
+		<device_ref tag=":_tmp:speaker" name="speaker"/>
+		<device_ref tag=":_tmp:ldac" name="dac_8bit_r2r"/>
+		<device_ref tag=":_tmp:rdac" name="dac_8bit_r2r"/>
+		<chip type="audio" tag=":speaker" name="Speaker"/>
 		<chip type="audio" tag=":ldac" name="8-Bit R-2R DAC"/>
 		<chip type="audio" tag=":rdac" name="8-Bit R-2R DAC"/>
-		<sound channels="2"/>
+		<sound channels="1"/>
 	</machine>
 	<machine name="coco_psg" sourcefile="devices/bus/coco/coco_psg.cpp" isdevice="yes" runnable="no">
 		<description>CoCo PSG</description>
 		<rom name="psg_firmware_v1.bin" size="524288" crc="5de614f8" sha1="9c7c8a5cc419ca1aca4d1c5e9f1195997c2bc95c" region="flash" offset="0"/>
-		<device_ref name="speaker"/>
-		<device_ref name="ym2149"/>
-		<device_ref name="sst_39sf040"/>
+		<device_ref tag=":_tmp:speaker" name="speaker"/>
+		<device_ref tag=":_tmp:psg" name="ym2149"/>
+		<device_ref tag=":_tmp:flash" name="sst_39sf040"/>
 		<chip type="audio" tag=":speaker" name="Speaker"/>
 		<chip type="audio" tag=":psg" name="YM2149 SSG" clock="1000000"/>
 		<sound channels="1"/>
@@ -3327,13 +3367,16 @@
 	<machine name="coco_rs232" sourcefile="devices/bus/coco/coco_rs232.cpp" isdevice="yes" runnable="no">
 		<description>CoCo Deluxe RS-232 PAK</description>
 		<rom name="deluxe_rs-232_program_pak_1983_26-2226_tandy.rom" size="4096" crc="d990e1f9" sha1="3fad25f3462a0b581b9c182ac11ad90c8fa08cb6" region="eprom" offset="0"/>
-		<device_ref name="mos6551"/>
-		<device_ref name="clock"/>
-		<device_ref name="rs232"/>
+		<device_ref tag=":_tmp:uart" name="mos6551"/>
+		<device_ref tag=":_tmp:uart:clock" name="clock"/>
+		<device_ref tag=":_tmp:port" name="rs232"/>
 		<slot name=":port">
 			<slotoption name="terminal" devname="serial_terminal"/>
 			<slotoption name="sunkbd" devname="sunkbd_adaptor"/>
+			<slotoption name="votraxtnt" devname="serial_votraxtnt"/>
+			<slotoption name="rs_printer" devname="rs_serial_printer"/>
 			<slotoption name="dec_loopback" devname="dec_rs232_loopback"/>
+			<slotoption name="h19" devname="serial_heath_h19"/>
 			<slotoption name="ie15" devname="ie15_terminal"/>
 			<slotoption name="null_modem" devname="null_modem"/>
 			<slotoption name="keyboard" devname="serial_keyboard"/>
@@ -3347,7 +3390,6 @@
 			<slotoption name="nss_tvi" devname="nss_tvinterface"/>
 			<slotoption name="rs232_sync_io" devname="rs232_sync_io"/>
 			<slotoption name="pty" devname="pseudo_terminal"/>
-			<slotoption name="rs_printer" devname="rs_serial_printer"/>
 		</slot>
 	</machine>
 	<machine name="coco_scii" sourcefile="devices/bus/coco/coco_fdc.cpp" isdevice="yes" runnable="no">
@@ -3356,13 +3398,13 @@
 		<biosset name="cdos3" description="Disto C-DOS 3 v1.2 for the CoCo 3" default="yes"/>
 		<rom name="cdos 4 4-6-89 cc1.bin" bios="cdos" size="16384" crc="9da6db28" sha1="2cc6e275178ca8d8f281d845792fb0ae069aaeda" region="eprom" offset="0"/>
 		<rom name="cdos 1_2 3-30-89 cc3.bin" bios="cdos3" size="16384" crc="891c0094" sha1="c1fa0fcbf1202a9b63aafd98dce777b502584230" region="eprom" offset="0"/>
-		<device_ref name="wd1773"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="ipt_merge_any_hi"/>
-		<device_ref name="distomeb_slot"/>
+		<device_ref tag=":_tmp:wd17xx" name="wd1773"/>
+		<device_ref tag=":_tmp:wd17xx:0" name="floppy_connector"/>
+		<device_ref tag=":_tmp:wd17xx:1" name="floppy_connector"/>
+		<device_ref tag=":_tmp:wd17xx:2" name="floppy_connector"/>
+		<device_ref tag=":_tmp:wd17xx:3" name="floppy_connector"/>
+		<device_ref tag=":_tmp:cart_line" name="ipt_merge_any_hi"/>
+		<device_ref tag=":_tmp:meb" name="distomeb_slot"/>
 		<slot name=":wd17xx:0">
 			<slotoption name="35dd" devname="floppy_35_dd"/>
 			<slotoption name="525dd" devname="floppy_525_dd" default="yes"/>
@@ -3391,12 +3433,12 @@
 		<description>CoCo S/SC PAK</description>
 		<rom name="pic-7040-510.bin" size="4096" crc="a8e2eb98" sha1="7c17dcbc21757535ce0b3a9e1ce5ca61319d3606" region="pic7040" offset="0"/>
 		<rom name="sp0256-al2.bin" size="2048" crc="b504ac15" sha1="e60fcb5fa16ff3f3b69d36c7a6e955744d3feafc" region="sp0256" offset="1000"/>
-		<device_ref name="tms7040"/>
-		<device_ref name="ram"/>
-		<device_ref name="speaker"/>
-		<device_ref name="sp0256"/>
-		<device_ref name="ay8913"/>
-		<device_ref name="cocossc_sac"/>
+		<device_ref tag=":_tmp:pic7040" name="tms7040"/>
+		<device_ref tag=":_tmp:staticram" name="ram"/>
+		<device_ref tag=":_tmp:ssc_audio" name="speaker"/>
+		<device_ref tag=":_tmp:sp0256" name="sp0256"/>
+		<device_ref tag=":_tmp:cocossc_ay" name="ay8913"/>
+		<device_ref tag=":_tmp:coco_sac_tag" name="cocossc_sac"/>
 		<chip type="cpu" tag=":pic7040" name="Texas Instruments TMS7040" clock="0"/>
 		<chip type="audio" tag=":ssc_audio" name="Speaker"/>
 		<chip type="audio" tag=":sp0256" name="GI SP0256 Narrator Speech Processor" clock="3120000"/>
@@ -3406,26 +3448,24 @@
 	</machine>
 	<machine name="coco_stereo_composer" sourcefile="devices/bus/coco/coco_stecomp.cpp" isdevice="yes" runnable="no">
 		<description>Speech Systems Stereo Composer</description>
-		<device_ref name="speaker"/>
-		<device_ref name="speaker"/>
-		<device_ref name="dac_8bit_r2r"/>
-		<device_ref name="dac_8bit_r2r"/>
-		<device_ref name="pia6821"/>
-		<chip type="audio" tag=":sc_lspeaker" name="Speaker"/>
-		<chip type="audio" tag=":sc_rspeaker" name="Speaker"/>
+		<device_ref tag=":_tmp:sc_speaker" name="speaker"/>
+		<device_ref tag=":_tmp:sc_ldac" name="dac_8bit_r2r"/>
+		<device_ref tag=":_tmp:sc_rdac" name="dac_8bit_r2r"/>
+		<device_ref tag=":_tmp:sc_pia" name="pia6821"/>
+		<chip type="audio" tag=":sc_speaker" name="Speaker"/>
 		<chip type="audio" tag=":sc_ldac" name="8-Bit R-2R DAC"/>
 		<chip type="audio" tag=":sc_rdac" name="8-Bit R-2R DAC"/>
-		<sound channels="2"/>
+		<sound channels="1"/>
 	</machine>
 	<machine name="coco_symphony_twelve" sourcefile="devices/bus/coco/coco_sym12.cpp" isdevice="yes" runnable="no">
 		<description>Speech Systems Symphony Twelve</description>
-		<device_ref name="pia6821"/>
-		<device_ref name="speaker"/>
-		<device_ref name="speaker"/>
-		<device_ref name="ay8910"/>
-		<device_ref name="ay8910"/>
-		<device_ref name="ay8910"/>
-		<device_ref name="ay8910"/>
+		<device_ref tag=":_tmp:s12_pia" name="pia6821"/>
+		<device_ref tag=":_tmp:s12_l" name="speaker"/>
+		<device_ref tag=":_tmp:s12_r" name="speaker"/>
+		<device_ref tag=":_tmp:s12_ay8910.1" name="ay8910"/>
+		<device_ref tag=":_tmp:s12_ay8910.2" name="ay8910"/>
+		<device_ref tag=":_tmp:s12_ay8910.3" name="ay8910"/>
+		<device_ref tag=":_tmp:s12_ay8910.4" name="ay8910"/>
 		<chip type="audio" tag=":s12_l" name="Speaker"/>
 		<chip type="audio" tag=":s12_r" name="Speaker"/>
 		<chip type="audio" tag=":s12_ay8910.1" name="AY-3-8910A PSG"/>
@@ -3445,10 +3485,10 @@
 		<rom name="tercoca4426-5-8549-3.4.bin" size="8192" crc="3fcdf92e" sha1="ec1589f8d62701ca3faf2a85a57ab2e1f61d2137" region="t4426_banks" offset="a000"/>
 		<rom name="tercoca4426-6-8549-3.4.bin" size="8192" crc="27652ccf" sha1="529a6f736666ae6660483e547d076725606b1c1d" region="t4426_banks" offset="c000"/>
 		<rom name="tercoca4426-7-8549-3.4.bin" size="8192" crc="f6640569" sha1="03f70dcc5f7ab60cd908427d45ebd85b6f464b93" region="t4426_banks" offset="e000"/>
-		<device_ref name="pia6821"/>
-		<device_ref name="acia6850"/>
-		<device_ref name="rs232"/>
-		<device_ref name="mc14411"/>
+		<device_ref tag=":_tmp:pia" name="pia6821"/>
+		<device_ref tag=":_tmp:acia" name="acia6850"/>
+		<device_ref tag=":_tmp:ser2" name="rs232"/>
+		<device_ref tag=":_tmp:brg" name="mc14411"/>
 		<configuration name="Cart Auto-Start" tag=":cart_autostart" mask="1">
 			<confsetting name="Off" value="0"/>
 			<confsetting name="On" value="1" default="yes"/>
@@ -3470,7 +3510,10 @@
 		<slot name=":ser2">
 			<slotoption name="terminal" devname="serial_terminal"/>
 			<slotoption name="sunkbd" devname="sunkbd_adaptor"/>
+			<slotoption name="votraxtnt" devname="serial_votraxtnt"/>
+			<slotoption name="rs_printer" devname="rs_serial_printer"/>
 			<slotoption name="dec_loopback" devname="dec_rs232_loopback"/>
+			<slotoption name="h19" devname="serial_heath_h19"/>
 			<slotoption name="ie15" devname="ie15_terminal"/>
 			<slotoption name="null_modem" devname="null_modem"/>
 			<slotoption name="keyboard" devname="serial_keyboard"/>
@@ -3484,7 +3527,6 @@
 			<slotoption name="nss_tvi" devname="nss_tvinterface"/>
 			<slotoption name="rs232_sync_io" devname="rs232_sync_io"/>
 			<slotoption name="pty" devname="pseudo_terminal"/>
-			<slotoption name="rs_printer" devname="rs_serial_printer"/>
 		</slot>
 	</machine>
 	<machine name="coco_vhd_image" sourcefile="trs/coco_vhd.cpp" isdevice="yes" runnable="no">
@@ -3493,35 +3535,43 @@
 	<machine name="coco_wpk" sourcefile="devices/bus/coco/coco_wpk.cpp" isdevice="yes" runnable="no">
 		<description>CoCo WordPak</description>
 		<rom name="chr_gen_4.0.rom" size="2048" crc="6e9a671a" sha1="0ff5fae512c7f1abe138504d51492404dd86be03" region="chargen" offset="0"/>
-		<device_ref name="screen"/>
-		<device_ref name="palette"/>
-		<device_ref name="r6545_1"/>
+		<device_ref tag=":_tmp:screen" name="screen"/>
+		<device_ref tag=":_tmp:palette" name="palette"/>
+		<device_ref tag=":_tmp:crtc" name="r6545_1"/>
 		<display tag=":screen" type="raster" rotate="0" width="640" height="240" refresh="55.103837" pixclock="14318181" htotal="896" hbend="0" hbstart="640" vtotal="290" vbend="0" vbstart="240" />
 		<feature type="graphics" status="imperfect"/>
 	</machine>
 	<machine name="coco_wpk2" sourcefile="devices/bus/coco/coco_wpk.cpp" isdevice="yes" runnable="no">
 		<description>CoCo WordPak II</description>
 		<rom name="chr_gen_4.0.rom" size="2048" crc="6e9a671a" sha1="0ff5fae512c7f1abe138504d51492404dd86be03" region="chargen" offset="0"/>
-		<device_ref name="screen"/>
-		<device_ref name="palette"/>
-		<device_ref name="r6545_1"/>
+		<device_ref tag=":_tmp:screen" name="screen"/>
+		<device_ref tag=":_tmp:palette" name="palette"/>
+		<device_ref tag=":_tmp:crtc" name="r6545_1"/>
 		<display tag=":screen" type="raster" rotate="0" width="640" height="240" refresh="55.103837" pixclock="14318181" htotal="896" hbend="0" hbstart="640" vtotal="290" vbend="0" vbstart="240" />
 		<feature type="graphics" status="imperfect"/>
 	</machine>
 	<machine name="coco_wpk2p" sourcefile="devices/bus/coco/coco_wpk2p.cpp" isdevice="yes" runnable="no">
 		<description>CoCo WordPak 2+</description>
-		<device_ref name="v9958"/>
-		<device_ref name="screen"/>
+		<device_ref tag=":_tmp:v9958" name="v9958"/>
+		<device_ref tag=":_tmp:screen" name="screen"/>
 		<display tag=":screen" type="raster" rotate="0" width="543" height="465" refresh="59.922749" pixclock="21477272" htotal="684" hbend="0" hbstart="543" vtotal="524" vbend="10" vbstart="475" />
 	</machine>
 	<machine name="coco_wpkrs" sourcefile="devices/bus/coco/coco_wpk.cpp" isdevice="yes" runnable="no">
 		<description>CoCo WordPak RS</description>
 		<rom name="chr_gen_4.0.rom" size="2048" crc="6e9a671a" sha1="0ff5fae512c7f1abe138504d51492404dd86be03" region="chargen" offset="0"/>
-		<device_ref name="screen"/>
-		<device_ref name="palette"/>
-		<device_ref name="r6545_1"/>
+		<device_ref tag=":_tmp:screen" name="screen"/>
+		<device_ref tag=":_tmp:palette" name="palette"/>
+		<device_ref tag=":_tmp:crtc" name="r6545_1"/>
 		<display tag=":screen" type="raster" rotate="0" width="640" height="240" refresh="55.103837" pixclock="14318181" htotal="896" hbend="0" hbstart="640" vtotal="290" vbend="0" vbstart="240" />
 		<feature type="graphics" status="imperfect"/>
+	</machine>
+	<machine name="coco_xsid" sourcefile="devices/bus/coco/coco_xsid.cpp" isdevice="yes" runnable="no">
+		<description>CoCo X-SID</description>
+		<device_ref tag=":_tmp:speaker" name="speaker"/>
+		<device_ref tag=":_tmp:mos8580" name="mos8580"/>
+		<chip type="audio" tag=":speaker" name="Speaker"/>
+		<chip type="audio" tag=":mos8580" name="MOS 8580 SID" clock="1000000"/>
+		<sound channels="1"/>
 	</machine>
 	<machine name="cococart_slot" sourcefile="devices/bus/coco/cococart.cpp" isdevice="yes" runnable="no">
 		<description>CoCo Cartridge Slot</description>
@@ -3542,8 +3592,8 @@
 	</machine>
 	<machine name="cocopakgmc" sourcefile="devices/bus/coco/coco_gmc.cpp" isdevice="yes" runnable="no">
 		<description>CoCo Games Master Cartridge</description>
-		<device_ref name="speaker"/>
-		<device_ref name="sn76489a"/>
+		<device_ref tag=":_tmp:gmc_speaker" name="speaker"/>
+		<device_ref tag=":_tmp:gmc_psg" name="sn76489a"/>
 		<chip type="audio" tag=":gmc_speaker" name="Speaker"/>
 		<chip type="audio" tag=":gmc_psg" name="SN76489A" clock="4000000"/>
 		<sound channels="1"/>
@@ -3560,7 +3610,7 @@
 	</machine>
 	<machine name="cocopakram" sourcefile="devices/bus/coco/coco_ram.cpp" isdevice="yes" runnable="no">
 		<description>Disto RAM Cartridge</description>
-		<device_ref name="distomeb_slot"/>
+		<device_ref tag=":_tmp:meb" name="distomeb_slot"/>
 		<slot name=":meb">
 			<slotoption name="rtime" devname="distomeb_rtime" default="yes"/>
 		</slot>
@@ -3572,11 +3622,11 @@
 	<machine name="cp450_fdc" sourcefile="devices/bus/coco/coco_fdc.cpp" isdevice="yes" runnable="no">
 		<description>Prológica CP-450 BASIC Disco V. 1.0 (1984)</description>
 		<rom name="cp450_basic_disco_v1.0.rom" size="8192" crc="e9ad60a0" sha1="827697fa5b755f5dc1efb054cdbbeb04e405405b" region="eprom" offset="0"/>
-		<device_ref name="wd1773"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_connector"/>
-		<device_ref name="floppy_connector"/>
+		<device_ref tag=":_tmp:wd17xx" name="wd1773"/>
+		<device_ref tag=":_tmp:wd17xx:0" name="floppy_connector"/>
+		<device_ref tag=":_tmp:wd17xx:1" name="floppy_connector"/>
+		<device_ref tag=":_tmp:wd17xx:2" name="floppy_connector"/>
+		<device_ref tag=":_tmp:wd17xx:3" name="floppy_connector"/>
 		<slot name=":wd17xx:0">
 			<slotoption name="35dd" devname="floppy_35_dd"/>
 			<slotoption name="525dd" devname="floppy_525_dd" default="yes"/>
@@ -3618,11 +3668,11 @@
 	</machine>
 	<machine name="dragon_msx2" sourcefile="devices/bus/coco/dragon_msx2.cpp" isdevice="yes" runnable="no">
 		<description>6x09 SuperSprite FM+</description>
-		<device_ref name="v9958"/>
-		<device_ref name="screen"/>
-		<device_ref name="speaker"/>
-		<device_ref name="ym2413"/>
-		<device_ref name="ym2149"/>
+		<device_ref tag=":_tmp:v9958" name="v9958"/>
+		<device_ref tag=":_tmp:screen" name="screen"/>
+		<device_ref tag=":_tmp:speaker" name="speaker"/>
+		<device_ref tag=":_tmp:ym2413" name="ym2413"/>
+		<device_ref tag=":_tmp:ym2149" name="ym2149"/>
 		<chip type="audio" tag=":speaker" name="Speaker"/>
 		<chip type="audio" tag=":ym2413" name="YM2413 OPLL" clock="3579545"/>
 		<chip type="audio" tag=":ym2149" name="YM2149 SSG" clock="3579545"/>
@@ -3651,24 +3701,24 @@
 	</machine>
 	<machine name="floppy_35_dd" sourcefile="devices/imagedev/floppy.cpp" isdevice="yes" runnable="no">
 		<description>3.5&quot; double density floppy drive</description>
-		<device_ref name="speaker"/>
-		<device_ref name="flopsnd"/>
+		<device_ref tag=":_tmp:flopsndout" name="speaker"/>
+		<device_ref tag=":_tmp:floppysound" name="flopsnd"/>
 		<chip type="audio" tag=":flopsndout" name="Speaker"/>
 		<chip type="audio" tag=":floppysound" name="Floppy sound" clock="44100"/>
 		<sound channels="1"/>
 	</machine>
 	<machine name="floppy_525_dd" sourcefile="devices/imagedev/floppy.cpp" isdevice="yes" runnable="no">
 		<description>5.25&quot; double density floppy drive</description>
-		<device_ref name="speaker"/>
-		<device_ref name="flopsnd"/>
+		<device_ref tag=":_tmp:flopsndout" name="speaker"/>
+		<device_ref tag=":_tmp:floppysound" name="flopsnd"/>
 		<chip type="audio" tag=":flopsndout" name="Speaker"/>
 		<chip type="audio" tag=":floppysound" name="Floppy sound" clock="44100"/>
 		<sound channels="1"/>
 	</machine>
 	<machine name="floppy_525_qd" sourcefile="devices/imagedev/floppy.cpp" isdevice="yes" runnable="no">
 		<description>5.25&quot; quad density floppy drive</description>
-		<device_ref name="speaker"/>
-		<device_ref name="flopsnd"/>
+		<device_ref tag=":_tmp:flopsndout" name="speaker"/>
+		<device_ref tag=":_tmp:floppysound" name="flopsnd"/>
 		<chip type="audio" tag=":flopsndout" name="Speaker"/>
 		<chip type="audio" tag=":floppysound" name="Floppy sound" clock="44100"/>
 		<sound channels="1"/>
@@ -3758,6 +3808,9 @@
 	<machine name="hd6309e" sourcefile="devices/cpu/m6809/hd6309.cpp" isdevice="yes" runnable="no">
 		<description>Hitachi HD6309E</description>
 	</machine>
+	<machine name="heath_tlb_connector" sourcefile="devices/bus/heathzenith/h19/tlb.cpp" isdevice="yes" runnable="no">
+		<description>Heath Terminal Logic board connector abstraction</description>
+	</machine>
 	<machine name="ie15_cpu" sourcefile="devices/cpu/ie15/ie15.cpp" isdevice="yes" runnable="no">
 		<description>ie15 CPU</description>
 	</machine>
@@ -3768,13 +3821,13 @@
 		<rom name="dump1.bin" bios="5chip" size="4096" crc="14b82284" sha1="5ac4159fbb1c3b81445605e26cd97a713ae12b5f" region="maincpu" offset="0"/>
 		<rom name="dump5.bin" bios="6chip" size="4096" crc="01f2e065" sha1="2b72dc0594e38a528400cd25aed0c47e0c432895" region="maincpu" offset="0"/>
 		<rom name="chargen-15ie.bin" size="2048" crc="ed16bf6b" sha1="6af9fb75f5375943d5c0ce9ed408e0fb4621b17e" region="chargen" offset="0"/>
-		<device_ref name="screen"/>
-		<device_ref name="ie15_cpu"/>
-		<device_ref name="ie15kbd"/>
-		<device_ref name="speaker"/>
-		<device_ref name="beep"/>
-		<device_ref name="gfxdecode"/>
-		<device_ref name="palette"/>
+		<device_ref tag=":_tmp:screen" name="screen"/>
+		<device_ref tag=":_tmp:maincpu" name="ie15_cpu"/>
+		<device_ref tag=":_tmp:keyboard" name="ie15kbd"/>
+		<device_ref tag=":_tmp:mono" name="speaker"/>
+		<device_ref tag=":_tmp:beeper" name="beep"/>
+		<device_ref tag=":_tmp:gfxdecode" name="gfxdecode"/>
+		<device_ref tag=":_tmp:palette" name="palette"/>
 		<chip type="cpu" tag=":maincpu" name="ie15 CPU" clock="3080000"/>
 		<chip type="audio" tag=":mono" name="Speaker"/>
 		<chip type="audio" tag=":beeper" name="Beep" clock="2400"/>
@@ -3831,14 +3884,14 @@
 	</machine>
 	<machine name="ie15_terminal" sourcefile="devices/bus/rs232/ie15.cpp" isdevice="yes" runnable="no">
 		<description>IE15 Terminal</description>
-		<device_ref name="ie15_device"/>
-		<device_ref name="screen"/>
-		<device_ref name="ie15_cpu"/>
-		<device_ref name="ie15kbd"/>
-		<device_ref name="speaker"/>
-		<device_ref name="beep"/>
-		<device_ref name="gfxdecode"/>
-		<device_ref name="palette"/>
+		<device_ref tag=":_tmp:ie15" name="ie15_device"/>
+		<device_ref tag=":_tmp:ie15:screen" name="screen"/>
+		<device_ref tag=":_tmp:ie15:maincpu" name="ie15_cpu"/>
+		<device_ref tag=":_tmp:ie15:keyboard" name="ie15kbd"/>
+		<device_ref tag=":_tmp:ie15:mono" name="speaker"/>
+		<device_ref tag=":_tmp:ie15:beeper" name="beep"/>
+		<device_ref tag=":_tmp:ie15:gfxdecode" name="gfxdecode"/>
+		<device_ref tag=":_tmp:ie15:palette" name="palette"/>
 		<chip type="cpu" tag=":ie15:maincpu" name="ie15 CPU" clock="3080000"/>
 		<chip type="audio" tag=":ie15:mono" name="Speaker"/>
 		<chip type="audio" tag=":ie15:beeper" name="Beep" clock="2400"/>
@@ -3921,16 +3974,16 @@
 	<machine name="mc6845" sourcefile="devices/video/mc6845.cpp" isdevice="yes" runnable="no">
 		<description>Motorola MC6845 CRTC</description>
 	</machine>
-	<machine name="mc6847_ntsc" sourcefile="devices/video/mc6847.cpp" isdevice="yes" runnable="no">
-		<description>Motorola MC6847 VDG (NTSC)</description>
+	<machine name="mc6847" sourcefile="devices/video/mc6847.cpp" isdevice="yes" runnable="no">
+		<description>Motorola MC6847 VDG</description>
 		<configuration name="Artifacting" tag=":artifacting" mask="3">
 			<confsetting name="Off" value="0"/>
 			<confsetting name="Standard" value="1" default="yes"/>
 			<confsetting name="Reverse" value="2"/>
 		</configuration>
 	</machine>
-	<machine name="mc6847t1_ntsc" sourcefile="devices/video/mc6847.cpp" isdevice="yes" runnable="no">
-		<description>Motorola MC6847T1 VDG (NTSC)</description>
+	<machine name="mc6847t1" sourcefile="devices/video/mc6847.cpp" isdevice="yes" runnable="no">
+		<description>Motorola MC6847T1 VDG</description>
 		<configuration name="Artifacting" tag=":artifacting" mask="3">
 			<confsetting name="Off" value="0"/>
 			<confsetting name="Standard" value="1" default="yes"/>
@@ -3943,21 +3996,23 @@
 	<machine name="mockingboardd" sourcefile="devices/bus/rs232/mboardd.cpp" isdevice="yes" runnable="no">
 		<description>Sweet Micro Systems Mockingboard D</description>
 		<rom name="mockingboard d rom.bin" size="2048" crc="277b1813" sha1="e8d20f4b59fe867ff76434d35a14d2cbdc8533e3" region="mbcpu" offset="0"/>
-		<device_ref name="m6803"/>
-		<device_ref name="speaker"/>
-		<device_ref name="speaker"/>
-		<device_ref name="ay8913"/>
-		<device_ref name="ay8913"/>
+		<device_ref tag=":_tmp:mbdcpu" name="m6803"/>
+		<device_ref tag=":_tmp:speaker" name="speaker"/>
+		<device_ref tag=":_tmp:ay1" name="ay8913"/>
+		<device_ref tag=":_tmp:ay2" name="ay8913"/>
 		<chip type="cpu" tag=":mbdcpu" name="Motorola MC6803" clock="4915200"/>
-		<chip type="audio" tag=":lspeaker" name="Speaker"/>
-		<chip type="audio" tag=":rspeaker" name="Speaker"/>
+		<chip type="audio" tag=":speaker" name="Speaker"/>
 		<chip type="audio" tag=":ay1" name="AY-3-8913 PSG" clock="1022727"/>
 		<chip type="audio" tag=":ay2" name="AY-3-8913 PSG" clock="1022727"/>
-		<sound channels="2"/>
+		<sound channels="1"/>
 	</machine>
 	<machine name="mos6551" sourcefile="devices/machine/mos6551.cpp" isdevice="yes" runnable="no">
 		<description>MOS 6551 ACIA</description>
-		<device_ref name="clock"/>
+		<device_ref tag=":_tmp:clock" name="clock"/>
+	</machine>
+	<machine name="mos8580" sourcefile="devices/sound/mos6581.cpp" isdevice="yes" runnable="no">
+		<description>MOS 8580 SID</description>
+		<sound channels="0"/>
 	</machine>
 	<machine name="netlist_sound" sourcefile="devices/machine/netlist.cpp" isdevice="yes" runnable="no">
 		<description>Netlist Sound Device</description>
@@ -3973,10 +4028,10 @@
 		<description>Novag Super System TV Interface</description>
 		<rom name="tvgr_011091" size="8192" crc="0ff64cec" sha1="d35881111cdf8e85a843e3b085447d07244d8d70" region="maincpu" offset="e000"/>
 		<rom name="cg_930" size="8192" crc="98287b9d" sha1="b20d7856e4739bafcd66434adf9881824f8a611b" region="cg_rom" offset="0"/>
-		<device_ref name="hd6303r"/>
-		<device_ref name="screen"/>
-		<device_ref name="mc6845"/>
-		<device_ref name="palette"/>
+		<device_ref tag=":_tmp:maincpu" name="hd6303r"/>
+		<device_ref tag=":_tmp:screen" name="screen"/>
+		<device_ref tag=":_tmp:crtc" name="mc6845"/>
+		<device_ref tag=":_tmp:palette" name="palette"/>
 		<chip type="cpu" tag=":maincpu" name="Hitachi HD6303R" clock="4915200"/>
 		<display tag=":screen" type="raster" rotate="0" width="320" height="200" refresh="58.336783" pixclock="7159090" htotal="472" hbend="0" hbstart="320" vtotal="260" vbend="0" vbstart="200" />
 		<input players="1">
@@ -3985,12 +4040,28 @@
 	</machine>
 	<machine name="null_modem" sourcefile="devices/bus/rs232/null_modem.cpp" isdevice="yes" runnable="no">
 		<description>RS-232 Null Modem</description>
-		<device_ref name="bitbanger"/>
+		<device_ref tag=":_tmp:stream" name="bitbanger"/>
 		<configuration name="Flow Control" tag=":FLOW_CONTROL" mask="7">
 			<confsetting name="Off" value="0" default="yes"/>
 			<confsetting name="RTS" value="1"/>
 			<confsetting name="DTR" value="2"/>
 			<confsetting name="XON/XOFF" value="4"/>
+		</configuration>
+		<configuration name="CR/LF Input Conversion" tag=":FLOW_CONTROL" mask="24">
+			<confsetting name="Off" value="0" default="yes"/>
+			<confsetting name="LF to CR" value="8"/>
+			<confsetting name="CR/LF to CR" value="16"/>
+			<confsetting name="LF to CR/LF" value="24"/>
+		</configuration>
+		<configuration name="Delay After CR" tag=":FLOW_CONTROL" mask="224">
+			<confsetting name="None" value="0" default="yes"/>
+			<confsetting name="10 ms" value="32"/>
+			<confsetting name="20 ms" value="64"/>
+			<confsetting name="40 ms" value="96"/>
+			<confsetting name="80 ms" value="128"/>
+			<confsetting name="160 ms" value="160"/>
+			<confsetting name="320 ms" value="192"/>
+			<confsetting name="640 ms" value="224"/>
 		</configuration>
 		<configuration name="Data Bits" tag=":RS232_DATABITS" mask="255">
 			<confsetting name="5" value="0"/>
@@ -4027,6 +4098,8 @@
 			<confsetting name="28800" value="10"/>
 			<confsetting name="38400" value="11"/>
 			<confsetting name="57600" value="12"/>
+			<confsetting name="76800" value="23"/>
+			<confsetting name="78125" value="24"/>
 			<confsetting name="111900" value="22"/>
 			<confsetting name="115200" value="13"/>
 		</configuration>
@@ -4058,6 +4131,8 @@
 			<confsetting name="28800" value="10"/>
 			<confsetting name="38400" value="11"/>
 			<confsetting name="57600" value="12"/>
+			<confsetting name="76800" value="23"/>
+			<confsetting name="78125" value="24"/>
 			<confsetting name="111900" value="22"/>
 			<confsetting name="115200" value="13"/>
 		</configuration>
@@ -4124,6 +4199,8 @@
 			<confsetting name="28800" value="10"/>
 			<confsetting name="38400" value="11"/>
 			<confsetting name="57600" value="12"/>
+			<confsetting name="76800" value="23"/>
+			<confsetting name="78125" value="24"/>
 			<confsetting name="111900" value="22"/>
 			<confsetting name="115200" value="13"/>
 		</configuration>
@@ -4155,6 +4232,8 @@
 			<confsetting name="28800" value="10"/>
 			<confsetting name="38400" value="11"/>
 			<confsetting name="57600" value="12"/>
+			<confsetting name="76800" value="23"/>
+			<confsetting name="78125" value="24"/>
 			<confsetting name="111900" value="22"/>
 			<confsetting name="115200" value="13"/>
 		</configuration>
@@ -4179,7 +4258,7 @@
 	</machine>
 	<machine name="rs232_patch_box" sourcefile="devices/bus/rs232/patchbox.cpp" isdevice="yes" runnable="no">
 		<description>RS-232 Patch Box</description>
-		<device_ref name="rs232"/>
+		<device_ref tag=":_tmp:dce" name="rs232"/>
 		<configuration name="TxD Source (V.24 103)" tag=":CONF0" mask="15">
 			<confsetting name="TxD" value="0" default="yes"/>
 			<confsetting name="RxD" value="1"/>
@@ -4404,7 +4483,10 @@
 		<slot name=":dce">
 			<slotoption name="terminal" devname="serial_terminal"/>
 			<slotoption name="sunkbd" devname="sunkbd_adaptor"/>
+			<slotoption name="votraxtnt" devname="serial_votraxtnt"/>
+			<slotoption name="rs_printer" devname="rs_serial_printer"/>
 			<slotoption name="dec_loopback" devname="dec_rs232_loopback"/>
+			<slotoption name="h19" devname="serial_heath_h19"/>
 			<slotoption name="ie15" devname="ie15_terminal"/>
 			<slotoption name="null_modem" devname="null_modem"/>
 			<slotoption name="keyboard" devname="serial_keyboard"/>
@@ -4418,12 +4500,11 @@
 			<slotoption name="nss_tvi" devname="nss_tvinterface"/>
 			<slotoption name="rs232_sync_io" devname="rs232_sync_io"/>
 			<slotoption name="pty" devname="pseudo_terminal"/>
-			<slotoption name="rs_printer" devname="rs_serial_printer"/>
 		</slot>
 	</machine>
 	<machine name="rs232_sync_io" sourcefile="devices/bus/rs232/rs232_sync_io.cpp" isdevice="yes" runnable="no">
 		<description>RS-232 Synchronous I/O</description>
-		<device_ref name="bitbanger"/>
+		<device_ref tag=":_tmp:stream" name="bitbanger"/>
 		<configuration name="Baud rate" tag=":RS232_BAUD" mask="255">
 			<confsetting name="50" value="14"/>
 			<confsetting name="75" value="15"/>
@@ -4446,6 +4527,8 @@
 			<confsetting name="28800" value="10"/>
 			<confsetting name="38400" value="11"/>
 			<confsetting name="57600" value="12"/>
+			<confsetting name="76800" value="23"/>
+			<confsetting name="78125" value="24"/>
 			<confsetting name="111900" value="22"/>
 			<confsetting name="115200" value="13"/>
 		</configuration>
@@ -4469,7 +4552,7 @@
 	</machine>
 	<machine name="rs_serial_printer" sourcefile="devices/bus/rs232/printer.cpp" isdevice="yes" runnable="no">
 		<description>Radio Shack Serial Printer</description>
-		<device_ref name="printer_image"/>
+		<device_ref tag=":_tmp:printer" name="printer_image"/>
 		<configuration name="Data Bits" tag=":RS232_DATABITS" mask="255">
 			<confsetting name="5" value="0"/>
 			<confsetting name="6" value="1"/>
@@ -4505,6 +4588,8 @@
 			<confsetting name="28800" value="10"/>
 			<confsetting name="38400" value="11"/>
 			<confsetting name="57600" value="12"/>
+			<confsetting name="76800" value="23"/>
+			<confsetting name="78125" value="24"/>
 			<confsetting name="111900" value="22"/>
 			<confsetting name="115200" value="13"/>
 		</configuration>
@@ -4526,13 +4611,26 @@
 		<description>Micro-Robotics Scorpion Intelligent Controller</description>
 		<biosset name="61203" description="Version 61203 (3rd Dec 1986)"/>
 		<rom name="scorpion_61203.bin" bios="61203" size="32768" crc="4ff495d1" sha1="91c273c94cd0dbca655e192dd01ac6dc3a4f60a8" region="sys_rom" offset="0"/>
-		<device_ref name="hd6303x"/>
-		<device_ref name="nvram"/>
-		<device_ref name="pcf8573"/>
+		<device_ref tag=":_tmp:maincpu" name="hd6303x"/>
+		<device_ref tag=":_tmp:nvram" name="nvram"/>
+		<device_ref tag=":_tmp:rtc" name="pcf8573"/>
 		<chip type="cpu" tag=":maincpu" name="Hitachi HD6303X" clock="4915200"/>
 	</machine>
 	<machine name="screen" sourcefile="emu/screen.cpp" isdevice="yes" runnable="no">
 		<description>Video Screen</description>
+	</machine>
+	<machine name="serial_heath_h19" sourcefile="devices/bus/rs232/heath_h19.cpp" isdevice="yes" runnable="no">
+		<description>Heath H19 Terminal (Serial Port)</description>
+		<device_ref tag=":_tmp:tlbc" name="heath_tlb_connector"/>
+		<slot name=":tlbc">
+			<slotoption name="watzman" devname="heath_watz_tlb"/>
+			<slotoption name="ultrarom" devname="heath_ultra_tlb"/>
+			<slotoption name="superset" devname="heath_superset_tlb"/>
+			<slotoption name="super19" devname="heath_super19_tlb"/>
+			<slotoption name="imaginator" devname="heath_imaginator_tlb"/>
+			<slotoption name="gp19" devname="heath_gp19_tlb"/>
+			<slotoption name="heath" devname="heath_tlb" default="yes"/>
+		</slot>
 	</machine>
 	<machine name="serial_keyboard" sourcefile="devices/bus/rs232/keyboard.cpp" isdevice="yes" runnable="no">
 		<description>Serial Keyboard</description>
@@ -4624,13 +4722,15 @@
 			<confsetting name="28800" value="10"/>
 			<confsetting name="38400" value="11"/>
 			<confsetting name="57600" value="12"/>
+			<confsetting name="76800" value="23"/>
+			<confsetting name="78125" value="24"/>
 			<confsetting name="111900" value="22"/>
 			<confsetting name="115200" value="13"/>
 		</configuration>
 	</machine>
 	<machine name="serial_printer" sourcefile="devices/bus/rs232/printer.cpp" isdevice="yes" runnable="no">
 		<description>Serial Printer</description>
-		<device_ref name="printer_image"/>
+		<device_ref tag=":_tmp:printer" name="printer_image"/>
 		<configuration name="Data Bits" tag=":RS232_DATABITS" mask="255">
 			<confsetting name="5" value="0"/>
 			<confsetting name="6" value="1"/>
@@ -4666,6 +4766,8 @@
 			<confsetting name="28800" value="10"/>
 			<confsetting name="38400" value="11"/>
 			<confsetting name="57600" value="12"/>
+			<confsetting name="76800" value="23"/>
+			<confsetting name="78125" value="24"/>
 			<confsetting name="111900" value="22"/>
 			<confsetting name="115200" value="13"/>
 		</configuration>
@@ -4682,10 +4784,10 @@
 	</machine>
 	<machine name="serial_terminal" sourcefile="devices/bus/rs232/terminal.cpp" isdevice="yes" runnable="no">
 		<description>Serial Terminal</description>
-		<device_ref name="screen"/>
-		<device_ref name="generic_keyboard"/>
-		<device_ref name="speaker"/>
-		<device_ref name="beep"/>
+		<device_ref tag=":_tmp:terminal_screen" name="screen"/>
+		<device_ref tag=":_tmp:keyboard" name="generic_keyboard"/>
+		<device_ref tag=":_tmp:bell" name="speaker"/>
+		<device_ref tag=":_tmp:beeper" name="beep"/>
 		<chip type="audio" tag=":bell" name="Speaker"/>
 		<chip type="audio" tag=":beeper" name="Beep" clock="2000"/>
 		<display tag=":terminal_screen" type="raster" rotate="0" width="640" height="240" refresh="50.000000" />
@@ -4728,6 +4830,8 @@
 			<confsetting name="28800" value="10"/>
 			<confsetting name="38400" value="11"/>
 			<confsetting name="57600" value="12"/>
+			<confsetting name="76800" value="23"/>
+			<confsetting name="78125" value="24"/>
 			<confsetting name="111900" value="22"/>
 			<confsetting name="115200" value="13"/>
 		</configuration>
@@ -4759,6 +4863,8 @@
 			<confsetting name="28800" value="10"/>
 			<confsetting name="38400" value="11"/>
 			<confsetting name="57600" value="12"/>
+			<confsetting name="76800" value="23"/>
+			<confsetting name="78125" value="24"/>
 			<confsetting name="111900" value="22"/>
 			<confsetting name="115200" value="13"/>
 		</configuration>
@@ -4840,6 +4946,37 @@
 			<confsetting name="30.0cps" value="248"/>
 		</configuration>
 	</machine>
+	<machine name="serial_votraxtnt" sourcefile="devices/bus/rs232/votraxtnt.cpp" isdevice="yes" runnable="no">
+		<description>Votrax Type 'N Talk (Serial Port)</description>
+		<device_ref tag=":_tmp:tnt" name="votraxtnt"/>
+		<device_ref tag=":_tmp:tnt:maincpu" name="m6802"/>
+		<device_ref tag=":_tmp:tnt:acia" name="acia6850"/>
+		<device_ref tag=":_tmp:tnt:acia_clock" name="clock"/>
+		<device_ref tag=":_tmp:tnt:mono" name="speaker"/>
+		<device_ref tag=":_tmp:tnt:votrax" name="votrsc01a"/>
+		<chip type="cpu" tag=":tnt:maincpu" name="Motorola MC6802" clock="2457600"/>
+		<chip type="audio" tag=":tnt:mono" name="Speaker"/>
+		<chip type="audio" tag=":tnt:votrax" name="Votrax SC-01-A" clock="720000"/>
+		<sound channels="1"/>
+		<dipswitch name="Baud Select" tag=":tnt:DSW1" mask="255">
+			<diplocation name="SW1" number="1"/>
+			<diplocation name="SW1" number="2"/>
+			<diplocation name="SW1" number="3"/>
+			<diplocation name="SW1" number="4"/>
+			<diplocation name="SW1" number="5"/>
+			<diplocation name="SW1" number="6"/>
+			<diplocation name="SW1" number="7"/>
+			<diplocation name="SW1" number="8"/>
+			<dipvalue name="75" value="1"/>
+			<dipvalue name="150" value="2"/>
+			<dipvalue name="300" value="4"/>
+			<dipvalue name="600" value="8"/>
+			<dipvalue name="1200" value="16"/>
+			<dipvalue name="2400" value="32"/>
+			<dipvalue name="4800" value="64"/>
+			<dipvalue name="9600" value="128" default="yes"/>
+		</dipswitch>
+	</machine>
 	<machine name="sn76489a" sourcefile="devices/sound/sn76496.cpp" isdevice="yes" runnable="no">
 		<description>SN76489A</description>
 		<sound channels="0"/>
@@ -4863,7 +5000,7 @@
 	</machine>
 	<machine name="sunkbd_adaptor" sourcefile="devices/bus/rs232/sun_kbd.cpp" isdevice="yes" runnable="no">
 		<description>Sun Keyboard Adaptor</description>
-		<device_ref name="sunkbd"/>
+		<device_ref tag=":_tmp:keyboard" name="sunkbd"/>
 		<slot name=":keyboard">
 			<slotoption name="type5jphle" devname="kbd_type5_hle_jp"/>
 			<slotoption name="type5sehle" devname="kbd_type5_hle_se"/>
@@ -4879,17 +5016,17 @@
 		<rom name="8224g_ver.1.1_6oct80.ic2" size="2048" crc="2b118c22" sha1="5fa031c834c7c582d5715764941499fcef51f477" region="program" offset="800"/>
 		<rom name="mcm66750.rom" size="2048" crc="aedc2830" sha1="49ce17d5b5cefb24e89ed3fd59887a652501b919" region="chargen1" offset="0"/>
 		<rom name="grafix_8x12_22aug80.bin" size="2048" crc="a525ed65" sha1="813d2e85ddb258c5b032b959e695ad33200cbcc4" region="chargen2" offset="0"/>
-		<device_ref name="m6802"/>
-		<device_ref name="ipt_merge_any_hi"/>
-		<device_ref name="pia6821"/>
-		<device_ref name="pia6821"/>
-		<device_ref name="ins8250"/>
-		<device_ref name="screen"/>
-		<device_ref name="mc6845"/>
-		<device_ref name="generic_keyboard"/>
-		<device_ref name="speaker"/>
-		<device_ref name="beep"/>
-		<device_ref name="printer_image"/>
+		<device_ref tag=":_tmp:maincpu" name="m6802"/>
+		<device_ref tag=":_tmp:mainirq" name="ipt_merge_any_hi"/>
+		<device_ref tag=":_tmp:pia0" name="pia6821"/>
+		<device_ref tag=":_tmp:pia1" name="pia6821"/>
+		<device_ref tag=":_tmp:uart" name="ins8250"/>
+		<device_ref tag=":_tmp:screen" name="screen"/>
+		<device_ref tag=":_tmp:crtc" name="mc6845"/>
+		<device_ref tag=":_tmp:keyboard" name="generic_keyboard"/>
+		<device_ref tag=":_tmp:bell" name="speaker"/>
+		<device_ref tag=":_tmp:beeper" name="beep"/>
+		<device_ref tag=":_tmp:printer" name="printer_image"/>
 		<chip type="cpu" tag=":maincpu" name="Motorola MC6802" clock="1843200"/>
 		<chip type="audio" tag=":bell" name="Speaker"/>
 		<chip type="audio" tag=":beeper" name="Beep" clock="2000"/>
@@ -5002,18 +5139,18 @@
 	</machine>
 	<machine name="swtpc8212_terminal" sourcefile="devices/bus/rs232/swtpc8212.cpp" isdevice="yes" runnable="no">
 		<description>SWTPC8212 Terminal</description>
-		<device_ref name="swtpc8212_device"/>
-		<device_ref name="m6802"/>
-		<device_ref name="ipt_merge_any_hi"/>
-		<device_ref name="pia6821"/>
-		<device_ref name="pia6821"/>
-		<device_ref name="ins8250"/>
-		<device_ref name="screen"/>
-		<device_ref name="mc6845"/>
-		<device_ref name="generic_keyboard"/>
-		<device_ref name="speaker"/>
-		<device_ref name="beep"/>
-		<device_ref name="printer_image"/>
+		<device_ref tag=":_tmp:swtpc8212" name="swtpc8212_device"/>
+		<device_ref tag=":_tmp:swtpc8212:maincpu" name="m6802"/>
+		<device_ref tag=":_tmp:swtpc8212:mainirq" name="ipt_merge_any_hi"/>
+		<device_ref tag=":_tmp:swtpc8212:pia0" name="pia6821"/>
+		<device_ref tag=":_tmp:swtpc8212:pia1" name="pia6821"/>
+		<device_ref tag=":_tmp:swtpc8212:uart" name="ins8250"/>
+		<device_ref tag=":_tmp:swtpc8212:screen" name="screen"/>
+		<device_ref tag=":_tmp:swtpc8212:crtc" name="mc6845"/>
+		<device_ref tag=":_tmp:swtpc8212:keyboard" name="generic_keyboard"/>
+		<device_ref tag=":_tmp:swtpc8212:bell" name="speaker"/>
+		<device_ref tag=":_tmp:swtpc8212:beeper" name="beep"/>
+		<device_ref tag=":_tmp:swtpc8212:printer" name="printer_image"/>
 		<chip type="cpu" tag=":swtpc8212:maincpu" name="Motorola MC6802" clock="1843200"/>
 		<chip type="audio" tag=":swtpc8212:bell" name="Speaker"/>
 		<chip type="audio" tag=":swtpc8212:beeper" name="Beep" clock="2000"/>
@@ -5134,6 +5271,42 @@
 	<machine name="v9958" sourcefile="devices/video/v9938.cpp" isdevice="yes" runnable="no">
 		<description>Yamaha V9958 VDP</description>
 	</machine>
+	<machine name="votraxtnt" sourcefile="devices/machine/votraxtnt.cpp" isdevice="yes" runnable="no">
+		<description>Votrax Type 'N Talk</description>
+		<rom name="cn49752n.bin" size="4096" crc="a44e1af3" sha1="af83b9e84f44c126b24ee754a22e34ca992a8d3d" region="maincpu" offset="0"/>
+		<device_ref tag=":_tmp:maincpu" name="m6802"/>
+		<device_ref tag=":_tmp:acia" name="acia6850"/>
+		<device_ref tag=":_tmp:acia_clock" name="clock"/>
+		<device_ref tag=":_tmp:mono" name="speaker"/>
+		<device_ref tag=":_tmp:votrax" name="votrsc01a"/>
+		<chip type="cpu" tag=":maincpu" name="Motorola MC6802" clock="2457600"/>
+		<chip type="audio" tag=":mono" name="Speaker"/>
+		<chip type="audio" tag=":votrax" name="Votrax SC-01-A" clock="720000"/>
+		<sound channels="1"/>
+		<dipswitch name="Baud Select" tag=":DSW1" mask="255">
+			<diplocation name="SW1" number="1"/>
+			<diplocation name="SW1" number="2"/>
+			<diplocation name="SW1" number="3"/>
+			<diplocation name="SW1" number="4"/>
+			<diplocation name="SW1" number="5"/>
+			<diplocation name="SW1" number="6"/>
+			<diplocation name="SW1" number="7"/>
+			<diplocation name="SW1" number="8"/>
+			<dipvalue name="75" value="1"/>
+			<dipvalue name="150" value="2"/>
+			<dipvalue name="300" value="4"/>
+			<dipvalue name="600" value="8"/>
+			<dipvalue name="1200" value="16"/>
+			<dipvalue name="2400" value="32"/>
+			<dipvalue name="4800" value="64"/>
+			<dipvalue name="9600" value="128" default="yes"/>
+		</dipswitch>
+	</machine>
+	<machine name="votrsc01a" sourcefile="devices/sound/votrax.cpp" isdevice="yes" runnable="no">
+		<description>Votrax SC-01-A</description>
+		<rom name="sc01a.bin" size="512" crc="fc416227" sha1="1d6da90b1807a01b5e186ef08476119a862b5e6d" region="internal" offset="0"/>
+		<sound channels="0"/>
+	</machine>
 	<machine name="wd1773" sourcefile="devices/machine/wd_fdc.cpp" isdevice="yes" runnable="no">
 		<description>Western Digital WD1773 FDC</description>
 	</machine>
@@ -5145,5 +5318,2063 @@
 		<description>YM2413 OPLL</description>
 		<rom name="ym2413_instruments.bin" size="144" crc="6f582d01" sha1="bb5537717e0b34849456b5ca7d405403dc3f8fda" region="internal" offset="0"/>
 		<sound channels="0"/>
+	</machine>
+	<machine name="atacf" sourcefile="devices/bus/ata/hdd.cpp" isdevice="yes" runnable="no">
+		<description>ATA CompactFlash Card</description>
+		<device_ref tag=":_tmp:image" name="harddisk_image"/>
+		<device type="harddisk" tag=":image" interface="ata_cf">
+			<instance name="harddisk" briefname="hard"/>
+			<extension name="chd"/>
+			<extension name="hd"/>
+			<extension name="hdv"/>
+			<extension name="2mg"/>
+			<extension name="hdi"/>
+		</device>
+	</machine>
+	<machine name="cdda" sourcefile="devices/sound/cdda.cpp" isdevice="yes" runnable="no">
+		<description>CD/DA</description>
+		<sound channels="0"/>
+	</machine>
+	<machine name="cdrom" sourcefile="devices/bus/ata/atapicdr.cpp" isdevice="yes" runnable="no">
+		<description>ATAPI CD-ROM</description>
+		<device_ref tag=":_tmp:image" name="cdrom_image"/>
+		<device_ref tag=":_tmp:cdda" name="cdda"/>
+		<chip type="audio" tag=":cdda" name="CD/DA" clock="44100"/>
+		<sound channels="0"/>
+		<device type="cdrom" tag=":image" interface="cdrom">
+			<instance name="cdrom" briefname="cdrm"/>
+			<extension name="chd"/>
+			<extension name="cue"/>
+			<extension name="toc"/>
+			<extension name="nrg"/>
+			<extension name="gdi"/>
+			<extension name="iso"/>
+			<extension name="cdr"/>
+		</device>
+	</machine>
+	<machine name="cdrom_image" sourcefile="devices/imagedev/cdromimg.cpp" isdevice="yes" runnable="no">
+		<description>CD-ROM Image</description>
+	</machine>
+	<machine name="centronics" sourcefile="devices/bus/centronics/ctronics.cpp" isdevice="yes" runnable="no">
+		<description>Centronics</description>
+	</machine>
+	<machine name="cp2024" sourcefile="devices/bus/ata/cp2024.cpp" isdevice="yes" runnable="no">
+		<description>Conner Peripherals CP-2024 hard disk</description>
+		<rom name="27c256.bin" size="32768" crc="574b5904" sha1="79bccc33835ba01fc4eb33fb4d412a691e7790c2" region="eprom" offset="0"/>
+		<device_ref tag=":_tmp:mcu" name="mc68hc11a1"/>
+		<chip type="cpu" tag=":mcu" name="Motorola MC68HC11A1" clock="10000000"/>
+		<feature type="disk" status="unemulated"/>
+	</machine>
+	<machine name="cr589" sourcefile="devices/bus/ata/cr589.cpp" isdevice="yes" runnable="no">
+		<description>Matsushita CR589 CD-ROM Drive</description>
+		<device_ref tag=":_tmp:image" name="cdrom_image"/>
+		<device_ref tag=":_tmp:cdda" name="cdda"/>
+		<chip type="audio" tag=":cdda" name="CD/DA" clock="44100"/>
+		<sound channels="0"/>
+		<device type="cdrom" tag=":image" interface="cdrom">
+			<instance name="cdrom" briefname="cdrm"/>
+			<extension name="chd"/>
+			<extension name="cue"/>
+			<extension name="toc"/>
+			<extension name="nrg"/>
+			<extension name="gdi"/>
+			<extension name="iso"/>
+			<extension name="cdr"/>
+		</device>
+	</machine>
+	<machine name="distomeb_rtime" sourcefile="devices/bus/coco/meb_rtime.cpp" isdevice="yes" runnable="no">
+		<description>Disto Real Time Clock Card</description>
+		<device_ref tag=":_tmp:rtc" name="msm6242"/>
+		<device_ref tag=":_tmp:centronics" name="centronics"/>
+		<device_ref tag=":_tmp:latch" name="output_latch"/>
+		<slot name=":centronics">
+			<slotoption name="nlq401" devname="nlq401"/>
+			<slotoption name="smartboard" devname="centronics_smartboard"/>
+			<slotoption name="chessmec" devname="centronics_chessmec"/>
+			<slotoption name="samdac" devname="centronics_samdac"/>
+			<slotoption name="covox_stereo" devname="covox_stereo"/>
+			<slotoption name="adaptator" devname="adaptator_multitap"/>
+			<slotoption name="digiblst" devname="cpcdigiblst"/>
+			<slotoption name="lx800" devname="lx800"/>
+			<slotoption name="jx80" devname="epson_jx80"/>
+			<slotoption name="ap2000" devname="ap2000"/>
+			<slotoption name="ex800" devname="ex800"/>
+			<slotoption name="fx80" devname="epson_fx80"/>
+			<slotoption name="rx80" devname="epson_rx80"/>
+			<slotoption name="mz1p16" devname="mz1p16"/>
+			<slotoption name="covox" devname="covox"/>
+			<slotoption name="pl80" devname="comx_pl80"/>
+			<slotoption name="lx810l" devname="lx810l"/>
+			<slotoption name="p72" devname="p72"/>
+			<slotoption name="printer" devname="centronics_printer" default="yes"/>
+		</slot>
+	</machine>
+	<machine name="harddisk_image" sourcefile="devices/imagedev/harddriv.cpp" isdevice="yes" runnable="no">
+		<description>Hard disk</description>
+	</machine>
+	<machine name="heath_gp19_tlb" sourcefile="devices/bus/heathzenith/h19/tlb.cpp" isdevice="yes" runnable="no">
+		<description>Heath Terminal Logic Board plus Northwest Digital Systems GP-19</description>
+		<rom name="gp19_rom_1_ver_1_1.u26" size="4096" crc="7cbe8e0d" sha1="977df895b067fa4e4646b4518cffb08d4e6bb6e0" region="maincpu" offset="0"/>
+		<rom name="gp19_rom_2_ver_1_1.u25" size="4096" crc="a85e3bc4" sha1="f64e851c5d3ef98a9a48e0fc482baa576773ff43" region="maincpu" offset="1000"/>
+		<rom name="gp19_rom_3_ver_1_1.u24" size="4096" crc="878f577c" sha1="0756435914dcfb981de4e40d5f81af3e0f5bb1c5" region="maincpu" offset="2000"/>
+		<rom name="gp19_char_gen_cg_1.u21" size="4096" crc="49ec9242" sha1="770a8c7b5b15bcfe465fd84326d0ae3dcaa85311" region="chargen" offset="0"/>
+		<rom name="2716_444-37_h19keyb.u445" size="2048" crc="5c3e6972" sha1="df49ce64ae48652346a91648c58178a34fb37d3c" region="keyboard" offset="0"/>
+		<device_ref tag=":_tmp:maincpu" name="z80"/>
+		<device_ref tag=":_tmp:screen" name="screen"/>
+		<device_ref tag=":_tmp:gfxdecode" name="gfxdecode"/>
+		<device_ref tag=":_tmp:palette" name="palette"/>
+		<device_ref tag=":_tmp:crtc" name="mc6845"/>
+		<device_ref tag=":_tmp:ins8250" name="ins8250"/>
+		<device_ref tag=":_tmp:mm5740" name="mm5740"/>
+		<device_ref tag=":_tmp:mono" name="speaker"/>
+		<device_ref tag=":_tmp:beeper" name="beep"/>
+		<device_ref tag=":_tmp:repeatclock" name="clock"/>
+		<chip type="cpu" tag=":maincpu" name="Zilog Z80" clock="2048000"/>
+		<chip type="audio" tag=":mono" name="Speaker"/>
+		<chip type="audio" tag=":beeper" name="Beep" clock="1000"/>
+		<display tag=":screen" type="raster" rotate="0" width="640" height="240" refresh="60.000781" pixclock="12292000" htotal="776" hbend="32" hbstart="672" vtotal="264" vbend="10" vbstart="250" />
+		<sound channels="1"/>
+		<input players="1">
+			<control type="keyboard" buttons="86"/>
+		</input>
+		<dipswitch name="Trailing Characters for Tektronix Message" tag=":SW1" mask="3">
+			<diplocation name="SW1" number="1"/>
+			<diplocation name="SW1" number="2"/>
+			<dipvalue name="None" value="0"/>
+			<dipvalue name="CR" value="1" default="yes"/>
+			<dipvalue name="None" value="2"/>
+			<dipvalue name="CR,EOT" value="3"/>
+		</dipswitch>
+		<dipswitch name="Shift Key" tag=":SW1" mask="4">
+			<diplocation name="SW1" number="3"/>
+			<dipvalue name="Normal" value="0" default="yes"/>
+			<dipvalue name="Shift key inverts CAPS LOCK" value="4"/>
+		</dipswitch>
+		<dipswitch name="Terminal Transmission Rate" tag=":SW1" mask="8">
+			<diplocation name="SW1" number="4"/>
+			<dipvalue name="Only limited by baud rate" value="0" default="yes"/>
+			<dipvalue name="One character per 16.7 msec" value="8"/>
+		</dipswitch>
+		<dipswitch name="Character Set" tag=":SW1" mask="16">
+			<diplocation name="SW1" number="5"/>
+			<dipvalue name="VT100" value="0"/>
+			<dipvalue name="Zenith" value="16" default="yes"/>
+		</dipswitch>
+		<dipswitch name="ANSI Mode" tag=":SW1" mask="32">
+			<diplocation name="SW1" number="6"/>
+			<dipvalue name="Zenith ANSI" value="0" default="yes"/>
+			<dipvalue name="EDT compatible" value="32"/>
+		</dipswitch>
+		<dipswitch name="Tektronix Character Wrap" tag=":SW1" mask="64">
+			<diplocation name="SW1" number="7"/>
+			<dipvalue name="Column 74" value="0" default="yes"/>
+			<dipvalue name="Column 73" value="64"/>
+		</dipswitch>
+		<dipswitch name="Blank Screen" tag=":SW1" mask="128">
+			<diplocation name="SW1" number="8"/>
+			<dipvalue name="After 10 mins" value="0" default="yes"/>
+			<dipvalue name="Never" value="128"/>
+		</dipswitch>
+		<dipswitch name="Baud Rate" tag=":SW401" mask="15">
+			<diplocation name="SW401" number="1"/>
+			<diplocation name="SW401" number="2"/>
+			<diplocation name="SW401" number="3"/>
+			<diplocation name="SW401" number="4"/>
+			<dipvalue name="110" value="1"/>
+			<dipvalue name="150" value="2"/>
+			<dipvalue name="300" value="3"/>
+			<dipvalue name="600" value="4"/>
+			<dipvalue name="1200" value="5"/>
+			<dipvalue name="1800" value="6"/>
+			<dipvalue name="2000" value="7"/>
+			<dipvalue name="2400" value="8"/>
+			<dipvalue name="3600" value="9"/>
+			<dipvalue name="4800" value="10"/>
+			<dipvalue name="7200" value="11"/>
+			<dipvalue name="9600" value="12" default="yes"/>
+			<dipvalue name="19200" value="13"/>
+		</dipswitch>
+		<dipswitch name="Parity" tag=":SW401" mask="48">
+			<diplocation name="SW401" number="5"/>
+			<diplocation name="SW401" number="6"/>
+			<dipvalue name="None" value="0" default="yes"/>
+			<dipvalue name="Odd" value="16"/>
+			<dipvalue name="None" value="32"/>
+			<dipvalue name="Even" value="48"/>
+		</dipswitch>
+		<dipswitch name="Parity Type" tag=":SW401" mask="64">
+			<diplocation name="SW401" number="7"/>
+			<dipvalue name="Normal" value="0" default="yes"/>
+			<dipvalue name="Stick" value="64"/>
+		</dipswitch>
+		<dipswitch name="Duplex" tag=":SW401" mask="128">
+			<diplocation name="SW401" number="8"/>
+			<dipvalue name="Half" value="0"/>
+			<dipvalue name="Full" value="128" default="yes"/>
+		</dipswitch>
+		<dipswitch name="Cursor" tag=":SW402" mask="1">
+			<diplocation name="SW402" number="1"/>
+			<dipvalue name="Underline" value="0" default="yes"/>
+			<dipvalue name="Block" value="1"/>
+		</dipswitch>
+		<dipswitch name="Keyclick" tag=":SW402" mask="2">
+			<diplocation name="SW402" number="2"/>
+			<dipvalue name="No" value="2"/>
+			<dipvalue name="Yes" value="0" default="yes"/>
+		</dipswitch>
+		<dipswitch name="Wrap at EOL" tag=":SW402" mask="4">
+			<diplocation name="SW402" number="3"/>
+			<dipvalue name="No" value="0" default="yes"/>
+			<dipvalue name="Yes" value="4"/>
+		</dipswitch>
+		<dipswitch name="Auto LF on CR" tag=":SW402" mask="8">
+			<diplocation name="SW402" number="4"/>
+			<dipvalue name="No" value="0" default="yes"/>
+			<dipvalue name="Yes" value="8"/>
+		</dipswitch>
+		<dipswitch name="Auto CR on LF" tag=":SW402" mask="16">
+			<diplocation name="SW402" number="5"/>
+			<dipvalue name="No" value="0" default="yes"/>
+			<dipvalue name="Yes" value="16"/>
+		</dipswitch>
+		<dipswitch name="Mode" tag=":SW402" mask="32">
+			<diplocation name="SW402" number="6"/>
+			<dipvalue name="Heath/VT52" value="0" default="yes"/>
+			<dipvalue name="ANSI" value="32"/>
+		</dipswitch>
+		<dipswitch name="Keypad Shifted" tag=":SW402" mask="64">
+			<diplocation name="SW402" number="7"/>
+			<dipvalue name="No" value="0" default="yes"/>
+			<dipvalue name="Yes" value="64"/>
+		</dipswitch>
+		<dipswitch name="Automatic Holdscreen" tag=":SW402" mask="128">
+			<diplocation name="SW402" number="8"/>
+			<dipvalue name="Disabled (VT100 mode)" value="0" default="yes"/>
+			<dipvalue name="Enabled (Z19 mode)" value="128"/>
+		</dipswitch>
+		<configuration name="CPU Clock" tag=":CONFIG" mask="3">
+			<confsetting name="2 MHz" value="0" default="yes"/>
+			<confsetting name="3 MHz" value="1"/>
+			<confsetting name="4 MHz" value="2"/>
+			<confsetting name="6 MHz" value="3"/>
+		</configuration>
+		<configuration name="CRT Color" tag=":CONFIG" mask="12">
+			<confsetting name="Green" value="0" default="yes"/>
+			<confsetting name="White" value="4"/>
+			<confsetting name="Amber" value="8"/>
+		</configuration>
+		<feature type="graphics" status="imperfect"/>
+	</machine>
+	<machine name="heath_imaginator_tlb" sourcefile="devices/bus/heathzenith/h19/tlb.cpp" isdevice="yes" runnable="no">
+		<description>Heath Terminal Logic Board plus Cleveland Codonics Imaginator I-100</description>
+		<rom name="2732_444-46_h19code.u437" size="4096" crc="f4447da0" sha1="fb4093d5b763be21a9580a0defebed664b1f7a7b" region="maincpu" offset="0"/>
+		<rom name="2732_imaginator_gpc_rev_1.2_pn_9000_0002.u9a" size="4096" crc="507bb13f" sha1="5b210f8d77e22fdf063f611eb5c29636cdb01250" region="maincpu" offset="2000"/>
+		<rom name="2716_444-29_h19font.u420" size="2048" crc="d595ac1d" sha1="130fb4ea8754106340c318592eec2d8a0deaf3d0" region="chargen" offset="0"/>
+		<rom name="2716_444-37_h19keyb.u445" size="2048" crc="5c3e6972" sha1="df49ce64ae48652346a91648c58178a34fb37d3c" region="keyboard" offset="0"/>
+		<device_ref tag=":_tmp:maincpu" name="z80"/>
+		<device_ref tag=":_tmp:screen" name="screen"/>
+		<device_ref tag=":_tmp:gfxdecode" name="gfxdecode"/>
+		<device_ref tag=":_tmp:palette" name="palette"/>
+		<device_ref tag=":_tmp:crtc" name="mc6845"/>
+		<device_ref tag=":_tmp:ins8250" name="ins8250"/>
+		<device_ref tag=":_tmp:mm5740" name="mm5740"/>
+		<device_ref tag=":_tmp:mono" name="speaker"/>
+		<device_ref tag=":_tmp:beeper" name="beep"/>
+		<device_ref tag=":_tmp:repeatclock" name="clock"/>
+		<chip type="cpu" tag=":maincpu" name="Zilog Z80" clock="2048000"/>
+		<chip type="audio" tag=":mono" name="Speaker"/>
+		<chip type="audio" tag=":beeper" name="Beep" clock="1000"/>
+		<display tag=":screen" type="raster" rotate="0" width="640" height="250" refresh="59.259259" pixclock="12288000" htotal="768" hbend="32" hbstart="672" vtotal="270" vbend="0" vbstart="250" />
+		<sound channels="1"/>
+		<input players="1">
+			<control type="keyboard" buttons="86"/>
+		</input>
+		<dipswitch name="Baud Rate" tag=":SW401" mask="15">
+			<diplocation name="SW401" number="1"/>
+			<diplocation name="SW401" number="2"/>
+			<diplocation name="SW401" number="3"/>
+			<diplocation name="SW401" number="4"/>
+			<dipvalue name="110" value="1"/>
+			<dipvalue name="150" value="2"/>
+			<dipvalue name="300" value="3"/>
+			<dipvalue name="600" value="4"/>
+			<dipvalue name="1200" value="5"/>
+			<dipvalue name="1800" value="6"/>
+			<dipvalue name="2000" value="7"/>
+			<dipvalue name="2400" value="8"/>
+			<dipvalue name="3600" value="9"/>
+			<dipvalue name="4800" value="10"/>
+			<dipvalue name="7200" value="11"/>
+			<dipvalue name="9600" value="12" default="yes"/>
+			<dipvalue name="19200" value="13"/>
+		</dipswitch>
+		<dipswitch name="Parity" tag=":SW401" mask="48">
+			<diplocation name="SW401" number="5"/>
+			<diplocation name="SW401" number="6"/>
+			<dipvalue name="None" value="0" default="yes"/>
+			<dipvalue name="Odd" value="16"/>
+			<dipvalue name="None" value="32"/>
+			<dipvalue name="Even" value="48"/>
+		</dipswitch>
+		<dipswitch name="Parity Type" tag=":SW401" mask="64">
+			<diplocation name="SW401" number="7"/>
+			<dipvalue name="Normal" value="0" default="yes"/>
+			<dipvalue name="Stick" value="64"/>
+		</dipswitch>
+		<dipswitch name="Duplex" tag=":SW401" mask="128">
+			<diplocation name="SW401" number="8"/>
+			<dipvalue name="Half" value="0"/>
+			<dipvalue name="Full" value="128" default="yes"/>
+		</dipswitch>
+		<dipswitch name="Cursor" tag=":SW402" mask="1">
+			<diplocation name="SW402" number="1"/>
+			<dipvalue name="Underline" value="0" default="yes"/>
+			<dipvalue name="Block" value="1"/>
+		</dipswitch>
+		<dipswitch name="Keyclick" tag=":SW402" mask="2">
+			<diplocation name="SW402" number="2"/>
+			<dipvalue name="No" value="2"/>
+			<dipvalue name="Yes" value="0" default="yes"/>
+		</dipswitch>
+		<dipswitch name="Wrap at EOL" tag=":SW402" mask="4">
+			<diplocation name="SW402" number="3"/>
+			<dipvalue name="No" value="0" default="yes"/>
+			<dipvalue name="Yes" value="4"/>
+		</dipswitch>
+		<dipswitch name="Auto LF on CR" tag=":SW402" mask="8">
+			<diplocation name="SW402" number="4"/>
+			<dipvalue name="No" value="0" default="yes"/>
+			<dipvalue name="Yes" value="8"/>
+		</dipswitch>
+		<dipswitch name="Auto CR on LF" tag=":SW402" mask="16">
+			<diplocation name="SW402" number="5"/>
+			<dipvalue name="No" value="0" default="yes"/>
+			<dipvalue name="Yes" value="16"/>
+		</dipswitch>
+		<dipswitch name="Mode" tag=":SW402" mask="32">
+			<diplocation name="SW402" number="6"/>
+			<dipvalue name="Heath/VT52" value="0" default="yes"/>
+			<dipvalue name="ANSI" value="32"/>
+		</dipswitch>
+		<dipswitch name="Keypad Shifted" tag=":SW402" mask="64">
+			<diplocation name="SW402" number="7"/>
+			<dipvalue name="No" value="0" default="yes"/>
+			<dipvalue name="Yes" value="64"/>
+		</dipswitch>
+		<dipswitch name="Refresh" tag=":SW402" mask="128">
+			<diplocation name="SW402" number="8"/>
+			<dipvalue name="60Hz" value="0" default="yes"/>
+			<dipvalue name="50Hz" value="128"/>
+		</dipswitch>
+		<configuration name="CPU Clock" tag=":CONFIG" mask="3">
+			<confsetting name="2 MHz" value="0" default="yes"/>
+			<confsetting name="3 MHz" value="1"/>
+			<confsetting name="4 MHz" value="2"/>
+			<confsetting name="6 MHz" value="3"/>
+		</configuration>
+		<configuration name="CRT Color" tag=":CONFIG" mask="12">
+			<confsetting name="Green" value="0" default="yes"/>
+			<confsetting name="White" value="4"/>
+			<confsetting name="Amber" value="8"/>
+		</configuration>
+	</machine>
+	<machine name="heath_super19_tlb" sourcefile="devices/bus/heathzenith/h19/tlb.cpp" isdevice="yes" runnable="no">
+		<description>Heath Terminal Logic Board w/Super19 ROM</description>
+		<rom name="2732_super19_h447.u437" size="4096" crc="6c51aaa6" sha1="5e368b39fe2f1af44a905dc474663198ab630117" region="maincpu" offset="0"/>
+		<rom name="2716_444-29_h19font.u420" size="2048" crc="d595ac1d" sha1="130fb4ea8754106340c318592eec2d8a0deaf3d0" region="chargen" offset="0"/>
+		<rom name="2716_444-37_h19keyb.u445" size="2048" crc="5c3e6972" sha1="df49ce64ae48652346a91648c58178a34fb37d3c" region="keyboard" offset="0"/>
+		<device_ref tag=":_tmp:maincpu" name="z80"/>
+		<device_ref tag=":_tmp:screen" name="screen"/>
+		<device_ref tag=":_tmp:gfxdecode" name="gfxdecode"/>
+		<device_ref tag=":_tmp:palette" name="palette"/>
+		<device_ref tag=":_tmp:crtc" name="mc6845"/>
+		<device_ref tag=":_tmp:ins8250" name="ins8250"/>
+		<device_ref tag=":_tmp:mm5740" name="mm5740"/>
+		<device_ref tag=":_tmp:mono" name="speaker"/>
+		<device_ref tag=":_tmp:beeper" name="beep"/>
+		<device_ref tag=":_tmp:repeatclock" name="clock"/>
+		<chip type="cpu" tag=":maincpu" name="Zilog Z80" clock="2048000"/>
+		<chip type="audio" tag=":mono" name="Speaker"/>
+		<chip type="audio" tag=":beeper" name="Beep" clock="1000"/>
+		<display tag=":screen" type="raster" rotate="0" width="640" height="250" refresh="59.259259" pixclock="12288000" htotal="768" hbend="32" hbstart="672" vtotal="270" vbend="0" vbstart="250" />
+		<sound channels="1"/>
+		<input players="1">
+			<control type="keyboard" buttons="86"/>
+		</input>
+		<dipswitch name="Baud Rate" tag=":SW401" mask="15">
+			<diplocation name="SW401" number="1"/>
+			<diplocation name="SW401" number="2"/>
+			<diplocation name="SW401" number="3"/>
+			<diplocation name="SW401" number="4"/>
+			<dipvalue name="110" value="1"/>
+			<dipvalue name="150" value="2"/>
+			<dipvalue name="300" value="3"/>
+			<dipvalue name="600" value="4"/>
+			<dipvalue name="1200" value="5"/>
+			<dipvalue name="1800" value="6"/>
+			<dipvalue name="2000" value="7"/>
+			<dipvalue name="2400" value="8"/>
+			<dipvalue name="3600" value="9"/>
+			<dipvalue name="4800" value="10"/>
+			<dipvalue name="7200" value="11"/>
+			<dipvalue name="9600" value="12" default="yes"/>
+			<dipvalue name="19200" value="13"/>
+			<dipvalue name="38400" value="14"/>
+		</dipswitch>
+		<dipswitch name="8 bit mode" tag=":SW401" mask="112">
+			<diplocation name="SW401" number="5"/>
+			<diplocation name="SW401" number="6"/>
+			<diplocation name="SW401" number="7"/>
+			<dipvalue name="Mode A/0 - 8th bit ignored, sent as 0" value="0" default="yes"/>
+			<dipvalue name="Mode B/1 - 8th bit ignored, sent as 1" value="16"/>
+			<dipvalue name="Mode C/2 - 8 bit escape mode" value="32"/>
+			<dipvalue name="Mode D/3 - 8 bit escape mode, invert 8th bit" value="48"/>
+			<dipvalue name="Mode E/4 - 8 bit data mode" value="64"/>
+			<dipvalue name="Mode F/5 - 8 bit data mode, invert 8th bit" value="80"/>
+			<dipvalue name="7 bit data with odd parity, 8th bit ignored on input" value="96"/>
+			<dipvalue name="7 bit data with even parity, 8th bit ignored on input" value="112"/>
+		</dipswitch>
+		<dipswitch name="Duplex" tag=":SW401" mask="128">
+			<diplocation name="SW401" number="8"/>
+			<dipvalue name="Half" value="0"/>
+			<dipvalue name="Full" value="128" default="yes"/>
+		</dipswitch>
+		<dipswitch name="Cursor" tag=":SW402" mask="1">
+			<diplocation name="SW402" number="1"/>
+			<dipvalue name="Underline" value="0" default="yes"/>
+			<dipvalue name="Block" value="1"/>
+		</dipswitch>
+		<dipswitch name="Transmit mode" tag=":SW402" mask="2">
+			<diplocation name="SW402" number="2"/>
+			<dipvalue name="Normal" value="0" default="yes"/>
+			<dipvalue name="Slow" value="2"/>
+		</dipswitch>
+		<dipswitch name="Wrap at EOL" tag=":SW402" mask="4">
+			<diplocation name="SW402" number="3"/>
+			<dipvalue name="No" value="0" default="yes"/>
+			<dipvalue name="Yes" value="4"/>
+		</dipswitch>
+		<dipswitch name="Auto LF on CR" tag=":SW402" mask="8">
+			<diplocation name="SW402" number="4"/>
+			<dipvalue name="No" value="0" default="yes"/>
+			<dipvalue name="Yes" value="8"/>
+		</dipswitch>
+		<dipswitch name="Auto CR on LF" tag=":SW402" mask="16">
+			<diplocation name="SW402" number="5"/>
+			<dipvalue name="No" value="0" default="yes"/>
+			<dipvalue name="Yes" value="16"/>
+		</dipswitch>
+		<dipswitch name="Mode" tag=":SW402" mask="32">
+			<diplocation name="SW402" number="6"/>
+			<dipvalue name="Heath/VT52" value="0" default="yes"/>
+			<dipvalue name="ANSI" value="32"/>
+		</dipswitch>
+		<dipswitch name="Keypad Shifted" tag=":SW402" mask="64">
+			<diplocation name="SW402" number="7"/>
+			<dipvalue name="No" value="0" default="yes"/>
+			<dipvalue name="Yes" value="64"/>
+		</dipswitch>
+		<dipswitch name="DEC Keypad Codes" tag=":SW402" mask="128">
+			<diplocation name="SW402" number="8"/>
+			<dipvalue name="Off" value="0" default="yes"/>
+			<dipvalue name="On" value="128"/>
+		</dipswitch>
+		<configuration name="CPU Clock" tag=":CONFIG" mask="3">
+			<confsetting name="2 MHz" value="0" default="yes"/>
+			<confsetting name="3 MHz" value="1"/>
+			<confsetting name="4 MHz" value="2"/>
+			<confsetting name="6 MHz" value="3"/>
+		</configuration>
+		<configuration name="CRT Color" tag=":CONFIG" mask="12">
+			<confsetting name="Green" value="0" default="yes"/>
+			<confsetting name="White" value="4"/>
+			<confsetting name="Amber" value="8"/>
+		</configuration>
+	</machine>
+	<machine name="heath_superset_tlb" sourcefile="devices/bus/heathzenith/h19/tlb.cpp" isdevice="yes" runnable="no">
+		<description>Heath Terminal Logic Board w/Superset ROM</description>
+		<rom name="27256_101-402_superset_code.u437" size="32768" crc="a6896076" sha1="a4e2d25028dc75a665c3f5a830a4e8cdecbd481c" region="maincpu" offset="0"/>
+		<rom name="27256_101-431_superset_font.u420" size="32768" crc="4c0688f6" sha1="be6059913420ad66f5c839d619fdcb164ffae85a" region="chargen" offset="0"/>
+		<rom name="2716_101-422_superset_kbd.u445" size="2048" crc="549d15b3" sha1="981962e5e05bbdc5a66b0e86870853ce5596e877" region="keyboard" offset="0"/>
+		<device_ref tag=":_tmp:maincpu" name="z80"/>
+		<device_ref tag=":_tmp:screen" name="screen"/>
+		<device_ref tag=":_tmp:gfxdecode" name="gfxdecode"/>
+		<device_ref tag=":_tmp:palette" name="palette"/>
+		<device_ref tag=":_tmp:crtc" name="mc6845"/>
+		<device_ref tag=":_tmp:ins8250" name="ins8250"/>
+		<device_ref tag=":_tmp:mm5740" name="mm5740"/>
+		<device_ref tag=":_tmp:mono" name="speaker"/>
+		<device_ref tag=":_tmp:beeper" name="beep"/>
+		<device_ref tag=":_tmp:repeatclock" name="clock"/>
+		<chip type="cpu" tag=":maincpu" name="Zilog Z80" clock="3072000"/>
+		<chip type="audio" tag=":mono" name="Speaker"/>
+		<chip type="audio" tag=":beeper" name="Beep" clock="1000"/>
+		<display tag=":screen" type="raster" rotate="0" width="640" height="250" refresh="59.259259" pixclock="12288000" htotal="768" hbend="32" hbstart="672" vtotal="270" vbend="0" vbstart="250" />
+		<sound channels="1"/>
+		<input players="1">
+			<control type="keyboard" buttons="86"/>
+		</input>
+		<dipswitch name="Baud Rate" tag=":SW401" mask="15">
+			<diplocation name="SW401" number="1"/>
+			<diplocation name="SW401" number="2"/>
+			<diplocation name="SW401" number="3"/>
+			<diplocation name="SW401" number="4"/>
+			<dipvalue name="75" value="0"/>
+			<dipvalue name="110" value="1"/>
+			<dipvalue name="150" value="2"/>
+			<dipvalue name="300" value="3"/>
+			<dipvalue name="600" value="4"/>
+			<dipvalue name="1200" value="5"/>
+			<dipvalue name="1800" value="6"/>
+			<dipvalue name="2000" value="7"/>
+			<dipvalue name="2400" value="8"/>
+			<dipvalue name="3600" value="9"/>
+			<dipvalue name="4800" value="10"/>
+			<dipvalue name="7200" value="11"/>
+			<dipvalue name="9600" value="12" default="yes"/>
+			<dipvalue name="19200" value="13"/>
+			<dipvalue name="38400" value="14"/>
+			<dipvalue name="134.5" value="15"/>
+		</dipswitch>
+		<dipswitch name="Duplex" tag=":SW401" mask="16">
+			<diplocation name="SW401" number="5"/>
+			<dipvalue name="Half" value="0"/>
+			<dipvalue name="Full" value="0"/>
+		</dipswitch>
+		<dipswitch name="Word Length" tag=":SW401" mask="32">
+			<diplocation name="SW401" number="6"/>
+			<dipvalue name="8-bit" value="0" default="yes"/>
+			<dipvalue name="7-bit" value="32"/>
+		</dipswitch>
+		<dipswitch name="Parity Type" tag=":SW401" mask="64">
+			<diplocation name="SW401" number="7"/>
+			<dipvalue name="None" value="0" default="yes"/>
+			<dipvalue name="Even" value="64"/>
+		</dipswitch>
+		<dipswitch name="Parity" tag=":SW401" mask="128">
+			<diplocation name="SW401" number="8"/>
+			<dipvalue name="Disabled" value="0"/>
+			<dipvalue name="Enabled" value="128" default="yes"/>
+		</dipswitch>
+		<dipswitch name="Cursor" tag=":SW402" mask="1">
+			<diplocation name="SW402" number="1"/>
+			<dipvalue name="Underline" value="0" default="yes"/>
+			<dipvalue name="Block" value="1"/>
+		</dipswitch>
+		<dipswitch name="Keyclick" tag=":SW402" mask="2">
+			<diplocation name="SW402" number="2"/>
+			<dipvalue name="No" value="2"/>
+			<dipvalue name="Yes" value="0" default="yes"/>
+		</dipswitch>
+		<dipswitch name="Wrap at EOL" tag=":SW402" mask="4">
+			<diplocation name="SW402" number="3"/>
+			<dipvalue name="No" value="0" default="yes"/>
+			<dipvalue name="Yes" value="4"/>
+		</dipswitch>
+		<dipswitch name="Auto LF on CR" tag=":SW402" mask="8">
+			<diplocation name="SW402" number="4"/>
+			<dipvalue name="No" value="0" default="yes"/>
+			<dipvalue name="Yes" value="8"/>
+		</dipswitch>
+		<dipswitch name="Auto CR on LF" tag=":SW402" mask="16">
+			<diplocation name="SW402" number="5"/>
+			<dipvalue name="No" value="0" default="yes"/>
+			<dipvalue name="Yes" value="16"/>
+		</dipswitch>
+		<dipswitch name="Mode" tag=":SW402" mask="32">
+			<diplocation name="SW402" number="6"/>
+			<dipvalue name="Heath/VT52" value="0" default="yes"/>
+			<dipvalue name="ANSI" value="32"/>
+		</dipswitch>
+		<dipswitch name="Keypad Shifted" tag=":SW402" mask="64">
+			<diplocation name="SW402" number="7"/>
+			<dipvalue name="No" value="0" default="yes"/>
+			<dipvalue name="Yes" value="64"/>
+		</dipswitch>
+		<dipswitch name="Refresh" tag=":SW402" mask="128">
+			<diplocation name="SW402" number="8"/>
+			<dipvalue name="60Hz" value="0" default="yes"/>
+			<dipvalue name="50Hz" value="128"/>
+		</dipswitch>
+		<configuration name="CPU Clock" tag=":CONFIG" mask="3">
+			<confsetting name="2 MHz" value="0" default="yes"/>
+			<confsetting name="3 MHz" value="1"/>
+			<confsetting name="4 MHz" value="2"/>
+			<confsetting name="6 MHz" value="3"/>
+		</configuration>
+		<configuration name="CRT Color" tag=":CONFIG" mask="12">
+			<confsetting name="Green" value="0" default="yes"/>
+			<confsetting name="White" value="4"/>
+			<confsetting name="Amber" value="8"/>
+		</configuration>
+	</machine>
+	<machine name="heath_tlb" sourcefile="devices/bus/heathzenith/h19/tlb.cpp" isdevice="yes" runnable="no">
+		<description>Heath Terminal Logic Board</description>
+		<rom name="2732_444-46_h19code.u437" size="4096" crc="f4447da0" sha1="fb4093d5b763be21a9580a0defebed664b1f7a7b" region="maincpu" offset="0"/>
+		<rom name="2716_444-29_h19font.u420" size="2048" crc="d595ac1d" sha1="130fb4ea8754106340c318592eec2d8a0deaf3d0" region="chargen" offset="0"/>
+		<rom name="2716_444-37_h19keyb.u445" size="2048" crc="5c3e6972" sha1="df49ce64ae48652346a91648c58178a34fb37d3c" region="keyboard" offset="0"/>
+		<device_ref tag=":_tmp:maincpu" name="z80"/>
+		<device_ref tag=":_tmp:screen" name="screen"/>
+		<device_ref tag=":_tmp:gfxdecode" name="gfxdecode"/>
+		<device_ref tag=":_tmp:palette" name="palette"/>
+		<device_ref tag=":_tmp:crtc" name="mc6845"/>
+		<device_ref tag=":_tmp:ins8250" name="ins8250"/>
+		<device_ref tag=":_tmp:mm5740" name="mm5740"/>
+		<device_ref tag=":_tmp:mono" name="speaker"/>
+		<device_ref tag=":_tmp:beeper" name="beep"/>
+		<device_ref tag=":_tmp:repeatclock" name="clock"/>
+		<chip type="cpu" tag=":maincpu" name="Zilog Z80" clock="2048000"/>
+		<chip type="audio" tag=":mono" name="Speaker"/>
+		<chip type="audio" tag=":beeper" name="Beep" clock="1000"/>
+		<display tag=":screen" type="raster" rotate="0" width="640" height="250" refresh="59.259259" pixclock="12288000" htotal="768" hbend="32" hbstart="672" vtotal="270" vbend="0" vbstart="250" />
+		<sound channels="1"/>
+		<input players="1">
+			<control type="keyboard" buttons="86"/>
+		</input>
+		<dipswitch name="Baud Rate" tag=":SW401" mask="15">
+			<diplocation name="SW401" number="1"/>
+			<diplocation name="SW401" number="2"/>
+			<diplocation name="SW401" number="3"/>
+			<diplocation name="SW401" number="4"/>
+			<dipvalue name="110" value="1"/>
+			<dipvalue name="150" value="2"/>
+			<dipvalue name="300" value="3"/>
+			<dipvalue name="600" value="4"/>
+			<dipvalue name="1200" value="5"/>
+			<dipvalue name="1800" value="6"/>
+			<dipvalue name="2000" value="7"/>
+			<dipvalue name="2400" value="8"/>
+			<dipvalue name="3600" value="9"/>
+			<dipvalue name="4800" value="10"/>
+			<dipvalue name="7200" value="11"/>
+			<dipvalue name="9600" value="12" default="yes"/>
+			<dipvalue name="19200" value="13"/>
+		</dipswitch>
+		<dipswitch name="Parity" tag=":SW401" mask="48">
+			<diplocation name="SW401" number="5"/>
+			<diplocation name="SW401" number="6"/>
+			<dipvalue name="None" value="0" default="yes"/>
+			<dipvalue name="Odd" value="16"/>
+			<dipvalue name="None" value="32"/>
+			<dipvalue name="Even" value="48"/>
+		</dipswitch>
+		<dipswitch name="Parity Type" tag=":SW401" mask="64">
+			<diplocation name="SW401" number="7"/>
+			<dipvalue name="Normal" value="0" default="yes"/>
+			<dipvalue name="Stick" value="64"/>
+		</dipswitch>
+		<dipswitch name="Duplex" tag=":SW401" mask="128">
+			<diplocation name="SW401" number="8"/>
+			<dipvalue name="Half" value="0"/>
+			<dipvalue name="Full" value="128" default="yes"/>
+		</dipswitch>
+		<dipswitch name="Cursor" tag=":SW402" mask="1">
+			<diplocation name="SW402" number="1"/>
+			<dipvalue name="Underline" value="0" default="yes"/>
+			<dipvalue name="Block" value="1"/>
+		</dipswitch>
+		<dipswitch name="Keyclick" tag=":SW402" mask="2">
+			<diplocation name="SW402" number="2"/>
+			<dipvalue name="No" value="2"/>
+			<dipvalue name="Yes" value="0" default="yes"/>
+		</dipswitch>
+		<dipswitch name="Wrap at EOL" tag=":SW402" mask="4">
+			<diplocation name="SW402" number="3"/>
+			<dipvalue name="No" value="0" default="yes"/>
+			<dipvalue name="Yes" value="4"/>
+		</dipswitch>
+		<dipswitch name="Auto LF on CR" tag=":SW402" mask="8">
+			<diplocation name="SW402" number="4"/>
+			<dipvalue name="No" value="0" default="yes"/>
+			<dipvalue name="Yes" value="8"/>
+		</dipswitch>
+		<dipswitch name="Auto CR on LF" tag=":SW402" mask="16">
+			<diplocation name="SW402" number="5"/>
+			<dipvalue name="No" value="0" default="yes"/>
+			<dipvalue name="Yes" value="16"/>
+		</dipswitch>
+		<dipswitch name="Mode" tag=":SW402" mask="32">
+			<diplocation name="SW402" number="6"/>
+			<dipvalue name="Heath/VT52" value="0" default="yes"/>
+			<dipvalue name="ANSI" value="32"/>
+		</dipswitch>
+		<dipswitch name="Keypad Shifted" tag=":SW402" mask="64">
+			<diplocation name="SW402" number="7"/>
+			<dipvalue name="No" value="0" default="yes"/>
+			<dipvalue name="Yes" value="64"/>
+		</dipswitch>
+		<dipswitch name="Refresh" tag=":SW402" mask="128">
+			<diplocation name="SW402" number="8"/>
+			<dipvalue name="60Hz" value="0" default="yes"/>
+			<dipvalue name="50Hz" value="128"/>
+		</dipswitch>
+		<configuration name="CPU Clock" tag=":CONFIG" mask="3">
+			<confsetting name="2 MHz" value="0" default="yes"/>
+			<confsetting name="3 MHz" value="1"/>
+			<confsetting name="4 MHz" value="2"/>
+			<confsetting name="6 MHz" value="3"/>
+		</configuration>
+		<configuration name="CRT Color" tag=":CONFIG" mask="12">
+			<confsetting name="Green" value="0" default="yes"/>
+			<confsetting name="White" value="4"/>
+			<confsetting name="Amber" value="8"/>
+		</configuration>
+	</machine>
+	<machine name="heath_ultra_tlb" sourcefile="devices/bus/heathzenith/h19/tlb.cpp" isdevice="yes" runnable="no">
+		<description>Heath Terminal Logic Board w/Ultra ROM</description>
+		<rom name="2532_h19_ultra_firmware.u437" size="4096" crc="8ad4cdb4" sha1="d6e1fc37a1f52abfce5e9adb1819e0030bed1df3" region="maincpu" offset="0"/>
+		<rom name="2716_444-29_h19font.u420" size="2048" crc="d595ac1d" sha1="130fb4ea8754106340c318592eec2d8a0deaf3d0" region="chargen" offset="0"/>
+		<rom name="2716_h19_ultra_keyboard.u445" size="2048" crc="76130c92" sha1="ca39c602af48505139d2750a084b5f8f0e662ff7" region="keyboard" offset="0"/>
+		<device_ref tag=":_tmp:maincpu" name="z80"/>
+		<device_ref tag=":_tmp:screen" name="screen"/>
+		<device_ref tag=":_tmp:gfxdecode" name="gfxdecode"/>
+		<device_ref tag=":_tmp:palette" name="palette"/>
+		<device_ref tag=":_tmp:crtc" name="mc6845"/>
+		<device_ref tag=":_tmp:ins8250" name="ins8250"/>
+		<device_ref tag=":_tmp:mm5740" name="mm5740"/>
+		<device_ref tag=":_tmp:mono" name="speaker"/>
+		<device_ref tag=":_tmp:beeper" name="beep"/>
+		<device_ref tag=":_tmp:repeatclock" name="clock"/>
+		<chip type="cpu" tag=":maincpu" name="Zilog Z80" clock="2048000"/>
+		<chip type="audio" tag=":mono" name="Speaker"/>
+		<chip type="audio" tag=":beeper" name="Beep" clock="1000"/>
+		<display tag=":screen" type="raster" rotate="0" width="640" height="250" refresh="59.259259" pixclock="12288000" htotal="768" hbend="32" hbstart="672" vtotal="270" vbend="0" vbstart="250" />
+		<sound channels="1"/>
+		<input players="1">
+			<control type="keyboard" buttons="86"/>
+		</input>
+		<dipswitch name="Baud Rate" tag=":SW401" mask="7">
+			<diplocation name="SW401" number="1"/>
+			<diplocation name="SW401" number="2"/>
+			<diplocation name="SW401" number="3"/>
+			<dipvalue name="110" value="0"/>
+			<dipvalue name="300" value="1"/>
+			<dipvalue name="1200" value="2"/>
+			<dipvalue name="2400" value="3"/>
+			<dipvalue name="4800" value="4"/>
+			<dipvalue name="9600" value="5" default="yes"/>
+			<dipvalue name="19200" value="6"/>
+			<dipvalue name="38400" value="7"/>
+		</dipswitch>
+		<dipswitch name="Parity" tag=":SW401" mask="8">
+			<diplocation name="SW401" number="4"/>
+			<dipvalue name="Disabled" value="0" default="yes"/>
+			<dipvalue name="Enabled" value="8"/>
+		</dipswitch>
+		<dipswitch name="Parity Type" tag=":SW401" mask="16">
+			<diplocation name="SW401" number="5"/>
+			<dipvalue name="Odd" value="0" default="yes"/>
+			<dipvalue name="Even" value="16"/>
+		</dipswitch>
+		<dipswitch name="Data Size" tag=":SW401" mask="32">
+			<diplocation name="SW401" number="6"/>
+			<dipvalue name="8-bit" value="0" default="yes"/>
+			<dipvalue name="7-bit" value="32"/>
+		</dipswitch>
+		<dipswitch name="Duplex" tag=":SW401" mask="64">
+			<diplocation name="SW401" number="7"/>
+			<dipvalue name="Half" value="0"/>
+			<dipvalue name="Full" value="64" default="yes"/>
+		</dipswitch>
+		<dipswitch name="Software Handshaking" tag=":SW401" mask="128">
+			<diplocation name="SW401" number="8"/>
+			<dipvalue name="Enabled" value="0"/>
+			<dipvalue name="Disabled" value="128" default="yes"/>
+		</dipswitch>
+		<dipswitch name="Cursor" tag=":SW402" mask="1">
+			<diplocation name="SW402" number="1"/>
+			<dipvalue name="Underline" value="0" default="yes"/>
+			<dipvalue name="Block" value="1"/>
+		</dipswitch>
+		<dipswitch name="Keyclick" tag=":SW402" mask="2">
+			<diplocation name="SW402" number="2"/>
+			<dipvalue name="No" value="2"/>
+			<dipvalue name="Yes" value="0" default="yes"/>
+		</dipswitch>
+		<dipswitch name="Wrap at EOL" tag=":SW402" mask="4">
+			<diplocation name="SW402" number="3"/>
+			<dipvalue name="No" value="0" default="yes"/>
+			<dipvalue name="Yes" value="4"/>
+		</dipswitch>
+		<dipswitch name="Keypad Shifted" tag=":SW402" mask="8">
+			<diplocation name="SW402" number="4"/>
+			<dipvalue name="No" value="0" default="yes"/>
+			<dipvalue name="Yes" value="8"/>
+		</dipswitch>
+		<dipswitch name="Default Key Values" tag=":SW402" mask="16">
+			<diplocation name="SW402" number="5"/>
+			<dipvalue name="HDOS Values" value="0" default="yes"/>
+			<dipvalue name="CP/M Values" value="16"/>
+		</dipswitch>
+		<dipswitch name="Cursor Blink" tag=":SW402" mask="96">
+			<diplocation name="SW402" number="6"/>
+			<diplocation name="SW402" number="7"/>
+			<dipvalue name="Steady" value="0"/>
+			<dipvalue name="Invisible" value="32"/>
+			<dipvalue name="Fast Blink" value="64"/>
+			<dipvalue name="Slow Blink" value="96" default="yes"/>
+		</dipswitch>
+		<dipswitch name="Interlace Scan Mode" tag=":SW402" mask="128">
+			<diplocation name="SW402" number="8"/>
+			<dipvalue name="Off" value="0" default="yes"/>
+			<dipvalue name="On" value="128"/>
+		</dipswitch>
+		<configuration name="CPU Clock" tag=":CONFIG" mask="3">
+			<confsetting name="2 MHz" value="0" default="yes"/>
+			<confsetting name="3 MHz" value="1"/>
+			<confsetting name="4 MHz" value="2"/>
+			<confsetting name="6 MHz" value="3"/>
+		</configuration>
+		<configuration name="CRT Color" tag=":CONFIG" mask="12">
+			<confsetting name="Green" value="0" default="yes"/>
+			<confsetting name="White" value="4"/>
+			<confsetting name="Amber" value="8"/>
+		</configuration>
+		<configuration name="Page 2 RAM present" tag=":CONFIG" mask="16">
+			<confsetting name="No" value="0"/>
+			<confsetting name="Yes" value="16" default="yes"/>
+		</configuration>
+	</machine>
+	<machine name="heath_watz_tlb" sourcefile="devices/bus/heathzenith/h19/tlb.cpp" isdevice="yes" runnable="no">
+		<description>Heath Terminal Logic Board w/Watzman ROM</description>
+		<biosset name="watzman" description="Watzman"/>
+		<biosset name="watzman-a" description="Watzman w/clock persists after reset" default="yes"/>
+		<rom name="watzman.u437" bios="watzman" size="4096" crc="8168b6dc" sha1="bfaebb9d766edbe545d24bc2b6630be4f3aa0ce9" region="maincpu" offset="0"/>
+		<rom name="watzman-a.u437" bios="watzman-a" size="4096" crc="1f7553e9" sha1="ac6ddb12b4fb46c1a0ad08ee43978ad3153b51aa" region="maincpu" offset="0"/>
+		<rom name="2716_444-29_h19font.u420" size="2048" crc="d595ac1d" sha1="130fb4ea8754106340c318592eec2d8a0deaf3d0" region="chargen" offset="0"/>
+		<rom name="keybd.u445" size="2048" crc="58dc8217" sha1="1b23705290bdf9fc6342065c6a528c04bff67b13" region="keyboard" offset="0"/>
+		<device_ref tag=":_tmp:maincpu" name="z80"/>
+		<device_ref tag=":_tmp:screen" name="screen"/>
+		<device_ref tag=":_tmp:gfxdecode" name="gfxdecode"/>
+		<device_ref tag=":_tmp:palette" name="palette"/>
+		<device_ref tag=":_tmp:crtc" name="mc6845"/>
+		<device_ref tag=":_tmp:ins8250" name="ins8250"/>
+		<device_ref tag=":_tmp:mm5740" name="mm5740"/>
+		<device_ref tag=":_tmp:mono" name="speaker"/>
+		<device_ref tag=":_tmp:beeper" name="beep"/>
+		<device_ref tag=":_tmp:repeatclock" name="clock"/>
+		<chip type="cpu" tag=":maincpu" name="Zilog Z80" clock="2048000"/>
+		<chip type="audio" tag=":mono" name="Speaker"/>
+		<chip type="audio" tag=":beeper" name="Beep" clock="1000"/>
+		<display tag=":screen" type="raster" rotate="0" width="640" height="250" refresh="59.259259" pixclock="12288000" htotal="768" hbend="32" hbstart="672" vtotal="270" vbend="0" vbstart="250" />
+		<sound channels="1"/>
+		<input players="1">
+			<control type="keyboard" buttons="86"/>
+		</input>
+		<dipswitch name="Baud Rate" tag=":SW401" mask="15">
+			<diplocation name="SW401" number="1"/>
+			<diplocation name="SW401" number="2"/>
+			<diplocation name="SW401" number="3"/>
+			<diplocation name="SW401" number="4"/>
+			<dipvalue name="75" value="0"/>
+			<dipvalue name="110" value="1"/>
+			<dipvalue name="150" value="2"/>
+			<dipvalue name="300" value="3"/>
+			<dipvalue name="600" value="4"/>
+			<dipvalue name="1200" value="5"/>
+			<dipvalue name="1800" value="6"/>
+			<dipvalue name="2000" value="7"/>
+			<dipvalue name="2400" value="8"/>
+			<dipvalue name="3600" value="9"/>
+			<dipvalue name="4800" value="10"/>
+			<dipvalue name="7200" value="11"/>
+			<dipvalue name="9600" value="12" default="yes"/>
+			<dipvalue name="19200" value="13"/>
+			<dipvalue name="38400" value="14"/>
+			<dipvalue name="134.5" value="15"/>
+		</dipswitch>
+		<dipswitch name="Parity" tag=":SW401" mask="48">
+			<diplocation name="SW401" number="5"/>
+			<diplocation name="SW401" number="6"/>
+			<dipvalue name="None" value="0" default="yes"/>
+			<dipvalue name="Odd" value="16"/>
+			<dipvalue name="None" value="32"/>
+			<dipvalue name="Even" value="48"/>
+		</dipswitch>
+		<dipswitch name="Word Size" tag=":SW401" mask="64">
+			<diplocation name="SW401" number="7"/>
+			<dipvalue name="8-bit Word" value="0" default="yes"/>
+			<dipvalue name="7-bit Word" value="64"/>
+		</dipswitch>
+		<dipswitch name="Duplex" tag=":SW401" mask="128">
+			<diplocation name="SW401" number="8"/>
+			<dipvalue name="Half" value="0"/>
+			<dipvalue name="Full" value="128" default="yes"/>
+		</dipswitch>
+		<dipswitch name="Cursor" tag=":SW402" mask="1">
+			<diplocation name="SW402" number="1"/>
+			<dipvalue name="Underline" value="0" default="yes"/>
+			<dipvalue name="Block" value="1"/>
+		</dipswitch>
+		<dipswitch name="Keyclick" tag=":SW402" mask="2">
+			<diplocation name="SW402" number="2"/>
+			<dipvalue name="No" value="2"/>
+			<dipvalue name="Yes" value="0" default="yes"/>
+		</dipswitch>
+		<dipswitch name="Wrap at EOL" tag=":SW402" mask="4">
+			<diplocation name="SW402" number="3"/>
+			<dipvalue name="No" value="0" default="yes"/>
+			<dipvalue name="Yes" value="4"/>
+		</dipswitch>
+		<dipswitch name="Auto LF on CR" tag=":SW402" mask="8">
+			<diplocation name="SW402" number="4"/>
+			<dipvalue name="No" value="0" default="yes"/>
+			<dipvalue name="Yes" value="8"/>
+		</dipswitch>
+		<dipswitch name="Auto CR on LF" tag=":SW402" mask="16">
+			<diplocation name="SW402" number="5"/>
+			<dipvalue name="No" value="0" default="yes"/>
+			<dipvalue name="Yes" value="16"/>
+		</dipswitch>
+		<dipswitch name="Mode" tag=":SW402" mask="32">
+			<diplocation name="SW402" number="6"/>
+			<dipvalue name="Heath/VT52" value="0" default="yes"/>
+			<dipvalue name="ANSI" value="32"/>
+		</dipswitch>
+		<dipswitch name="Keypad Shifted" tag=":SW402" mask="64">
+			<diplocation name="SW402" number="7"/>
+			<dipvalue name="No" value="0" default="yes"/>
+			<dipvalue name="Yes" value="64"/>
+		</dipswitch>
+		<dipswitch name="Refresh" tag=":SW402" mask="128">
+			<diplocation name="SW402" number="8"/>
+			<dipvalue name="60Hz" value="0" default="yes"/>
+			<dipvalue name="50Hz" value="128"/>
+		</dipswitch>
+		<configuration name="CPU Clock" tag=":CONFIG" mask="3">
+			<confsetting name="2 MHz" value="0" default="yes"/>
+			<confsetting name="3 MHz" value="1"/>
+			<confsetting name="4 MHz" value="2"/>
+			<confsetting name="6 MHz" value="3"/>
+		</configuration>
+		<configuration name="CRT Color" tag=":CONFIG" mask="12">
+			<confsetting name="Green" value="0" default="yes"/>
+			<confsetting name="White" value="4"/>
+			<confsetting name="Amber" value="8"/>
+		</configuration>
+	</machine>
+	<machine name="i80c32" sourcefile="devices/cpu/mcs51/i80c52.cpp" isdevice="yes" runnable="no">
+		<description>Intel 80C32</description>
+	</machine>
+	<machine name="idehd" sourcefile="devices/bus/ata/hdd.cpp" isdevice="yes" runnable="no">
+		<description>IDE Hard Disk</description>
+		<device_ref tag=":_tmp:image" name="harddisk_image"/>
+		<device type="harddisk" tag=":image" interface="ide_hdd,hdd">
+			<instance name="harddisk" briefname="hard"/>
+			<extension name="chd"/>
+			<extension name="hd"/>
+			<extension name="hdv"/>
+			<extension name="2mg"/>
+			<extension name="hdi"/>
+		</device>
+	</machine>
+	<machine name="kbd_type3_hle" sourcefile="devices/bus/sunkbd/hlekbd.cpp" isdevice="yes" runnable="no">
+		<description>Sun Type 3 Keyboard (HLE)</description>
+		<device_ref tag=":_tmp:bell" name="speaker"/>
+		<device_ref tag=":_tmp:beeper" name="beep"/>
+		<chip type="audio" tag=":bell" name="Speaker"/>
+		<chip type="audio" tag=":beeper" name="Beep" clock="2083"/>
+		<sound channels="1"/>
+		<input players="1">
+			<control type="keyboard" buttons="95"/>
+		</input>
+	</machine>
+	<machine name="kbd_type4_hle" sourcefile="devices/bus/sunkbd/hlekbd.cpp" isdevice="yes" runnable="no">
+		<description>Sun Type 4 Keyboard (HLE)</description>
+		<device_ref tag=":_tmp:bell" name="speaker"/>
+		<device_ref tag=":_tmp:beeper" name="beep"/>
+		<chip type="audio" tag=":bell" name="Speaker"/>
+		<chip type="audio" tag=":beeper" name="Beep" clock="2083"/>
+		<sound channels="1"/>
+		<input players="1">
+			<control type="keyboard" buttons="107"/>
+		</input>
+		<dipswitch name="Layout" tag=":DIP" mask="63">
+			<diplocation name="DIP" number="8"/>
+			<diplocation name="DIP" number="7"/>
+			<diplocation name="DIP" number="6"/>
+			<diplocation name="DIP" number="5"/>
+			<diplocation name="DIP" number="4"/>
+			<diplocation name="DIP" number="3"/>
+			<dipvalue name="U.S.A. (US4.kt)" value="0" default="yes"/>
+			<dipvalue name="U.S.A. (US4.kt)" value="1"/>
+			<dipvalue name="Belgium (FranceBelg4.kt)" value="2"/>
+			<dipvalue name="Canada (Canada4.kt)" value="3"/>
+			<dipvalue name="Denmark (Denmakr4.kt)" value="4"/>
+			<dipvalue name="Germany (Germany4.kt)" value="5"/>
+			<dipvalue name="Italy (Italy4.kt)" value="6"/>
+			<dipvalue name="The Netherlands (Netherland4.kt)" value="7"/>
+			<dipvalue name="Norway (Norway4.kt)" value="8"/>
+			<dipvalue name="Portugal (Portugal4.kt)" value="9"/>
+			<dipvalue name="Latin America/Spanish (SpainLatAm4.kt)" value="10"/>
+			<dipvalue name="Sweden (SwedenFin4.kt)" value="11"/>
+			<dipvalue name="Switzerland/French (Switzer_Fr4.kt)" value="12"/>
+			<dipvalue name="Switzerland/German (Switzer_Ge4.kt)" value="13"/>
+			<dipvalue name="Great Britain (UK4.kt)" value="14"/>
+			<dipvalue name="Korea (Korea4.kt)" value="16"/>
+			<dipvalue name="Taiwan (Taiwan4.kt)" value="17"/>
+			<dipvalue name="U.S.A. (US5.kt)" value="33"/>
+			<dipvalue name="U.S.A./UNIX (US_UNIX5.kt)" value="34"/>
+			<dipvalue name="France (France5.kt)" value="35"/>
+			<dipvalue name="Denmark (Denmark5.kt)" value="36"/>
+			<dipvalue name="Germany (Germany5.kt)" value="37"/>
+			<dipvalue name="Italy (Italy5.kt)" value="38"/>
+			<dipvalue name="The Netherlands (Netherland5.kt)" value="39"/>
+			<dipvalue name="Norway (Norway5.kt)" value="40"/>
+			<dipvalue name="Portugal (Portugal5.kt)" value="41"/>
+			<dipvalue name="Spain (Spain5.kt)" value="42"/>
+			<dipvalue name="Sweden (Sweden5.kt)" value="43"/>
+			<dipvalue name="Switzerland/French (Switzer_Fr5.kt)" value="44"/>
+			<dipvalue name="Switzerland/German (Switzer_Ge5.kt)" value="45"/>
+			<dipvalue name="Great Britain (UK5.kt)" value="46"/>
+			<dipvalue name="Korea (Korea5.kt)" value="47"/>
+			<dipvalue name="Taiwan (Taiwan5.kt)" value="48"/>
+			<dipvalue name="Japan (Japan5.kt)" value="49"/>
+			<dipvalue name="Canada/French (Canada_Fr5.kt)" value="50"/>
+			<dipvalue name="Hungary (Hungary5.kt)" value="51"/>
+			<dipvalue name="Poland (Poland5.kt)" value="52"/>
+			<dipvalue name="Czech (Czech5.kt)" value="53"/>
+			<dipvalue name="Russia (Russia5.kt)" value="54"/>
+			<dipvalue name="Latvia (Latvia5.kt)" value="55"/>
+			<dipvalue name="Turkey-Q5 (TurkeyQ5.kt)" value="56"/>
+			<dipvalue name="Greece (Greece5.kt)" value="57"/>
+			<dipvalue name="Arabic (Arabic5.kt)" value="58"/>
+			<dipvalue name="Lithuania (Lithuania5.kt)" value="59"/>
+			<dipvalue name="Belgium (Belgium5.kt)" value="60"/>
+			<dipvalue name="Turkey-F5 (TurkeyF5.kt)" value="62"/>
+			<dipvalue name="Canada/French (Canada_Fr5_TBITS5.kt)" value="63"/>
+		</dipswitch>
+		<dipswitch name="Unused" tag=":DIP" mask="64">
+			<diplocation name="DIP" number="2"/>
+			<dipvalue name="Off" value="0" default="yes"/>
+			<dipvalue name="On" value="64"/>
+		</dipswitch>
+		<dipswitch name="Identify as" tag=":DIP" mask="128">
+			<diplocation name="DIP" number="1"/>
+			<dipvalue name="Type 4" value="0" default="yes"/>
+			<dipvalue name="Type 3" value="128"/>
+		</dipswitch>
+	</machine>
+	<machine name="kbd_type5_hle_gb" sourcefile="devices/bus/sunkbd/hlekbd.cpp" isdevice="yes" runnable="no">
+		<description>Sun Type 5 Keyboard (Great Britain - HLE)</description>
+		<device_ref tag=":_tmp:bell" name="speaker"/>
+		<device_ref tag=":_tmp:beeper" name="beep"/>
+		<chip type="audio" tag=":bell" name="Speaker"/>
+		<chip type="audio" tag=":beeper" name="Beep" clock="2083"/>
+		<sound channels="1"/>
+		<input players="1">
+			<control type="keyboard" buttons="119"/>
+		</input>
+		<dipswitch name="Layout" tag=":DIP" mask="31">
+			<diplocation name="S" number="5"/>
+			<diplocation name="S" number="4"/>
+			<diplocation name="S" number="3"/>
+			<diplocation name="S" number="2"/>
+			<diplocation name="S" number="1"/>
+			<dipvalue name="U.S.A. (US5.kt)" value="1"/>
+			<dipvalue name="U.S.A./UNIX (US_UNIX5.kt)" value="2"/>
+			<dipvalue name="France (France5.kt)" value="3"/>
+			<dipvalue name="Denmark (Denmark5.kt)" value="4"/>
+			<dipvalue name="Germany (Germany5.kt)" value="5"/>
+			<dipvalue name="Italy (Italy5.kt)" value="6"/>
+			<dipvalue name="The Netherlands (Netherland5.kt)" value="7"/>
+			<dipvalue name="Norway (Norway5.kt)" value="8"/>
+			<dipvalue name="Portugal (Portugal5.kt)" value="9"/>
+			<dipvalue name="Spain (Spain5.kt)" value="10"/>
+			<dipvalue name="Sweden (Sweden5.kt)" value="11"/>
+			<dipvalue name="Switzerland/French (Switzer_Fr5.kt)" value="12"/>
+			<dipvalue name="Switzerland/German (Switzer_Ge5.kt)" value="13"/>
+			<dipvalue name="Great Britain (UK5.kt)" value="14" default="yes"/>
+			<dipvalue name="Korea (Korea5.kt)" value="15"/>
+			<dipvalue name="Taiwan (Taiwan5.kt)" value="16"/>
+			<dipvalue name="Japan (Japan5.kt)" value="17"/>
+			<dipvalue name="Canada/French (Canada_Fr5.kt)" value="18"/>
+			<dipvalue name="Hungary (Hungary5.kt)" value="19"/>
+			<dipvalue name="Poland (Poland5.kt)" value="20"/>
+			<dipvalue name="Czech (Czech5.kt)" value="21"/>
+			<dipvalue name="Russia (Russia5.kt)" value="22"/>
+			<dipvalue name="Latvia (Latvia5.kt)" value="23"/>
+			<dipvalue name="Turkey-Q5 (TurkeyQ5.kt)" value="24"/>
+			<dipvalue name="Greece (Greece5.kt)" value="25"/>
+			<dipvalue name="Arabic (Arabic5.kt)" value="26"/>
+			<dipvalue name="Lithuania (Lithuania5.kt)" value="27"/>
+			<dipvalue name="Belgium (Belgium5.kt)" value="28"/>
+			<dipvalue name="Turkey-F5 (TurkeyF5.kt)" value="30"/>
+			<dipvalue name="Canada/French (Canada_Fr5_TBITS5.kt)" value="31"/>
+		</dipswitch>
+	</machine>
+	<machine name="kbd_type5_hle_jp" sourcefile="devices/bus/sunkbd/hlekbd.cpp" isdevice="yes" runnable="no">
+		<description>Sun Type 5 Keyboard (Japan - HLE)</description>
+		<device_ref tag=":_tmp:bell" name="speaker"/>
+		<device_ref tag=":_tmp:beeper" name="beep"/>
+		<chip type="audio" tag=":bell" name="Speaker"/>
+		<chip type="audio" tag=":beeper" name="Beep" clock="2083"/>
+		<sound channels="1"/>
+		<input players="1">
+			<control type="keyboard" buttons="122"/>
+		</input>
+		<dipswitch name="Layout" tag=":DIP" mask="31">
+			<diplocation name="S" number="5"/>
+			<diplocation name="S" number="4"/>
+			<diplocation name="S" number="3"/>
+			<diplocation name="S" number="2"/>
+			<diplocation name="S" number="1"/>
+			<dipvalue name="U.S.A. (US5.kt)" value="1"/>
+			<dipvalue name="U.S.A./UNIX (US_UNIX5.kt)" value="2"/>
+			<dipvalue name="France (France5.kt)" value="3"/>
+			<dipvalue name="Denmark (Denmark5.kt)" value="4"/>
+			<dipvalue name="Germany (Germany5.kt)" value="5"/>
+			<dipvalue name="Italy (Italy5.kt)" value="6"/>
+			<dipvalue name="The Netherlands (Netherland5.kt)" value="7"/>
+			<dipvalue name="Norway (Norway5.kt)" value="8"/>
+			<dipvalue name="Portugal (Portugal5.kt)" value="9"/>
+			<dipvalue name="Spain (Spain5.kt)" value="10"/>
+			<dipvalue name="Sweden (Sweden5.kt)" value="11"/>
+			<dipvalue name="Switzerland/French (Switzer_Fr5.kt)" value="12"/>
+			<dipvalue name="Switzerland/German (Switzer_Ge5.kt)" value="13"/>
+			<dipvalue name="Great Britain (UK5.kt)" value="14"/>
+			<dipvalue name="Korea (Korea5.kt)" value="15"/>
+			<dipvalue name="Taiwan (Taiwan5.kt)" value="16"/>
+			<dipvalue name="Japan (Japan5.kt)" value="17" default="yes"/>
+			<dipvalue name="Canada/French (Canada_Fr5.kt)" value="18"/>
+			<dipvalue name="Hungary (Hungary5.kt)" value="19"/>
+			<dipvalue name="Poland (Poland5.kt)" value="20"/>
+			<dipvalue name="Czech (Czech5.kt)" value="21"/>
+			<dipvalue name="Russia (Russia5.kt)" value="22"/>
+			<dipvalue name="Latvia (Latvia5.kt)" value="23"/>
+			<dipvalue name="Turkey-Q5 (TurkeyQ5.kt)" value="24"/>
+			<dipvalue name="Greece (Greece5.kt)" value="25"/>
+			<dipvalue name="Arabic (Arabic5.kt)" value="26"/>
+			<dipvalue name="Lithuania (Lithuania5.kt)" value="27"/>
+			<dipvalue name="Belgium (Belgium5.kt)" value="28"/>
+			<dipvalue name="Turkey-F5 (TurkeyF5.kt)" value="30"/>
+			<dipvalue name="Canada/French (Canada_Fr5_TBITS5.kt)" value="31"/>
+		</dipswitch>
+	</machine>
+	<machine name="kbd_type5_hle_se" sourcefile="devices/bus/sunkbd/hlekbd.cpp" isdevice="yes" runnable="no">
+		<description>Sun Type 5 Keyboard (Sweden - HLE)</description>
+		<device_ref tag=":_tmp:bell" name="speaker"/>
+		<device_ref tag=":_tmp:beeper" name="beep"/>
+		<chip type="audio" tag=":bell" name="Speaker"/>
+		<chip type="audio" tag=":beeper" name="Beep" clock="2083"/>
+		<sound channels="1"/>
+		<input players="1">
+			<control type="keyboard" buttons="119"/>
+		</input>
+		<dipswitch name="Layout" tag=":DIP" mask="31">
+			<diplocation name="S" number="5"/>
+			<diplocation name="S" number="4"/>
+			<diplocation name="S" number="3"/>
+			<diplocation name="S" number="2"/>
+			<diplocation name="S" number="1"/>
+			<dipvalue name="U.S.A. (US5.kt)" value="1"/>
+			<dipvalue name="U.S.A./UNIX (US_UNIX5.kt)" value="2"/>
+			<dipvalue name="France (France5.kt)" value="3"/>
+			<dipvalue name="Denmark (Denmark5.kt)" value="4"/>
+			<dipvalue name="Germany (Germany5.kt)" value="5"/>
+			<dipvalue name="Italy (Italy5.kt)" value="6"/>
+			<dipvalue name="The Netherlands (Netherland5.kt)" value="7"/>
+			<dipvalue name="Norway (Norway5.kt)" value="8"/>
+			<dipvalue name="Portugal (Portugal5.kt)" value="9"/>
+			<dipvalue name="Spain (Spain5.kt)" value="10"/>
+			<dipvalue name="Sweden (Sweden5.kt)" value="11" default="yes"/>
+			<dipvalue name="Switzerland/French (Switzer_Fr5.kt)" value="12"/>
+			<dipvalue name="Switzerland/German (Switzer_Ge5.kt)" value="13"/>
+			<dipvalue name="Great Britain (UK5.kt)" value="14"/>
+			<dipvalue name="Korea (Korea5.kt)" value="15"/>
+			<dipvalue name="Taiwan (Taiwan5.kt)" value="16"/>
+			<dipvalue name="Japan (Japan5.kt)" value="17"/>
+			<dipvalue name="Canada/French (Canada_Fr5.kt)" value="18"/>
+			<dipvalue name="Hungary (Hungary5.kt)" value="19"/>
+			<dipvalue name="Poland (Poland5.kt)" value="20"/>
+			<dipvalue name="Czech (Czech5.kt)" value="21"/>
+			<dipvalue name="Russia (Russia5.kt)" value="22"/>
+			<dipvalue name="Latvia (Latvia5.kt)" value="23"/>
+			<dipvalue name="Turkey-Q5 (TurkeyQ5.kt)" value="24"/>
+			<dipvalue name="Greece (Greece5.kt)" value="25"/>
+			<dipvalue name="Arabic (Arabic5.kt)" value="26"/>
+			<dipvalue name="Lithuania (Lithuania5.kt)" value="27"/>
+			<dipvalue name="Belgium (Belgium5.kt)" value="28"/>
+			<dipvalue name="Turkey-F5 (TurkeyF5.kt)" value="30"/>
+			<dipvalue name="Canada/French (Canada_Fr5_TBITS5.kt)" value="31"/>
+		</dipswitch>
+	</machine>
+	<machine name="kbd_type5_hle_us" sourcefile="devices/bus/sunkbd/hlekbd.cpp" isdevice="yes" runnable="no">
+		<description>Sun Type 5 Keyboard (U.S.A. - HLE)</description>
+		<device_ref tag=":_tmp:bell" name="speaker"/>
+		<device_ref tag=":_tmp:beeper" name="beep"/>
+		<chip type="audio" tag=":bell" name="Speaker"/>
+		<chip type="audio" tag=":beeper" name="Beep" clock="2083"/>
+		<sound channels="1"/>
+		<input players="1">
+			<control type="keyboard" buttons="118"/>
+		</input>
+		<dipswitch name="Layout" tag=":DIP" mask="31">
+			<diplocation name="S" number="5"/>
+			<diplocation name="S" number="4"/>
+			<diplocation name="S" number="3"/>
+			<diplocation name="S" number="2"/>
+			<diplocation name="S" number="1"/>
+			<dipvalue name="U.S.A. (US5.kt)" value="1" default="yes"/>
+			<dipvalue name="U.S.A./UNIX (US_UNIX5.kt)" value="2"/>
+			<dipvalue name="France (France5.kt)" value="3"/>
+			<dipvalue name="Denmark (Denmark5.kt)" value="4"/>
+			<dipvalue name="Germany (Germany5.kt)" value="5"/>
+			<dipvalue name="Italy (Italy5.kt)" value="6"/>
+			<dipvalue name="The Netherlands (Netherland5.kt)" value="7"/>
+			<dipvalue name="Norway (Norway5.kt)" value="8"/>
+			<dipvalue name="Portugal (Portugal5.kt)" value="9"/>
+			<dipvalue name="Spain (Spain5.kt)" value="10"/>
+			<dipvalue name="Sweden (Sweden5.kt)" value="11"/>
+			<dipvalue name="Switzerland/French (Switzer_Fr5.kt)" value="12"/>
+			<dipvalue name="Switzerland/German (Switzer_Ge5.kt)" value="13"/>
+			<dipvalue name="Great Britain (UK5.kt)" value="14"/>
+			<dipvalue name="Korea (Korea5.kt)" value="15"/>
+			<dipvalue name="Taiwan (Taiwan5.kt)" value="16"/>
+			<dipvalue name="Japan (Japan5.kt)" value="17"/>
+			<dipvalue name="Canada/French (Canada_Fr5.kt)" value="18"/>
+			<dipvalue name="Hungary (Hungary5.kt)" value="19"/>
+			<dipvalue name="Poland (Poland5.kt)" value="20"/>
+			<dipvalue name="Czech (Czech5.kt)" value="21"/>
+			<dipvalue name="Russia (Russia5.kt)" value="22"/>
+			<dipvalue name="Latvia (Latvia5.kt)" value="23"/>
+			<dipvalue name="Turkey-Q5 (TurkeyQ5.kt)" value="24"/>
+			<dipvalue name="Greece (Greece5.kt)" value="25"/>
+			<dipvalue name="Arabic (Arabic5.kt)" value="26"/>
+			<dipvalue name="Lithuania (Lithuania5.kt)" value="27"/>
+			<dipvalue name="Belgium (Belgium5.kt)" value="28"/>
+			<dipvalue name="Turkey-F5 (TurkeyF5.kt)" value="30"/>
+			<dipvalue name="Canada/French (Canada_Fr5_TBITS5.kt)" value="31"/>
+		</dipswitch>
+	</machine>
+	<machine name="mb91f155a" sourcefile="devices/cpu/fr/fr.cpp" isdevice="yes" runnable="no">
+		<description>Fujitsu MB91F155A</description>
+	</machine>
+	<machine name="mc68hc11a1" sourcefile="devices/cpu/mc68hc11/mc68hc11.cpp" isdevice="yes" runnable="no">
+		<description>Motorola MC68HC11A1</description>
+	</machine>
+	<machine name="midiin" sourcefile="devices/imagedev/midiin.cpp" isdevice="yes" runnable="no">
+		<description>MIDI In image device</description>
+		<configuration name="MIDI file mode" tag=":CFG" mask="255">
+			<confsetting name="Multi" value="255" default="yes"/>
+			<confsetting name="Poly: Channel 1" value="0"/>
+			<confsetting name="Poly: Channel 2" value="1"/>
+			<confsetting name="Poly: Channel 3" value="2"/>
+			<confsetting name="Poly: Channel 4" value="3"/>
+			<confsetting name="Poly: Channel 5" value="4"/>
+			<confsetting name="Poly: Channel 6" value="5"/>
+			<confsetting name="Poly: Channel 7" value="6"/>
+			<confsetting name="Poly: Channel 8" value="7"/>
+			<confsetting name="Poly: Channel 9" value="8"/>
+			<confsetting name="Poly: Channel 10" value="9"/>
+			<confsetting name="Poly: Channel 11" value="10"/>
+			<confsetting name="Poly: Channel 12" value="11"/>
+			<confsetting name="Poly: Channel 13" value="12"/>
+			<confsetting name="Poly: Channel 14" value="13"/>
+			<confsetting name="Poly: Channel 15" value="14"/>
+			<confsetting name="Poly: Channel 16" value="15"/>
+		</configuration>
+	</machine>
+	<machine name="midiin_port" sourcefile="devices/bus/midi/midiinport.cpp" isdevice="yes" runnable="no">
+		<description>MIDI In port</description>
+		<device_ref tag=":_tmp:midiinimg" name="midiin"/>
+		<configuration name="MIDI file mode" tag=":midiinimg:CFG" mask="255">
+			<confsetting name="Multi" value="255" default="yes"/>
+			<confsetting name="Poly: Channel 1" value="0"/>
+			<confsetting name="Poly: Channel 2" value="1"/>
+			<confsetting name="Poly: Channel 3" value="2"/>
+			<confsetting name="Poly: Channel 4" value="3"/>
+			<confsetting name="Poly: Channel 5" value="4"/>
+			<confsetting name="Poly: Channel 6" value="5"/>
+			<confsetting name="Poly: Channel 7" value="6"/>
+			<confsetting name="Poly: Channel 8" value="7"/>
+			<confsetting name="Poly: Channel 9" value="8"/>
+			<confsetting name="Poly: Channel 10" value="9"/>
+			<confsetting name="Poly: Channel 11" value="10"/>
+			<confsetting name="Poly: Channel 12" value="11"/>
+			<confsetting name="Poly: Channel 13" value="12"/>
+			<confsetting name="Poly: Channel 14" value="13"/>
+			<confsetting name="Poly: Channel 15" value="14"/>
+			<confsetting name="Poly: Channel 16" value="15"/>
+		</configuration>
+		<device type="midiin" tag=":midiinimg">
+			<instance name="midiin" briefname="min"/>
+			<extension name="mid"/>
+			<extension name="syx"/>
+		</device>
+	</machine>
+	<machine name="midiout" sourcefile="devices/imagedev/midiout.cpp" isdevice="yes" runnable="no">
+		<description>MIDI Out image device</description>
+	</machine>
+	<machine name="midiout_port" sourcefile="devices/bus/midi/midioutport.cpp" isdevice="yes" runnable="no">
+		<description>MIDI Out port</description>
+		<device_ref tag=":_tmp:midioutimg" name="midiout"/>
+		<device type="midiout" tag=":midioutimg">
+			<instance name="midiout" briefname="mout"/>
+			<extension name="mid"/>
+		</device>
+	</machine>
+	<machine name="mm5740" sourcefile="devices/machine/mm5740.cpp" isdevice="yes" runnable="no">
+		<description>MM5740 Keyboard Encoder</description>
+		<rom name="mm5740aac.ic1" size="450" crc="aed404d3" sha1="e7b9feba5f789f388d27820b5f3fa591d41b4ab1" region="internal" offset="0"/>
+	</machine>
+	<machine name="msm6242" sourcefile="devices/machine/msm6242.cpp" isdevice="yes" runnable="no">
+		<description>OKI MSM6242 RTC</description>
+	</machine>
+	<machine name="output_latch" sourcefile="devices/machine/output_latch.cpp" isdevice="yes" runnable="no">
+		<description>Output Latch</description>
+	</machine>
+	<machine name="px320a" sourcefile="devices/bus/ata/px320a.cpp" isdevice="yes" runnable="no">
+		<description>PleXCombo PX-320A CD-RW/DVD-ROM Drive</description>
+		<biosset name="v106" description="Firmware v1.06"/>
+		<biosset name="v105" description="Firmware v1.05"/>
+		<biosset name="v104" description="Firmware v1.04a"/>
+		<biosset name="v103" description="Firmware v1.03"/>
+		<biosset name="v102" description="Firmware v1.02"/>
+		<rom name="sapp106.bin" size="524288" crc="2ba54c7a" sha1="032cc5009fe84db902096ea2bb9dc2221601ab20" region="firmware" offset="0"/>
+		<rom name="sapp105.bin" size="524288" crc="3755a053" sha1="fb966d506edb6e0a97ad64de3898ce9e75e22d7d" region="firmware" offset="0"/>
+		<rom name="sapp104.bin" size="524288" crc="7197425f" sha1="0b02508d668439a78ea8e3d97eddf5a3de6e2ba5" region="firmware" offset="0"/>
+		<rom name="sap1032.bin" size="524288" crc="9ff1c729" sha1="6ed44bf8decaac2ee9127bdd66e0ff1fd52969c3" region="firmware" offset="0"/>
+		<rom name="sapp102.bin" size="524288" crc="9f96bea4" sha1="5b70f32e83d8c19d2895d38d0f7e15f2eee326fd" region="firmware" offset="0"/>
+		<device_ref tag=":_tmp:frcpu" name="mb91f155a"/>
+		<chip type="cpu" tag=":frcpu" name="Fujitsu MB91F155A" clock="16000000"/>
+		<feature type="disk" status="unemulated"/>
+	</machine>
+	<machine name="xm3301" sourcefile="devices/bus/ata/xm3301.cpp" isdevice="yes" runnable="no">
+		<description>Toshiba XM-3301 CD-ROM Drive</description>
+		<device_ref tag=":_tmp:image" name="cdrom_image"/>
+		<device_ref tag=":_tmp:cdda" name="cdda"/>
+		<chip type="audio" tag=":cdda" name="CD/DA" clock="44100"/>
+		<sound channels="0"/>
+		<feature type="disk" status="unemulated"/>
+		<device type="cdrom" tag=":image" interface="cdrom">
+			<instance name="cdrom" briefname="cdrm"/>
+			<extension name="chd"/>
+			<extension name="cue"/>
+			<extension name="toc"/>
+			<extension name="nrg"/>
+			<extension name="gdi"/>
+			<extension name="iso"/>
+			<extension name="cdr"/>
+		</device>
+	</machine>
+	<machine name="z80" sourcefile="devices/cpu/z80/z80.cpp" isdevice="yes" runnable="no">
+		<description>Zilog Z80</description>
+	</machine>
+	<machine name="zip100_ide" sourcefile="devices/bus/ata/zip100.cpp" isdevice="yes" runnable="no">
+		<description>Iomega Zip 100MB IDE Drive</description>
+		<rom name="nm27c520m.u1" size="65536" crc="67a04459" sha1="b8df2a733838db5116982a7295484b77b272287c" region="eprom" offset="0"/>
+		<device_ref tag=":_tmp:mcu" name="i80c32"/>
+		<chip type="cpu" tag=":mcu" name="Intel 80C32" clock="12000000"/>
+		<feature type="disk" status="unemulated"/>
+	</machine>
+	<machine name="93c06_16" sourcefile="devices/machine/eepromser.cpp" isdevice="yes" runnable="no">
+		<description>Serial EEPROM 93C06 (16x16)</description>
+	</machine>
+	<machine name="adaptator_multitap" sourcefile="devices/bus/centronics/adaptator.cpp" isdevice="yes" runnable="no">
+		<description>The Adaptator 2x DE-9 Multitap</description>
+		<device_ref tag=":_tmp:joy_p1" name="vcs_control_port"/>
+		<device_ref tag=":_tmp:joy_p2" name="vcs_control_port"/>
+		<slot name=":joy_p1">
+			<slotoption name="trakball" devname="atari_trakball"/>
+			<slotoption name="wheel" devname="vcs_wheel"/>
+			<slotoption name="joybstr" devname="vcs_joystick_booster"/>
+			<slotoption name="cx85" devname="atari_cx85"/>
+			<slotoption name="keypad" devname="vcs_keypad"/>
+			<slotoption name="lp" devname="vcs_lightpen"/>
+			<slotoption name="pad" devname="vcs_paddles"/>
+			<slotoption name="mouse" devname="vcs_mouse"/>
+			<slotoption name="joy" devname="vcs_joystick" default="yes"/>
+		</slot>
+		<slot name=":joy_p2">
+			<slotoption name="trakball" devname="atari_trakball"/>
+			<slotoption name="wheel" devname="vcs_wheel"/>
+			<slotoption name="joybstr" devname="vcs_joystick_booster"/>
+			<slotoption name="cx85" devname="atari_cx85"/>
+			<slotoption name="keypad" devname="vcs_keypad"/>
+			<slotoption name="lp" devname="vcs_lightpen"/>
+			<slotoption name="pad" devname="vcs_paddles"/>
+			<slotoption name="mouse" devname="vcs_mouse"/>
+			<slotoption name="joy" devname="vcs_joystick" default="yes"/>
+		</slot>
+	</machine>
+	<machine name="ap2000" sourcefile="devices/bus/centronics/epson_lx810l.cpp" isdevice="yes" runnable="no">
+		<description>Epson ActionPrinter 2000</description>
+		<rom name="ap2k.ic3c" size="32768" crc="ee7294b7" sha1="219ffa6ff661ce95d5772c9fc1967093718f04e9" region="maincpu" offset="0"/>
+		<rom name="at93c06" size="32" status="nodump" region="eeprom" offset="0"/>
+		<device_ref tag=":_tmp:maincpu" name="upd7810"/>
+		<device_ref tag=":_tmp:speaker" name="speaker"/>
+		<device_ref tag=":_tmp:dac" name="dac"/>
+		<device_ref tag=":_tmp:e05a30" name="e05a30"/>
+		<device_ref tag=":_tmp:eeprom" name="93c06_16"/>
+		<device_ref tag=":_tmp:bitmap_printer" name="bitmap_printer"/>
+		<device_ref tag=":_tmp:bitmap_printer:screen" name="screen"/>
+		<device_ref tag=":_tmp:bitmap_printer:pf_stepper" name="stepper"/>
+		<device_ref tag=":_tmp:bitmap_printer:cr_stepper" name="stepper"/>
+		<chip type="cpu" tag=":maincpu" name="NEC uPD7810" clock="14745600"/>
+		<chip type="audio" tag=":speaker" name="Speaker"/>
+		<chip type="audio" tag=":dac" name="1-Bit DAC"/>
+		<display tag=":bitmap_printer:screen" type="raster" rotate="0" width="1024" height="384" refresh="60.000000" />
+		<sound channels="1"/>
+		<input players="1">
+			<control type="keyboard" buttons="6"/>
+		</input>
+		<dipswitch name="Character spacing" tag=":DIPSW1" mask="1">
+			<diplocation name="SW 1" number="1" inverted="yes"/>
+			<dipvalue name="10 cpi" value="0" default="yes"/>
+			<dipvalue name="12 cpi" value="1"/>
+		</dipswitch>
+		<dipswitch name="Shape of zero" tag=":DIPSW1" mask="2">
+			<diplocation name="SW 1" number="2" inverted="yes"/>
+			<dipvalue name="Not slashed" value="0" default="yes"/>
+			<dipvalue name="Slashed" value="2"/>
+		</dipswitch>
+		<dipswitch name="Page length" tag=":DIPSW1" mask="12">
+			<diplocation name="SW 1" number="3" inverted="yes"/>
+			<diplocation name="SW 1" number="4" inverted="yes"/>
+			<dipvalue name="8.5&quot;" value="8"/>
+			<dipvalue name="11&quot;" value="0" default="yes"/>
+			<dipvalue name="11.7&quot; (A4)" value="12"/>
+			<dipvalue name="12&quot;" value="4"/>
+		</dipswitch>
+		<dipswitch name="Character table" tag=":DIPSW1" mask="16">
+			<diplocation name="SW 1" number="5" inverted="yes"/>
+			<dipvalue name="Italics" value="0" default="yes"/>
+			<dipvalue name="Graphics" value="16"/>
+		</dipswitch>
+		<dipswitch name="International character set" tag=":DIPSW1" mask="224">
+			<diplocation name="SW 1" number="6" inverted="yes"/>
+			<diplocation name="SW 1" number="7" inverted="yes"/>
+			<diplocation name="SW 1" number="8" inverted="yes"/>
+			<dipvalue name="USA (PC 437)" value="224" default="yes"/>
+			<dipvalue name="France (PC 850)" value="96"/>
+			<dipvalue name="Germany (PC 860)" value="160"/>
+			<dipvalue name="UK (PC 863)" value="32"/>
+			<dipvalue name="Denmark (PC 865)" value="192"/>
+			<dipvalue name="Sweden (PC 437)" value="64"/>
+			<dipvalue name="Italy (PC 437)" value="128"/>
+			<dipvalue name="Spain (PC 437)" value="0"/>
+		</dipswitch>
+		<dipswitch name="Short tear-off" tag=":DIPSW2" mask="1">
+			<diplocation name="SW 2" number="1" inverted="yes"/>
+			<dipvalue name="Invalid" value="1" default="yes"/>
+			<dipvalue name="Valid" value="0"/>
+		</dipswitch>
+		<dipswitch name="Cut-sheet feeder mode" tag=":DIPSW2" mask="2">
+			<diplocation name="SW 2" number="2" inverted="yes"/>
+			<dipvalue name="Off" value="0" default="yes"/>
+			<dipvalue name="On" value="2"/>
+		</dipswitch>
+		<dipswitch name="Skip over perforation" tag=":DIPSW2" mask="4">
+			<diplocation name="SW 2" number="3" inverted="yes"/>
+			<dipvalue name="Off" value="0" default="yes"/>
+			<dipvalue name="1&quot;" value="4"/>
+		</dipswitch>
+		<dipswitch name="Auto line feed" tag=":DIPSW2" mask="8">
+			<diplocation name="SW 2" number="4" inverted="yes"/>
+			<dipvalue name="Off" value="0" default="yes"/>
+			<dipvalue name="On" value="8"/>
+		</dipswitch>
+		<configuration name="Draw Inch Marks" tag=":bitmap_printer:DRAWMARKS" mask="3">
+			<confsetting name="Off" value="0"/>
+			<confsetting name="with marks" value="1"/>
+			<confsetting name="with numbers" value="2" default="yes"/>
+		</configuration>
+		<adjuster name="Printer Bottom Margin" default="18"/>
+		<adjuster name="Printer Top Margin" default="18"/>
+	</machine>
+	<machine name="arm_cpu" sourcefile="devices/cpu/arm/arm.cpp" isdevice="yes" runnable="no">
+		<description>ARM</description>
+	</machine>
+	<machine name="bitmap_printer" sourcefile="devices/machine/bitmap_printer.cpp" isdevice="yes" runnable="no">
+		<description>Bitmap Printer Device</description>
+		<device_ref tag=":_tmp:screen" name="screen"/>
+		<device_ref tag=":_tmp:pf_stepper" name="stepper"/>
+		<device_ref tag=":_tmp:cr_stepper" name="stepper"/>
+		<display tag=":screen" type="raster" rotate="0" width="0" height="384" refresh="60.000000" />
+		<input players="1">
+		</input>
+		<configuration name="Draw Inch Marks" tag=":DRAWMARKS" mask="3">
+			<confsetting name="Off" value="0"/>
+			<confsetting name="with marks" value="1"/>
+			<confsetting name="with numbers" value="2" default="yes"/>
+		</configuration>
+		<adjuster name="Printer Bottom Margin" default="18"/>
+		<adjuster name="Printer Top Margin" default="18"/>
+	</machine>
+	<machine name="centronics_chessmec" sourcefile="devices/bus/centronics/chessmec.cpp" isdevice="yes" runnable="no">
+		<description>Tasc ChessMachine EC Interface</description>
+		<device_ref tag=":_tmp:chessm" name="chessmachine"/>
+		<device_ref tag=":_tmp:chessm:maincpu" name="arm_cpu"/>
+		<chip type="cpu" tag=":chessm:maincpu" name="ARM" clock="15000000"/>
+	</machine>
+	<machine name="centronics_printer" sourcefile="devices/bus/centronics/printer.cpp" isdevice="yes" runnable="no">
+		<description>Centronics Printer</description>
+		<device_ref tag=":_tmp:printer" name="printer_image"/>
+		<device type="printout" tag=":printer">
+			<instance name="printout" briefname="prin"/>
+			<extension name="prn"/>
+		</device>
+	</machine>
+	<machine name="centronics_samdac" sourcefile="devices/bus/centronics/samdac.cpp" isdevice="yes" runnable="no">
+		<description>SAMDAC</description>
+		<device_ref tag=":_tmp:speaker" name="speaker"/>
+		<device_ref tag=":_tmp:dac0" name="dac_8bit_r2r"/>
+		<device_ref tag=":_tmp:dac1" name="dac_8bit_r2r"/>
+		<chip type="audio" tag=":speaker" name="Speaker"/>
+		<chip type="audio" tag=":dac0" name="8-Bit R-2R DAC"/>
+		<chip type="audio" tag=":dac1" name="8-Bit R-2R DAC"/>
+		<sound channels="1"/>
+	</machine>
+	<machine name="centronics_smartboard" sourcefile="devices/bus/centronics/smartboard.cpp" isdevice="yes" runnable="no">
+		<description>Tasc SmartBoard SB30 Interface</description>
+		<device_ref tag=":_tmp:smartboard" name="tasc_sb30"/>
+		<device_ref tag=":_tmp:smartboard:board" name="sensorboard"/>
+		<configuration name="Duplicate Piece IDs" tag=":smartboard:CONF" mask="1">
+			<confsetting name="No" value="0" default="yes"/>
+			<confsetting name="Yes" value="1"/>
+		</configuration>
+		<configuration name="Remember Position" tag=":smartboard:board:CONF" mask="3">
+			<condition tag="UI_CHECK" mask="4" relation="ne" value="0"/>
+			<confsetting name="No" value="1"/>
+			<confsetting name="Yes" value="2"/>
+			<confsetting name="Auto" value="0" default="yes"/>
+		</configuration>
+		<configuration name="Show Pieces" tag=":smartboard:board:CONF" mask="4">
+			<condition tag="UI_CHECK" mask="4" relation="ne" value="0"/>
+			<confsetting name="No" value="4"/>
+			<confsetting name="Yes" value="0" default="yes"/>
+		</configuration>
+	</machine>
+	<machine name="chessmachine" sourcefile="devices/machine/chessmachine.cpp" isdevice="yes" runnable="no">
+		<description>Tasc ChessMachine</description>
+		<rom name="74s288.1" size="32" crc="284114e2" sha1="df4037536d505d7240bb1d70dc58f59a34ab77b4" region="bootrom" offset="0"/>
+		<rom name="74s288.2" size="32" crc="9f239c75" sha1="aafaf30dac90f36b01f9ee89903649fc4ea0480d" region="bootrom" offset="1"/>
+		<rom name="74s288.3" size="32" crc="0455360b" sha1="f1486142330f2c39a4d6c479646030d31443d1c8" region="bootrom" offset="2"/>
+		<rom name="74s288.4" size="32" crc="c7c9aba8" sha1="cbb5b12b5917e36679d45bcbc36ea9285223a75d" region="bootrom" offset="3"/>
+		<device_ref tag=":_tmp:maincpu" name="arm_cpu"/>
+		<chip type="cpu" tag=":maincpu" name="ARM" clock="0"/>
+	</machine>
+	<machine name="comx_pl80" sourcefile="devices/bus/centronics/comxpl80.cpp" isdevice="yes" runnable="no">
+		<description>COMX PL-80</description>
+		<rom name="pl80.pt6" size="3584" crc="ae059e5b" sha1="f25812606b0082d32eb603d0a702a2187089d332" region="cx005" offset="80"/>
+		<rom name="it.em.ou.bin" size="8192" crc="1b4a3198" sha1="138ff6666a31c2d18cd63e609dd94d9cd1529931" region="gfx1" offset="2000"/>
+		<rom name="tiny.bin" size="1024" crc="940ec1ed" sha1="ad83a3b57e2f0fbaa1e40644cd999b3f239635e8" region="gfx1" offset="4000"/>
+		<configuration name="COMX PL-80 Font Pack" tag=":FONT" mask="3">
+			<confsetting name="None" value="0" default="yes"/>
+			<confsetting name="Italic, Emphasized and Outline" value="1"/>
+			<confsetting name="Tiny" value="2"/>
+		</configuration>
+	</machine>
+	<machine name="covox" sourcefile="devices/bus/centronics/covox.cpp" isdevice="yes" runnable="no">
+		<description>Covox Speech Thing</description>
+		<device_ref tag=":_tmp:speaker" name="speaker"/>
+		<device_ref tag=":_tmp:dac" name="dac_8bit_r2r"/>
+		<chip type="audio" tag=":speaker" name="Speaker"/>
+		<chip type="audio" tag=":dac" name="8-Bit R-2R DAC"/>
+		<sound channels="1"/>
+	</machine>
+	<machine name="covox_stereo" sourcefile="devices/bus/centronics/covox.cpp" isdevice="yes" runnable="no">
+		<description>Covox (Stereo-in-1)</description>
+		<device_ref tag=":_tmp:speaker" name="speaker"/>
+		<device_ref tag=":_tmp:ldac" name="dac_8bit_r2r"/>
+		<device_ref tag=":_tmp:rdac" name="dac_8bit_r2r"/>
+		<chip type="audio" tag=":speaker" name="Speaker"/>
+		<chip type="audio" tag=":ldac" name="8-Bit R-2R DAC"/>
+		<chip type="audio" tag=":rdac" name="8-Bit R-2R DAC"/>
+		<sound channels="1"/>
+	</machine>
+	<machine name="cpcdigiblst" sourcefile="devices/bus/centronics/digiblst.cpp" isdevice="yes" runnable="no">
+		<description>Digiblaster (DIY)</description>
+		<device_ref tag=":_tmp:speaker" name="speaker"/>
+		<device_ref tag=":_tmp:dac" name="dac_8bit_r2r"/>
+		<chip type="audio" tag=":speaker" name="Speaker"/>
+		<chip type="audio" tag=":dac" name="8-Bit R-2R DAC"/>
+		<sound channels="1"/>
+	</machine>
+	<machine name="e05a03" sourcefile="devices/machine/e05a03.cpp" isdevice="yes" runnable="no">
+		<description>Epson E05A03 Gate Array</description>
+	</machine>
+	<machine name="e05a30" sourcefile="devices/machine/e05a30.cpp" isdevice="yes" runnable="no">
+		<description>Epson E05A30 Gate Array</description>
+	</machine>
+	<machine name="epson_fx80" sourcefile="devices/bus/centronics/epson_fx80.cpp" isdevice="yes" runnable="no">
+		<description>Epson FX-80</description>
+		<rom name="epson_8426k9_m1206ba029_read_as_27c128.bin" size="16384" crc="ff5c2b1e" sha1="e1e38c3e4864e60f701939e23331360b76603a24" region="maincpu" offset="0"/>
+		<rom name="epson_fx_c42040kb_8042ah.bin" size="2048" crc="3e9d08c1" sha1="d5074f60497cc75d40996e6cef63231d3a3697f1" region="slavecpu" offset="0"/>
+		<device_ref tag=":_tmp:maincpu" name="upd7810"/>
+		<device_ref tag=":_tmp:slavecpu" name="i8042ah"/>
+		<chip type="cpu" tag=":maincpu" name="NEC uPD7810" clock="10000000"/>
+		<chip type="cpu" tag=":slavecpu" name="Intel 8042AH" clock="11000000"/>
+		<feature type="printer" status="unemulated"/>
+	</machine>
+	<machine name="epson_jx80" sourcefile="devices/bus/centronics/epson_fx80.cpp" isdevice="yes" runnable="no">
+		<description>Epson JX-80</description>
+		<rom name="jx80_a4_fs5_27128.bin" size="16384" crc="2925a47b" sha1="1864d3561491d7dca78ac2cd13a023460f551184" region="maincpu" offset="0"/>
+		<rom name="epson_fx_c42040kb_8042ah.bin" size="2048" crc="3e9d08c1" sha1="d5074f60497cc75d40996e6cef63231d3a3697f1" region="slavecpu" offset="0"/>
+		<device_ref tag=":_tmp:maincpu" name="upd7810"/>
+		<device_ref tag=":_tmp:slavecpu" name="i8042ah"/>
+		<chip type="cpu" tag=":maincpu" name="NEC uPD7810" clock="10000000"/>
+		<chip type="cpu" tag=":slavecpu" name="Intel 8042AH" clock="11000000"/>
+		<feature type="printer" status="unemulated"/>
+	</machine>
+	<machine name="epson_rx80" sourcefile="devices/bus/centronics/epson_rx80.cpp" isdevice="yes" runnable="no">
+		<description>Epson RX-80</description>
+		<rom name="rx80_2764.bin" size="8192" crc="5206104a" sha1="3e304f5331181aedb321d3db23a9387e3cfacf0c" region="maincpu" offset="0"/>
+		<device_ref tag=":_tmp:maincpu" name="upd7810"/>
+		<chip type="cpu" tag=":maincpu" name="NEC uPD7810" clock="11000000"/>
+		<feature type="printer" status="unemulated"/>
+	</machine>
+	<machine name="ex800" sourcefile="devices/bus/centronics/epson_ex800.cpp" isdevice="yes" runnable="no">
+		<description>Epson EX-800</description>
+		<rom name="w8_pe9.9b" size="32768" crc="6dd41e9b" sha1="8e30ead727b9317154742efd881206e9f9bbf95b" region="maincpu" offset="0"/>
+		<device_ref tag=":_tmp:maincpu" name="upd7810"/>
+		<device_ref tag=":_tmp:mono" name="speaker"/>
+		<device_ref tag=":_tmp:beeper" name="beep"/>
+		<chip type="cpu" tag=":maincpu" name="NEC uPD7810" clock="12000000"/>
+		<chip type="audio" tag=":mono" name="Speaker"/>
+		<chip type="audio" tag=":beeper" name="Beep" clock="4000"/>
+		<sound channels="1"/>
+		<input players="1">
+			<control type="keyboard" buttons="11"/>
+		</input>
+		<dipswitch name="Condensed characters" tag=":DSW_1" mask="1">
+			<dipvalue name="Off" value="0" default="yes"/>
+			<dipvalue name="On" value="1"/>
+		</dipswitch>
+		<dipswitch name="Slashed zero" tag=":DSW_1" mask="2">
+			<dipvalue name="Off" value="0" default="yes"/>
+			<dipvalue name="On" value="2"/>
+		</dipswitch>
+		<dipswitch name="Character table" tag=":DSW_1" mask="4">
+			<dipvalue name="Italics" value="0" default="yes"/>
+			<dipvalue name="Graphics" value="4"/>
+		</dipswitch>
+		<dipswitch name="Printer commands" tag=":DSW_1" mask="8">
+			<dipvalue name="ESC/P" value="0" default="yes"/>
+			<dipvalue name="IBM printer emulation" value="8"/>
+		</dipswitch>
+		<dipswitch name="Print quality" tag=":DSW_1" mask="16">
+			<dipvalue name="Draft" value="0" default="yes"/>
+			<dipvalue name="NLQ" value="16"/>
+		</dipswitch>
+		<dipswitch name="Int. character set" tag=":DSW_1" mask="224">
+			<dipvalue name="USA" value="0" default="yes"/>
+			<dipvalue name="French" value="32"/>
+			<dipvalue name="German" value="32"/>
+			<dipvalue name="UK" value="64"/>
+			<dipvalue name="Danish" value="64"/>
+			<dipvalue name="Swedish" value="96"/>
+			<dipvalue name="Italian" value="96"/>
+			<dipvalue name="Spanish" value="128"/>
+		</dipswitch>
+		<dipswitch name="Page length" tag=":DSW_2" mask="1">
+			<dipvalue name="11 inch" value="0" default="yes"/>
+			<dipvalue name="12 inch" value="1"/>
+		</dipswitch>
+		<dipswitch name="Auto. sheet feeder" tag=":DSW_2" mask="2">
+			<dipvalue name="Canceled" value="0" default="yes"/>
+			<dipvalue name="Selected" value="2"/>
+		</dipswitch>
+		<dipswitch name="Skip-over-perforation" tag=":DSW_2" mask="4">
+			<dipvalue name="None" value="0" default="yes"/>
+			<dipvalue name="1 inch" value="4"/>
+		</dipswitch>
+		<dipswitch name="Add LF after CR" tag=":DSW_2" mask="8">
+			<dipvalue name="CR only" value="0" default="yes"/>
+			<dipvalue name="CR + LF" value="8"/>
+		</dipswitch>
+		<dipswitch name="Interface type" tag=":DSW_2" mask="48">
+			<dipvalue name="Parallel" value="0" default="yes"/>
+			<dipvalue name="Serial (odd parity)" value="16"/>
+			<dipvalue name="Serial (even parity)" value="32"/>
+			<dipvalue name="Serial (no parity)" value="48"/>
+		</dipswitch>
+		<dipswitch name="Baud rate" tag=":DSW_2" mask="192">
+			<dipvalue name="9600" value="0" default="yes"/>
+			<dipvalue name="4800" value="64"/>
+			<dipvalue name="1200" value="128"/>
+			<dipvalue name="300" value="192"/>
+		</dipswitch>
+	</machine>
+	<machine name="hasp_savquest" sourcefile="devices/bus/centronics/hasp_savquest.cpp" isdevice="yes" runnable="no">
+		<description>Alladin HASP dongle for Savage Quest</description>
+	</machine>
+	<machine name="i8042ah" sourcefile="devices/cpu/mcs48/mcs48.cpp" isdevice="yes" runnable="no">
+		<description>Intel 8042AH</description>
+	</machine>
+	<machine name="i8050" sourcefile="devices/cpu/mcs48/mcs48.cpp" isdevice="yes" runnable="no">
+		<description>Intel 8050</description>
+	</machine>
+	<machine name="input_buffer" sourcefile="devices/machine/buffer.cpp" isdevice="yes" runnable="no">
+		<description>Input Buffer</description>
+	</machine>
+	<machine name="lx800" sourcefile="devices/bus/centronics/epson_lx800.cpp" isdevice="yes" runnable="no">
+		<description>Epson LX-800</description>
+		<rom name="lx800.ic3c" size="32768" crc="da06c45b" sha1="9618c940dd10d5b43cd1edd5763b90e6447de667" region="maincpu" offset="0"/>
+		<device_ref tag=":_tmp:maincpu" name="upd7810"/>
+		<device_ref tag=":_tmp:mono" name="speaker"/>
+		<device_ref tag=":_tmp:beeper" name="beep"/>
+		<device_ref tag=":_tmp:ic3b" name="e05a03"/>
+		<chip type="cpu" tag=":maincpu" name="NEC uPD7810" clock="14745600"/>
+		<chip type="audio" tag=":mono" name="Speaker"/>
+		<chip type="audio" tag=":beeper" name="Beep" clock="4000"/>
+		<sound channels="1"/>
+		<input players="1">
+			<control type="keyboard" buttons="3"/>
+		</input>
+		<dipswitch name="Typeface" tag=":DIPSW1" mask="1">
+			<diplocation name="SW 1" number="1" inverted="yes"/>
+			<dipvalue name="Normal" value="0" default="yes"/>
+			<dipvalue name="Condensed" value="1"/>
+		</dipswitch>
+		<dipswitch name="Shape of zero" tag=":DIPSW1" mask="2">
+			<diplocation name="SW 1" number="2" inverted="yes"/>
+			<dipvalue name="Not slashed" value="0" default="yes"/>
+			<dipvalue name="Slashed" value="2"/>
+		</dipswitch>
+		<dipswitch name="Character table" tag=":DIPSW1" mask="4">
+			<diplocation name="SW 1" number="3" inverted="yes"/>
+			<dipvalue name="Italics" value="0" default="yes"/>
+			<dipvalue name="Graphics" value="4"/>
+		</dipswitch>
+		<dipswitch name="Paper-out detection" tag=":DIPSW1" mask="8">
+			<diplocation name="SW 1" number="4" inverted="yes"/>
+			<dipvalue name="Invalid" value="0" default="yes"/>
+			<dipvalue name="Valid" value="8"/>
+		</dipswitch>
+		<dipswitch name="Printing quality" tag=":DIPSW1" mask="16">
+			<diplocation name="SW 1" number="5" inverted="yes"/>
+			<dipvalue name="Draft" value="0" default="yes"/>
+			<dipvalue name="NLQ" value="16"/>
+		</dipswitch>
+		<dipswitch name="International character set" tag=":DIPSW1" mask="224">
+			<diplocation name="SW 1" number="6" inverted="yes"/>
+			<diplocation name="SW 1" number="7" inverted="yes"/>
+			<diplocation name="SW 1" number="8" inverted="yes"/>
+			<dipvalue name="USA" value="224" default="yes"/>
+			<dipvalue name="France" value="96"/>
+			<dipvalue name="Germany" value="160"/>
+			<dipvalue name="UK" value="32"/>
+			<dipvalue name="Denmark" value="192"/>
+			<dipvalue name="Sweden" value="64"/>
+			<dipvalue name="Italy" value="128"/>
+			<dipvalue name="Spain" value="0"/>
+		</dipswitch>
+		<dipswitch name="Page length" tag=":DIPSW2" mask="1">
+			<diplocation name="SW 2" number="1" inverted="yes"/>
+			<dipvalue name="11&quot;" value="0" default="yes"/>
+			<dipvalue name="12&quot;" value="1"/>
+		</dipswitch>
+		<dipswitch name="Cut-sheet feeder mode" tag=":DIPSW2" mask="2">
+			<diplocation name="SW 2" number="2" inverted="yes"/>
+			<dipvalue name="Off" value="0" default="yes"/>
+			<dipvalue name="On" value="2"/>
+		</dipswitch>
+		<dipswitch name="Skip over perforation" tag=":DIPSW2" mask="4">
+			<diplocation name="SW 2" number="3" inverted="yes"/>
+			<dipvalue name="Off" value="0" default="yes"/>
+			<dipvalue name="1&quot;" value="4"/>
+		</dipswitch>
+		<dipswitch name="Auto line feed" tag=":DIPSW2" mask="8">
+			<diplocation name="SW 2" number="4" inverted="yes"/>
+			<dipvalue name="Off" value="0" default="yes"/>
+			<dipvalue name="On" value="8"/>
+		</dipswitch>
+	</machine>
+	<machine name="lx810l" sourcefile="devices/bus/centronics/epson_lx810l.cpp" isdevice="yes" runnable="no">
+		<description>Epson LX-810L</description>
+		<rom name="lx810l.ic3c" size="32768" crc="a66454e1" sha1="8e6f2f98abcbd8af6e34b9ba746edf0d18aef843" region="maincpu" offset="0"/>
+		<rom name="at93c06" size="32" status="nodump" region="eeprom" offset="0"/>
+		<device_ref tag=":_tmp:maincpu" name="upd7810"/>
+		<device_ref tag=":_tmp:speaker" name="speaker"/>
+		<device_ref tag=":_tmp:dac" name="dac"/>
+		<device_ref tag=":_tmp:e05a30" name="e05a30"/>
+		<device_ref tag=":_tmp:eeprom" name="93c06_16"/>
+		<device_ref tag=":_tmp:bitmap_printer" name="bitmap_printer"/>
+		<device_ref tag=":_tmp:bitmap_printer:screen" name="screen"/>
+		<device_ref tag=":_tmp:bitmap_printer:pf_stepper" name="stepper"/>
+		<device_ref tag=":_tmp:bitmap_printer:cr_stepper" name="stepper"/>
+		<chip type="cpu" tag=":maincpu" name="NEC uPD7810" clock="14745600"/>
+		<chip type="audio" tag=":speaker" name="Speaker"/>
+		<chip type="audio" tag=":dac" name="1-Bit DAC"/>
+		<display tag=":bitmap_printer:screen" type="raster" rotate="0" width="1024" height="384" refresh="60.000000" />
+		<sound channels="1"/>
+		<input players="1">
+			<control type="keyboard" buttons="6"/>
+		</input>
+		<dipswitch name="Character spacing" tag=":DIPSW1" mask="1">
+			<diplocation name="SW 1" number="1" inverted="yes"/>
+			<dipvalue name="10 cpi" value="0" default="yes"/>
+			<dipvalue name="12 cpi" value="1"/>
+		</dipswitch>
+		<dipswitch name="Shape of zero" tag=":DIPSW1" mask="2">
+			<diplocation name="SW 1" number="2" inverted="yes"/>
+			<dipvalue name="Not slashed" value="0" default="yes"/>
+			<dipvalue name="Slashed" value="2"/>
+		</dipswitch>
+		<dipswitch name="Page length" tag=":DIPSW1" mask="12">
+			<diplocation name="SW 1" number="3" inverted="yes"/>
+			<diplocation name="SW 1" number="4" inverted="yes"/>
+			<dipvalue name="8.5&quot;" value="8"/>
+			<dipvalue name="11&quot;" value="0" default="yes"/>
+			<dipvalue name="11.7&quot; (A4)" value="12"/>
+			<dipvalue name="12&quot;" value="4"/>
+		</dipswitch>
+		<dipswitch name="Character table" tag=":DIPSW1" mask="16">
+			<diplocation name="SW 1" number="5" inverted="yes"/>
+			<dipvalue name="Italics" value="0" default="yes"/>
+			<dipvalue name="Graphics" value="16"/>
+		</dipswitch>
+		<dipswitch name="International character set" tag=":DIPSW1" mask="224">
+			<diplocation name="SW 1" number="6" inverted="yes"/>
+			<diplocation name="SW 1" number="7" inverted="yes"/>
+			<diplocation name="SW 1" number="8" inverted="yes"/>
+			<dipvalue name="USA (PC 437)" value="224" default="yes"/>
+			<dipvalue name="France (PC 850)" value="96"/>
+			<dipvalue name="Germany (PC 860)" value="160"/>
+			<dipvalue name="UK (PC 863)" value="32"/>
+			<dipvalue name="Denmark (PC 865)" value="192"/>
+			<dipvalue name="Sweden (PC 437)" value="64"/>
+			<dipvalue name="Italy (PC 437)" value="128"/>
+			<dipvalue name="Spain (PC 437)" value="0"/>
+		</dipswitch>
+		<dipswitch name="Short tear-off" tag=":DIPSW2" mask="1">
+			<diplocation name="SW 2" number="1" inverted="yes"/>
+			<dipvalue name="Invalid" value="1" default="yes"/>
+			<dipvalue name="Valid" value="0"/>
+		</dipswitch>
+		<dipswitch name="Cut-sheet feeder mode" tag=":DIPSW2" mask="2">
+			<diplocation name="SW 2" number="2" inverted="yes"/>
+			<dipvalue name="Off" value="0" default="yes"/>
+			<dipvalue name="On" value="2"/>
+		</dipswitch>
+		<dipswitch name="Skip over perforation" tag=":DIPSW2" mask="4">
+			<diplocation name="SW 2" number="3" inverted="yes"/>
+			<dipvalue name="Off" value="0" default="yes"/>
+			<dipvalue name="1&quot;" value="4"/>
+		</dipswitch>
+		<dipswitch name="Auto line feed" tag=":DIPSW2" mask="8">
+			<diplocation name="SW 2" number="4" inverted="yes"/>
+			<dipvalue name="Off" value="0" default="yes"/>
+			<dipvalue name="On" value="8"/>
+		</dipswitch>
+		<configuration name="Draw Inch Marks" tag=":bitmap_printer:DRAWMARKS" mask="3">
+			<confsetting name="Off" value="0"/>
+			<confsetting name="with marks" value="1"/>
+			<confsetting name="with numbers" value="2" default="yes"/>
+		</configuration>
+		<adjuster name="Printer Bottom Margin" default="18"/>
+		<adjuster name="Printer Top Margin" default="18"/>
+	</machine>
+	<machine name="mz1p16" sourcefile="devices/bus/centronics/mz1p16.cpp" isdevice="yes" runnable="no">
+		<description>Sharp MZ-1P16 Plotter Printer</description>
+		<rom name="m5m8050h-059p.ic1" size="4096" crc="beb12a84" sha1="2e059c2f7d653294c77fe8e1a37436b4c028e122" region="mcu" offset="0"/>
+		<device_ref tag=":_tmp:mcu" name="i8050"/>
+		<device_ref tag=":_tmp:buffer" name="input_buffer"/>
+		<chip type="cpu" tag=":mcu" name="Intel 8050" clock="6000000"/>
+		<feature type="printer" status="unemulated"/>
+	</machine>
+	<machine name="nlq401" sourcefile="devices/bus/centronics/nlq401.cpp" isdevice="yes" runnable="no">
+		<description>Schneider NLQ 401 Matrix Printer</description>
+		<rom name="schneider_nlq401_rev004.bin" size="16384" crc="5c331aed" sha1="b6374abaebb8e484e573caa21b1cc87f1554c8d6" region="prom" offset="0"/>
+		<device_ref tag=":_tmp:mcu" name="upd7810"/>
+		<device_ref tag=":_tmp:inpexp" name="tms1025"/>
+		<device_ref tag=":_tmp:outexp" name="tms1025"/>
+		<chip type="cpu" tag=":mcu" name="NEC uPD7810" clock="11000000"/>
+		<dipswitch name="DIP28" tag=":P2" mask="2">
+			<diplocation name="SW2" number="8"/>
+			<dipvalue name="Off" value="2" default="yes"/>
+			<dipvalue name="On" value="0"/>
+		</dipswitch>
+		<dipswitch name="DIP27" tag=":P2" mask="4">
+			<diplocation name="SW2" number="7"/>
+			<dipvalue name="Off" value="4" default="yes"/>
+			<dipvalue name="On" value="0"/>
+		</dipswitch>
+		<dipswitch name="DIP16" tag=":P2" mask="8">
+			<diplocation name="SW1" number="3"/>
+			<dipvalue name="Off" value="8" default="yes"/>
+			<dipvalue name="On" value="0"/>
+		</dipswitch>
+		<dipswitch name="DIP17" tag=":P3" mask="1">
+			<diplocation name="SW1" number="2"/>
+			<dipvalue name="Off" value="1" default="yes"/>
+			<dipvalue name="On" value="0"/>
+		</dipswitch>
+		<dipswitch name="DIP18" tag=":P3" mask="2">
+			<diplocation name="SW1" number="1"/>
+			<dipvalue name="Off" value="2" default="yes"/>
+			<dipvalue name="On" value="0"/>
+		</dipswitch>
+		<dipswitch name="DIP26" tag=":P3" mask="4">
+			<diplocation name="SW2" number="6"/>
+			<dipvalue name="Off" value="4" default="yes"/>
+			<dipvalue name="On" value="0"/>
+		</dipswitch>
+		<dipswitch name="DIP25" tag=":P3" mask="8">
+			<diplocation name="SW2" number="5"/>
+			<dipvalue name="Off" value="8" default="yes"/>
+			<dipvalue name="On" value="0"/>
+		</dipswitch>
+		<dipswitch name="DIP24" tag=":P4" mask="1">
+			<diplocation name="SW2" number="4"/>
+			<dipvalue name="Off" value="1" default="yes"/>
+			<dipvalue name="On" value="0"/>
+		</dipswitch>
+		<dipswitch name="DIP23" tag=":P4" mask="2">
+			<diplocation name="SW2" number="3"/>
+			<dipvalue name="Off" value="2" default="yes"/>
+			<dipvalue name="On" value="0"/>
+		</dipswitch>
+		<dipswitch name="DIP22" tag=":P4" mask="4">
+			<diplocation name="SW2" number="2"/>
+			<dipvalue name="Off" value="4" default="yes"/>
+			<dipvalue name="On" value="0"/>
+		</dipswitch>
+		<dipswitch name="DIP21" tag=":P4" mask="8">
+			<diplocation name="SW2" number="1"/>
+			<dipvalue name="Off" value="8" default="yes"/>
+			<dipvalue name="On" value="0"/>
+		</dipswitch>
+		<dipswitch name="DIP11" tag=":SW1" mask="1">
+			<diplocation name="SW1" number="8"/>
+			<dipvalue name="Off" value="1" default="yes"/>
+			<dipvalue name="On" value="0"/>
+		</dipswitch>
+		<dipswitch name="DIP12" tag=":SW1" mask="2">
+			<diplocation name="SW1" number="7"/>
+			<dipvalue name="Off" value="2" default="yes"/>
+			<dipvalue name="On" value="0"/>
+		</dipswitch>
+		<dipswitch name="DIP13" tag=":SW1" mask="4">
+			<diplocation name="SW1" number="6"/>
+			<dipvalue name="Off" value="4" default="yes"/>
+			<dipvalue name="On" value="0"/>
+		</dipswitch>
+		<dipswitch name="DIP14" tag=":SW1" mask="8">
+			<diplocation name="SW1" number="5"/>
+			<dipvalue name="Off" value="8" default="yes"/>
+			<dipvalue name="On" value="0"/>
+		</dipswitch>
+		<dipswitch name="DIP15" tag=":SW1" mask="16">
+			<diplocation name="SW1" number="4"/>
+			<dipvalue name="Off" value="16" default="yes"/>
+			<dipvalue name="On" value="0"/>
+		</dipswitch>
+		<feature type="printer" status="unemulated"/>
+	</machine>
+	<machine name="p72" sourcefile="devices/bus/centronics/nec_p72.cpp" isdevice="yes" runnable="no">
+		<description>NEC PinWriter P72</description>
+		<rom name="p72.2c" size="1048576" crc="2bc6846f" sha1="10430f1d3b73ad413d77053515d9d53831a1341b" region="maincpu" offset="0"/>
+		<device_ref tag=":_tmp:maincpu" name="v33"/>
+		<chip type="cpu" tag=":maincpu" name="NEC V33" clock="8000000"/>
+	</machine>
+	<machine name="sensorboard" sourcefile="devices/machine/sensorboard.cpp" isdevice="yes" runnable="no">
+		<description>Sensorboard</description>
+		<configuration name="Remember Position" tag=":CONF" mask="3">
+			<condition tag="UI_CHECK" mask="4" relation="ne" value="0"/>
+			<confsetting name="No" value="1"/>
+			<confsetting name="Yes" value="2"/>
+			<confsetting name="Auto" value="0" default="yes"/>
+		</configuration>
+		<configuration name="Show Pieces" tag=":CONF" mask="4">
+			<condition tag="UI_CHECK" mask="4" relation="ne" value="0"/>
+			<confsetting name="No" value="4"/>
+			<confsetting name="Yes" value="0" default="yes"/>
+		</configuration>
+	</machine>
+	<machine name="stepper" sourcefile="devices/machine/steppers.cpp" isdevice="yes" runnable="no">
+		<description>Stepper Motor</description>
+	</machine>
+	<machine name="tasc_sb30" sourcefile="devices/machine/smartboard.cpp" isdevice="yes" runnable="no">
+		<description>Tasc SmartBoard SB30</description>
+		<device_ref tag=":_tmp:board" name="sensorboard"/>
+		<configuration name="Duplicate Piece IDs" tag=":CONF" mask="1">
+			<confsetting name="No" value="0" default="yes"/>
+			<confsetting name="Yes" value="1"/>
+		</configuration>
+		<configuration name="Remember Position" tag=":board:CONF" mask="3">
+			<condition tag="UI_CHECK" mask="4" relation="ne" value="0"/>
+			<confsetting name="No" value="1"/>
+			<confsetting name="Yes" value="2"/>
+			<confsetting name="Auto" value="0" default="yes"/>
+		</configuration>
+		<configuration name="Show Pieces" tag=":board:CONF" mask="4">
+			<condition tag="UI_CHECK" mask="4" relation="ne" value="0"/>
+			<confsetting name="No" value="4"/>
+			<confsetting name="Yes" value="0" default="yes"/>
+		</configuration>
+	</machine>
+	<machine name="tms1025" sourcefile="devices/machine/tms1024.cpp" isdevice="yes" runnable="no">
+		<description>TMS1025 I/O Expander</description>
+	</machine>
+	<machine name="upd7810" sourcefile="devices/cpu/upd7810/upd7810.cpp" isdevice="yes" runnable="no">
+		<description>NEC uPD7810</description>
+	</machine>
+	<machine name="v33" sourcefile="devices/cpu/nec/nec.cpp" isdevice="yes" runnable="no">
+		<description>NEC V33</description>
+	</machine>
+	<machine name="vcs_control_port" sourcefile="devices/bus/vcs_ctrl/ctrl.cpp" isdevice="yes" runnable="no">
+		<description>Atari VCS controller port</description>
+	</machine>
+	<machine name="atari_cx85" sourcefile="devices/bus/vcs_ctrl/cx85.cpp" isdevice="yes" runnable="no">
+		<description>Atari CX85 Numeric Keypad</description>
+		<device_ref tag=":_tmp:encoder" name="mm74c923"/>
+		<input players="1">
+			<control type="keypad" buttons="17"/>
+		</input>
+	</machine>
+	<machine name="atari_trakball" sourcefile="devices/bus/vcs_ctrl/trakball.cpp" isdevice="yes" runnable="no">
+		<description>Atari CX22/CX80 Trak-Ball</description>
+		<input players="1">
+			<control type="trackball" buttons="1" minimum="0" maximum="255" sensitivity="80"/>
+		</input>
+	</machine>
+	<machine name="mm74c923" sourcefile="devices/machine/mm74c922.cpp" isdevice="yes" runnable="no">
+		<description>MM74C923 20-Key Encoder</description>
+	</machine>
+	<machine name="vcs_joystick" sourcefile="devices/bus/vcs_ctrl/joystick.cpp" isdevice="yes" runnable="no">
+		<description>Atari / CBM Digital joystick</description>
+		<input players="1">
+			<control type="joy" buttons="1" ways="8"/>
+		</input>
+	</machine>
+	<machine name="vcs_joystick_booster" sourcefile="devices/bus/vcs_ctrl/joybooster.cpp" isdevice="yes" runnable="no">
+		<description>CBS Electronics Booster-Grip Joystick Adaptor</description>
+		<input players="1">
+			<control type="joy" buttons="3" ways="8"/>
+		</input>
+	</machine>
+	<machine name="vcs_keypad" sourcefile="devices/bus/vcs_ctrl/keypad.cpp" isdevice="yes" runnable="no">
+		<description>Atari / CBM Keypad</description>
+		<input players="1">
+			<control type="keypad" buttons="12"/>
+		</input>
+	</machine>
+	<machine name="vcs_lightpen" sourcefile="devices/bus/vcs_ctrl/lightpen.cpp" isdevice="yes" runnable="no">
+		<description>Atari / CBM Light Pen</description>
+		<input players="1">
+			<control type="lightgun" buttons="1" minimum="0" maximum="255" sensitivity="45" keydelta="15"/>
+		</input>
+	</machine>
+	<machine name="vcs_mouse" sourcefile="devices/bus/vcs_ctrl/mouse.cpp" isdevice="yes" runnable="no">
+		<description>Atari / CBM Mouse</description>
+		<input players="1">
+			<control type="mouse" buttons="2" minimum="0" maximum="63" sensitivity="15" keydelta="10" reverse="yes"/>
+		</input>
+	</machine>
+	<machine name="vcs_paddles" sourcefile="devices/bus/vcs_ctrl/paddles.cpp" isdevice="yes" runnable="no">
+		<description>Atari / CBM Dual paddles</description>
+		<input players="2">
+			<control type="paddle" player="1" buttons="1" minimum="0" maximum="255" sensitivity="30" keydelta="20" reverse="yes"/>
+			<control type="paddle" player="2" buttons="1" minimum="0" maximum="255" sensitivity="30" keydelta="20" reverse="yes"/>
+		</input>
+	</machine>
+	<machine name="vcs_wheel" sourcefile="devices/bus/vcs_ctrl/wheel.cpp" isdevice="yes" runnable="no">
+		<description>Atari / CBM Driving Wheel</description>
+		<input players="1">
+			<control type="trackball" buttons="1" minimum="0" maximum="255" sensitivity="40" keydelta="5"/>
+		</input>
 	</machine>
 </mame>
