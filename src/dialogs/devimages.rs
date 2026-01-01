@@ -121,34 +121,31 @@ pub fn entry_popup_menu(
 			unreachable!();
 		};
 
-		let load_image_command = {
+		let load_image_action = {
 			let tag = entry.tag.to_string();
 			Some(Action::LoadImageDialog { tag })
 		};
 
-		let connect_to_socket_command = {
+		let connect_to_socket_action = {
 			let tag = entry.tag.to_string();
 			Some(Action::ConnectToSocketDialog { tag })
 		};
 
-		let unload_command = {
+		let unload_action = {
 			let tag = entry.tag.to_string();
 			Some(Action::UnloadImage { tag })
 		};
 
 		DevicesAndImagesContextMenuInfo {
-			load_image_command: load_image_command
+			load_image_action: load_image_action
 				.as_ref()
 				.map(Action::encode_for_slint)
 				.unwrap_or_default(),
-			connect_to_socket_command: connect_to_socket_command
+			connect_to_socket_action: connect_to_socket_action
 				.as_ref()
 				.map(Action::encode_for_slint)
 				.unwrap_or_default(),
-			unload_command: unload_command
-				.as_ref()
-				.map(Action::encode_for_slint)
-				.unwrap_or_default(),
+			unload_action: unload_action.as_ref().map(Action::encode_for_slint).unwrap_or_default(),
 		}
 	});
 
