@@ -162,7 +162,7 @@ pub fn entry_popup_menu(
 
 		let unload_action = {
 			let tag = entry.tag.to_string();
-			Some(Action::UnloadImage { tag })
+			Some(Action::LoadImage { tag, image_desc: None })
 		};
 		let unload_action = unload_action.as_ref().map(Action::encode_for_slint).unwrap_or_default();
 

@@ -10,6 +10,7 @@ use strum::EnumProperty;
 use strum::IntoStaticStr;
 
 use crate::dialogs::seqpoll::SeqPollDialogType;
+use crate::imagedesc::ImageDesc;
 use crate::prefs::BuiltinCollection;
 use crate::prefs::PrefsCollection;
 use crate::prefs::PrefsItem;
@@ -99,8 +100,9 @@ pub enum Action {
 	LoadImageDialog {
 		tag: String,
 	},
-	UnloadImage {
+	LoadImage {
 		tag: String,
+		image_desc: Option<ImageDesc>,
 	},
 	ConnectToSocketDialog {
 		tag: String,

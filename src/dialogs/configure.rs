@@ -284,8 +284,8 @@ fn context_menu_command(state: &Rc<State>, command: Action) {
 			};
 			spawn_local(fut).unwrap();
 		}
-		Action::UnloadImage { tag } => {
-			state.set_image_imagedesc(tag, None);
+		Action::LoadImage { tag, image_desc } => {
+			state.set_image_imagedesc(tag, image_desc);
 		}
 		Action::Launch(path) => {
 			let _ = open::that(path);
