@@ -1380,8 +1380,12 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 			};
 			spawn_local(fut).unwrap();
 		}
-		Action::UnloadImage { tag } => {
-			model.issue_command(MameCommand::unload_image(&tag));
+		Action::LoadImage { tag, image_desc } => {
+			if let Some(image_desc) = image_desc {
+				model.issue_command(MameCommand::load_image(tag, &image_desc));
+			} else {
+				model.issue_command(MameCommand::unload_image(&tag));
+			}
 		}
 		Action::ConnectToSocketDialog { tag } => {
 			let model_clone = model.clone();

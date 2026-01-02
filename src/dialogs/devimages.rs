@@ -142,8 +142,9 @@ pub fn entry_popup_menu(
 			.into_iter()
 			.map(|spi| {
 				let title = spi.port_name.to_shared_string();
-				let image_desc = ImageDesc::File(spi.port_name.into());
-				let action = Action::from(MameCommand::load_image(entry.tag, &image_desc));
+				let tag = entry.tag.to_string();
+				let image_desc = Some(ImageDesc::File(spi.port_name.into()));
+				let action = Action::LoadImage { tag, image_desc };
 				let action = Action::encode_for_slint(&action);
 				SimpleMenuEntry { title, action }
 			})
@@ -162,7 +163,7 @@ pub fn entry_popup_menu(
 
 		let unload_action = {
 			let tag = entry.tag.to_string();
-			Some(Action::UnloadImage { tag })
+			Some(Action::LoadImage { tag, image_desc: None })
 		};
 		let unload_action = unload_action.as_ref().map(Action::encode_for_slint).unwrap_or_default();
 
