@@ -1,4 +1,3 @@
-use serialport::available_ports;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
 use slint::LogicalPosition;
@@ -6,7 +5,6 @@ use slint::ModelRc;
 use slint::ToSharedString;
 use slint::VecModel;
 use tokio::sync::mpsc;
-use tracing::error;
 
 use crate::action::Action;
 use crate::channel::Channel;
@@ -16,6 +14,7 @@ use crate::devimageconfig::ListSlots;
 use crate::dialogs::SenderExt;
 use crate::guiutils::modal::ModalStack;
 use crate::imagedesc::ImageDesc;
+use crate::imagedesc::available_ports;
 use crate::models::devimages::DevicesAndImagesModel;
 use crate::runtime::command::MameCommand;
 use crate::status::Status;
@@ -137,8 +136,6 @@ pub fn entry_popup_menu(
 			.unwrap_or_default();
 
 		let connect_to_serial_port_actions = available_ports()
-			.inspect_err(|e| error!("Failed to get available ports: {}", e))
-			.unwrap_or_default()
 			.into_iter()
 			.map(|spi| {
 				let title = spi.port_name.to_shared_string();
