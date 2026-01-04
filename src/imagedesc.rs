@@ -8,6 +8,7 @@ use serde::Serialize;
 use serde::de::Visitor;
 use serde::de::value::MapAccessDeserializer;
 use smol_str::SmolStr;
+use tracing::warn;
 
 use crate::software::is_valid_software_list_name;
 
@@ -57,6 +58,7 @@ impl ImageDesc {
 	pub fn validate(&self) -> Result<()> {
 		if let Self::File(filename) = self
 			&& !Path::new(filename).is_file()
+			&& available_ports().iter().all(|p| p.port_name != *filename)
 		{
 			let error = ThisError::FileNotFound(filename.to_string());
 			return Err(error.into());
@@ -119,6 +121,13 @@ fn socket(hostname: impl Into<SmolStr>, port: u16) -> Result<ImageDesc, ThisErro
 	}
 
 	Ok(ImageDesc::Socket { hostname, port })
+}
+
+/// Simple wrapper around serialport::available_ports() that logs errors
+pub fn available_ports() -> Vec<serialport::SerialPortInfo> {
+	serialport::available_ports()
+		.inspect_err(|e| warn!("Failed to get available ports: {}", e))
+		.unwrap_or_default()
 }
 
 #[derive(Debug, Serialize, Deserialize)]
