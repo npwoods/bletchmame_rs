@@ -31,9 +31,7 @@ use crate::console::Console;
 use crate::console::EmitType;
 use crate::job::Job;
 use crate::platform::CommandExt;
-use crate::prefs::PrefsPaths;
 use crate::runtime::MameStderr;
-use crate::runtime::MameWindowing;
 use crate::runtime::args::MameArguments;
 use crate::runtime::command::MameCommand;
 use crate::status::Update;
@@ -73,8 +71,7 @@ enum MameEvent {
 }
 
 pub fn spawn_mame_session_thread(
-	prefs_paths: &PrefsPaths,
-	mame_windowing: &MameWindowing,
+	mame_args: MameArguments,
 	mame_stderr: MameStderr,
 	console: Arc<Mutex<Option<Console>>>,
 	callback: Rc<dyn Fn(Action) + 'static>,
@@ -91,7 +88,6 @@ pub fn spawn_mame_session_thread(
 		})
 		.unwrap();
 	};
-	let mame_args = MameArguments::new(prefs_paths, mame_windowing);
 	let (sender, receiver) = channel();
 
 	let job = Job::new(move || execute_mame(&mame_args, &receiver, &event_callback, mame_stderr, console.as_ref()));

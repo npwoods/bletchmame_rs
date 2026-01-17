@@ -76,6 +76,7 @@ use crate::dialogs::socket::dialog_connect_to_socket;
 use crate::dialogs::stopwarning::StopWarningResult;
 use crate::dialogs::stopwarning::dialog_stop_warning;
 use crate::dialogs::switches::dialog_switches;
+use crate::dialogs::video::dialog_video;
 use crate::guiutils::is_context_menu_event;
 use crate::guiutils::modal::ModalStack;
 use crate::history::History;
@@ -90,6 +91,8 @@ use crate::prefs::SortOrder;
 use crate::prefs::pathtype::PathType;
 use crate::runtime::MameStderr;
 use crate::runtime::MameWindowing;
+use crate::runtime::args::MameArguments;
+use crate::runtime::args::MameArgumentsResult;
 use crate::runtime::command::MameCommand;
 use crate::runtime::command::MovieFormat;
 use crate::selection::SelectionManager;
@@ -107,6 +110,7 @@ use crate::ui::ListItem;
 use crate::ui::ReportIssue;
 use crate::ui::SearchBarItem;
 use crate::ui::SimpleMenuEntry;
+use crate::ui::VideoSettings;
 use crate::version::MameVersion;
 
 const SOUND_ATTENUATION_OFF: i32 = -32;
@@ -164,6 +168,7 @@ struct AppModel {
 	state: RefCell<AppState>,
 	status_changed_channel: Channel<Status>,
 	child_window: RefCell<Option<ChildWindow>>,
+	mame_windowing: MameWindowing,
 	history_loader: RefCell<Option<HistoryLoader>>,
 	searchbar_actions: RefCell<Vec<SharedString>>,
 }
@@ -213,7 +218,8 @@ impl AppModel {
 
 		// update the state (unless we're new)
 		if old_prefs.is_some() {
-			self.update_state(|state| state.update_paths(&prefs.paths));
+			let mame_args_result = MameArguments::new(&prefs, &self.mame_windowing, false);
+			self.update_state(|state| state.update_mame_args_result(mame_args_result));
 		}
 
 		// react to all of the possible changes
@@ -398,6 +404,11 @@ impl AppModel {
 			.map(|r| format!("{}.{}", r.machine_name, extension))
 	}
 
+	pub fn make_mame_args(&self) -> MameArgumentsResult {
+		let prefs = self.preferences.borrow();
+		MameArguments::new(&prefs, &self.mame_windowing, false)
+	}
+
 	pub fn maybe_stop_warning(self: &Rc<Self>, f: impl FnOnce(&Rc<Self>) + 'static) {
 		let model = self.clone();
 		let show_warning = model.preferences.borrow().show_stop_warning;
@@ -480,6 +491,19 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	// create the window stack
 	let modal_stack = ModalStack::new(args.backend_runtime.clone(), app_window);
 
+	// create the child window
+	let (child_window, mame_windowing) = match args.mame_windowing {
+		AppWindowing::Integrated => {
+			let parent = app_window.window();
+			let child_window = args.backend_runtime.create_child_window(parent).await.unwrap();
+			let child_window_text = child_window.text();
+			(Some(child_window), MameWindowing::Attached(child_window_text.into()))
+		}
+		AppWindowing::Windowed => (None, MameWindowing::Windowed),
+		AppWindowing::WindowedMaximized => (None, MameWindowing::WindowedMaximized),
+		AppWindowing::Fullscreen => (None, MameWindowing::Fullscreen),
+	};
+
 	// create the model
 	let model = AppModel {
 		app_window_weak: app_window.as_weak(),
@@ -488,7 +512,8 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		preferences: RefCell::new(Preferences::default()),
 		state: RefCell::new(AppState::bogus()),
 		status_changed_channel: Channel::default(),
-		child_window: RefCell::new(None),
+		child_window: RefCell::new(child_window),
+		mame_windowing,
 		history_loader: RefCell::new(None),
 		searchbar_actions: RefCell::new([].into()),
 	};
@@ -808,6 +833,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		app_window.set_menu_action_settings_input_misc(SettingsInput(InputClass::Misc).encode_for_slint());
 		app_window.set_menu_action_settings_input_config(SettingsInput(InputClass::Config).encode_for_slint());
 		app_window.set_menu_action_settings_input_dipswitch(SettingsInput(InputClass::DipSwitch).encode_for_slint());
+		app_window.set_menu_action_settings_video(SettingsVideo.encode_for_slint());
 		app_window.set_menu_action_settings_paths(SettingsPaths(None).encode_for_slint());
 		app_window.set_menu_action_settings_reset(SettingsReset.encode_for_slint());
 		app_window.set_menu_action_settings_import_mame_ini(SettingsImportMameIni.encode_for_slint());
@@ -820,24 +846,10 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	// initial updates
 	model.modify_prefs(|prefs| *prefs = preferences);
 
-	// create the child window
-	let mame_windowing = match args.mame_windowing {
-		AppWindowing::Integrated => {
-			let parent = app_window.window();
-			let child_window = model.backend_runtime.create_child_window(parent).await.unwrap();
-			let child_window_text = child_window.text();
-			model.child_window.replace(Some(child_window));
-			MameWindowing::Attached(child_window_text.into())
-		}
-		AppWindowing::Windowed => MameWindowing::Windowed,
-		AppWindowing::WindowedMaximized => MameWindowing::WindowedMaximized,
-		AppWindowing::Fullscreen => MameWindowing::Fullscreen,
-	};
-
 	// now create the "real initial" state, now that we have a model to work with
-	let paths = model.preferences.borrow().paths.clone();
+	let mame_args_result = model.make_mame_args();
 	let model_weak = Rc::downgrade(&model);
-	let state = AppState::new(prefs_path, paths, mame_windowing, args.mame_stderr, move |action| {
+	let state = AppState::new(prefs_path, mame_args_result, args.mame_stderr, move |action| {
 		let model = model_weak.upgrade().unwrap();
 		handle_action(&model, action);
 	});
@@ -1163,6 +1175,26 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 					model.clone().spawn_maybe_pause(fut);
 				}
 			};
+		}
+		Action::SettingsVideo => {
+			let model_clone = model.clone();
+			let fut = async move {
+				let modal_stack = model_clone.modal_stack.clone();
+				let old_settings = {
+					let prefs = model_clone.preferences.borrow();
+					VideoSettings {
+						prescale: prefs.prescale.into(),
+						extra_mame_arguments: prefs.extra_mame_arguments.to_shared_string(),
+					}
+				};
+				if let Some(new_settings) = dialog_video(modal_stack, old_settings).await {
+					model_clone.modify_prefs(|prefs| {
+						prefs.prescale = new_settings.prescale.try_into().unwrap();
+						prefs.extra_mame_arguments = new_settings.extra_mame_arguments.as_str().trim().into();
+					});
+				}
+			};
+			model.clone().spawn_maybe_pause(fut);
 		}
 		Action::SettingsPaths(path_type) => {
 			let fut = show_paths_dialog(model.clone(), path_type);

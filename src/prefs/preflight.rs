@@ -10,6 +10,7 @@ use crate::prefs::PreflightProblem;
 pub fn preflight_checks<T>(
 	mame_executable_path: Option<&Path>,
 	plugins_path_iter: impl Iterator<Item = T>,
+	skip_file_system_checks: bool,
 ) -> Vec<PreflightProblem>
 where
 	T: AsRef<Path>,
@@ -18,12 +19,13 @@ where
 
 	// MAME executable preflights
 	if let Some(mame_executable_path) = mame_executable_path {
-		let mame_executable_path = Path::new(mame_executable_path);
-		let metadata = metadata(mame_executable_path);
-		if metadata.is_err() {
-			problems.push(PreflightProblem::NoMameExecutable);
-		} else if metadata.is_ok_and(|x| !x.is_file()) || !mame_executable_path.is_executable() {
-			problems.push(PreflightProblem::MameExecutableIsNotExecutable);
+		if !skip_file_system_checks {
+			let metadata = metadata(mame_executable_path);
+			if metadata.is_err() {
+				problems.push(PreflightProblem::NoMameExecutable);
+			} else if metadata.is_ok_and(|x| !x.is_file()) || !mame_executable_path.is_executable() {
+				problems.push(PreflightProblem::MameExecutableIsNotExecutable);
+			}
 		}
 	} else {
 		problems.push(PreflightProblem::NoMameExecutablePath)
@@ -31,9 +33,11 @@ where
 
 	// plugins preflights
 	let plugins_paths = plugins_path_iter
-		.filter(|path| metadata(path).is_ok_and(|m| m.is_dir()))
+		.filter(|path| skip_file_system_checks || metadata(path).is_ok_and(|m| m.is_dir()))
 		.collect::<Vec<_>>();
-	if !plugins_paths.is_empty() {
+	if plugins_paths.is_empty() {
+		problems.push(PreflightProblem::NoPluginsPaths);
+	} else if !skip_file_system_checks {
 		let mut found_boot = false;
 		let mut found_worker_ui = false;
 		for path in plugins_paths {
@@ -53,8 +57,6 @@ where
 		if !found_worker_ui {
 			problems.push(PreflightProblem::WorkerUiPluginNotFound);
 		}
-	} else {
-		problems.push(PreflightProblem::NoPluginsPaths);
 	}
 
 	info!(problems=?problems, "preflight_checks()");

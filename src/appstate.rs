@@ -12,7 +12,6 @@ use slint::invoke_from_event_loop;
 use smol_str::SmolStr;
 use smol_str::ToSmolStr;
 use smol_str::format_smolstr;
-use strum::VariantArray;
 use throttle::Throttle;
 
 use crate::action::Action;
@@ -21,10 +20,9 @@ use crate::console::Console;
 use crate::info::InfoDb;
 use crate::job::Job;
 use crate::prefs::PreflightProblem;
-use crate::prefs::PrefsPaths;
-use crate::prefs::pathtype::PathType;
 use crate::runtime::MameStderr;
-use crate::runtime::MameWindowing;
+use crate::runtime::args::MameArguments;
+use crate::runtime::args::MameArgumentsResult;
 use crate::runtime::command::MameCommand;
 use crate::runtime::session::spawn_mame_session_thread;
 use crate::status::Status;
@@ -39,7 +37,7 @@ use crate::runtime::session::Result as SessionResult;
 
 #[derive(Clone)]
 pub struct AppState {
-	paths: Rc<PrefsPaths>,
+	mame_args_result: MameArgumentsResult,
 	info_db_build: Option<InfoDbBuild>,
 	live: Option<Live>,
 	failure: Option<Rc<Failure>>,
@@ -70,13 +68,13 @@ struct Session {
 	command_sender: Option<Arc<Sender<MameCommand>>>,
 	status: Option<Rc<Status>>,
 	pending_status: Option<Rc<Status>>,
-	pending_paths_update: Option<Rc<PrefsPaths>>,
+	pending_mame_args_result_update: Option<MameArgumentsResult>,
 	pending_restart: bool,
 }
 
 #[derive(Debug)]
 enum Failure {
-	Preflight(Vec<PreflightProblem>),
+	Preflight(Rc<[PreflightProblem]>),
 	SessionError(SessionError),
 	StatusValidationProblem(ValidationError),
 	InfoDbBuild(Error),
@@ -85,7 +83,6 @@ enum Failure {
 
 struct Fixed {
 	prefs_path: PathBuf,
-	mame_windowing: MameWindowing,
 	mame_stderr: MameStderr,
 	console: Arc<Mutex<Option<Console>>>,
 	callback: CommandCallback,
@@ -120,8 +117,7 @@ impl AppState {
 	/// Creates an initial `AppState`
 	pub fn new(
 		prefs_path: PathBuf,
-		paths: Rc<PrefsPaths>,
-		mame_windowing: MameWindowing,
+		mame_args_result: MameArgumentsResult,
 		mame_stderr: MameStderr,
 		callback: impl Fn(Action) + 'static,
 	) -> Self {
@@ -129,14 +125,13 @@ impl AppState {
 		let callback = Rc::from(callback);
 		let fixed = Fixed {
 			prefs_path,
-			mame_windowing,
 			mame_stderr,
 			console,
 			callback,
 		};
 		let fixed = Rc::new(fixed);
 		Self {
-			paths,
+			mame_args_result,
 			info_db_build: None,
 			live: None,
 			failure: None,
@@ -150,8 +145,7 @@ impl AppState {
 	pub fn bogus() -> Self {
 		Self::new(
 			"".into(),
-			Rc::new(PrefsPaths::default()),
-			MameWindowing::Attached("".into()),
+			Ok(MameArguments::default()),
 			MameStderr::Capture,
 			|_| unreachable!(),
 		)
@@ -165,21 +159,23 @@ impl AppState {
 
 		// get or load the InfoDb
 		let info_db = self.info_db().cloned().or_else(|| {
-			self.paths
-				.as_ref()
-				.mame_executable
-				.as_deref()
-				.and_then(|mame_executable_path| InfoDb::load(&self.fixed.prefs_path, mame_executable_path).ok())
-				.map(Rc::new)
+			let mame_executable_path = self.mame_args_result.as_ref().as_ref().ok()?.program.as_str();
+			let info_db = InfoDb::load(&self.fixed.prefs_path, mame_executable_path).ok()?;
+			Some(Rc::new(info_db))
 		});
 
 		if let Some(info_db) = info_db {
-			let preflight_problems = self.paths.preflight();
-			let session = preflight_problems.is_empty().then(|| self.start_session());
+			let (session, failure) = match self.mame_args_result.clone() {
+				Ok(mame_args) => {
+					let session = self.start_session(mame_args);
+					(Some(session), None)
+				}
+				Err(e) => {
+					let failure = Rc::new(Failure::Preflight(e.preflight_problems));
+					(None, Some(failure))
+				}
+			};
 
-			let failure = session
-				.is_none()
-				.then(|| Rc::new(Failure::Preflight(preflight_problems)));
 			let new_state = Self {
 				live: Some(Live { info_db, session }),
 				failure,
@@ -192,10 +188,9 @@ impl AppState {
 		}
 	}
 
-	fn start_session(&self) -> Session {
+	fn start_session(&self, mame_args: MameArguments) -> Session {
 		let (job, command_sender) = spawn_mame_session_thread(
-			self.paths.as_ref(),
-			&self.fixed.mame_windowing,
+			mame_args,
 			self.fixed.mame_stderr,
 			self.fixed.console.clone(),
 			self.fixed.callback.clone(),
@@ -206,7 +201,7 @@ impl AppState {
 			command_sender,
 			status: None,
 			pending_status: None,
-			pending_paths_update: None,
+			pending_mame_args_result_update: None,
 			pending_restart: false,
 		}
 	}
@@ -216,40 +211,54 @@ impl AppState {
 			return None;
 		}
 
-		// quick run of preflight
-		let preflight_problems = self.paths.preflight();
-		let new_state = if preflight_problems
-			.iter()
-			.any(|x| x.problem_type() == Some(PathType::MameExecutable))
-		{
-			let failure = Failure::Preflight(preflight_problems);
-			let failure = Some(Rc::new(failure));
-			Self {
-				failure,
-				..self.clone()
-			}
-		} else {
-			let prefs_path = &self.fixed.prefs_path;
-			let mame_executable_path = self.paths.mame_executable.as_deref().unwrap();
-			let callback = self.fixed.callback.clone();
-			let (job, canceller) = spawn_infodb_build_thread(prefs_path, mame_executable_path, callback);
-			let info_db_build = InfoDbBuild {
-				job,
-				canceller,
-				machine_description: None,
-			};
-			Self {
-				info_db_build: Some(info_db_build),
-				..self.clone()
+		// access the MAME executable path (or preflight errors if we don't have them)
+		let mame_executable_path_result = match self.mame_args_result.as_ref() {
+			Ok(mame_args) => Ok(mame_args.program.as_str()),
+			Err(e) => {
+				if let Some(program) = &e.program {
+					Ok(program.as_str())
+				} else {
+					Err(&e.preflight_problems)
+				}
 			}
 		};
+
+		// and based on whether we had success or failure, built the new state
+		let new_state = match mame_executable_path_result {
+			Ok(mame_executable_path) => {
+				let prefs_path = &self.fixed.prefs_path;
+				let callback = self.fixed.callback.clone();
+				let (job, canceller) = spawn_infodb_build_thread(prefs_path, mame_executable_path, callback);
+				let info_db_build = InfoDbBuild {
+					job,
+					canceller,
+					machine_description: None,
+				};
+				Self {
+					info_db_build: Some(info_db_build),
+					..self.clone()
+				}
+			}
+
+			Err(preflight_problems) => {
+				assert!(!preflight_problems.is_empty());
+				let preflight_problems = preflight_problems.clone();
+				let failure = Failure::Preflight(preflight_problems);
+				let failure = Some(Rc::new(failure));
+				Self {
+					failure,
+					..self.clone()
+				}
+			}
+		};
+
 		Some(new_state)
 	}
 
-	// update paths and refresh MAME if needed
-	pub fn update_paths(&self, paths: &Rc<PrefsPaths>) -> Option<Self> {
-		if !paths_changes_require_new_session(&self.paths, paths) {
-			// no significant changes? nothing to do
+	// update MAME arguments and refresh MAME if needed
+	pub fn update_mame_args_result(&self, mame_args_result: MameArgumentsResult) -> Option<Self> {
+		if self.mame_args_result == mame_args_result {
+			// no changes? nothing to do
 			return None;
 		}
 
@@ -261,7 +270,7 @@ impl AppState {
 			.map(|(info_db, old_session)| {
 				let new_session = Session {
 					command_sender: None,
-					pending_paths_update: Some(paths.clone()),
+					pending_mame_args_result_update: Some(mame_args_result.clone()),
 					pending_restart: true,
 					..old_session.clone()
 				};
@@ -272,14 +281,14 @@ impl AppState {
 			});
 
 		// create the new state
-		let paths = if live.is_some() {
-			self.paths.clone()
+		let mame_args_result = if live.is_some() {
+			self.mame_args_result.clone()
 		} else {
-			paths.clone()
+			mame_args_result.clone()
 		};
 		let new_state = Self {
 			live,
-			paths,
+			mame_args_result,
 			..self.clone()
 		};
 
@@ -384,7 +393,8 @@ impl AppState {
 					(Some(new_session), failure)
 				} else {
 					// no session; create a new one
-					let session = self.start_session();
+					let mame_args = self.mame_args_result.as_ref().unwrap().clone();
+					let session = self.start_session(mame_args);
 					(Some(session), None)
 				};
 				let new_live = Live {
@@ -494,7 +504,7 @@ impl AppState {
 		};
 
 		// there might be a pending paths update
-		let pending_paths = session.pending_paths_update.as_ref();
+		let pending_mame_args_result = session.pending_mame_args_result_update.as_ref();
 
 		// do we need to restart ourselves afterwards?
 		let pending_restart = session.pending_restart && failure.is_none();
@@ -511,8 +521,8 @@ impl AppState {
 		};
 
 		// apply any pending paths update
-		let new_state = pending_paths
-			.and_then(|paths| new_state.update_paths(paths))
+		let new_state = pending_mame_args_result
+			.and_then(|mame_args_result| new_state.update_mame_args_result(mame_args_result.clone()))
 			.unwrap_or(new_state);
 
 		// if there is a pending restart, kick it off - in any case after this we're done
@@ -599,7 +609,7 @@ impl AppState {
 			(None, _, _, true) => Some(ReportType::ShuttingDown),
 			(None, _, true, false) => Some(ReportType::Resetting),
 			(None, Some(Failure::Preflight(preflight_problems)), false, false) => {
-				Some(ReportType::PreflightFailure(preflight_problems.as_slice()))
+				Some(ReportType::PreflightFailure(preflight_problems.as_ref()))
 			}
 			(None, Some(Failure::SessionError(e)), false, false) => Some(ReportType::SessionError(e)),
 			(None, Some(Failure::StatusValidationProblem(ValidationError::Invalid(e))), false, false) => {
@@ -860,15 +870,6 @@ fn validate_and_update_status(
 	} else {
 		(status.cloned(), pending_status.cloned(), result)
 	}
-}
-
-/// Returns true if changes between the two `PrefsPaths` require a new MAME session
-fn paths_changes_require_new_session(old: &PrefsPaths, new: &PrefsPaths) -> bool {
-	PathType::VARIANTS
-		.iter()
-		.copied()
-		.filter(|&path_type| path_type == PathType::MameExecutable || path_type.mame_argument().is_some())
-		.any(|path_type| old.by_type(path_type) != new.by_type(path_type))
 }
 
 #[cfg(test)]

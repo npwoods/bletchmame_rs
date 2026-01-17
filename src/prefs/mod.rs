@@ -41,39 +41,55 @@ use crate::prefs::preflight::preflight_checks;
 use crate::prefs::var::resolve_path;
 use crate::prefs::var::resolve_paths_string;
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+#[serde(default)]
 pub struct Preferences {
-	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub paths: Rc<PrefsPaths>,
 
-	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub window_size: Option<PrefsSize>,
 
-	#[serde(default)]
 	pub is_fullscreen: bool,
 
-	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub fullscreen_display: Option<SmolStr>,
 
-	#[serde(default)]
+	pub prescale: u8,
+
+	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub extra_mame_arguments: SmolStr,
+
 	pub items_columns: Vec<PrefsColumn>,
 
-	#[serde(default)]
 	pub collections: Vec<Rc<PrefsCollection>>,
 
-	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub history: Vec<HistoryEntry>,
 
-	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub history_position: usize,
 
-	#[serde(default = "default_true")]
 	pub show_stop_warning: bool,
 }
 
-fn default_true() -> bool {
-	true
+impl Default for Preferences {
+	fn default() -> Self {
+		Self {
+			paths: PrefsPaths::default().into(),
+			window_size: None,
+			is_fullscreen: false,
+			fullscreen_display: None,
+			prescale: 1,
+			extra_mame_arguments: "".into(),
+			items_columns: [].into(),
+			collections: [].into(),
+			history: [].into(),
+			history_position: 0,
+			show_stop_warning: true,
+		}
+	}
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -149,11 +165,11 @@ impl PrefsPaths {
 			})
 	}
 
-	pub fn preflight(&self) -> Vec<PreflightProblem> {
+	pub fn preflight(&self, skip_file_system_checks: bool) -> Vec<PreflightProblem> {
 		let mame_executable_path = self.mame_executable.as_ref().and_then(|path| self.resolve(path));
 		let mame_executable_path = mame_executable_path.as_ref().map(|path| path.as_ref());
 		let plugins_path_iter = self.plugins.iter().flat_map(|path| self.resolve(path.as_ref()));
-		preflight_checks(mame_executable_path, plugins_path_iter)
+		preflight_checks(mame_executable_path, plugins_path_iter, skip_file_system_checks)
 	}
 }
 
@@ -185,7 +201,7 @@ fn access_paths(path_type: PathType) -> (fn(&PrefsPaths) -> &[SmolStr], PathsSto
 	}
 }
 
-#[derive(Copy, Clone, Debug, strum::Display, EnumIter, EnumString, EnumProperty)]
+#[derive(Copy, Clone, Debug, strum::Display, EnumIter, EnumString, EnumProperty, PartialEq, Eq)]
 pub enum PreflightProblem {
 	#[strum(to_string = "No MAME executable path specified", props(ProblemType = "MAME Executable"))]
 	NoMameExecutablePath,

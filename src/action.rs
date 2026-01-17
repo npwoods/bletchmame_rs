@@ -54,6 +54,7 @@ pub enum Action {
 
 	// Settings menu
 	SettingsInput(InputClass),
+	SettingsVideo,
 	SettingsPaths(Option<PathType>),
 	SettingsToggleBuiltinCollection(BuiltinCollection),
 	SettingsReset,
