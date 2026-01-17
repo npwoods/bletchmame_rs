@@ -40,6 +40,8 @@ pub enum PathType {
 	Plugins,
 	#[strum(to_string = "MAME Configs", props(MameArgument = "-cfg_directory"))]
 	Cfg,
+	#[strum(to_string = "Hard Drive Differences", props(MameArgument = "-diff_directory"))]
+	Diff,
 	#[strum(to_string = "INI files", props(MameArgument = "-inipath"))]
 	Ini,
 	#[strum(to_string = "NVRAM", props(MameArgument = "-nvram_directory"))]
@@ -75,6 +77,7 @@ impl PathType {
 			| Self::SoftwareLists
 			| Self::Plugins
 			| Self::Cfg
+			| Self::Diff
 			| Self::Ini
 			| Self::Nvram
 			| Self::Cheats => PickType::Dir,

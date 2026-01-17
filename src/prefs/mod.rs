@@ -114,6 +114,9 @@ pub struct PrefsPaths {
 	pub cfg: Option<SmolStr>,
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub diff: Option<SmolStr>,
+
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub inis: Vec<SmolStr>,
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
@@ -190,6 +193,7 @@ fn access_paths(path_type: PathType) -> (fn(&PrefsPaths) -> &[SmolStr], PathsSto
 		PathType::SoftwareLists => ((|x| &x.software_lists), PathsStore::Multiple(|x| &mut x.software_lists)),
 		PathType::Plugins => ((|x| &x.plugins), PathsStore::Multiple(|x| &mut x.plugins)),
 		PathType::Cfg => ((|x| x.cfg.as_slice()), PathsStore::Single(|x| &mut x.cfg)),
+		PathType::Diff => ((|x| x.diff.as_slice()), PathsStore::Single(|x| &mut x.diff)),
 		PathType::Ini => ((|x| &x.inis), PathsStore::Multiple(|x| &mut x.inis)),
 		PathType::Nvram => ((|x| x.nvram.as_slice()), PathsStore::Single(|x| &mut x.nvram)),
 		PathType::Cheats => ((|x| x.cheats.as_slice()), PathsStore::Single(|x| &mut x.cheats)),
@@ -424,6 +428,7 @@ impl Preferences {
 		let mut result = load_prefs_from_reader(json.as_bytes()).unwrap();
 		let result_paths = Rc::get_mut(&mut result.paths).unwrap();
 		result_paths.cfg = prefs_path.clone();
+		result_paths.diff = prefs_path.clone();
 		result_paths.inis = prefs_path.iter().cloned().collect();
 		result_paths.nvram = prefs_path;
 		result
