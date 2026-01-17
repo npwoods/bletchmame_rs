@@ -41,39 +41,48 @@ use crate::prefs::preflight::preflight_checks;
 use crate::prefs::var::resolve_path;
 use crate::prefs::var::resolve_paths_string;
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+#[serde(default)]
 pub struct Preferences {
-	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub paths: Rc<PrefsPaths>,
 
-	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub window_size: Option<PrefsSize>,
 
-	#[serde(default)]
 	pub is_fullscreen: bool,
 
-	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub fullscreen_display: Option<SmolStr>,
 
-	#[serde(default)]
 	pub items_columns: Vec<PrefsColumn>,
 
-	#[serde(default)]
 	pub collections: Vec<Rc<PrefsCollection>>,
 
-	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub history: Vec<HistoryEntry>,
 
-	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub history_position: usize,
 
-	#[serde(default = "default_true")]
 	pub show_stop_warning: bool,
 }
 
-fn default_true() -> bool {
-	true
+impl Default for Preferences {
+	fn default() -> Self {
+		Self {
+			paths: PrefsPaths::default().into(),
+			window_size: None,
+			is_fullscreen: false,
+			fullscreen_display: None,
+			items_columns: [].into(),
+			collections: [].into(),
+			history: [].into(),
+			history_position: 0,
+			show_stop_warning: true,
+		}
+	}
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
