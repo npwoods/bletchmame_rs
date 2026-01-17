@@ -56,6 +56,11 @@ pub struct Preferences {
 	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub fullscreen_display: Option<SmolStr>,
 
+	pub prescale: u8,
+
+	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub extra_mame_arguments: SmolStr,
+
 	pub items_columns: Vec<PrefsColumn>,
 
 	pub collections: Vec<Rc<PrefsCollection>>,
@@ -76,6 +81,8 @@ impl Default for Preferences {
 			window_size: None,
 			is_fullscreen: false,
 			fullscreen_display: None,
+			prescale: 1,
+			extra_mame_arguments: "".into(),
 			items_columns: [].into(),
 			collections: [].into(),
 			history: [].into(),

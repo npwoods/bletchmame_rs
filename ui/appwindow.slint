@@ -114,6 +114,7 @@ export component AppWindow inherits Window {
     in property <string> menu-action-settings-input-misc;
     in property <string> menu-action-settings-input-config;
     in property <string> menu-action-settings-input-dipswitch;
+    in property <string> menu-action-settings-video;
     in property <string> menu-action-settings-paths;
     in property <string> menu-action-settings-reset;
     in property <string> menu-action-settings-import-mame-ini;
@@ -519,6 +520,14 @@ export component AppWindow inherits Window {
             }
 
             MenuSeparator { }
+
+            MenuItem {
+                title: @tr("MenuBar" => "Video...");
+                enabled: mode() == "ready";
+                activated => {
+                    menu-item-action(root.menu-action-settings-video);
+                }
+            }
 
             MenuItem {
                 title: @tr("MenuBar" => "Paths...");

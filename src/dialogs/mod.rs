@@ -16,6 +16,7 @@ pub mod seqpoll;
 pub mod socket;
 pub mod stopwarning;
 pub mod switches;
+pub mod video;
 
 #[ext(SenderExt)]
 impl<T> Sender<T> {

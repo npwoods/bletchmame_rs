@@ -49,8 +49,17 @@ impl MameArguments {
 			MameWindowing::Fullscreen => vec!["-now".into()],
 		};
 
+		// video arguments
+		let video_args = ["-prescale".into(), Cow::Owned(prefs.prescale.to_string())].into_iter();
+
 		// platform specific arguments
 		let platform_args = platform_specific_args().into_iter().map(Cow::Borrowed);
+
+		// extra arguments
+		let extra_mame_arguments = prefs
+			.extra_mame_arguments
+			.split_whitespace()
+			.map(|s| Cow::Owned(OsString::from(s)));
 
 		// assemble all arguments
 		let program = prefs.paths.mame_executable.clone().unwrap();
@@ -59,11 +68,13 @@ impl MameArguments {
 			.map(Cow::Borrowed)
 			.chain(windowing_args)
 			.chain(platform_args)
+			.chain(video_args)
 			.map(|x| match x {
 				Cow::Borrowed(x) => Cow::Borrowed(OsStr::new(x)),
 				Cow::Owned(x) => Cow::Owned(OsString::from(x)),
 			})
 			.chain(path_args)
+			.chain(extra_mame_arguments)
 			.collect::<Arc<[_]>>();
 		Ok(Self { program, args })
 	}

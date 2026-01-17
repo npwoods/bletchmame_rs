@@ -76,6 +76,7 @@ use crate::dialogs::socket::dialog_connect_to_socket;
 use crate::dialogs::stopwarning::StopWarningResult;
 use crate::dialogs::stopwarning::dialog_stop_warning;
 use crate::dialogs::switches::dialog_switches;
+use crate::dialogs::video::dialog_video;
 use crate::guiutils::is_context_menu_event;
 use crate::guiutils::modal::ModalStack;
 use crate::history::History;
@@ -109,6 +110,7 @@ use crate::ui::ListItem;
 use crate::ui::ReportIssue;
 use crate::ui::SearchBarItem;
 use crate::ui::SimpleMenuEntry;
+use crate::ui::VideoSettings;
 use crate::version::MameVersion;
 
 const SOUND_ATTENUATION_OFF: i32 = -32;
@@ -831,6 +833,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		app_window.set_menu_action_settings_input_misc(SettingsInput(InputClass::Misc).encode_for_slint());
 		app_window.set_menu_action_settings_input_config(SettingsInput(InputClass::Config).encode_for_slint());
 		app_window.set_menu_action_settings_input_dipswitch(SettingsInput(InputClass::DipSwitch).encode_for_slint());
+		app_window.set_menu_action_settings_video(SettingsVideo.encode_for_slint());
 		app_window.set_menu_action_settings_paths(SettingsPaths(None).encode_for_slint());
 		app_window.set_menu_action_settings_reset(SettingsReset.encode_for_slint());
 		app_window.set_menu_action_settings_import_mame_ini(SettingsImportMameIni.encode_for_slint());
@@ -1172,6 +1175,26 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 					model.clone().spawn_maybe_pause(fut);
 				}
 			};
+		}
+		Action::SettingsVideo => {
+			let model_clone = model.clone();
+			let fut = async move {
+				let modal_stack = model_clone.modal_stack.clone();
+				let old_settings = {
+					let prefs = model_clone.preferences.borrow();
+					VideoSettings {
+						prescale: prefs.prescale.into(),
+						extra_mame_arguments: prefs.extra_mame_arguments.to_shared_string(),
+					}
+				};
+				if let Some(new_settings) = dialog_video(modal_stack, old_settings).await {
+					model_clone.modify_prefs(|prefs| {
+						prefs.prescale = new_settings.prescale.try_into().unwrap();
+						prefs.extra_mame_arguments = new_settings.extra_mame_arguments.as_str().trim().into();
+					});
+				}
+			};
+			model.clone().spawn_maybe_pause(fut);
 		}
 		Action::SettingsPaths(path_type) => {
 			let fut = show_paths_dialog(model.clone(), path_type);

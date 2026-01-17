@@ -6,6 +6,7 @@
     ]
   },
   "isFullscreen": false,
+  "prescale": 1,
   "itemsColumns": [
     {
       "type": "name",

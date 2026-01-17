@@ -1,0 +1,101 @@
+import {
+    Button,
+    GridBox,
+    HorizontalBox,
+    StandardButton,
+    Slider,
+    TextEdit,
+    VerticalBox,
+} from "std-widgets.slint";
+import { Icons } from "icons.slint";
+
+export struct VideoSettings {
+    prescale: int,
+    extra-mame-arguments: string}
+
+export component VideoDialog inherits Window {
+    // callbacks
+    callback ok-clicked();
+    callback cancel-clicked();
+
+    // properties
+    in-out property <VideoSettings> settings: default-settings;
+    in property <VideoSettings> original-settings: default-settings;
+    in property <VideoSettings> default-settings: { prescale: 1 };
+    property <length> label-width: 120px;
+
+    // changed handlers
+    changed settings => {
+        prescale-slider.value = settings.prescale;
+    }
+
+    // controls
+    title: "Video";
+    icon: Icons.bletchmame;
+    VerticalBox {
+        HorizontalBox {
+            vertical-stretch: 0;
+            Text {
+                width: label-width;
+                vertical-alignment: center;
+                text: "Prescale:";
+            }
+
+            prescale-slider := Slider {
+                minimum: 1;
+                maximum: 20;
+                step: 1;
+                value: root.settings.prescale;
+                changed(value) => {
+                    root.settings.prescale = value;
+                }
+            }
+
+            Text {
+                vertical-alignment: center;
+                text: root.settings.prescale;
+            }
+        }
+
+        HorizontalBox {
+            vertical-stretch: 1;
+            Text {
+                width: label-width;
+                text: "Extra MAME Options:";
+            }
+
+            TextEdit {
+                preferred-height: 100%;
+                font-family: "Courier New";
+                text <=> root.settings.extra-mame-arguments;
+            }
+        }
+
+        HorizontalBox {
+            alignment: end;
+            vertical-stretch: 0;
+            Button {
+                enabled: root.settings != root.default-settings;
+                text: "Reset To Default";
+                clicked => {
+                    root.settings = root.default-settings;
+                }
+            }
+
+            StandardButton {
+                kind: ok;
+                clicked => {
+                    root.ok-clicked();
+                }
+                enabled: root.settings != root.original-settings;
+            }
+
+            StandardButton {
+                kind: cancel;
+                clicked => {
+                    root.cancel-clicked();
+                }
+            }
+        }
+    }
+}
