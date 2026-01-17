@@ -1,26 +1,42 @@
 use std::borrow::Cow;
 use std::ffi::OsStr;
 use std::ffi::OsString;
+use std::rc::Rc;
+use std::sync::Arc;
 
+use smol_str::SmolStr;
 use strum::IntoEnumIterator;
 
-use crate::prefs::PrefsPaths;
+use crate::prefs::Preferences;
+use crate::prefs::PreflightProblem;
 use crate::prefs::pathtype::PathType;
 use crate::runtime::MameWindowing;
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct MameArguments {
-	pub program: String,
-	pub args: Vec<Cow<'static, OsStr>>,
+	pub program: SmolStr,
+	pub args: Arc<[Cow<'static, OsStr>]>,
 }
 
 impl MameArguments {
-	pub fn new(prefs_paths: &PrefsPaths, windowing: &MameWindowing) -> Self {
+	pub fn new(prefs: &Preferences, windowing: &MameWindowing, skip_file_system_checks: bool) -> MameArgumentsResult {
+		// run preflight first
+		let preflight_problems = prefs.paths.preflight(skip_file_system_checks);
+		if !preflight_problems.is_empty() {
+			let program = prefs.paths.mame_executable.clone();
+			let preflight_problems = preflight_problems.into();
+			let error = MameArgumentsError {
+				program,
+				preflight_problems,
+			};
+			return Err(error);
+		}
+
 		// convert all path vec's to the appropriate MAME arguments
 		let path_args = PathType::iter()
 			.filter_map(|path_type| {
 				let arg = path_type.mame_argument()?;
-				let value = prefs_paths.full_string(path_type)?;
+				let value = prefs.paths.full_string(path_type)?;
 				Some((arg, value))
 			})
 			.flat_map(|(arg, value)| [Cow::Borrowed(OsStr::new(arg)), Cow::Owned(value)]);
@@ -37,7 +53,7 @@ impl MameArguments {
 		let platform_args = platform_specific_args().into_iter().map(Cow::Borrowed);
 
 		// assemble all arguments
-		let program = prefs_paths.mame_executable.as_ref().unwrap().to_string();
+		let program = prefs.paths.mame_executable.clone().unwrap();
 		let args = ["-plugin", "worker_ui", "-skip_gameinfo", "-nomouse", "-debug"]
 			.into_iter()
 			.map(Cow::Borrowed)
@@ -48,10 +64,18 @@ impl MameArguments {
 				Cow::Owned(x) => Cow::Owned(OsString::from(x)),
 			})
 			.chain(path_args)
-			.collect::<Vec<_>>();
-		Self { program, args }
+			.collect::<Arc<[_]>>();
+		Ok(Self { program, args })
 	}
 }
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MameArgumentsError {
+	pub program: Option<SmolStr>,
+	pub preflight_problems: Rc<[PreflightProblem]>,
+}
+
+pub type MameArgumentsResult = std::result::Result<MameArguments, MameArgumentsError>;
 
 /// Returns platform specific arguments to MAME
 fn platform_specific_args() -> Vec<&'static str> {
@@ -79,6 +103,7 @@ mod test {
 	use std::path::MAIN_SEPARATOR_STR;
 	use std::path::Path;
 
+	use crate::prefs::Preferences;
 	use crate::prefs::PrefsPaths;
 	use crate::runtime::MameWindowing;
 
@@ -87,7 +112,7 @@ mod test {
 	#[test]
 	pub fn mame_args_new() {
 		let windowing = MameWindowing::Attached("1234".into());
-		let prefs_paths = PrefsPaths {
+		let paths = PrefsPaths {
 			mame_executable: Some("/mydir/mame/mame.exe".into()),
 			roms: vec!["/mydir/mame/roms1".into(), "/mydir/mame/roms2".into()],
 			samples: vec!["/mydir/mame/samples1".into(), "/mydir/mame/samples2".into()],
@@ -98,7 +123,12 @@ mod test {
 			cheats: Some("/mydir/mame/cheats".into()),
 			..Default::default()
 		};
-		let result = MameArguments::new(&prefs_paths, &windowing);
+		let paths = paths.into();
+		let prefs = Preferences {
+			paths,
+			..Default::default()
+		};
+		let result = MameArguments::new(&prefs, &windowing, true).unwrap();
 
 		fn find_arg(args: &[impl AsRef<Path>], target: &str) -> Option<String> {
 			args.iter().position(|x| x.as_ref() == Path::new(target)).map(|idx| {

@@ -185,7 +185,7 @@ fn access_paths(path_type: PathType) -> (fn(&PrefsPaths) -> &[SmolStr], PathsSto
 	}
 }
 
-#[derive(Copy, Clone, Debug, strum::Display, EnumIter, EnumString, EnumProperty)]
+#[derive(Copy, Clone, Debug, strum::Display, EnumIter, EnumString, EnumProperty, PartialEq, Eq)]
 pub enum PreflightProblem {
 	#[strum(to_string = "No MAME executable path specified", props(ProblemType = "MAME Executable"))]
 	NoMameExecutablePath,

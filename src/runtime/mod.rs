@@ -2,8 +2,6 @@ pub mod args;
 pub mod command;
 pub mod session;
 
-use std::rc::Rc;
-
 use anyhow::Error;
 use serde::Deserialize;
 use serde::Serialize;
@@ -14,7 +12,7 @@ use crate::imagedesc::ImageDesc;
 
 #[derive(Clone, Debug)]
 pub enum MameWindowing {
-	Attached(Rc<str>),
+	Attached(SmolStr),
 	Windowed,
 	WindowedMaximized,
 	Fullscreen,
