@@ -149,11 +149,11 @@ impl PrefsPaths {
 			})
 	}
 
-	pub fn preflight(&self) -> Vec<PreflightProblem> {
+	pub fn preflight(&self, skip_file_system_checks: bool) -> Vec<PreflightProblem> {
 		let mame_executable_path = self.mame_executable.as_ref().and_then(|path| self.resolve(path));
 		let mame_executable_path = mame_executable_path.as_ref().map(|path| path.as_ref());
 		let plugins_path_iter = self.plugins.iter().flat_map(|path| self.resolve(path.as_ref()));
-		preflight_checks(mame_executable_path, plugins_path_iter)
+		preflight_checks(mame_executable_path, plugins_path_iter, skip_file_system_checks)
 	}
 }
 

@@ -174,7 +174,7 @@ impl AppState {
 		});
 
 		if let Some(info_db) = info_db {
-			let preflight_problems = self.paths.preflight();
+			let preflight_problems = self.paths.preflight(false);
 			let session = preflight_problems.is_empty().then(|| self.start_session());
 
 			let failure = session
@@ -217,7 +217,7 @@ impl AppState {
 		}
 
 		// quick run of preflight
-		let preflight_problems = self.paths.preflight();
+		let preflight_problems = self.paths.preflight(false);
 		let new_state = if preflight_problems
 			.iter()
 			.any(|x| x.problem_type() == Some(PathType::MameExecutable))
