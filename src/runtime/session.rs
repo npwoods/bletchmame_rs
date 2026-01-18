@@ -318,16 +318,20 @@ fn emit_console_command_line(console: &Mutex<Option<Console>>, mame_args: &MameA
 		let args = mame_args.args.iter().map(|x| x.to_string_lossy());
 		let text = std::iter::once(Cow::Borrowed(mame_args.program.as_str()))
 			.chain(args)
-			.map(|s| {
-				if s.is_empty() || s.contains(' ') {
-					Cow::Owned(format!("\"{s}\""))
-				} else {
-					s
-				}
-			})
+			.map(quote_argument_for_console)
 			.join(" ");
 		console.emit(EmitType::CommandLine, &text)
 	});
+}
+
+fn quote_argument_for_console<'a>(s: impl Into<Cow<'a, str>>) -> Cow<'a, str> {
+	let s = s.into();
+	if s.is_empty() || s.contains(' ') || s.contains('\"') {
+		let s = s.replace('\"', "\\\"");
+		Cow::Owned(format!("\"{s}\""))
+	} else {
+		s
+	}
 }
 
 fn with_active_console(console: &Mutex<Option<Console>>, f: impl FnOnce(&mut Console) -> anyhow::Result<()>) {
@@ -345,5 +349,20 @@ impl From<ThisError> for Error {
 			exit_code: None,
 			mame_stderr_text: None,
 		}
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use test_case::test_case;
+
+	#[test_case(0, "", "\"\"")]
+	#[test_case(1, "foo", "foo")]
+	#[test_case(2, "\"foo\"", "\"\\\"foo\\\"\"")]
+	#[test_case(3, "foo bar", "\"foo bar\"")]
+
+	fn quote_argument_for_console(_index: usize, s: &str, expected: &str) {
+		let actual = super::quote_argument_for_console(s);
+		assert_eq!(actual, expected);
 	}
 }
