@@ -5,6 +5,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use smol_str::SmolStr;
+use splitty::split_unquoted_char;
 use strum::IntoEnumIterator;
 
 use crate::prefs::Preferences;
@@ -56,9 +57,8 @@ impl MameArguments {
 		let platform_args = platform_specific_args().into_iter().map(Cow::Borrowed);
 
 		// extra arguments
-		let extra_mame_arguments = prefs
-			.extra_mame_arguments
-			.split_whitespace()
+		let extra_mame_arguments = split_unquoted_char(&prefs.extra_mame_arguments, ' ')
+			.unwrap_quotes(true)
 			.map(|s| Cow::Owned(OsString::from(s)));
 
 		// assemble all arguments
