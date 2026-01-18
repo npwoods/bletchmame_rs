@@ -523,7 +523,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Video...");
-                enabled: mode() == "ready";
+                enabled: mode() == "ready" || mode() == "report";
                 activated => {
                     menu-item-action(root.menu-action-settings-video);
                 }
@@ -531,7 +531,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Paths...");
-                enabled: true;
+                enabled: mode() == "ready" || mode() == "report";
                 activated => {
                     menu-item-action(root.menu-action-settings-paths);
                 }
