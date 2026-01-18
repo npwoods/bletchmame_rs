@@ -22,7 +22,7 @@ export component VideoDialog inherits Window {
     in-out property <VideoSettings> settings: default-settings;
     in property <VideoSettings> original-settings: default-settings;
     in property <VideoSettings> default-settings: { prescale: 1 };
-    property <length> label-width: 120px;
+    property <length> label-width: 140px;
 
     // changed handlers
     changed settings => {
@@ -61,10 +61,12 @@ export component VideoDialog inherits Window {
             vertical-stretch: 1;
             Text {
                 width: label-width;
-                text: "Extra MAME Options:";
+                text: "Extra MAME Arguments:";
             }
 
             TextEdit {
+                min-width: 140px;
+                min-height: 60px;
                 preferred-height: 100%;
                 font-family: "Courier New";
                 text <=> root.settings.extra-mame-arguments;
