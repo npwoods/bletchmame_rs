@@ -78,11 +78,12 @@ impl PartialOrd for MameVersion {
 
 impl Display for MameVersion {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-		if self.full_text.is_some() || self.major_minor.is_none() {
-			write!(f, "{}", self.full_text.as_deref().unwrap_or_default())
-		} else {
-			let (major, minor) = self.major_minor.unwrap();
+		if let Some((major, minor)) = self.major_minor
+			&& self.full_text.is_none()
+		{
 			write!(f, "{major}.{minor} (mame{major}{minor})")
+		} else {
+			write!(f, "{}", self.full_text.as_deref().unwrap_or_default())
 		}
 	}
 }
