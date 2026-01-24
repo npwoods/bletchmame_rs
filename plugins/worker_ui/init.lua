@@ -682,7 +682,15 @@ function command_start(args)
 	while #start_load_args > 0 and start_load_args[1]:sub(1, 1) == "-" do
 		local arg_name = table.remove(start_load_args, 1):sub(2)
 		local arg_value = table.remove(start_load_args, 1)
-		machine_options().entries[arg_name]:value(arg_value)
+		local entry = machine_options().entries[arg_name]
+		local sample_value = entry:default_value();
+		if math.type(sample_value) == "integer" then
+			arg_value = math.tointeger(arg_value)
+		end
+		if math.type(sample_value) == "float" then
+			arg_value = tonumber(arg_value) * 1.0
+		end
+		entry:value(arg_value)
 	end
 
 	print("@INFO ### Starting emulation...")
