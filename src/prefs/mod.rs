@@ -519,7 +519,9 @@ fn ensure_directory(path: &impl AsRef<Path>) {
 mod test {
 	use std::fs::File;
 
+	use assert_json_diff::assert_json_eq;
 	use assert_matches::assert_matches;
+	use serde_json::Value;
 	use tempdir::TempDir;
 	use test_case::test_case;
 
@@ -532,11 +534,25 @@ mod test {
 		let prefs = Preferences::fresh(None);
 		let json = save_prefs_to_string(&prefs).expect("Failed to save fresh prefs");
 
-		let fresh_json = include_str!("prefs_fresh.json");
-		assert_eq!(fresh_json.replace('\r', ""), json.replace('\r', ""));
-
 		let new_prefs = load_prefs_from_reader(json.as_bytes()).expect("Failed to load saved fresh prefs");
 		assert_eq!(prefs, new_prefs);
+	}
+
+	#[test_case(0, include_str!("prefs_fresh.json"))]
+	#[test_case(1, include_str!("test_data/prefs01.json"))]
+	pub fn reserialization(_index: usize, json: &str) {
+		let prefs = load_prefs_from_reader(json.as_bytes()).expect("Failed to load prefs");
+		let reserialized_json = save_prefs_to_string(&prefs).expect("Failed to save prefs");
+
+		// reeserialize the JSON and compare
+		let json_value = serde_json::from_str::<Value>(json).unwrap();
+		let reserialized_json_value = serde_json::from_str::<Value>(&reserialized_json).unwrap();
+		assert_json_eq!(reserialized_json_value, json_value);
+
+		// reload the prefs and compare
+		let reserialized_prefs =
+			load_prefs_from_reader(reserialized_json.as_bytes()).expect("Failed to load reserialized prefs");
+		assert_eq!(prefs, reserialized_prefs);
 	}
 
 	#[test_case(0, &["foo"])]

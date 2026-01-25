@@ -1,0 +1,107 @@
+{
+    "paths": {
+        "mameExecutable": "/home/mame_files/mame",
+        "roms": [
+            "/home/mame_files/roms"
+        ],
+        "samples": [
+            "/home/mame_files/samples"
+        ],
+        "plugins": [
+            "/home/mame_files/plugins"
+        ],
+        "softwareLists": [
+            "/home/mame_files/hash"
+        ],
+        "cfg": "/home/.config/BletchMAME",
+        "diff": "/home/.config/BletchMAME",
+        "inis": [
+            "/home/.config/BletchMAME"
+        ],
+        "nvram": "/home/.config/BletchMAME",
+        "cheats": "/home/mame_files/cheat",
+        "snapshots": [
+            "/home/mame_files/snap.zip"
+        ],
+        "historyFile": "/home/mame_files/history_lite.xml"
+    },
+    "windowSize": {
+        "width": 1806.0,
+        "height": 2892.0
+    },
+    "isFullscreen": false,
+    "prescale": 20,
+    "itemsColumns": [
+        {
+            "type": "name",
+            "sort": "ascending",
+            "width": 100.0
+        },
+        {
+            "type": "sourceFile",
+            "width": 155.0
+        },
+        {
+            "type": "description",
+            "width": 400.0
+        },
+        {
+            "type": "year",
+            "width": 80.0
+        },
+        {
+            "type": "provider",
+            "width": 180.0
+        }
+    ],
+    "collections": [
+        {
+            "type": "builtin",
+            "subtype": "all"
+        },
+        {
+            "type": "builtin",
+            "subtype": "allSoftware"
+        },
+        {
+            "type": "folder",
+            "name": "Favorites",
+            "items": [
+                {
+                    "type": "machine",
+                    "machine": "alienar"
+                },
+                {
+                    "type": "software",
+                    "softwareList": "a2600",
+                    "software": "halo"
+                },
+                {
+                    "type": "machine",
+                    "machine": "c64",
+                    "slots": {
+                        "joy2": "cx85",
+                        "tape": "c2n"
+                    },
+                    "images": {
+                        "tape:c2n:cassette": {
+                            "type": "file",
+                            "filename": "/tmp/foo.tap"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "type": "machineSoftware",
+            "machine": "a2600"
+        }
+    ],
+    "history": [
+        {
+            "type": "builtin",
+            "subtype": "all"
+        }
+    ],
+    "showStopWarning": true
+}
