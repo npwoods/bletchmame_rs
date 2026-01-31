@@ -41,6 +41,7 @@ use crate::prefs::PrefsItemDetails;
 use crate::prefs::PrefsMachineItem;
 use crate::prefs::PrefsPaths;
 use crate::prefs::PrefsSoftwareItem;
+use crate::prefs::PrefsVideo;
 use crate::software::SoftwareListDispenser;
 use crate::ui::ConfigureDialog;
 use crate::ui::DeviceAndImageEntry;
@@ -87,6 +88,7 @@ pub async fn dialog_configure(
 	info_db: Rc<InfoDb>,
 	item: PrefsItem,
 	paths: &PrefsPaths,
+	global_video: &PrefsVideo,
 ) -> Option<PrefsItem> {
 	// prepare the dialog
 	let modal = modal_stack.modal(|| ConfigureDialog::new().unwrap());
@@ -95,6 +97,7 @@ pub async fn dialog_configure(
 	// get the state
 	let dialog_weak = modal.dialog().as_weak();
 	let modal_stack = modal_stack.clone();
+	let video = item.video.clone();
 	let state = State::new(dialog_weak, modal_stack, paths, &info_db, item);
 	let state = Rc::new(state);
 
@@ -184,6 +187,13 @@ pub async fn dialog_configure(
 	modal.dialog().on_run_audit_clicked(move || {
 		state_clone.start_run_audit();
 	});
+
+	// video options
+	modal.dialog().set_video_use_default_settings(video.is_none());
+	modal
+		.dialog()
+		.set_video_settings(video.as_ref().map(|v| v.into()).unwrap_or_else(|| global_video.into()));
+	modal.dialog().set_video_default_settings(global_video.into());
 
 	// loading error?
 	if let Some(error) = state.error() {
@@ -605,7 +615,11 @@ impl State {
 				PrefsItemDetails::Software(item)
 			}
 		};
-		PrefsItem { video: None, details }
+
+		let video = (!dialog.get_video_use_default_settings())
+			.then(|| PrefsVideo::try_from(&dialog.get_video_settings()).unwrap());
+
+		PrefsItem { details, video }
 	}
 
 	pub fn set_slot_entry_option(&self, entry_index: usize, new_option_name: Option<&str>) {

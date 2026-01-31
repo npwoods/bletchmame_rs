@@ -1448,7 +1448,10 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 
 			let fut = async move {
 				let paths = model_clone.preferences.borrow().paths.clone();
-				if let Some(item) = dialog_configure(model_clone.modal_stack.clone(), info_db, item, &paths).await {
+				let global_video = model_clone.preferences.borrow().video.clone();
+				if let Some(item) =
+					dialog_configure(model_clone.modal_stack.clone(), info_db, item, &paths, &global_video).await
+				{
 					model_clone.modify_prefs(|prefs| {
 						let old_collection = prefs.collections[folder_index].clone();
 						let PrefsCollection::Folder { name, mut items } = old_collection.as_ref().clone() else {

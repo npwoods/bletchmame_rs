@@ -18,6 +18,7 @@ import {
 } from "../devimageslist.slint";
 import { Icons } from "../icons.slint";
 import { ToolTipArea } from "../tooltip.slint";
+import { VideoConfigComponent, VideoSettings } from "../videoconfig.slint";
 
 struct SoftwareMachine {
     machine-index: int,
@@ -52,6 +53,9 @@ export component ConfigureDialog inherits Window {
     in property <[SoftwareMachine]> software-machines;
     in property <bool> software-machines-bulk-all-enabled;
     in property <bool> software-machines-bulk-none-enabled;
+    in-out property <VideoSettings> video-settings: { prescale: 20 };
+    in property <VideoSettings> video-default-settings: { prescale: 1 };
+    in-out property <bool> video-use-default-settings: true;
 
     // callbacks
     callback ok-clicked();
@@ -196,6 +200,29 @@ export component ConfigureDialog inherits Window {
                             text: "Run Audit";
                             clicked => {
                                 root.run-audit-clicked();
+                            }
+                        }
+                    }
+                }
+
+                Tab {
+                    title: "Video";
+                    VerticalBox {
+                        CheckBox {
+                            checked <=> root.video-use-default-settings;
+                            text: "Use global video settings";
+                        }
+
+                        VideoConfigComponent {
+                            vertical-stretch: 1;
+                            enabled: !root.video-use-default-settings;
+                            changed settings => {
+                                if (!root.video-use-default-settings) {
+                                    root.video-settings = self.settings;
+                                }
+                            }
+                            changed enabled => {
+                                self.settings = self.enabled ? root.video-settings : root.video-default-settings;
                             }
                         }
                     }
