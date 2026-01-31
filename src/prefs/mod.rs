@@ -391,8 +391,15 @@ pub struct HistoryEntry {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PrefsItem {
+	#[serde(flatten)]
+	pub details: PrefsItemDetails,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", tag = "type")]
-pub enum PrefsItem {
+pub enum PrefsItemDetails {
 	Machine(PrefsMachineItem),
 	Software(PrefsSoftwareItem),
 }

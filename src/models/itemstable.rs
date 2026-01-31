@@ -36,6 +36,7 @@ use crate::prefs::BuiltinCollection;
 use crate::prefs::ColumnType;
 use crate::prefs::PrefsCollection;
 use crate::prefs::PrefsItem;
+use crate::prefs::PrefsItemDetails;
 use crate::prefs::PrefsMachineItem;
 use crate::prefs::PrefsSoftwareItem;
 use crate::prefs::SortOrder;
@@ -247,8 +248,8 @@ impl ItemsTableModel {
 
 					Some(PrefsCollection::Folder { name: _, items }) => items
 						.iter()
-						.filter_map(|item| match item {
-							PrefsItem::Machine(item) => {
+						.filter_map(|item| match &item.details {
+							PrefsItemDetails::Machine(item) => {
 								let machine_config = MachineConfig::from_machine_name_and_slots(
 									info_db.clone(),
 									&item.machine_name,
@@ -266,7 +267,7 @@ impl ItemsTableModel {
 								};
 								Some(item)
 							}
-							PrefsItem::Software(software_item) => {
+							PrefsItemDetails::Software(software_item) => {
 								let item =
 									software_folder_item(&mut dispenser, software_item).unwrap_or_else(|error| {
 										Item::Unrecognized {
@@ -642,7 +643,7 @@ enum Item {
 }
 
 fn make_prefs_item(_info_db: &InfoDb, item: &Item) -> PrefsItem {
-	match item {
+	let details = match item {
 		Item::Machine {
 			machine_config,
 			images,
@@ -665,7 +666,7 @@ fn make_prefs_item(_info_db: &InfoDb, item: &Item) -> PrefsItem {
 				ram_size,
 				bios,
 			};
-			PrefsItem::Machine(item)
+			PrefsItemDetails::Machine(item)
 		}
 		Item::Software {
 			software_list,
@@ -681,10 +682,11 @@ fn make_prefs_item(_info_db: &InfoDb, item: &Item) -> PrefsItem {
 				software: software.name.to_string(),
 				preferred_machines,
 			};
-			PrefsItem::Software(item)
+			PrefsItemDetails::Software(item)
 		}
-		Item::Unrecognized { item, .. } => item.clone(),
-	}
+		Item::Unrecognized { item, .. } => item.details.clone(),
+	};
+	PrefsItem { details }
 }
 
 struct RowModel {
@@ -816,7 +818,9 @@ fn column_text<'a>(_info_db: &'a InfoDb, item: &'a Item, column: ColumnType) -> 
 			ColumnType::Provider => software.publisher.as_str().into(),
 		},
 		Item::Unrecognized { item, .. } => {
-			let PrefsItem::Software(item) = item else { todo!() };
+			let PrefsItemDetails::Software(item) = &item.details else {
+				todo!()
+			};
 			match column {
 				ColumnType::Name => item.software.clone().into(),
 				ColumnType::SourceFile => format!("{}.xml", item.software_list).into(),

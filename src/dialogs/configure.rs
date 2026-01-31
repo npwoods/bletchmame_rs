@@ -37,6 +37,7 @@ use crate::mconfig::MachineConfig;
 use crate::models::audit::AuditModel;
 use crate::models::devimages::DevicesAndImagesModel;
 use crate::prefs::PrefsItem;
+use crate::prefs::PrefsItemDetails;
 use crate::prefs::PrefsMachineItem;
 use crate::prefs::PrefsPaths;
 use crate::prefs::PrefsSoftwareItem;
@@ -305,8 +306,8 @@ impl State {
 		info_db: &Rc<InfoDb>,
 		item: PrefsItem,
 	) -> Self {
-		let core = match item {
-			PrefsItem::Machine(item) => {
+		let core = match item.details {
+			PrefsItemDetails::Machine(item) => {
 				// figure out the diconfig
 				let machine_index = info_db.machines().find_index(&item.machine_name).unwrap();
 				let machine_config =
@@ -333,7 +334,7 @@ impl State {
 					bios,
 				}
 			}
-			PrefsItem::Software(item) => {
+			PrefsItemDetails::Software(item) => {
 				let software_list = info_db.software_lists().find(&item.software_list).unwrap();
 				let software_machines = software_list
 					.original_for_machines()
@@ -540,7 +541,7 @@ impl State {
 	pub fn get_prefs_item(&self) -> PrefsItem {
 		let dialog = self.dialog_weak.unwrap();
 
-		match &self.core {
+		let details = match &self.core {
 			CoreState::Machine { .. } => self.with_diconfig(|diconfig| {
 				let machine = diconfig.machine().unwrap();
 				let machine_name = machine.name().to_string();
@@ -568,7 +569,7 @@ impl State {
 					ram_size,
 					bios,
 				};
-				PrefsItem::Machine(item)
+				PrefsItemDetails::Machine(item)
 			}),
 
 			CoreState::Software {
@@ -601,9 +602,10 @@ impl State {
 					software: software.clone(),
 					preferred_machines,
 				};
-				PrefsItem::Software(item)
+				PrefsItemDetails::Software(item)
 			}
-		}
+		};
+		PrefsItem { details }
 	}
 
 	pub fn set_slot_entry_option(&self, entry_index: usize, new_option_name: Option<&str>) {
