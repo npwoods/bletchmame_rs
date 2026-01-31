@@ -18,10 +18,10 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
-        qt: [true, false]
+        features: ["", "--all-features", "--no-default-features"]
         exclude:
           - os: windows-latest
-            qt: true
+            features: "--all-features"
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
@@ -36,7 +36,7 @@ jobs:
           sudo apt update
           sudo apt install -y libxdo-dev libpango1.0-dev libgtk-3-dev libudev-dev
       - name: Install Qt
-        if: ${{ matrix.qt }}
+        if: matrix.features == '--all-features'
         uses: jurplel/install-qt-action@v4          
       - name: Caching
         uses: actions/cache@v3
@@ -47,12 +47,12 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-test-${{ matrix.features }}-${{ hashFiles('**/Cargo.lock') }}
       - name: Test Suite
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: ${{ matrix.qt && '--all-features' || '' }}
+          args: ${{ matrix.features }}
 
   diagnostics:
     name: Diagnostics
@@ -91,10 +91,10 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
-        qt: [true, false]
+        features: ["", "--all-features"]
         exclude:
           - os: windows-latest
-            qt: true
+            features: "--all-features"
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
@@ -111,7 +111,7 @@ jobs:
           sudo apt update
           sudo apt install -y libxdo-dev libpango1.0-dev libgtk-3-dev libudev-dev
       - name: Install Qt
-        if: ${{ matrix.qt }}
+        if: matrix.features == '--all-features'
         uses: jurplel/install-qt-action@v4          
       - name: Caching
         uses: actions/cache@v3
@@ -122,12 +122,12 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-clippy-${{ matrix.features }}-${{ hashFiles('**/Cargo.lock') }}
       - name: Clippy
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: ${{ matrix.qt && '--all-features --all-targets -- -D warnings' || '--all-targets -- -D warnings' }}
+          args: ${{ matrix.features }} --all-targets -- -D warnings
 
   fmt:
     name: Rustfmt

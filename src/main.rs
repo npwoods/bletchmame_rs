@@ -12,7 +12,6 @@ mod collections;
 mod console;
 mod debugstr;
 mod devimageconfig;
-mod diagnostics;
 mod dialogs;
 mod guiutils;
 mod history;
@@ -36,6 +35,9 @@ mod threadlocalbubble;
 mod version;
 mod xml;
 
+#[cfg(feature = "diagnostics")]
+mod diagnostics;
+
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::rc::Rc;
@@ -51,10 +53,12 @@ use tracing_subscriber::EnvFilter;
 use crate::appwindow::AppArgs;
 use crate::backend::BackendRuntime;
 use crate::backend::SlintBackend;
-use crate::diagnostics::info_db_from_xml_file;
 use crate::platform::platform_init;
 use crate::runtime::MameStderr;
 use crate::ui::AppWindow;
+
+#[cfg(feature = "diagnostics")]
+use crate::diagnostics::info_db_from_xml_file;
 
 mod ui {
 	slint::include_modules!();
@@ -76,16 +80,20 @@ struct Opt {
 	#[structopt(long)]
 	echo_console: Option<String>,
 
-	#[cfg_attr(feature = "diagnostics", structopt(long))]
+	#[cfg(feature = "diagnostics")]
+	#[structopt(long)]
 	process_listxml: bool,
 
-	#[cfg_attr(feature = "diagnostics", structopt(long, parse(from_os_str)))]
+	#[cfg(feature = "diagnostics")]
+	#[structopt(long)]
 	process_listxml_file: Option<PathBuf>,
 
 	#[cfg_attr(feature = "diagnostics", structopt(long))]
+	#[cfg_attr(not(feature = "diagnostics"), structopt(skip))]
 	log: Option<String>,
 
 	#[cfg_attr(feature = "diagnostics", structopt(long))]
+	#[cfg_attr(not(feature = "diagnostics"), structopt(skip))]
 	no_capture_mame_stderr: bool,
 }
 
@@ -103,14 +111,18 @@ fn main() -> ExitCode {
 	}
 
 	// are we doing diagnostics
-	let process_listxml = match (opts.process_listxml, opts.process_listxml_file.as_deref()) {
-		(false, None) => None,
-		(true, None) => Some(None),
-		(false, Some(path)) => Some(Some(path)),
-		(true, Some(_)) => panic!("Cannot specify --process-listxml and --process-listxml-file simultaneously"),
-	};
-	if let Some(path) = process_listxml {
-		return info_db_from_xml_file(path);
+	#[cfg(feature = "diagnostics")]
+	{
+		let process_listxml = match (opts.process_listxml, opts.process_listxml_file.as_deref()) {
+			(false, None) => None,
+			(true, None) => Some(None),
+			(false, Some(path)) => Some(Some(path)),
+			(true, Some(_)) => panic!("Cannot specify --process-listxml and --process-listxml-file simultaneously"),
+		};
+
+		if let Some(path) = process_listxml {
+			return info_db_from_xml_file(path);
+		}
 	}
 
 	// echo console?
