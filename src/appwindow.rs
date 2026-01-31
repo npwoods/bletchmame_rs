@@ -110,7 +110,6 @@ use crate::ui::ListItem;
 use crate::ui::ReportIssue;
 use crate::ui::SearchBarItem;
 use crate::ui::SimpleMenuEntry;
-use crate::ui::VideoSettings;
 use crate::version::MameVersion;
 
 const SOUND_ATTENUATION_OFF: i32 = -32;
@@ -1180,17 +1179,10 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 			let model_clone = model.clone();
 			let fut = async move {
 				let modal_stack = model_clone.modal_stack.clone();
-				let old_settings = {
-					let prefs = model_clone.preferences.borrow();
-					VideoSettings {
-						prescale: prefs.prescale.into(),
-						extra_mame_arguments: prefs.extra_mame_arguments.to_shared_string(),
-					}
-				};
-				if let Some(new_settings) = dialog_video(modal_stack, old_settings).await {
+				let old_video = model_clone.preferences.borrow().video.clone();
+				if let Some(new_video) = dialog_video(modal_stack, old_video).await {
 					model_clone.modify_prefs(|prefs| {
-						prefs.prescale = new_settings.prescale.try_into().unwrap();
-						prefs.extra_mame_arguments = new_settings.extra_mame_arguments.as_str().trim().into();
+						prefs.video = new_video;
 					});
 				}
 			};

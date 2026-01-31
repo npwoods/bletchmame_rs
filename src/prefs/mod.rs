@@ -25,6 +25,7 @@ use num::clamp;
 use serde::Deserialize;
 use serde::Serialize;
 use slint::LogicalSize;
+use slint::ToSharedString;
 use smol_str::SmolStr;
 use strum::EnumIter;
 use strum::EnumProperty;
@@ -56,10 +57,8 @@ pub struct Preferences {
 	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub fullscreen_display: Option<SmolStr>,
 
-	pub prescale: u8,
-
-	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
-	pub extra_mame_arguments: SmolStr,
+	#[serde(flatten)]
+	pub video: PrefsVideo,
 
 	pub items_columns: Vec<PrefsColumn>,
 
@@ -81,8 +80,7 @@ impl Default for Preferences {
 			window_size: None,
 			is_fullscreen: false,
 			fullscreen_display: None,
-			prescale: 1,
-			extra_mame_arguments: "".into(),
+			video: Default::default(),
 			items_columns: [].into(),
 			collections: [].into(),
 			history: [].into(),
@@ -202,6 +200,47 @@ fn access_paths(path_type: PathType) -> (fn(&PrefsPaths) -> &[SmolStr], PathsSto
 			(|x| x.history_file.as_slice()),
 			PathsStore::Single(|x| &mut x.history_file),
 		),
+	}
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct PrefsVideo {
+	pub prescale: u8,
+
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub extra_mame_arguments: SmolStr,
+}
+
+impl Default for PrefsVideo {
+	fn default() -> Self {
+		Self {
+			prescale: 1,
+			extra_mame_arguments: "".into(),
+		}
+	}
+}
+
+impl TryFrom<&crate::ui::VideoSettings> for PrefsVideo {
+	type Error = anyhow::Error;
+
+	fn try_from(value: &crate::ui::VideoSettings) -> std::result::Result<Self, Self::Error> {
+		let prescale = value.prescale.try_into()?;
+		let extra_mame_arguments = value.extra_mame_arguments.as_str().trim().into();
+		Ok(Self {
+			prescale,
+			extra_mame_arguments,
+		})
+	}
+}
+
+impl From<&PrefsVideo> for crate::ui::VideoSettings {
+	fn from(value: &PrefsVideo) -> Self {
+		let prescale = value.prescale.into();
+		let extra_mame_arguments = value.extra_mame_arguments.to_shared_string();
+		Self {
+			prescale,
+			extra_mame_arguments,
+		}
 	}
 }
 

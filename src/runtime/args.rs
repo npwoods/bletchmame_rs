@@ -51,13 +51,13 @@ impl MameArguments {
 		};
 
 		// video arguments
-		let video_args = ["-prescale".into(), Cow::Owned(prefs.prescale.to_string())].into_iter();
+		let video_args = ["-prescale".into(), Cow::Owned(prefs.video.prescale.to_string())].into_iter();
 
 		// platform specific arguments
 		let platform_args = platform_specific_args().into_iter().map(Cow::Borrowed);
 
 		// extra arguments
-		let extra_mame_arguments = split_unquoted_char(&prefs.extra_mame_arguments, ' ')
+		let extra_mame_arguments = split_unquoted_char(&prefs.video.extra_mame_arguments, ' ')
 			.unwrap_quotes(true)
 			.map(|s| Cow::Owned(OsString::from(s)));
 
