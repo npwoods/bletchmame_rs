@@ -36,8 +36,10 @@ use crate::prefs::BuiltinCollection;
 use crate::prefs::ColumnType;
 use crate::prefs::PrefsCollection;
 use crate::prefs::PrefsItem;
+use crate::prefs::PrefsItemDetails;
 use crate::prefs::PrefsMachineItem;
 use crate::prefs::PrefsSoftwareItem;
+use crate::prefs::PrefsVideo;
 use crate::prefs::SortOrder;
 use crate::runtime::MameStartArgs;
 use crate::selection::SelectionManager;
@@ -191,12 +193,13 @@ impl ItemsTableModel {
 						.filter(|(_, machine)| machine.runnable())
 						.map(|(machine_index, _)| {
 							let machine_config = MachineConfig::from_machine_index(info_db.clone(), machine_index);
-							Item::Machine {
+							let details = ItemDetails::Machine {
 								machine_config,
 								images: Default::default(),
 								ram_size: None,
 								bios: None,
-							}
+							};
+							details.into()
 						})
 						.collect::<Rc<[_]>>(),
 					Some(PrefsCollection::Builtin(BuiltinCollection::AllSoftware)) => dispenser
@@ -216,12 +219,13 @@ impl ItemsTableModel {
 							.map(|x| x.index())
 							.collect::<Vec<_>>();
 
-							Item::Software {
+							let details = ItemDetails::Software {
 								software_list,
 								software,
 								machine_indexes,
 								preferred_machines: None,
-							}
+							};
+							details.into()
 						})
 						.collect::<Rc<[_]>>(),
 
@@ -237,44 +241,51 @@ impl ItemsTableModel {
 								.map(|s| (list.clone(), s.clone()))
 								.collect::<Vec<_>>()
 						})
-						.map(|(software_list, software)| Item::Software {
-							software_list,
-							software,
-							machine_indexes: Vec::default(),
-							preferred_machines: None,
+						.map(|(software_list, software)| {
+							let details = ItemDetails::Software {
+								software_list,
+								software,
+								machine_indexes: Vec::default(),
+								preferred_machines: None,
+							};
+							details.into()
 						})
 						.collect::<Rc<[_]>>(),
 
 					Some(PrefsCollection::Folder { name: _, items }) => items
 						.iter()
-						.filter_map(|item| match item {
-							PrefsItem::Machine(item) => {
-								let machine_config = MachineConfig::from_machine_name_and_slots(
-									info_db.clone(),
-									&item.machine_name,
-									&item.slots,
-								)
-								.ok()?;
-								let images = item.images.clone();
-								let ram_size = item.ram_size;
-								let bios = item.bios.clone();
-								let item = Item::Machine {
-									machine_config,
-									images,
-									ram_size,
-									bios,
-								};
-								Some(item)
-							}
-							PrefsItem::Software(software_item) => {
-								let item =
-									software_folder_item(&mut dispenser, software_item).unwrap_or_else(|error| {
-										Item::Unrecognized {
-											item: item.clone(),
-											error: Rc::new(error),
-										}
-									});
-								Some(item)
+						.filter_map(|item| {
+							let video = item.video.clone();
+							match &item.details {
+								PrefsItemDetails::Machine(item) => {
+									let machine_config = MachineConfig::from_machine_name_and_slots(
+										info_db.clone(),
+										&item.machine_name,
+										&item.slots,
+									)
+									.ok()?;
+									let images = item.images.clone();
+									let ram_size = item.ram_size;
+									let bios: Option<String> = item.bios.clone();
+									let details = ItemDetails::Machine {
+										machine_config,
+										images,
+										ram_size,
+										bios,
+									};
+									Some(Item { video, details })
+								}
+								PrefsItemDetails::Software(software_item) => {
+									let item =
+										software_folder_item(&mut dispenser, software_item).unwrap_or_else(|error| {
+											let details = ItemDetails::Unrecognized {
+												details: item.details.clone(),
+												error: Rc::new(error),
+											};
+											details.into()
+										});
+									Some(item)
+								}
 							}
 						})
 						.collect::<Rc<[_]>>(),
@@ -330,8 +341,8 @@ impl ItemsTableModel {
 		let items = vec![make_prefs_item(info_db, item)];
 
 		// get the critical information - the description and where (if anyplace) "Browse" would go to
-		let (run_title, run_descs, browse_target, can_configure) = match item {
-			Item::Machine {
+		let (run_title, run_descs, browse_target, can_configure) = match &item.details {
+			ItemDetails::Machine {
 				machine_config,
 				images,
 				ram_size,
@@ -354,6 +365,7 @@ impl ItemsTableModel {
 					.iter()
 					.map(|(tag, image_desc)| (tag.as_str().into(), image_desc.clone()))
 					.collect::<Vec<_>>();
+				let video = item.video.clone();
 
 				let start_args = MameStartArgs {
 					machine_name,
@@ -361,6 +373,7 @@ impl ItemsTableModel {
 					bios,
 					slots,
 					images,
+					video,
 				};
 				let action = has_mame_initialized.then_some(Action::Start(start_args));
 				let run_title = run_item_text(machine.description()).into();
@@ -375,7 +388,7 @@ impl ItemsTableModel {
 
 				(run_title, run_descs, browse_target, true)
 			}
-			Item::Software {
+			ItemDetails::Software {
 				software,
 				machine_indexes,
 				..
@@ -408,6 +421,7 @@ impl ItemsTableModel {
 								bios: None,
 								slots: [].into(),
 								images,
+								video: item.video.clone(),
 							};
 							let action = Some(Action::Start(start_args));
 							let title = machine.description().into();
@@ -418,7 +432,7 @@ impl ItemsTableModel {
 				let run_title = run_item_text(&software.description).into();
 				(run_title, run_descs, None, true)
 			}
-			Item::Unrecognized { error, .. } => {
+			ItemDetails::Unrecognized { error, .. } => {
 				let run_title = error.to_string().into();
 				let run_descs = Vec::new();
 				(run_title, run_descs, None, false)
@@ -598,13 +612,13 @@ fn software_folder_item(dispenser: &mut SoftwareListDispenser, item: &PrefsSoftw
 
 	let preferred_machines = item.preferred_machines.as_ref().map(|x| x.iter().join("\0").into());
 
-	let result = Item::Software {
+	let details = ItemDetails::Software {
 		software_list,
 		software,
 		machine_indexes,
 		preferred_machines,
 	};
-	Ok(result)
+	Ok(details.into())
 }
 
 /// Sometimes, the items view is empty - we can (try to) report why
@@ -621,7 +635,13 @@ pub enum EmptyReason {
 }
 
 #[derive(Clone)]
-enum Item {
+struct Item {
+	pub video: Option<PrefsVideo>,
+	pub details: ItemDetails,
+}
+
+#[derive(Clone)]
+enum ItemDetails {
 	Machine {
 		// Commentary:  `MachineConfig` has its own `InfoDb`; maybe we need a lighter `MachineConfigPartial`?
 		machine_config: MachineConfig,
@@ -636,14 +656,21 @@ enum Item {
 		preferred_machines: Option<Box<str>>, // NUL delimited
 	},
 	Unrecognized {
-		item: PrefsItem,
+		details: PrefsItemDetails,
 		error: Rc<Error>,
 	},
 }
 
+impl From<ItemDetails> for Item {
+	fn from(details: ItemDetails) -> Self {
+		Self { video: None, details }
+	}
+}
+
 fn make_prefs_item(_info_db: &InfoDb, item: &Item) -> PrefsItem {
-	match item {
-		Item::Machine {
+	let video = item.video.clone();
+	let details = match &item.details {
+		ItemDetails::Machine {
 			machine_config,
 			images,
 			ram_size,
@@ -665,9 +692,9 @@ fn make_prefs_item(_info_db: &InfoDb, item: &Item) -> PrefsItem {
 				ram_size,
 				bios,
 			};
-			PrefsItem::Machine(item)
+			PrefsItemDetails::Machine(item)
 		}
-		Item::Software {
+		ItemDetails::Software {
 			software_list,
 			software,
 			preferred_machines,
@@ -681,10 +708,11 @@ fn make_prefs_item(_info_db: &InfoDb, item: &Item) -> PrefsItem {
 				software: software.name.to_string(),
 				preferred_machines,
 			};
-			PrefsItem::Software(item)
+			PrefsItemDetails::Software(item)
 		}
-		Item::Unrecognized { item, .. } => item.clone(),
-	}
+		ItemDetails::Unrecognized { details, .. } => details.clone(),
+	};
+	PrefsItem { video, details }
 }
 
 struct RowModel {
@@ -792,8 +820,8 @@ fn build_items_map(
 }
 
 fn column_text<'a>(_info_db: &'a InfoDb, item: &'a Item, column: ColumnType) -> Cow<'a, str> {
-	match item {
-		Item::Machine { machine_config, .. } => {
+	match &item.details {
+		ItemDetails::Machine { machine_config, .. } => {
 			let machine = machine_config.machine();
 			let text = match column {
 				ColumnType::Name => machine.name(),
@@ -804,7 +832,7 @@ fn column_text<'a>(_info_db: &'a InfoDb, item: &'a Item, column: ColumnType) -> 
 			};
 			text.into()
 		}
-		Item::Software {
+		ItemDetails::Software {
 			software_list,
 			software,
 			..
@@ -815,8 +843,10 @@ fn column_text<'a>(_info_db: &'a InfoDb, item: &'a Item, column: ColumnType) -> 
 			ColumnType::Year => software.year.as_str().into(),
 			ColumnType::Provider => software.publisher.as_str().into(),
 		},
-		Item::Unrecognized { item, .. } => {
-			let PrefsItem::Software(item) = item else { todo!() };
+		ItemDetails::Unrecognized { details, .. } => {
+			let PrefsItemDetails::Software(item) = &details else {
+				todo!()
+			};
 			match column {
 				ColumnType::Name => item.software.clone().into(),
 				ColumnType::SourceFile => format!("{}.xml", item.software_list).into(),

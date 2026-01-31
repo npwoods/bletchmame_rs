@@ -1,22 +1,22 @@
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
-use slint::ToSharedString;
 use tokio::sync::mpsc;
 
 use crate::dialogs::SenderExt;
 use crate::guiutils::modal::ModalStack;
-use crate::prefs::Preferences;
+use crate::prefs::PrefsVideo;
 use crate::ui::VideoDialog;
 use crate::ui::VideoSettings;
 
-pub async fn dialog_video(modal_stack: ModalStack, settings: VideoSettings) -> Option<VideoSettings> {
+pub async fn dialog_video(modal_stack: ModalStack, video: PrefsVideo) -> Option<PrefsVideo> {
 	let modal = modal_stack.modal(|| VideoDialog::new().unwrap());
 	let (tx, mut rx) = mpsc::channel(1);
 
 	// set up the video settings
+	let settings = VideoSettings::from(&video);
 	modal.dialog().set_settings(settings.clone());
 	modal.dialog().set_original_settings(settings);
-	modal.dialog().set_default_settings(default_video_settings());
+	modal.dialog().set_default_settings((&PrefsVideo::default()).into());
 
 	// set up the close handler
 	let tx_clone = tx.clone();
@@ -30,6 +30,7 @@ pub async fn dialog_video(modal_stack: ModalStack, settings: VideoSettings) -> O
 	let dialog_weak = modal.dialog().as_weak();
 	modal.dialog().on_ok_clicked(move || {
 		let results = dialog_weak.unwrap().get_settings();
+		let results = PrefsVideo::try_from(&results).unwrap();
 		tx_clone.signal(Some(results));
 	});
 
@@ -41,12 +42,4 @@ pub async fn dialog_video(modal_stack: ModalStack, settings: VideoSettings) -> O
 
 	// show the dialog
 	modal.run(async { rx.recv().await.unwrap() }).await
-}
-
-fn default_video_settings() -> VideoSettings {
-	let default_prefs = Preferences::default();
-	VideoSettings {
-		prescale: default_prefs.prescale.into(),
-		extra_mame_arguments: default_prefs.extra_mame_arguments.to_shared_string(),
-	}
 }

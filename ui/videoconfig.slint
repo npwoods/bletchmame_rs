@@ -1,0 +1,68 @@
+import {
+    Button,
+    HorizontalBox,
+    Slider,
+    TextEdit,
+    VerticalBox,
+} from "std-widgets.slint";
+
+export struct VideoSettings {
+    prescale: int,
+    extra-mame-arguments: string}
+
+export component VideoConfigComponent {
+    // properties
+    in property <bool> enabled: true;
+    in-out property <VideoSettings> settings: { prescale: 1 };
+    property <length> label-width: 140px;
+
+    // changed handlers
+    changed settings => {
+        prescale-slider.value = settings.prescale;
+    }
+
+    // controls
+    VerticalBox {
+        HorizontalBox {
+            vertical-stretch: 0;
+            Text {
+                width: label-width;
+                vertical-alignment: center;
+                text: "Prescale:";
+            }
+
+            prescale-slider := Slider {
+                minimum: 1;
+                maximum: 20;
+                step: 1;
+                value: root.settings.prescale;
+                enabled: root.enabled;
+                changed(value) => {
+                    root.settings.prescale = value;
+                }
+            }
+
+            Text {
+                vertical-alignment: center;
+                text: root.settings.prescale;
+            }
+        }
+
+        HorizontalBox {
+            vertical-stretch: 1;
+            Text {
+                width: label-width;
+                text: "Extra MAME Arguments:";
+            }
+
+            TextEdit {
+                min-width: 140px;
+                min-height: 60px;
+                preferred-height: 100%;
+                font-family: "Courier New";
+                enabled: root.enabled;
+                text <=> root.settings.extra-mame-arguments;
+            }
+        }
+    }
+}

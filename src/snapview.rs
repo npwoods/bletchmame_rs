@@ -24,6 +24,7 @@ use zip::result::ZipError;
 
 use crate::history_xml::HistoryXml;
 use crate::prefs::PrefsItem;
+use crate::prefs::PrefsItemDetails;
 use crate::prefs::PrefsMachineItem;
 use crate::prefs::PrefsSoftwareItem;
 
@@ -36,10 +37,10 @@ pub enum MultiPath {
 pub struct HistoryLoader(CancelableWorker<PathBuf, Result<HistoryXml>>);
 
 pub fn snap_view_string(item: Option<&PrefsItem>) -> SharedString {
-	match item {
+	match item.map(|x| &x.details) {
 		None => "".into(),
-		Some(PrefsItem::Machine(PrefsMachineItem { machine_name, .. })) => machine_name.into(),
-		Some(PrefsItem::Software(PrefsSoftwareItem {
+		Some(PrefsItemDetails::Machine(PrefsMachineItem { machine_name, .. })) => machine_name.into(),
+		Some(PrefsItemDetails::Software(PrefsSoftwareItem {
 			software_list,
 			software,
 			..
