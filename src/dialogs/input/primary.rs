@@ -12,6 +12,7 @@ use slint::Model;
 use slint::ModelNotify;
 use slint::ModelRc;
 use slint::ModelTracker;
+use slint::ToSharedString;
 use slint::Weak;
 use strum::VariantArray;
 use tokio::sync::mpsc;
@@ -276,7 +277,7 @@ impl Model for InputDialogModel {
 		let cluster = state.clusters.get(row)?;
 		let name = input_cluster_name(&state.inputs, cluster).into();
 		let input_seqs = input_cluster_input_seqs(&state.inputs, cluster);
-		let text = build_code_text(input_seqs, &state.codes).as_ref().into();
+		let text = build_code_text(input_seqs, &state.codes).to_shared_string();
 
 		let primary_action = match cluster {
 			InputCluster::Single(input_index) => {

@@ -363,7 +363,7 @@ impl State {
 			}
 			(Phase::Machine, b"chip") => {
 				let [chip_type, tag, name, clock] = evt.find_attributes([b"type", b"tag", b"name", b"clock"])?;
-				let Ok(chip_type) = chip_type.mandatory("type")?.as_ref().parse::<ChipType>() else {
+				let Ok(chip_type) = (*chip_type.mandatory("type")?).parse::<ChipType>() else {
 					// presumably an unknown chip type; ignore
 					return Ok(None);
 				};
@@ -386,7 +386,7 @@ impl State {
 				let [name, tag, mask] = evt.find_attributes([b"name", b"tag", b"mask"])?;
 				let name = name.mandatory("name")?;
 				let tag = normalize_tag(tag.mandatory("tag")?);
-				let mask = mask.mandatory("mask")?.as_ref().parse::<u32>()?.into();
+				let mask = (*mask.mandatory("mask")?).parse::<u32>()?.into();
 				let name_strindex = self.strings.lookup(&name);
 				let tag_strindex = self.strings.lookup(&tag);
 				let config = binary::Configuration {
@@ -436,8 +436,8 @@ impl State {
 					// presumably an unknown condition relation; ignore
 					return Ok(None);
 				};
-				let mask = mask.mandatory("mask")?.as_ref().parse::<u32>()?.into();
-				let value = value.mandatory("value")?.as_ref().parse::<u32>()?.into();
+				let mask = (*mask.mandatory("mask")?).parse::<u32>()?.into();
+				let value = (*value.mandatory("value")?).parse::<u32>()?.into();
 				let condition = binary::ConfigurationSettingCondition {
 					tag_strindex,
 					condition_relation,
@@ -511,7 +511,7 @@ impl State {
 			(Phase::Machine, b"softwarelist") => {
 				let [tag, name, status, filter] = evt.find_attributes([b"tag", b"name", b"status", b"filter"])?;
 				let status = status.mandatory("status")?;
-				let Ok(status) = status.as_ref().parse::<SoftwareListStatus>() else {
+				let Ok(status) = (*status).parse::<SoftwareListStatus>() else {
 					// presumably an unknown software list status; ignore
 					return Ok(None);
 				};

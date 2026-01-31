@@ -6,6 +6,7 @@ use std::sync::Arc;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
 use slint::LogicalPosition;
+use slint::ToSharedString;
 use slint::Weak;
 use smol_str::SmolStr;
 use strum::VariantArray;
@@ -256,8 +257,8 @@ fn build_input_dialog_entry(
 	if let Some(input) = input {
 		let input_seqs = [(input, Some(axis), SeqType::Standard), (input, Some(axis), seq_type)];
 		let suffix = seq_type.suffix();
-		let name = format!("{}{}", &input.name, suffix).into();
-		let text = build_code_text(input_seqs, codes).as_ref().into();
+		let name = format!("{}{}", &input.name, suffix).to_shared_string();
+		let text = build_code_text(input_seqs, codes).to_shared_string();
 		let primary_action = Action::SeqPollDialog {
 			port_tag: input.port_tag.clone(),
 			mask: input.mask,

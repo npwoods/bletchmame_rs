@@ -1664,7 +1664,7 @@ fn update_ui_for_current_history_item(model: &AppModel) {
 
 	// update current collection text
 	let current_collection_desc = collection.description(model.state.borrow().info_db().map(|x| &**x));
-	app_window.set_current_collection_text(current_collection_desc.as_ref().into());
+	app_window.set_current_collection_text(current_collection_desc.to_shared_string());
 
 	// update the bookmark this collection icon
 	let is_collection_in_list = prefs.collections.contains(&collection);

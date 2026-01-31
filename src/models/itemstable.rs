@@ -20,6 +20,7 @@ use slint::ModelRc;
 use slint::ModelTracker;
 use slint::SharedString;
 use slint::StandardListViewItem;
+use slint::ToSharedString;
 use slint::VecModel;
 use smol_str::SmolStr;
 use tracing::debug;
@@ -743,9 +744,8 @@ impl Model for RowModel {
 	fn row_data(&self, column: usize) -> Option<Self::Data> {
 		let column = *self.columns.get(column)?;
 		let item = self.items.get(self.row).unwrap();
-		let text = column_text(&self.info_db, item, column);
-		let text = String::from(text.as_ref());
-		Some(SharedString::from(text).into())
+		let text = column_text(&self.info_db, item, column).to_shared_string();
+		Some(text.into())
 	}
 
 	fn model_tracker(&self) -> &dyn ModelTracker {

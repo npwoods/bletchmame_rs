@@ -97,9 +97,9 @@ impl State {
 					b"has_input_using_mouse",
 				])?;
 				let machine_name = romname.unwrap_or_default().into();
-				let is_paused = is_paused.map(|x| parse_mame_bool(x.as_ref())).transpose()?;
-				let polling_input_seq = polling_input_seq.map(|x| parse_mame_bool(x.as_ref())).transpose()?;
-				let has_input_using_mouse = has_input_using_mouse.map(|x| parse_mame_bool(x.as_ref())).transpose()?;
+				let is_paused = is_paused.map(parse_mame_bool).transpose()?;
+				let polling_input_seq = polling_input_seq.map(parse_mame_bool).transpose()?;
+				let has_input_using_mouse = has_input_using_mouse.map(parse_mame_bool).transpose()?;
 				debug!(
 					machine_name=?machine_name,
 					is_paused=?is_paused,

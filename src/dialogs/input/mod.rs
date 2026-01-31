@@ -9,6 +9,7 @@ use std::str::FromStr;
 use easy_ext::ext;
 use itertools::Itertools;
 use slint::ModelRc;
+use slint::ToSharedString;
 use slint::VecModel;
 use strum::EnumString;
 
@@ -214,7 +215,7 @@ fn build_context_menu<'a>(
 		let selections = quick_items
 			.iter()
 			.map(|(title, seqs)| {
-				let title = title.as_ref().into();
+				let title = (&**title).into();
 				let seqs = seqs
 					.iter()
 					.map(|(port_tag, mask, seq_type, code)| ((*port_tag).clone(), *mask, *seq_type, (*code).into()))
@@ -234,7 +235,7 @@ fn build_context_menu<'a>(
 		.map(|(title, seqs)| {
 			let command = MameCommand::seq_set(&seqs);
 			let action = Action::from(command).encode_for_slint();
-			let title = title.as_ref().into();
+			let title = title.to_shared_string();
 			SimpleMenuEntry { title, action }
 		})
 		.chain(multiple_action)
