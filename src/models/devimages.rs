@@ -6,6 +6,7 @@ use slint::ModelNotify;
 use slint::ModelRc;
 use slint::ModelTracker;
 use slint::SharedString;
+use slint::ToSharedString;
 use slint::VecModel;
 
 use crate::devimageconfig::DevicesImagesConfig;
@@ -96,7 +97,7 @@ impl Model for DevicesAndImagesModel {
 					.into_iter()
 					.map(|opt| {
 						if let Some(name) = opt.name {
-							let name = SharedString::from(name.as_ref());
+							let name = name.to_shared_string();
 							if let Some(desc) = opt.description {
 								(name.clone(), format!("{desc} ({name})").into())
 							} else {
@@ -114,8 +115,7 @@ impl Model for DevicesAndImagesModel {
 				let display_name = image_desc
 					.map(ImageDesc::display_name)
 					.unwrap_or_default()
-					.as_ref()
-					.into();
+					.to_shared_string();
 				(Vec::default(), -1, display_name)
 			}
 		};

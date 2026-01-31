@@ -63,7 +63,7 @@ impl State {
 					return Ok(None);
 				};
 				if !is_valid_software_list_name(name.as_ref()) {
-					error!("handle_start(): Invalid software name {}", name.as_ref());
+					error!("handle_start(): Invalid software name {}", name);
 					return Ok(None);
 				}
 

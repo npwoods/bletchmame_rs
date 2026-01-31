@@ -5,6 +5,7 @@ use std::rc::Rc;
 use slint::Model;
 use slint::ModelNotify;
 use slint::ModelTracker;
+use slint::ToSharedString;
 use slint::Weak;
 
 use crate::action::Action;
@@ -102,7 +103,7 @@ impl Model for CollectionsViewModel {
 		let info_db = info_db.as_ref()?.as_ref();
 		self.get(row).map(|item| {
 			let icon = item.icon().slint_icon(&self.app_window_weak.unwrap());
-			let text = item.description(Some(info_db)).as_ref().into();
+			let text = item.description(Some(info_db)).to_shared_string();
 			NavigationItem {
 				icon,
 				text,

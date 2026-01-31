@@ -204,7 +204,7 @@ mod test {
 	#[test_case(2, ImageDesc::socket("contoso.com", 8888).unwrap(), "socket.contoso.com:8888")]
 	fn as_mame_image_desc(_index: usize, image_desc: ImageDesc, expected: &str) {
 		let actual = image_desc.as_mame_image_desc();
-		assert_eq!(expected, actual.as_ref());
+		assert_eq!(expected, &*actual);
 	}
 
 	#[test_case(0, "/foo/bar.img", None, Ok(ImageDesc::File("/foo/bar.img".into())))]
