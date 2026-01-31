@@ -9,6 +9,7 @@ use smol_str::SmolStr;
 use strum::EnumString;
 
 use crate::imagedesc::ImageDesc;
+use crate::prefs::PrefsVideo;
 
 #[derive(Clone, Debug)]
 pub enum MameWindowing {
@@ -34,6 +35,7 @@ pub struct MameStartArgs {
 	pub bios: Option<String>,
 	pub slots: Vec<(SmolStr, SmolStr)>,
 	pub images: Vec<(SmolStr, ImageDesc)>,
+	pub video: Option<PrefsVideo>,
 }
 
 impl MameStartArgs {

@@ -20,6 +20,7 @@ use crate::console::Console;
 use crate::info::InfoDb;
 use crate::job::Job;
 use crate::prefs::PreflightProblem;
+use crate::runtime::MameStartArgs;
 use crate::runtime::MameStderr;
 use crate::runtime::args::MameArguments;
 use crate::runtime::args::MameArgumentsResult;
@@ -43,6 +44,7 @@ pub struct AppState {
 	failure: Option<Rc<Failure>>,
 	last_save_state: Option<Rc<str>>,
 	pending_shutdown: bool,
+	pending_start: Option<MameStartArgs>,
 	fixed: Rc<Fixed>,
 }
 
@@ -137,6 +139,7 @@ impl AppState {
 			failure: None,
 			last_save_state: None,
 			pending_shutdown: false,
+			pending_start: None,
 			fixed,
 		}
 	}
@@ -317,6 +320,29 @@ impl AppState {
 
 		// attempt to reactivate and return
 		let new_state = new_state.activate().unwrap_or(new_state);
+		Some(new_state)
+	}
+
+	pub fn set_pending_start(&self, pending_start: MameStartArgs) -> Self {
+		Self {
+			pending_start: Some(pending_start),
+			..self.clone()
+		}
+	}
+
+	pub fn issue_pending_start_if_possible(&self) -> Option<Self> {
+		let session = self.live.as_ref().unwrap().session.as_ref()?;
+		session.status.as_ref()?;
+		let command_sender = session.command_sender.as_deref()?;
+
+		let pending_start = self.pending_start.as_ref()?;
+		let command = MameCommand::start(pending_start);
+		command_sender.send(command).unwrap();
+
+		let new_state = Self {
+			pending_start: None,
+			..self.clone()
+		};
 		Some(new_state)
 	}
 

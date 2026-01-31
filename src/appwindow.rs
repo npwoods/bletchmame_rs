@@ -87,6 +87,7 @@ use crate::models::itemstable::ItemsTableModel;
 use crate::prefs::BuiltinCollection;
 use crate::prefs::Preferences;
 use crate::prefs::PrefsCollection;
+use crate::prefs::PrefsVideo;
 use crate::prefs::SortOrder;
 use crate::prefs::pathtype::PathType;
 use crate::runtime::MameStderr;
@@ -165,6 +166,7 @@ struct AppModel {
 	modal_stack: ModalStack,
 	preferences: RefCell<Preferences>,
 	state: RefCell<AppState>,
+	video_override: RefCell<Option<PrefsVideo>>,
 	status_changed_channel: Channel<Status>,
 	child_window: RefCell<Option<ChildWindow>>,
 	mame_windowing: MameWindowing,
@@ -215,9 +217,9 @@ impl AppModel {
 		// save (ignore errors)
 		let _ = self.preferences.borrow().save(self.state.borrow().prefs_path());
 
-		// update the state (unless we're new)
-		if old_prefs.is_some() {
-			let mame_args_result = MameArguments::new(&prefs, &self.mame_windowing, false);
+		// update MAME arguments if not running
+		if old_prefs.is_some() && self.state.borrow().status().is_some_and(|s| s.running.is_none()) {
+			let mame_args_result = MameArguments::new(&prefs, None, &self.mame_windowing, false);
 			self.update_state(|state| state.update_mame_args_result(mame_args_result));
 		}
 
@@ -303,6 +305,14 @@ impl AppModel {
 				collections_model.update(info_db, &prefs.collections);
 			});
 			update_ui_for_current_history_item(self);
+		}
+
+		// pending start?
+		{
+			let mut state = self.state.borrow_mut();
+			if let Some(new_state) = state.issue_pending_start_if_possible() {
+				*state = new_state;
+			}
 		}
 
 		// shutting down?
@@ -405,7 +415,8 @@ impl AppModel {
 
 	pub fn make_mame_args(&self) -> MameArgumentsResult {
 		let prefs = self.preferences.borrow();
-		MameArguments::new(&prefs, &self.mame_windowing, false)
+		let video_override = self.video_override.borrow();
+		MameArguments::new(&prefs, video_override.as_ref(), &self.mame_windowing, false)
 	}
 
 	pub fn maybe_stop_warning(self: &Rc<Self>, f: impl FnOnce(&Rc<Self>) + 'static) {
@@ -510,6 +521,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		modal_stack,
 		preferences: RefCell::new(Preferences::default()),
 		state: RefCell::new(AppState::bogus()),
+		video_override: RefCell::new(None),
 		status_changed_channel: Channel::default(),
 		child_window: RefCell::new(child_window),
 		mame_windowing,
@@ -1245,10 +1257,12 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 			let fut = dialog_message_box::<OkOnly>(model_clone.modal_stack.clone(), "Error", message);
 			spawn_local(fut).unwrap();
 		}
-		Action::Start(start_args) => match start_args.preflight() {
+		Action::Start(mut start_args) => match start_args.preflight() {
 			Ok(_) => {
-				let action = MameCommand::start(&start_args).into();
-				handle_action(model, action);
+				model.video_override.replace(start_args.video.take());
+				let mame_args_result = model.make_mame_args();
+				model.update_state(|state| state.update_mame_args_result(mame_args_result));
+				model.update_state(|state| Some(state.set_pending_start(start_args)));
 			}
 			Err(errors) => {
 				let message = errors.into_iter().map(|e| e.to_string()).collect::<String>();

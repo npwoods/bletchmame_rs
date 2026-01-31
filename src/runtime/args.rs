@@ -10,6 +10,7 @@ use strum::IntoEnumIterator;
 
 use crate::prefs::Preferences;
 use crate::prefs::PreflightProblem;
+use crate::prefs::PrefsVideo;
 use crate::prefs::pathtype::PathType;
 use crate::runtime::MameWindowing;
 
@@ -20,7 +21,12 @@ pub struct MameArguments {
 }
 
 impl MameArguments {
-	pub fn new(prefs: &Preferences, windowing: &MameWindowing, skip_file_system_checks: bool) -> MameArgumentsResult {
+	pub fn new(
+		prefs: &Preferences,
+		video_override: Option<&PrefsVideo>,
+		windowing: &MameWindowing,
+		skip_file_system_checks: bool,
+	) -> MameArgumentsResult {
 		// run preflight first
 		let preflight_problems = prefs.paths.preflight(skip_file_system_checks);
 		if !preflight_problems.is_empty() {
@@ -51,13 +57,14 @@ impl MameArguments {
 		};
 
 		// video arguments
-		let video_args = ["-prescale".into(), Cow::Owned(prefs.video.prescale.to_string())].into_iter();
+		let video = video_override.unwrap_or(&prefs.video);
+		let video_args = ["-prescale".into(), Cow::Owned(video.prescale.to_string())].into_iter();
 
 		// platform specific arguments
 		let platform_args = platform_specific_args().into_iter().map(Cow::Borrowed);
 
 		// extra arguments
-		let extra_mame_arguments = split_unquoted_char(&prefs.video.extra_mame_arguments, ' ')
+		let extra_mame_arguments = split_unquoted_char(&video.extra_mame_arguments, ' ')
 			.unwrap_quotes(true)
 			.map(|s| Cow::Owned(OsString::from(s)));
 
@@ -139,7 +146,7 @@ mod test {
 			paths,
 			..Default::default()
 		};
-		let result = MameArguments::new(&prefs, &windowing, true).unwrap();
+		let result = MameArguments::new(&prefs, None, &windowing, true).unwrap();
 
 		fn find_arg(args: &[impl AsRef<Path>], target: &str) -> Option<String> {
 			args.iter().position(|x| x.as_ref() == Path::new(target)).map(|idx| {

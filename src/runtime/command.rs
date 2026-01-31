@@ -344,6 +344,7 @@ mod test {
 				bios: None,
 				slots: [].into(),
 				images,
+				video: None,
 			};
 			MameCommand::start(&start_args)
 		}

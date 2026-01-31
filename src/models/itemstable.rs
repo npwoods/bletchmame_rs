@@ -365,6 +365,7 @@ impl ItemsTableModel {
 					.iter()
 					.map(|(tag, image_desc)| (tag.as_str().into(), image_desc.clone()))
 					.collect::<Vec<_>>();
+				let video = item.video.clone();
 
 				let start_args = MameStartArgs {
 					machine_name,
@@ -372,6 +373,7 @@ impl ItemsTableModel {
 					bios,
 					slots,
 					images,
+					video,
 				};
 				let action = has_mame_initialized.then_some(Action::Start(start_args));
 				let run_title = run_item_text(machine.description()).into();
@@ -419,6 +421,7 @@ impl ItemsTableModel {
 								bios: None,
 								slots: [].into(),
 								images,
+								video: item.video.clone(),
 							};
 							let action = Some(Action::Start(start_args));
 							let title = machine.description().into();
