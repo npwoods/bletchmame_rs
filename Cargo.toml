@@ -62,8 +62,8 @@ tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 unicase = "2.9.0"
 uuid = { version = "1.20.0", features = ["v4"] }
 winit = "0.30.12"
-zerocopy = { version = "0.8.33", features = ["derive"] }
-zip = "7.0.0"
+zerocopy = { version = "0.8.37", features = ["derive"] }
+zip = "7.2.0"
 
 # Slint dependencies
 i-slint-backend-qt = { git = "https://github.com/npwoods/slint.git", rev = "14fa01f18e8bc0f5e59511d16ee39987011bfeb4", optional = true }
