@@ -203,7 +203,7 @@ fn access_paths(path_type: PathType) -> (fn(&PrefsPaths) -> &[SmolStr], PathsSto
 	}
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PrefsVideo {
 	pub prescale: u8,
 
@@ -393,6 +393,9 @@ pub struct HistoryEntry {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct PrefsItem {
+	#[serde(default, flatten, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub video: Option<PrefsVideo>,
+
 	#[serde(flatten)]
 	pub details: PrefsItemDetails,
 }

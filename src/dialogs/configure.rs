@@ -605,7 +605,7 @@ impl State {
 				PrefsItemDetails::Software(item)
 			}
 		};
-		PrefsItem { details }
+		PrefsItem { video: None, details }
 	}
 
 	pub fn set_slot_entry_option(&self, entry_index: usize, new_option_name: Option<&str>) {
