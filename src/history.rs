@@ -77,6 +77,7 @@ where
 
 	fn current_history_entry(&self) -> &'_ HistoryEntry {
 		let (history, position) = self.entries();
+		assert!(!history.is_empty(), "hgistory cannot be empty");
 		&history[history.len() - position - 1]
 	}
 

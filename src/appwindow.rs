@@ -3,6 +3,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::ffi::OsString;
+use std::ops::ControlFlow;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -87,13 +88,10 @@ use crate::models::itemstable::ItemsTableModel;
 use crate::prefs::BuiltinCollection;
 use crate::prefs::Preferences;
 use crate::prefs::PrefsCollection;
-use crate::prefs::PrefsVideo;
 use crate::prefs::SortOrder;
 use crate::prefs::pathtype::PathType;
 use crate::runtime::MameStderr;
 use crate::runtime::MameWindowing;
-use crate::runtime::args::MameArguments;
-use crate::runtime::args::MameArgumentsResult;
 use crate::runtime::command::MameCommand;
 use crate::runtime::command::MovieFormat;
 use crate::selection::SelectionManager;
@@ -164,12 +162,9 @@ struct AppModel {
 	app_window_weak: Weak<AppWindow>,
 	backend_runtime: BackendRuntime,
 	modal_stack: ModalStack,
-	preferences: RefCell<Preferences>,
 	state: RefCell<AppState>,
-	video_override: RefCell<Option<PrefsVideo>>,
 	status_changed_channel: Channel<Status>,
 	child_window: RefCell<Option<ChildWindow>>,
-	mame_windowing: MameWindowing,
 	history_loader: RefCell<Option<HistoryLoader>>,
 	searchbar_actions: RefCell<Vec<SharedString>>,
 }
@@ -200,28 +195,20 @@ impl AppModel {
 	pub fn modify_prefs(self: &Rc<Self>, func: impl FnOnce(&mut Preferences)) {
 		// modify actual preferences, and while we're at it get the old prefs for comparison
 		// purposes
-		let old_prefs = {
-			let mut prefs = self.preferences.borrow_mut();
-			let old_prefs = prefs.clone();
-			func(&mut prefs);
-			old_prefs
+		let (old_prefs, prefs) = {
+			let mut state = self.state.borrow_mut();
+			let old_prefs = state.preferences.clone();
+			func(&mut state.preferences);
+			let prefs = state.preferences.clone();
+			(old_prefs, prefs)
 		};
 
 		// we need to treat the initial modify_prefs() differently; if this is the first
 		// time we didn't really have "old prefs"; we determine this by checking the history
 		let old_prefs = (!old_prefs.history.is_empty()).then_some(&old_prefs);
 
-		// reborrow prefs (but not mutably)
-		let prefs = self.preferences.borrow();
-
 		// save (ignore errors)
-		let _ = self.preferences.borrow().save(self.state.borrow().prefs_path());
-
-		// update MAME arguments if not running
-		if old_prefs.is_some() && self.state.borrow().status().is_some_and(|s| s.running.is_none()) {
-			let mame_args_result = MameArguments::new(&prefs, None, &self.mame_windowing, false);
-			self.update_state(|state| state.update_mame_args_result(mame_args_result));
-		}
+		let _ = prefs.save(self.state.borrow().prefs_path());
 
 		// react to all of the possible changes
 		if old_prefs.is_none_or(|old_prefs| prefs.collections != old_prefs.collections) {
@@ -276,20 +263,24 @@ impl AppModel {
 		update_items_model_for_current_prefs(self);
 	}
 
-	pub fn update_state(self: &Rc<Self>, callback: impl FnOnce(&AppState) -> Option<AppState>) {
+	pub fn update_state(self: &Rc<Self>, callback: impl FnOnce(&mut AppState) -> bool) {
 		let info_db_changed = {
-			// invoke the callback to get the new state
+			// prepare to mutate the state
 			let mut state = self.state.borrow_mut();
-			let Some(new_state) = callback(&state) else { return };
+
+			// get the old InfoDb
+			let old_info_db = state.info_db().cloned();
+
+			// invoke the callback
+			if !callback(&mut state) {
+				return;
+			}
 
 			// did the InfoDB change?
-			let info_db_changed = state.info_db().is_some() != new_state.info_db().is_some()
-				|| Option::zip(state.info_db().as_ref(), new_state.info_db().as_ref())
-					.is_some_and(|(old, new)| !Rc::ptr_eq(old, new));
-
-			// commit the state and return the changes
-			*state = new_state;
-			info_db_changed
+			Option::zip(old_info_db.as_ref(), state.info_db())
+				.map_or(old_info_db.is_none() && state.info_db().is_none(), |(old, new)| {
+					Rc::ptr_eq(old, new)
+				})
 		};
 
 		// InfoDb changed?
@@ -300,26 +291,11 @@ impl AppModel {
 				items_model.update(Some(info_db), None, None, None, None, None, None);
 			});
 			self.with_collections_view_model(|collections_model| {
-				let prefs = self.preferences.borrow();
+				let state = self.state.borrow();
 				let info_db = info_db.clone();
-				collections_model.update(info_db, &prefs.collections);
+				collections_model.update(info_db, &state.preferences.collections);
 			});
 			update_ui_for_current_history_item(self);
-		}
-
-		// pending start?
-		{
-			let mut state = self.state.borrow_mut();
-			if let Some(new_state) = state.issue_pending_start_if_possible() {
-				*state = new_state;
-			}
-		}
-
-		// shutting down?
-		let is_shutdown = self.state.borrow().is_shutdown();
-		if is_shutdown {
-			update_prefs(self);
-			quit_event_loop().unwrap()
 		}
 
 		{
@@ -400,6 +376,18 @@ impl AppModel {
 		update_menus(self);
 	}
 
+	pub fn update_state_possible_shutdown(self: &Rc<Self>, callback: impl FnOnce(&mut AppState) -> ControlFlow<()>) {
+		let mut shutdown = false;
+		self.update_state(|state| {
+			shutdown = callback(state).is_break();
+			true
+		});
+		if shutdown {
+			update_prefs(self);
+			quit_event_loop().unwrap()
+		}
+	}
+
 	pub fn issue_command(&self, command: MameCommand) {
 		self.state.borrow().issue_command(command);
 	}
@@ -413,15 +401,9 @@ impl AppModel {
 			.map(|r| format!("{}.{}", r.machine_name, extension))
 	}
 
-	pub fn make_mame_args(&self) -> MameArgumentsResult {
-		let prefs = self.preferences.borrow();
-		let video_override = self.video_override.borrow();
-		MameArguments::new(&prefs, video_override.as_ref(), &self.mame_windowing, false)
-	}
-
 	pub fn maybe_stop_warning(self: &Rc<Self>, f: impl FnOnce(&Rc<Self>) + 'static) {
 		let model = self.clone();
-		let show_warning = model.preferences.borrow().show_stop_warning;
+		let show_warning = model.state.borrow().preferences.show_stop_warning;
 		let fut = async move {
 			let result = if show_warning && model.state.borrow().status().is_some_and(|s| s.running.is_some()) {
 				let fut = dialog_stop_warning(model.modal_stack.clone(), show_warning);
@@ -519,12 +501,9 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		app_window_weak: app_window.as_weak(),
 		backend_runtime: args.backend_runtime,
 		modal_stack,
-		preferences: RefCell::new(Preferences::default()),
 		state: RefCell::new(AppState::bogus()),
-		video_override: RefCell::new(None),
 		status_changed_channel: Channel::default(),
 		child_window: RefCell::new(child_window),
-		mame_windowing,
 		history_loader: RefCell::new(None),
 		searchbar_actions: RefCell::new([].into()),
 	};
@@ -722,7 +701,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	app_window.on_items_row_pointer_event(move |index, evt, position| {
 		if is_context_menu_event(&evt) {
 			let index = usize::try_from(index).unwrap();
-			let folder_info = get_folder_collections(&model_clone.preferences.borrow().collections);
+			let folder_info = get_folder_collections(&model_clone.state.borrow().preferences.collections);
 			let has_mame_initialized = model_clone.state.borrow().status().is_some();
 			if let Some(context_commands) =
 				model_clone.with_items_table_model(|x| x.context_commands(index, &folder_info, has_mame_initialized))
@@ -854,21 +833,19 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		app_window.set_menu_action_help_about(HelpAbout.encode_for_slint());
 	}
 
-	// initial updates
-	model.modify_prefs(|prefs| *prefs = preferences);
-
 	// now create the "real initial" state, now that we have a model to work with
-	let mame_args_result = model.make_mame_args();
 	let model_weak = Rc::downgrade(&model);
-	let state = AppState::new(prefs_path, mame_args_result, args.mame_stderr, move |action| {
+	let state = AppState::new(prefs_path, args.mame_stderr, mame_windowing, move |action| {
 		let model = model_weak.upgrade().unwrap();
 		handle_action(&model, action);
 	});
+	model.state.replace(state);
+	model.modify_prefs(|prefs| *prefs = preferences);
 
 	// and lets do something with that state; specifically
 	// - load the InfoDB (if availble)
 	// - start the MAME session (and maybe an InfoDB build in parallel)
-	model.update_state(|_| state.activate());
+	model.update_state(AppState::activate);
 
 	// and we've started
 	app_window.set_has_started(true);
@@ -923,17 +900,17 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 			model.clone().spawn_maybe_pause(fut);
 		}
 		Action::FileQuickLoadState => {
-			let last_save_state = model.state.borrow().last_save_state().unwrap();
+			let last_save_state = model.state.borrow().last_save_state().unwrap().to_string();
 			model.issue_command(MameCommand::state_load(last_save_state));
 		}
 		Action::FileQuickSaveState => {
-			let last_save_state = model.state.borrow().last_save_state().unwrap();
+			let last_save_state = model.state.borrow().last_save_state().unwrap().to_string();
 			model.issue_command(MameCommand::state_save(last_save_state));
 		}
 		Action::FileLoadState => {
 			let model_clone = model.clone();
 			let fut = async move {
-				let last_save_state = model_clone.state.borrow().last_save_state();
+				let last_save_state = model_clone.state.borrow().last_save_state().map(str::to_string);
 				let (initial_dir, initial_file) =
 					initial_dir_and_file_from_path(last_save_state.as_deref().map(Path::new));
 
@@ -942,7 +919,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 				let file_types = SAVE_STATE_FILE_TYPES;
 				if let Some(filename) = load_file_dialog(parent, title, file_types, initial_dir, initial_file).await {
 					model_clone.issue_command(MameCommand::state_load(&filename));
-					model_clone.update_state(|state| Some(state.set_last_save_state(Some(filename.into()))));
+					model_clone.update_state(|state| state.set_last_save_state(Some(filename.into())));
 				}
 			};
 			model.clone().spawn_maybe_pause(fut);
@@ -950,7 +927,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 		Action::FileSaveState => {
 			let model_clone = model.clone();
 			let fut = async move {
-				let last_save_state = model_clone.state.borrow().last_save_state();
+				let last_save_state = model_clone.state.borrow().last_save_state().map(str::to_string);
 				let (initial_dir, initial_file) =
 					initial_dir_and_file_from_path(last_save_state.as_deref().map(Path::new));
 				let (initial_dir, initial_file) = if initial_dir.is_some() && initial_file.is_some() {
@@ -969,7 +946,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 				let file_types = SAVE_STATE_FILE_TYPES;
 				if let Some(filename) = save_file_dialog(parent, title, file_types, initial_dir, initial_file).await {
 					model_clone.issue_command(MameCommand::state_save(&filename));
-					model_clone.update_state(|state| Some(state.set_last_save_state(Some(filename.into()))));
+					model_clone.update_state(|state| state.set_last_save_state(Some(filename.into())));
 				}
 			};
 			model.clone().spawn_maybe_pause(fut);
@@ -1032,9 +1009,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 		Action::FileResetHard => {
 			model.issue_command(MameCommand::hard_reset());
 		}
-		Action::FileExit => {
-			model.maybe_stop_warning(|model| model.update_state(AppState::shutdown));
-		}
+		Action::FileExit => model.maybe_stop_warning(|model| model.update_state_possible_shutdown(AppState::shutdown)),
 		Action::OptionsThrottleRate(throttle) => {
 			model.issue_command(MameCommand::throttle_rate(throttle));
 		}
@@ -1076,9 +1051,9 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 			let new_fullscreen = !window.is_fullscreen();
 
 			window.set_fullscreen(new_fullscreen);
-			let mut prefs = model.preferences.borrow_mut();
-			prefs.is_fullscreen = new_fullscreen;
-			prefs.fullscreen_display = window.fullscreen_display().map(|x| x.into());
+			let mut state = model.state.borrow_mut();
+			state.preferences.is_fullscreen = new_fullscreen;
+			state.preferences.fullscreen_display = window.fullscreen_display().map(|x| x.into());
 		}
 		Action::OptionsToggleMenuBar => {
 			let has_input_using_mouse = model
@@ -1191,7 +1166,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 			let model_clone = model.clone();
 			let fut = async move {
 				let modal_stack = model_clone.modal_stack.clone();
-				let old_video = model_clone.preferences.borrow().video.clone();
+				let old_video = model_clone.state.borrow().preferences.video.clone();
 				if let Some(new_video) = dialog_video(modal_stack, old_video).await {
 					model_clone.modify_prefs(|prefs| {
 						prefs.video = new_video;
@@ -1219,7 +1194,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 		}),
 		Action::SettingsImportMameIni => {
 			let model_clone = model.clone();
-			let paths = model.preferences.borrow().paths.clone();
+			let paths = model.state.borrow().preferences.paths.clone();
 			let fut = async move {
 				match dialog_import_mame_ini(model_clone.modal_stack.clone(), paths).await {
 					Ok(None) => {}
@@ -1232,17 +1207,17 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 			spawn_local(fut).unwrap();
 		}
 		Action::HelpResetMame => {
-			model.update_state(|state| state.reset());
+			model.update_state(AppState::reset);
 		}
 		Action::HelpRefreshInfoDb => {
-			model.update_state(|state| state.infodb_rebuild());
+			model.update_state(AppState::infodb_rebuild);
 		}
 		Action::HelpAbout => {
 			let fut = dialog_about(model.modal_stack.clone());
 			model.clone().spawn_maybe_pause(fut);
 		}
 		Action::MameSessionEnded => {
-			model.update_state(|state| Some(state.session_ended()));
+			model.update_state_possible_shutdown(AppState::session_ended);
 		}
 		Action::MameStatusUpdate(update) => {
 			model.update_state(|state| state.status_update(update));
@@ -1257,12 +1232,9 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 			let fut = dialog_message_box::<OkOnly>(model_clone.modal_stack.clone(), "Error", message);
 			spawn_local(fut).unwrap();
 		}
-		Action::Start(mut start_args) => match start_args.preflight() {
+		Action::Start(start_args) => match start_args.preflight() {
 			Ok(_) => {
-				model.video_override.replace(start_args.video.take());
-				let mame_args_result = model.make_mame_args();
-				model.update_state(|state| state.update_mame_args_result(mame_args_result));
-				model.update_state(|state| Some(state.set_pending_start(start_args)));
+				model.update_state(|state| state.start(start_args));
 			}
 			Err(errors) => {
 				let message = errors.into_iter().map(|e| e.to_string()).collect::<String>();
@@ -1317,7 +1289,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 			});
 		}
 		Action::AddToNewFolderDialog(items) => {
-			let existing_names = get_folder_collection_names(&model.preferences.borrow().collections);
+			let existing_names = get_folder_collection_names(&model.state.borrow().preferences.collections);
 			let model_clone = model.clone();
 			let fut = async move {
 				if let Some(name) = dialog_new_collection(model_clone.modal_stack.clone(), existing_names).await {
@@ -1349,7 +1321,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 		}
 		Action::DeleteCollectionDialog { index } => {
 			let model_clone = model.clone();
-			let old_name = get_collection_name(&model.preferences.borrow().collections, index).to_string();
+			let old_name = get_collection_name(&model.state.borrow().preferences.collections, index).to_string();
 			let fut = async move {
 				let message = format!("Are you sure you want to delete \"{old_name}\"");
 				if dialog_message_box::<OkCancel>(model_clone.modal_stack.clone(), "Delete", message).await
@@ -1365,9 +1337,9 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 			spawn_local(fut).unwrap();
 		}
 		Action::RenameCollectionDialog { index } => {
-			let existing_names = get_folder_collection_names(&model.preferences.borrow().collections);
+			let existing_names = get_folder_collection_names(&model.state.borrow().preferences.collections);
 			let model_clone = model.clone();
-			let old_name = get_collection_name(&model.preferences.borrow().collections, index).to_string();
+			let old_name = get_collection_name(&model.state.borrow().preferences.collections, index).to_string();
 			let fut = async move {
 				if let Some(new_name) =
 					dialog_rename_collection(model_clone.modal_stack.clone(), existing_names, old_name).await
@@ -1382,7 +1354,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 			prefs.rename_folder(index, new_name);
 		}),
 		Action::BookmarkCurrentCollection => {
-			let (collection, _) = model.preferences.borrow().current_collection();
+			let (collection, _) = model.state.borrow().preferences.current_collection();
 			model.modify_prefs(|prefs| {
 				prefs.collections.push(collection);
 			})
@@ -1436,17 +1408,18 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 			spawn_local(fut).unwrap();
 		}
 		Action::InfoDbBuildProgress { machine_description } => {
-			model.update_state(|state| Some(state.infodb_build_progress(machine_description)))
+			model.update_state(|state| state.infodb_build_progress(machine_description))
 		}
-		Action::InfoDbBuildComplete => model.update_state(|state| Some(state.infodb_build_complete())),
-		Action::InfoDbBuildCancel => model.update_state(|state| Some(state.infodb_build_cancel())),
+		Action::InfoDbBuildComplete => model.update_state(AppState::infodb_build_complete),
+		Action::InfoDbBuildCancel => model.update_state(AppState::infodb_build_cancel),
 		Action::ReactivateMame => model.update_state(AppState::activate),
 		Action::Configure { folder_name, index } => {
 			let model_clone = model.clone();
 			let info_db = model.state.borrow().info_db().unwrap().clone();
 			let (folder_index, item) = model
-				.preferences
+				.state
 				.borrow()
+				.preferences
 				.collections
 				.iter()
 				.enumerate()
@@ -1461,8 +1434,8 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 				.expect("could not find folder");
 
 			let fut = async move {
-				let paths = model_clone.preferences.borrow().paths.clone();
-				let global_video = model_clone.preferences.borrow().video.clone();
+				let paths = model_clone.state.borrow().preferences.paths.clone();
+				let global_video = model_clone.state.borrow().preferences.video.clone();
 				if let Some(item) =
 					dialog_configure(model_clone.modal_stack.clone(), info_db, item, &paths, &global_video).await
 				{
@@ -1571,7 +1544,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 }
 
 async fn show_paths_dialog(model: Rc<AppModel>, path_type: Option<PathType>) {
-	let paths = model.preferences.borrow().paths.clone();
+	let paths = model.state.borrow().preferences.paths.clone();
 	if let Some(new_paths) = dialog_paths(model.modal_stack.clone(), paths, path_type).await {
 		model.modify_prefs(|prefs| prefs.paths = new_paths.into());
 	}
@@ -1582,7 +1555,7 @@ fn update_menus(model: &AppModel) {
 	let state = model.state.borrow();
 	let build = state.status().as_ref().map(|s| &s.build);
 	let running = state.status().and_then(|s| s.running.as_ref());
-	let has_mame_executable = model.preferences.borrow().paths.mame_executable.is_some();
+	let has_mame_executable = model.state.borrow().preferences.paths.mame_executable.is_some();
 	let is_running = running.is_some();
 	let is_paused = running.as_ref().map(|r| r.is_paused).unwrap_or_default();
 	let is_throttled = running.as_ref().map(|r| r.is_throttled).unwrap_or_default();
@@ -1648,7 +1621,8 @@ fn update_ui_for_current_history_item(model: &AppModel) {
 
 	// the basics
 	let app_window = model.app_window();
-	let prefs = model.preferences.borrow();
+	let state = model.state.borrow();
+	let prefs = &state.preferences;
 	let search = prefs.current_history_entry().search.clone();
 
 	// update back/forward buttons
@@ -1688,7 +1662,8 @@ fn update_items_columns_model(model: &AppModel) {
 	let start_instant = Instant::now();
 
 	let app_window = model.app_window();
-	let prefs = model.preferences.borrow();
+	let state = model.state.borrow();
+	let prefs = &state.preferences;
 
 	let items_columns = app_window.get_items_columns();
 	let sort_suppressed = prefs.current_history_entry().sort_suppressed;
@@ -1715,7 +1690,8 @@ fn update_items_model_for_current_prefs(model: &AppModel) {
 	let start_instant = Instant::now();
 
 	model.with_items_table_model(move |items_model| {
-		let prefs = model.preferences.borrow();
+		let state = model.state.borrow();
+		let prefs = &state.preferences;
 		let entry = prefs.current_history_entry();
 		let (current_collection, _) = prefs.current_collection();
 		let column_types = prefs.items_columns.iter().map(|col| col.column_type).collect();
@@ -1821,7 +1797,7 @@ fn searchbar_items(model: &AppModel, text: &str) -> Vec<SearchBarItem> {
 	let component = model.app_window();
 	let state = model.state.borrow();
 	let info_db = state.info_db().map(|x| x.as_ref());
-	let prefs = model.preferences.borrow();
+	let prefs = &state.preferences;
 
 	let mut items = prefs
 		.collections
