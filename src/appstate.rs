@@ -19,6 +19,7 @@ use crate::canceller::Canceller;
 use crate::console::Console;
 use crate::info::InfoDb;
 use crate::job::Job;
+use crate::prefs::Preferences;
 use crate::prefs::PreflightProblem;
 use crate::runtime::MameStartArgs;
 use crate::runtime::MameStderr;
@@ -37,6 +38,7 @@ use crate::runtime::session::Error as SessionError;
 use crate::runtime::session::Result as SessionResult;
 
 pub struct AppState {
+	pub preferences: Preferences,
 	mame_args_result: MameArgumentsResult,
 	info_db_build: Option<InfoDbBuild>,
 	live: Option<Live>,
@@ -131,6 +133,7 @@ impl AppState {
 			callback,
 		};
 		Self {
+			preferences: Preferences::default(),
 			mame_args_result,
 			info_db_build: None,
 			live: None,
