@@ -1,3 +1,4 @@
+use std::ops::ControlFlow;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -21,8 +22,10 @@ use crate::info::InfoDb;
 use crate::job::Job;
 use crate::prefs::Preferences;
 use crate::prefs::PreflightProblem;
+use crate::prefs::PrefsVideo;
 use crate::runtime::MameStartArgs;
 use crate::runtime::MameStderr;
+use crate::runtime::MameWindowing;
 use crate::runtime::args::MameArguments;
 use crate::runtime::args::MameArgumentsResult;
 use crate::runtime::command::MameCommand;
@@ -39,13 +42,11 @@ use crate::runtime::session::Result as SessionResult;
 
 pub struct AppState {
 	pub preferences: Preferences,
-	mame_args_result: MameArgumentsResult,
 	info_db_build: Option<InfoDbBuild>,
 	live: Option<Live>,
 	failure: Option<Failure>,
 	last_save_state: Option<Box<str>>,
-	pending_shutdown: bool,
-	pending_start: Option<MameStartArgs>,
+	video_override: Option<PrefsVideo>,
 	fixed: Fixed,
 }
 
@@ -71,8 +72,13 @@ struct Session {
 	command_sender: Option<Arc<Sender<MameCommand>>>,
 	status: Option<Rc<Status>>,
 	pending_status: Option<Rc<Status>>,
-	pending_mame_args_result_update: Option<MameArgumentsResult>,
-	pending_restart: bool,
+	post_session_end: Option<PostSessionEnd>,
+}
+
+#[derive(Clone, Debug)]
+enum PostSessionEnd {
+	Shutdown,
+	Restart { command: Option<MameCommand> },
 }
 
 #[derive(Debug)]
@@ -87,6 +93,7 @@ enum Failure {
 struct Fixed {
 	prefs_path: PathBuf,
 	mame_stderr: MameStderr,
+	mame_windowing: MameWindowing,
 	console: Arc<Mutex<Option<Console>>>,
 	callback: CommandCallback,
 }
@@ -120,8 +127,8 @@ impl AppState {
 	/// Creates an initial `AppState`
 	pub fn new(
 		prefs_path: PathBuf,
-		mame_args_result: MameArgumentsResult,
 		mame_stderr: MameStderr,
+		mame_windowing: MameWindowing,
 		callback: impl Fn(Action) + 'static,
 	) -> Self {
 		let console = Arc::new(Mutex::new(None));
@@ -129,18 +136,17 @@ impl AppState {
 		let fixed = Fixed {
 			prefs_path,
 			mame_stderr,
+			mame_windowing,
 			console,
 			callback,
 		};
 		Self {
 			preferences: Preferences::default(),
-			mame_args_result,
 			info_db_build: None,
 			live: None,
 			failure: None,
 			last_save_state: None,
-			pending_shutdown: false,
-			pending_start: None,
+			video_override: None,
 			fixed,
 		}
 	}
@@ -149,27 +155,37 @@ impl AppState {
 	pub fn bogus() -> Self {
 		Self::new(
 			"".into(),
-			Ok(MameArguments::default()),
 			MameStderr::Capture,
+			MameWindowing::Windowed,
 			|_| unreachable!(),
+		)
+	}
+
+	fn make_mame_args(&self) -> MameArgumentsResult {
+		MameArguments::new(
+			&self.preferences,
+			self.video_override.as_ref(),
+			&self.fixed.mame_windowing,
+			false,
 		)
 	}
 
 	pub fn activate(&mut self) -> bool {
 		// if we already have a session (in any form, we're already active) or if we're shutting down, don't proceed
-		if self.live.as_ref().is_some_and(|live| live.session.is_some()) || self.pending_shutdown {
+		if self.live.as_ref().is_some_and(|live| live.session.is_some()) {
 			return false;
 		}
 
 		// get or load the InfoDb
+		let mame_args_result = self.make_mame_args();
 		let info_db = self.info_db().cloned().or_else(|| {
-			let mame_executable_path = self.mame_args_result.as_ref().as_ref().ok()?.program.as_str();
+			let mame_executable_path = mame_args_result.as_ref().as_ref().ok()?.program.as_str();
 			let info_db = InfoDb::load(&self.fixed.prefs_path, mame_executable_path).ok()?;
 			Some(Rc::new(info_db))
 		});
 
 		if let Some(info_db) = info_db {
-			let (session, failure) = match self.mame_args_result.clone() {
+			let (session, failure) = match mame_args_result {
 				Ok(mame_args) => {
 					let session = self.start_session(mame_args);
 					(Some(session), None)
@@ -202,8 +218,7 @@ impl AppState {
 			command_sender,
 			status: None,
 			pending_status: None,
-			pending_mame_args_result_update: None,
-			pending_restart: false,
+			post_session_end: None,
 		}
 	}
 
@@ -213,7 +228,8 @@ impl AppState {
 		}
 
 		// access the MAME executable path (or preflight errors if we don't have them)
-		let mame_executable_path_result = match self.mame_args_result.as_ref() {
+		let mame_arguments_result = self.make_mame_args();
+		let mame_executable_path_result = match mame_arguments_result.as_ref() {
 			Ok(mame_args) => Ok(mame_args.program.as_str()),
 			Err(e) => {
 				if let Some(program) = &e.program {
@@ -248,94 +264,38 @@ impl AppState {
 		true
 	}
 
-	// update MAME arguments and refresh MAME if needed
-	pub fn update_mame_args_result(&mut self, mame_args_result: MameArgumentsResult) -> bool {
-		if self.mame_args_result == mame_args_result {
-			// no changes? nothing to do
-			return false;
-		}
-
-		// shutdown the live session if we have one; other wise drop it all
-		let live = self
-			.live
-			.as_ref()
-			.and_then(|live| live.session.as_ref().map(|session| (live.info_db.clone(), session)))
-			.map(|(info_db, old_session)| {
-				let new_session = Session {
-					command_sender: None,
-					pending_mame_args_result_update: Some(mame_args_result.clone()),
-					pending_restart: true,
-					..old_session.clone()
-				};
-				Live {
-					info_db,
-					session: Some(new_session),
-				}
-			});
-
-		// create the new state
-		let mame_args_result = if live.is_some() {
-			self.mame_args_result.clone()
-		} else {
-			mame_args_result.clone()
-		};
-
-		self.live = live;
-		self.mame_args_result = mame_args_result;
-
-		// attempt to reactivate and return
-		self.activate();
-		true
-	}
-
 	pub fn reset(&mut self) -> bool {
-		let live = self
-			.live
-			.as_ref()
-			.and_then(|live| live.session.as_ref().map(|session| (live.info_db.clone(), session)))
-			.map(|(info_db, old_session)| {
-				let new_session = Session {
-					command_sender: None,
-					pending_restart: true,
-					..old_session.clone()
-				};
-				Live {
-					info_db,
-					session: Some(new_session),
-				}
-			});
-		self.live = live;
+		// if a session is live, set it to stop and restart
+		if let Some(session) = self.live.as_mut().and_then(|live| live.session.as_mut()) {
+			session.command_sender = None;
+			session.post_session_end = Some(PostSessionEnd::Restart { command: None });
+		}
 
 		// attempt to reactivate and return
 		self.activate();
 		true
 	}
 
-	pub fn set_pending_start(&mut self, pending_start: MameStartArgs) -> bool {
-		self.pending_start = Some(pending_start);
-		true
-	}
+	pub fn start(&mut self, start_args: MameStartArgs) -> bool {
+		// build the command that will ultimately be issued to MAME/worker_ui
+		let command = MameCommand::start(&start_args);
 
-	pub fn issue_pending_start_if_possible(&mut self) -> bool {
-		let Some(live) = self.live.as_ref() else {
-			return false;
-		};
-		let Some(session) = live.session.as_ref() else {
-			return false;
-		};
-		if session.status.is_none() {
-			return false;
+		// access the live session (which had better be present)
+		let session = self.live.as_mut().unwrap().session.as_mut().unwrap();
+
+		// is the session live and ready?
+		if let Some(command_sender) = &session.command_sender
+			&& self.video_override == start_args.video
+		{
+			// if so, issue the command to start
+			command_sender.send(command).unwrap();
+		} else {
+			// if not, set us up to restart with the new command
+			let command = Some(command);
+			self.video_override = start_args.video;
+			session.command_sender = None;
+			session.post_session_end = Some(PostSessionEnd::Restart { command });
 		}
-		let Some(command_sender) = session.command_sender.as_deref() else {
-			return false;
-		};
-		let Some(pending_start) = self.pending_start.as_ref() else {
-			return false;
-		};
-		let command = MameCommand::start(pending_start);
-		command_sender.send(command).unwrap();
-
-		self.pending_start = None;
 		true
 	}
 
@@ -408,7 +368,7 @@ impl AppState {
 					(Some(new_session), failure)
 				} else {
 					// no session; create a new one
-					let mame_args = self.mame_args_result.as_ref().unwrap().clone();
+					let mame_args = self.make_mame_args().unwrap();
 					let session = self.start_session(mame_args);
 					(Some(session), None)
 				};
@@ -497,7 +457,7 @@ impl AppState {
 	}
 
 	/// The MAME session ended; return a new state
-	pub fn session_ended(&mut self) -> bool {
+	pub fn session_ended(&mut self) -> ControlFlow<()> {
 		// access the "live" and the session
 		let live = self.live.as_mut().unwrap();
 		let session = live.session.as_mut().unwrap();
@@ -508,40 +468,44 @@ impl AppState {
 		// if we failed, we have to report the error
 		let failure = result.err().map(Failure::SessionError);
 
-		// there might be a pending paths update
-		let pending_mame_args_result = session.pending_mame_args_result_update.take();
+		// identify activities that need to happen after the session ends
+		let (reactivate, command, result) = match session.post_session_end.take() {
+			None => (false, None, ControlFlow::Continue(())),
+			Some(PostSessionEnd::Restart { command }) => (true, command, ControlFlow::Continue(())),
+			Some(PostSessionEnd::Shutdown) => (false, None, ControlFlow::Break(())),
+		};
 
-		// do we need to restart ourselves afterwards?
-		let pending_restart = session.pending_restart && failure.is_none();
-
-		// create the new state
+		// clear out the session
 		if let Some(live) = self.live.as_mut() {
 			live.session = None;
 		}
+
+		// identify failures
 		self.failure = failure;
 
-		// apply any pending paths update
-		if let Some(pending_mame_args_result) = pending_mame_args_result {
-			self.update_mame_args_result(pending_mame_args_result);
-		}
-
-		// if there is a pending restart, kick it off - in any case after this we're done
-		if pending_restart {
+		// do we need to reactivate?
+		if reactivate {
 			self.activate();
 		}
-		true
+
+		// do we need to issue a command?
+		if let Some(command) = command {
+			self.issue_command(command);
+		}
+
+		// and we're done!
+		result
 	}
 
-	pub fn shutdown(&mut self) -> bool {
-		if self.pending_shutdown {
-			return false;
-		}
-
-		self.pending_shutdown = true;
-		if let Some(session) = self.live.as_mut().and_then(|live| live.session.as_mut()) {
+	pub fn shutdown(&mut self) -> ControlFlow<()> {
+		let session = self.live.as_mut().and_then(|live| live.session.as_mut());
+		if let Some(session) = session {
 			session.command_sender = None;
+			session.post_session_end = Some(PostSessionEnd::Shutdown);
+			ControlFlow::Continue(())
+		} else {
+			ControlFlow::Break(())
 		}
-		true
 	}
 
 	pub fn info_db(&self) -> Option<&'_ Rc<InfoDb>> {
@@ -583,17 +547,22 @@ impl AppState {
 
 		// upfront logic to determine the type of report presented, if any; keep
 		// this logic distinct from the mechanics of displaying the report
-		let is_starting_up = self
+		let (is_starting_up, is_shutting_down) = self
 			.live
 			.as_ref()
 			.and_then(|live| live.session.as_ref())
-			.map(|session| session.status.is_none())
+			.map(|session| {
+				(
+					session.status.is_none(),
+					matches!(session.post_session_end, Some(PostSessionEnd::Shutdown)),
+				)
+			})
 			.unwrap_or_default();
 		let report_type = match (
 			self.info_db_build.as_ref(),
 			self.failure.as_ref(),
 			is_starting_up,
-			self.pending_shutdown,
+			is_shutting_down,
 		) {
 			(Some(info_db_build), _, _, _) => {
 				Some(ReportType::InfoDbBuild(info_db_build.machine_description.as_deref()))
@@ -731,12 +700,6 @@ impl AppState {
 
 	pub fn is_building_infodb(&self) -> bool {
 		self.info_db_build.is_some()
-	}
-
-	pub fn is_shutdown(&self) -> bool {
-		self.pending_shutdown
-			&& self.info_db_build.is_none()
-			&& self.live.as_ref().is_none_or(|live| live.session.is_none())
 	}
 
 	pub fn prefs_path(&self) -> &'_ Path {

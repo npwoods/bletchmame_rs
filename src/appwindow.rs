@@ -3,6 +3,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::ffi::OsString;
+use std::ops::ControlFlow;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -87,13 +88,10 @@ use crate::models::itemstable::ItemsTableModel;
 use crate::prefs::BuiltinCollection;
 use crate::prefs::Preferences;
 use crate::prefs::PrefsCollection;
-use crate::prefs::PrefsVideo;
 use crate::prefs::SortOrder;
 use crate::prefs::pathtype::PathType;
 use crate::runtime::MameStderr;
 use crate::runtime::MameWindowing;
-use crate::runtime::args::MameArguments;
-use crate::runtime::args::MameArgumentsResult;
 use crate::runtime::command::MameCommand;
 use crate::runtime::command::MovieFormat;
 use crate::selection::SelectionManager;
@@ -165,10 +163,8 @@ struct AppModel {
 	backend_runtime: BackendRuntime,
 	modal_stack: ModalStack,
 	state: RefCell<AppState>,
-	video_override: RefCell<Option<PrefsVideo>>,
 	status_changed_channel: Channel<Status>,
 	child_window: RefCell<Option<ChildWindow>>,
-	mame_windowing: MameWindowing,
 	history_loader: RefCell<Option<HistoryLoader>>,
 	searchbar_actions: RefCell<Vec<SharedString>>,
 }
@@ -213,12 +209,6 @@ impl AppModel {
 
 		// save (ignore errors)
 		let _ = prefs.save(self.state.borrow().prefs_path());
-
-		// update MAME arguments if not running
-		if old_prefs.is_some() && self.state.borrow().status().is_some_and(|s| s.running.is_none()) {
-			let mame_args_result = MameArguments::new(&prefs, None, &self.mame_windowing, false);
-			self.update_state(|state| state.update_mame_args_result(mame_args_result));
-		}
 
 		// react to all of the possible changes
 		if old_prefs.is_none_or(|old_prefs| prefs.collections != old_prefs.collections) {
@@ -308,16 +298,6 @@ impl AppModel {
 			update_ui_for_current_history_item(self);
 		}
 
-		// pending start?
-		self.state.borrow_mut().issue_pending_start_if_possible();
-
-		// shutting down?
-		let is_shutdown = self.state.borrow().is_shutdown();
-		if is_shutdown {
-			update_prefs(self);
-			quit_event_loop().unwrap()
-		}
-
 		{
 			let state = self.state.borrow();
 			let status = state.status();
@@ -396,6 +376,18 @@ impl AppModel {
 		update_menus(self);
 	}
 
+	pub fn update_state_possible_shutdown(self: &Rc<Self>, callback: impl FnOnce(&mut AppState) -> ControlFlow<()>) {
+		let mut shutdown = false;
+		self.update_state(|state| {
+			shutdown = callback(state).is_break();
+			true
+		});
+		if shutdown {
+			update_prefs(self);
+			quit_event_loop().unwrap()
+		}
+	}
+
 	pub fn issue_command(&self, command: MameCommand) {
 		self.state.borrow().issue_command(command);
 	}
@@ -407,12 +399,6 @@ impl AppModel {
 			.as_ref()
 			.and_then(|s| s.running.as_ref())
 			.map(|r| format!("{}.{}", r.machine_name, extension))
-	}
-
-	pub fn make_mame_args(&self) -> MameArgumentsResult {
-		let state = self.state.borrow();
-		let video_override = self.video_override.borrow();
-		MameArguments::new(&state.preferences, video_override.as_ref(), &self.mame_windowing, false)
 	}
 
 	pub fn maybe_stop_warning(self: &Rc<Self>, f: impl FnOnce(&Rc<Self>) + 'static) {
@@ -516,10 +502,8 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		backend_runtime: args.backend_runtime,
 		modal_stack,
 		state: RefCell::new(AppState::bogus()),
-		video_override: RefCell::new(None),
 		status_changed_channel: Channel::default(),
 		child_window: RefCell::new(child_window),
-		mame_windowing,
 		history_loader: RefCell::new(None),
 		searchbar_actions: RefCell::new([].into()),
 	};
@@ -850,9 +834,8 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	}
 
 	// now create the "real initial" state, now that we have a model to work with
-	let mame_args_result = MameArguments::new(&preferences, None, &model.mame_windowing, false);
 	let model_weak = Rc::downgrade(&model);
-	let state = AppState::new(prefs_path, mame_args_result, args.mame_stderr, move |action| {
+	let state = AppState::new(prefs_path, args.mame_stderr, mame_windowing, move |action| {
 		let model = model_weak.upgrade().unwrap();
 		handle_action(&model, action);
 	});
@@ -1026,9 +1009,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 		Action::FileResetHard => {
 			model.issue_command(MameCommand::hard_reset());
 		}
-		Action::FileExit => {
-			model.maybe_stop_warning(|model| model.update_state(AppState::shutdown));
-		}
+		Action::FileExit => model.maybe_stop_warning(|model| model.update_state_possible_shutdown(AppState::shutdown)),
 		Action::OptionsThrottleRate(throttle) => {
 			model.issue_command(MameCommand::throttle_rate(throttle));
 		}
@@ -1236,7 +1217,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 			model.clone().spawn_maybe_pause(fut);
 		}
 		Action::MameSessionEnded => {
-			model.update_state(AppState::session_ended);
+			model.update_state_possible_shutdown(AppState::session_ended);
 		}
 		Action::MameStatusUpdate(update) => {
 			model.update_state(|state| state.status_update(update));
@@ -1251,12 +1232,9 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 			let fut = dialog_message_box::<OkOnly>(model_clone.modal_stack.clone(), "Error", message);
 			spawn_local(fut).unwrap();
 		}
-		Action::Start(mut start_args) => match start_args.preflight() {
+		Action::Start(start_args) => match start_args.preflight() {
 			Ok(_) => {
-				model.video_override.replace(start_args.video.take());
-				let mame_args_result = model.make_mame_args();
-				model.update_state(|state| state.update_mame_args_result(mame_args_result));
-				model.update_state(|state| state.set_pending_start(start_args));
+				model.update_state(|state| state.start(start_args));
 			}
 			Err(errors) => {
 				let message = errors.into_iter().map(|e| e.to_string()).collect::<String>();
