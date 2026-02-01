@@ -36,16 +36,15 @@ use crate::version::MameVersion;
 use crate::runtime::session::Error as SessionError;
 use crate::runtime::session::Result as SessionResult;
 
-#[derive(Clone)]
 pub struct AppState {
 	mame_args_result: MameArgumentsResult,
 	info_db_build: Option<InfoDbBuild>,
 	live: Option<Live>,
-	failure: Option<Rc<Failure>>,
-	last_save_state: Option<Rc<str>>,
+	failure: Option<Failure>,
+	last_save_state: Option<Box<str>>,
 	pending_shutdown: bool,
 	pending_start: Option<MameStartArgs>,
-	fixed: Rc<Fixed>,
+	fixed: Fixed,
 }
 
 /// Represents the state of an InfoDb build (-listxml) job
@@ -131,7 +130,6 @@ impl AppState {
 			console,
 			callback,
 		};
-		let fixed = Rc::new(fixed);
 		Self {
 			mame_args_result,
 			info_db_build: None,
@@ -154,10 +152,10 @@ impl AppState {
 		)
 	}
 
-	pub fn activate(&self) -> Option<Self> {
+	pub fn activate(&mut self) -> bool {
 		// if we already have a session (in any form, we're already active) or if we're shutting down, don't proceed
 		if self.live.as_ref().is_some_and(|live| live.session.is_some()) || self.pending_shutdown {
-			return None;
+			return false;
 		}
 
 		// get or load the InfoDb
@@ -174,17 +172,14 @@ impl AppState {
 					(Some(session), None)
 				}
 				Err(e) => {
-					let failure = Rc::new(Failure::Preflight(e.preflight_problems));
+					let failure = Failure::Preflight(e.preflight_problems);
 					(None, Some(failure))
 				}
 			};
 
-			let new_state = Self {
-				live: Some(Live { info_db, session }),
-				failure,
-				..self.clone()
-			};
-			Some(new_state)
+			self.live = Some(Live { info_db, session });
+			self.failure = failure;
+			true
 		} else {
 			// we don't have InfoDb; force a rebuild
 			self.infodb_rebuild()
@@ -209,9 +204,9 @@ impl AppState {
 		}
 	}
 
-	pub fn infodb_rebuild(&self) -> Option<Self> {
+	pub fn infodb_rebuild(&mut self) -> bool {
 		if self.info_db_build.is_some() {
-			return None;
+			return false;
 		}
 
 		// access the MAME executable path (or preflight errors if we don't have them)
@@ -227,7 +222,7 @@ impl AppState {
 		};
 
 		// and based on whether we had success or failure, built the new state
-		let new_state = match mame_executable_path_result {
+		match mame_executable_path_result {
 			Ok(mame_executable_path) => {
 				let prefs_path = &self.fixed.prefs_path;
 				let callback = self.fixed.callback.clone();
@@ -237,32 +232,24 @@ impl AppState {
 					canceller,
 					machine_description: None,
 				};
-				Self {
-					info_db_build: Some(info_db_build),
-					..self.clone()
-				}
+				self.info_db_build = Some(info_db_build);
 			}
 
 			Err(preflight_problems) => {
 				assert!(!preflight_problems.is_empty());
 				let preflight_problems = preflight_problems.clone();
 				let failure = Failure::Preflight(preflight_problems);
-				let failure = Some(Rc::new(failure));
-				Self {
-					failure,
-					..self.clone()
-				}
+				self.failure = Some(failure);
 			}
 		};
-
-		Some(new_state)
+		true
 	}
 
 	// update MAME arguments and refresh MAME if needed
-	pub fn update_mame_args_result(&self, mame_args_result: MameArgumentsResult) -> Option<Self> {
+	pub fn update_mame_args_result(&mut self, mame_args_result: MameArgumentsResult) -> bool {
 		if self.mame_args_result == mame_args_result {
 			// no changes? nothing to do
-			return None;
+			return false;
 		}
 
 		// shutdown the live session if we have one; other wise drop it all
@@ -289,18 +276,16 @@ impl AppState {
 		} else {
 			mame_args_result.clone()
 		};
-		let new_state = Self {
-			live,
-			mame_args_result,
-			..self.clone()
-		};
+
+		self.live = live;
+		self.mame_args_result = mame_args_result;
 
 		// attempt to reactivate and return
-		let new_state = new_state.activate().unwrap_or(new_state);
-		Some(new_state)
+		self.activate();
+		true
 	}
 
-	pub fn reset(&self) -> Option<Self> {
+	pub fn reset(&mut self) -> bool {
 		let live = self
 			.live
 			.as_ref()
@@ -316,34 +301,39 @@ impl AppState {
 					session: Some(new_session),
 				}
 			});
-		let new_state = Self { live, ..self.clone() };
+		self.live = live;
 
 		// attempt to reactivate and return
-		let new_state = new_state.activate().unwrap_or(new_state);
-		Some(new_state)
+		self.activate();
+		true
 	}
 
-	pub fn set_pending_start(&self, pending_start: MameStartArgs) -> Self {
-		Self {
-			pending_start: Some(pending_start),
-			..self.clone()
+	pub fn set_pending_start(&mut self, pending_start: MameStartArgs) -> bool {
+		self.pending_start = Some(pending_start);
+		true
+	}
+
+	pub fn issue_pending_start_if_possible(&mut self) -> bool {
+		let Some(live) = self.live.as_ref() else {
+			return false;
+		};
+		let Some(session) = live.session.as_ref() else {
+			return false;
+		};
+		if session.status.is_none() {
+			return false;
 		}
-	}
-
-	pub fn issue_pending_start_if_possible(&self) -> Option<Self> {
-		let session = self.live.as_ref().unwrap().session.as_ref()?;
-		session.status.as_ref()?;
-		let command_sender = session.command_sender.as_deref()?;
-
-		let pending_start = self.pending_start.as_ref()?;
+		let Some(command_sender) = session.command_sender.as_deref() else {
+			return false;
+		};
+		let Some(pending_start) = self.pending_start.as_ref() else {
+			return false;
+		};
 		let command = MameCommand::start(pending_start);
 		command_sender.send(command).unwrap();
 
-		let new_state = Self {
-			pending_start: None,
-			..self.clone()
-		};
-		Some(new_state)
+		self.pending_start = None;
+		true
 	}
 
 	/// Issues a command to MAME
@@ -354,28 +344,24 @@ impl AppState {
 		}
 	}
 
-	pub fn infodb_build_progress(&self, machine_description: String) -> Self {
+	pub fn infodb_build_progress(&mut self, machine_description: String) -> bool {
 		let info_db_build = InfoDbBuild {
 			machine_description: Some(machine_description),
 			..self.info_db_build.as_ref().unwrap().clone()
 		};
-		let info_db_build = Some(info_db_build);
-
-		Self {
-			info_db_build,
-			..self.clone()
-		}
+		self.info_db_build = Some(info_db_build);
+		true
 	}
 
-	pub fn infodb_build_complete(&self) -> Self {
+	pub fn infodb_build_complete(&mut self) -> bool {
 		self.internal_infodb_build_complete(false)
 	}
 
-	pub fn infodb_build_cancel(&self) -> Self {
+	pub fn infodb_build_cancel(&mut self) -> bool {
 		self.internal_infodb_build_complete(true)
 	}
 
-	fn internal_infodb_build_complete(&self, cancel: bool) -> Self {
+	fn internal_infodb_build_complete(&mut self, cancel: bool) -> bool {
 		// we expect to be in the process of building, and to be able to "take" the job
 		let info_db_build = self.info_db_build.as_ref().unwrap();
 
@@ -454,22 +440,21 @@ impl AppState {
 		};
 
 		// and return
-		let failure = failure.map(Rc::new);
-		Self {
-			live,
-			failure,
-			info_db_build: None,
-			..self.clone()
-		}
+		self.live = live;
+		self.failure = failure;
+		self.info_db_build = None;
+		true
 	}
 
 	/// Apply a `worker_ui` status update
-	pub fn status_update(&self, update: Update) -> Option<Self> {
+	pub fn status_update(&mut self, update: Update) -> bool {
 		let live = self.live.as_ref().unwrap();
 		let session = live.session.as_ref().unwrap();
 
 		// ignore status updates when we're shutting down
-		session.command_sender.as_ref()?;
+		if session.command_sender.is_none() {
+			return false;
+		}
 
 		// validate the status update
 		let (new_status, new_pending_status, result) = validate_and_update_status(
@@ -483,7 +468,7 @@ impl AppState {
 		let (failure, rebuild_info_db) = match result {
 			Ok(()) => (None, false),
 			Err(ValidationError::VersionMismatch(_, _)) => (None, self.info_db_build.is_none()),
-			Err(e) => (Some(Rc::new(Failure::StatusValidationProblem(e))), false),
+			Err(e) => (Some(Failure::StatusValidationProblem(e)), false),
 		};
 
 		// and munge this into the new state
@@ -496,86 +481,64 @@ impl AppState {
 			session: Some(new_session),
 			..live.clone()
 		};
-		let failure = failure.or_else(|| self.failure.clone());
-		let new_state: AppState = Self {
-			live: Some(new_live),
-			failure,
-			..self.clone()
-		};
+		self.live = Some(new_live);
+		if let Some(failure) = failure {
+			self.failure = Some(failure);
+		}
 
 		// kick off an InfoDb rebuild if appropriate
-		let new_state = rebuild_info_db
-			.then(|| new_state.infodb_rebuild())
-			.flatten()
-			.unwrap_or(new_state);
-
-		// and return the new state
-		Some(new_state)
+		if rebuild_info_db {
+			self.infodb_rebuild();
+		}
+		true
 	}
 
 	/// The MAME session ended; return a new state
-	pub fn session_ended(&self) -> Self {
+	pub fn session_ended(&mut self) -> bool {
 		// access the "live" and the session
-		let live = self.live.as_ref().unwrap();
-		let session = live.session.as_ref().unwrap();
+		let live = self.live.as_mut().unwrap();
+		let session = live.session.as_mut().unwrap();
 
 		// join the thread and get the result
 		let result = session.job.join().unwrap();
 
 		// if we failed, we have to report the error
-		let failure = if let Err(e) = result {
-			Some(Rc::new(Failure::SessionError(e)))
-		} else {
-			None
-		};
+		let failure = result.err().map(Failure::SessionError);
 
 		// there might be a pending paths update
-		let pending_mame_args_result = session.pending_mame_args_result_update.as_ref();
+		let pending_mame_args_result = session.pending_mame_args_result_update.take();
 
 		// do we need to restart ourselves afterwards?
 		let pending_restart = session.pending_restart && failure.is_none();
 
 		// create the new state
-		let new_live = Live {
-			session: None,
-			..live.clone()
-		};
-		let new_state = Self {
-			live: Some(new_live),
-			failure,
-			..self.clone()
-		};
+		if let Some(live) = self.live.as_mut() {
+			live.session = None;
+		}
+		self.failure = failure;
 
 		// apply any pending paths update
-		let new_state = pending_mame_args_result
-			.and_then(|mame_args_result| new_state.update_mame_args_result(mame_args_result.clone()))
-			.unwrap_or(new_state);
+		if let Some(pending_mame_args_result) = pending_mame_args_result {
+			self.update_mame_args_result(pending_mame_args_result);
+		}
 
 		// if there is a pending restart, kick it off - in any case after this we're done
-		pending_restart
-			.then(|| new_state.activate())
-			.flatten()
-			.unwrap_or(new_state)
+		if pending_restart {
+			self.activate();
+		}
+		true
 	}
 
-	pub fn shutdown(&self) -> Option<Self> {
-		(!self.pending_shutdown).then(|| {
-			let live = self.live.as_ref().map(|live| {
-				let session = live.session.as_ref().map(|session| Session {
-					command_sender: None,
-					..session.clone()
-				});
-				Live {
-					session,
-					..live.clone()
-				}
-			});
-			Self {
-				pending_shutdown: true,
-				live,
-				..self.clone()
-			}
-		})
+	pub fn shutdown(&mut self) -> bool {
+		if self.pending_shutdown {
+			return false;
+		}
+
+		self.pending_shutdown = true;
+		if let Some(session) = self.live.as_mut().and_then(|live| live.session.as_mut()) {
+			session.command_sender = None;
+		}
+		true
 	}
 
 	pub fn info_db(&self) -> Option<&'_ Rc<InfoDb>> {
@@ -625,7 +588,7 @@ impl AppState {
 			.unwrap_or_default();
 		let report_type = match (
 			self.info_db_build.as_ref(),
-			self.failure.as_deref(),
+			self.failure.as_ref(),
 			is_starting_up,
 			self.pending_shutdown,
 		) {
@@ -777,16 +740,13 @@ impl AppState {
 		&self.fixed.prefs_path
 	}
 
-	pub fn last_save_state(&self) -> Option<Rc<str>> {
-		self.last_save_state.clone()
+	pub fn last_save_state(&self) -> Option<&'_ str> {
+		self.last_save_state.as_deref()
 	}
 
-	pub fn set_last_save_state(&self, last_save_state: impl Into<Option<Rc<str>>>) -> Self {
-		let last_save_state = last_save_state.into();
-		Self {
-			last_save_state,
-			..self.clone()
-		}
+	pub fn set_last_save_state(&mut self, last_save_state: impl Into<Option<Box<str>>>) -> bool {
+		self.last_save_state = last_save_state.into();
+		true
 	}
 
 	pub fn show_console(&self) -> Result<()> {
@@ -895,20 +855,5 @@ fn validate_and_update_status(
 		}
 	} else {
 		(status.cloned(), pending_status.cloned(), result)
-	}
-}
-
-#[cfg(test)]
-mod test {
-	use test_case::test_case;
-
-	use super::AppState;
-
-	#[test_case(0, AppState::bogus(), false)]
-	#[test_case(1, AppState::bogus().shutdown(), true)]
-	pub fn is_shutdown(_index: usize, state: impl Into<Option<AppState>>, expected: bool) {
-		let state = state.into().unwrap();
-		let actual = state.is_shutdown();
-		assert_eq!(expected, actual);
 	}
 }

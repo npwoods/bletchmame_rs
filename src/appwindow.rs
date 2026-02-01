@@ -276,20 +276,24 @@ impl AppModel {
 		update_items_model_for_current_prefs(self);
 	}
 
-	pub fn update_state(self: &Rc<Self>, callback: impl FnOnce(&AppState) -> Option<AppState>) {
+	pub fn update_state(self: &Rc<Self>, callback: impl FnOnce(&mut AppState) -> bool) {
 		let info_db_changed = {
-			// invoke the callback to get the new state
+			// prepare to mutate the state
 			let mut state = self.state.borrow_mut();
-			let Some(new_state) = callback(&state) else { return };
+
+			// get the old InfoDb
+			let old_info_db = state.info_db().cloned();
+
+			// invoke the callback
+			if !callback(&mut state) {
+				return;
+			}
 
 			// did the InfoDB change?
-			let info_db_changed = state.info_db().is_some() != new_state.info_db().is_some()
-				|| Option::zip(state.info_db().as_ref(), new_state.info_db().as_ref())
-					.is_some_and(|(old, new)| !Rc::ptr_eq(old, new));
-
-			// commit the state and return the changes
-			*state = new_state;
-			info_db_changed
+			Option::zip(old_info_db.as_ref(), state.info_db())
+				.map_or(old_info_db.is_none() && state.info_db().is_none(), |(old, new)| {
+					Rc::ptr_eq(old, new)
+				})
 		};
 
 		// InfoDb changed?
@@ -308,12 +312,7 @@ impl AppModel {
 		}
 
 		// pending start?
-		{
-			let mut state = self.state.borrow_mut();
-			if let Some(new_state) = state.issue_pending_start_if_possible() {
-				*state = new_state;
-			}
-		}
+		self.state.borrow_mut().issue_pending_start_if_possible();
 
 		// shutting down?
 		let is_shutdown = self.state.borrow().is_shutdown();
@@ -864,11 +863,12 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		let model = model_weak.upgrade().unwrap();
 		handle_action(&model, action);
 	});
+	model.state.replace(state);
 
 	// and lets do something with that state; specifically
 	// - load the InfoDB (if availble)
 	// - start the MAME session (and maybe an InfoDB build in parallel)
-	model.update_state(|_| state.activate());
+	model.update_state(AppState::activate);
 
 	// and we've started
 	app_window.set_has_started(true);
@@ -923,17 +923,17 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 			model.clone().spawn_maybe_pause(fut);
 		}
 		Action::FileQuickLoadState => {
-			let last_save_state = model.state.borrow().last_save_state().unwrap();
+			let last_save_state = model.state.borrow().last_save_state().unwrap().to_string();
 			model.issue_command(MameCommand::state_load(last_save_state));
 		}
 		Action::FileQuickSaveState => {
-			let last_save_state = model.state.borrow().last_save_state().unwrap();
+			let last_save_state = model.state.borrow().last_save_state().unwrap().to_string();
 			model.issue_command(MameCommand::state_save(last_save_state));
 		}
 		Action::FileLoadState => {
 			let model_clone = model.clone();
 			let fut = async move {
-				let last_save_state = model_clone.state.borrow().last_save_state();
+				let last_save_state = model_clone.state.borrow().last_save_state().map(str::to_string);
 				let (initial_dir, initial_file) =
 					initial_dir_and_file_from_path(last_save_state.as_deref().map(Path::new));
 
@@ -942,7 +942,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 				let file_types = SAVE_STATE_FILE_TYPES;
 				if let Some(filename) = load_file_dialog(parent, title, file_types, initial_dir, initial_file).await {
 					model_clone.issue_command(MameCommand::state_load(&filename));
-					model_clone.update_state(|state| Some(state.set_last_save_state(Some(filename.into()))));
+					model_clone.update_state(|state| state.set_last_save_state(Some(filename.into())));
 				}
 			};
 			model.clone().spawn_maybe_pause(fut);
@@ -950,7 +950,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 		Action::FileSaveState => {
 			let model_clone = model.clone();
 			let fut = async move {
-				let last_save_state = model_clone.state.borrow().last_save_state();
+				let last_save_state = model_clone.state.borrow().last_save_state().map(str::to_string);
 				let (initial_dir, initial_file) =
 					initial_dir_and_file_from_path(last_save_state.as_deref().map(Path::new));
 				let (initial_dir, initial_file) = if initial_dir.is_some() && initial_file.is_some() {
@@ -969,7 +969,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 				let file_types = SAVE_STATE_FILE_TYPES;
 				if let Some(filename) = save_file_dialog(parent, title, file_types, initial_dir, initial_file).await {
 					model_clone.issue_command(MameCommand::state_save(&filename));
-					model_clone.update_state(|state| Some(state.set_last_save_state(Some(filename.into()))));
+					model_clone.update_state(|state| state.set_last_save_state(Some(filename.into())));
 				}
 			};
 			model.clone().spawn_maybe_pause(fut);
@@ -1232,17 +1232,17 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 			spawn_local(fut).unwrap();
 		}
 		Action::HelpResetMame => {
-			model.update_state(|state| state.reset());
+			model.update_state(AppState::reset);
 		}
 		Action::HelpRefreshInfoDb => {
-			model.update_state(|state| state.infodb_rebuild());
+			model.update_state(AppState::infodb_rebuild);
 		}
 		Action::HelpAbout => {
 			let fut = dialog_about(model.modal_stack.clone());
 			model.clone().spawn_maybe_pause(fut);
 		}
 		Action::MameSessionEnded => {
-			model.update_state(|state| Some(state.session_ended()));
+			model.update_state(AppState::session_ended);
 		}
 		Action::MameStatusUpdate(update) => {
 			model.update_state(|state| state.status_update(update));
@@ -1262,7 +1262,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 				model.video_override.replace(start_args.video.take());
 				let mame_args_result = model.make_mame_args();
 				model.update_state(|state| state.update_mame_args_result(mame_args_result));
-				model.update_state(|state| Some(state.set_pending_start(start_args)));
+				model.update_state(|state| state.set_pending_start(start_args));
 			}
 			Err(errors) => {
 				let message = errors.into_iter().map(|e| e.to_string()).collect::<String>();
@@ -1436,10 +1436,10 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 			spawn_local(fut).unwrap();
 		}
 		Action::InfoDbBuildProgress { machine_description } => {
-			model.update_state(|state| Some(state.infodb_build_progress(machine_description)))
+			model.update_state(|state| state.infodb_build_progress(machine_description))
 		}
-		Action::InfoDbBuildComplete => model.update_state(|state| Some(state.infodb_build_complete())),
-		Action::InfoDbBuildCancel => model.update_state(|state| Some(state.infodb_build_cancel())),
+		Action::InfoDbBuildComplete => model.update_state(AppState::infodb_build_complete),
+		Action::InfoDbBuildCancel => model.update_state(AppState::infodb_build_cancel),
 		Action::ReactivateMame => model.update_state(AppState::activate),
 		Action::Configure { folder_name, index } => {
 			let model_clone = model.clone();
