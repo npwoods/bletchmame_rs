@@ -74,6 +74,27 @@ export component ConfigureDialog inherits Window {
         dev-images-list.show-context-menu(info, point);
     }
 
+    // video settings synchronization/gymnastics
+    property <VideoSettings> video-current-settings: video-settings;
+    changed video-current-settings => {
+        if (!video-use-default-settings) {
+            video-settings = self.video-current-settings;
+        }
+    }
+    changed video-settings => {
+        if (!video-use-default-settings) {
+            video-current-settings = self.video-settings;
+        }
+    }
+    changed video-default-settings => {
+        if (video-use-default-settings) {
+            video-current-settings = self.video-default-settings;
+        }
+    }
+    changed video-use-default-settings => {
+        video-current-settings = video-use-default-settings ? video-default-settings : video-settings;
+    }
+
     // control hierarchy
     VerticalBox {
         GridLayout {
@@ -216,14 +237,7 @@ export component ConfigureDialog inherits Window {
                         VideoConfigComponent {
                             vertical-stretch: 1;
                             enabled: !root.video-use-default-settings;
-                            changed settings => {
-                                if (!root.video-use-default-settings) {
-                                    root.video-settings = self.settings;
-                                }
-                            }
-                            changed enabled => {
-                                self.settings = self.enabled ? root.video-settings : root.video-default-settings;
-                            }
+                            settings <=> root.video-current-settings;
                         }
                     }
                 }
