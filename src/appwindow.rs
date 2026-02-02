@@ -92,6 +92,7 @@ use crate::prefs::SortOrder;
 use crate::prefs::pathtype::PathType;
 use crate::runtime::MameStderr;
 use crate::runtime::MameWindowing;
+use crate::runtime::args::MameArguments;
 use crate::runtime::command::MameCommand;
 use crate::runtime::command::MovieFormat;
 use crate::selection::SelectionManager;
@@ -209,6 +210,13 @@ impl AppModel {
 
 		// save (ignore errors)
 		let _ = prefs.save(self.state.borrow().prefs_path());
+
+		// do we need to restart MAME because of this change?
+		if let Some(old_prefs) = old_prefs
+			&& mame_command_line_key(old_prefs) != mame_command_line_key(&prefs)
+		{
+			self.state.borrow_mut().reset();
+		}
 
 		// react to all of the possible changes
 		if old_prefs.is_none_or(|old_prefs| prefs.collections != old_prefs.collections) {
@@ -1848,4 +1856,9 @@ fn translate_searchbar_items(model: ModelRc<SearchBarItem>) -> ModelRc<ListItem>
 		.collect::<Vec<_>>();
 	let model = VecModel::from(items);
 	ModelRc::new(model)
+}
+
+fn mame_command_line_key(prefs: &Preferences) -> impl Eq + '_ {
+	let args = MameArguments::new(prefs, None, &MameWindowing::Windowed, true);
+	(&prefs.paths.mame_executable, args)
 }
