@@ -1,0 +1,24 @@
+export component HorizontalSplitter {
+    // properties
+    height: 100%;
+    width: 5px;
+
+    // components
+    TouchArea {
+        mouse-cursor: col-resize;
+        property <bool> is-down: false;
+        pointer-event(event) => {
+            if (event.kind == PointerEventKind.down) {
+                is-down = true;
+            }
+            if (event.kind == PointerEventKind.up) {
+                is-down = false;
+            }
+        }
+        changed mouse-x => {
+            if (is-down) {
+                root.x += self.mouse-x - root.width / 2;
+            }
+        }
+    }
+}
