@@ -487,6 +487,12 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		let physical_size = LogicalSize::from(*window_size).to_physical(app_window.window().scale_factor());
 		app_window.window().set_size(physical_size);
 	}
+	if let Some(main_window_left_column_width) = preferences.main_window_left_column_width {
+		app_window.set_column_left_width(main_window_left_column_width);
+	}
+	if let Some(main_window_right_column_width) = preferences.main_window_right_column_width {
+		app_window.set_column_right_width(main_window_right_column_width);
+	}
 
 	// create the window stack
 	let modal_stack = ModalStack::new(args.backend_runtime.clone(), app_window);
@@ -1747,11 +1753,17 @@ fn update_builtin_collections_menu_checked(model: &AppModel, prefs: &Preferences
 fn update_prefs(model: &Rc<AppModel>) {
 	model.modify_prefs(|prefs| {
 		// update window size
-		let physical_size = model.app_window().window().size();
-		let logical_size = physical_size.to_logical(model.app_window().window().scale_factor());
+		let app_window = model.app_window();
+		let physical_size = app_window.window().size();
+		let logical_size = physical_size.to_logical(app_window.window().scale_factor());
 		prefs.window_size = Some(logical_size.into());
 
-		let items_columns = model.app_window().get_items_columns();
+		// splitter columns
+		prefs.main_window_left_column_width = Some(app_window.get_column_left_width());
+		prefs.main_window_right_column_width = Some(app_window.get_column_right_width());
+
+		// items columns
+		let items_columns = app_window.get_items_columns();
 		for (index, column) in prefs.items_columns.iter_mut().enumerate() {
 			if let Some(data) = items_columns.row_data(index) {
 				column.width = data.width;
