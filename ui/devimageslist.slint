@@ -32,9 +32,7 @@ export component DevicesAndImagesList {
     // properties
     in property <DevicesAndImagesState> state;
     in property <bool> images-button-enabled;
-    in-out property <length> splitter-x: 240px;
-    in-out property <length> splitter-width: 5px;
-    property <length> button-width: 30px;
+    in-out property <length> column-1-width: 240px;
 
     // callbacks
     callback entry-option-changed(int, string);
@@ -104,50 +102,55 @@ export component DevicesAndImagesList {
 
     // controls
     ListView {
-        for data[index] in root.state.entries: Rectangle {
+        for data[index] in root.state.entries: HorizontalLayout {
             height: 30px;
-            width: parent.width;
-            Text {
-                x: data.indent * 20px;
-                text: data.display_tag;
+            horizontal-stretch: 1;
+
+            // controls
+            HorizontalLayout {
+                width: root.column-1-width;
+                Rectangle {
+                    width: data.indent * 20px;
+                }
+
+                Text {
+                    horizontal-stretch: 1;
+                    text: data.display_tag;
+                }
             }
 
-            ComboBox {
-                x: root.splitter-x + root.splitter-width;
-                width: root.width - (root.splitter-x + root.splitter-width);
-                visible: data.current-option-index >= 0;
+            HorizontalSplitter {
+                value <=> root.column-1-width;
+                min-value: 10px;
+            }
+
+            if data.current-option-index >= 0: ComboBox {
+                horizontal-stretch: 1;
                 model: data.option-descriptions;
                 current-index: data.current-option-index;
                 selected(value) => {
                     root.entry-option-changed(index, data.option-names[self.current-index]);
                 }
             }
+            if data.current-option-index < 0: HorizontalLayout {
+                horizontal-stretch: 1;
+                LineEdit {
+                    horizontal-stretch: 1;
+                    visible: data.current-option-index < 0;
+                    placeholder-text: root.state.none-string;
+                    text: data.filename;
+                    read-only: true;
+                }
 
-            LineEdit {
-                x: root.splitter-x + root.splitter-width;
-                width: root.width - (root.splitter-x + root.splitter-width) - root.button-width;
-                visible: data.current-option-index < 0;
-                placeholder-text: root.state.none-string;
-                text: data.filename;
-                read-only: true;
-            }
-
-            Button {
-                x: root.width - root.button-width;
-                width: root.button-width;
-                visible: data.current-option-index < 0;
-                enabled: root.images-button-enabled;
-                text: "...";
-                clicked => {
-                    root.entry-button-clicked(index, { x: self.absolute-position.x, y: self.absolute-position.y + self.height });
+                Button {
+                    width: 30px;
+                    enabled: root.images-button-enabled;
+                    text: "...";
+                    clicked => {
+                        root.entry-button-clicked(index, { x: self.absolute-position.x, y: self.absolute-position.y + self.height });
+                    }
                 }
             }
         }
-    }
-
-    HorizontalSplitter {
-        x <=> root.splitter-x;
-        width: root.splitter-width;
-        height: 100%;
     }
 }

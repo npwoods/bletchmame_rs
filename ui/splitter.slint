@@ -2,6 +2,9 @@ export component HorizontalSplitter {
     // properties
     height: 100%;
     width: 5px;
+    in-out property <length> value;
+    in property <length> min-value: 0px;
+    in property <float> multiple: 1.0;
 
     // components
     TouchArea {
@@ -17,7 +20,7 @@ export component HorizontalSplitter {
         }
         changed mouse-x => {
             if (is-down) {
-                root.x += self.mouse-x - root.width / 2;
+                root.value = max(root.min-value, root.value + self.mouse-x * root.multiple);
             }
         }
     }

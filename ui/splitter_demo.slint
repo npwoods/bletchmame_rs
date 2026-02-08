@@ -1,0 +1,39 @@
+import { HorizontalSplitter } from "splitter.slint";
+import { HorizontalBox } from "std-widgets.slint";
+
+export component SplitterDemo {
+    // properties
+    property <length> column-1-width: 200px;
+    property <length> column-2-width: 200px;
+    preferred-width: 500px;
+    preferred-height: 500px;
+
+    // components
+    HorizontalLayout {
+        rect-1 := Rectangle {
+            width: column-1-width;
+            background: red;
+        }
+
+        splitter-1 := HorizontalSplitter {
+            value <=> column-1-width;
+            min-value: 10px;
+        }
+
+        rect-2 := Rectangle {
+            width: column-2-width;
+            background: green;
+        }
+
+        splitter-2 := HorizontalSplitter {
+            value <=> column-2-width;
+            min-value: 10px;
+        }
+
+        rect-3 := Rectangle {
+            horizontal-stretch: 1;
+            min-width: 10px;
+            background: blue;
+        }
+    }
+}
