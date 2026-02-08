@@ -21,6 +21,7 @@ import {
 } from "@slint/material.slint";
 import { SimpleMenuEntry } from "common.slint";
 import { Icons } from "icons.slint";
+import { HorizontalSplitter } from "splitter.slint";
 
 struct CollectionContextMenuInfo {
     move-up-action: string,
@@ -156,6 +157,10 @@ export component AppWindow inherits Window {
         item-context-menu.show(point);
     }
 
+    // splitters
+    in-out property <length> column-left-width: 250px;
+    in-out property <length> column-right-width: 300px;
+
     // the collections view on the left
     in property <[NavigationItem]> collections-model;
     in-out property <int> collections-view-selected-index;
@@ -168,6 +173,7 @@ export component AppWindow inherits Window {
     in property <bool> bookmark-collection-enabled;
     in property <string> current-collection-text;
     in-out property <string> items-search-text;
+    private property <length> toolbar-height: 40px;
     callback history-advance-clicked(int);
     callback bookmark-collection-clicked();
     pure callback get-searchbar-items(string) -> [SearchBarItem];
@@ -727,13 +733,13 @@ export component AppWindow inherits Window {
                 visible: root.mode() == "ready";
 
                 // collections list view on the left
-                VerticalBox {
+                VerticalLayout {
                     alignment: start;
+                    width: root.column-left-width;
                     min-height: 0px;
                     NavigationDrawer {
                         vertical-stretch: 0;
                         preferred-height: 100%;
-                        width: 250px;
                         groups: [{ title: 0, items: collections-model }];
                         current-index <=> collections-view-selected-index;
                         selected(group-index, index) => {
@@ -745,17 +751,23 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                VerticalBox {
+                HorizontalSplitter {
+                    value <=> root.column-left-width;
+                    min-value: 80px;
+                }
+
+                VerticalLayout {
+                    min-width: 10px;
                     alignment: stretch;
                         
                     // toolbar below the current collection
                     HorizontalBox {
                         vertical-stretch: 0;
                         alignment: stretch;
-                        height: 50px;
                         preferred-width: 100%;
                         FilledIconButton {
-                            horizontal-stretch: 0;
+                            width: root.toolbar-height;
+                            height: root.toolbar-height;
                             icon: Icons.arrow-back;
                             enabled: history-can-go-back;
                             clicked => {
@@ -764,7 +776,8 @@ export component AppWindow inherits Window {
                         }
 
                         FilledIconButton {
-                            horizontal-stretch: 0;
+                            width: root.toolbar-height;
+                            height: root.toolbar-height;
                             icon: Icons.book;
                             enabled: bookmark-collection-enabled;
                             clicked => {
@@ -773,7 +786,8 @@ export component AppWindow inherits Window {
                         }
 
                         FilledIconButton {
-                            horizontal-stretch: 0;
+                            width: root.toolbar-height;
+                            height: root.toolbar-height;
                             icon: Icons.arrow-forward;
                             enabled: history-can-go-forward;
                             clicked => {
@@ -782,6 +796,7 @@ export component AppWindow inherits Window {
                         }
 
                         SearchBar {
+                            height: root.toolbar-height;
                             property <[SearchBarItem]> my-items: get-searchbar-items(self.text);
                             horizontal-stretch: 1;
                             placeholder-text: "Search " + current-collection-text;
@@ -836,18 +851,23 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                VerticalBox {
+                HorizontalSplitter {
+                    value <=> root.column-right-width;
+                    min-value: 10px;
+                    multiple: -1.0;
+                }
+
+                VerticalLayout {
+                    width: root.column-right-width;
                     alignment: center;
                     Image {
                         source: get-snap-image-func();
-                        width: 300px;
                         min-height: 0px;
                         preferred-height: 300px;
                     }
 
                     Rectangle {
                         vertical-stretch: 1;
-                        width: 300px;
                         min-height: 0px;
                         preferred-height: 300px;
                         TextEdit {
