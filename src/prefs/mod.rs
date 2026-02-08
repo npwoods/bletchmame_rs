@@ -52,6 +52,12 @@ pub struct Preferences {
 	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub window_size: Option<PrefsSize>,
 
+	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub main_window_left_column_width: Option<f32>,
+
+	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub main_window_right_column_width: Option<f32>,
+
 	pub is_fullscreen: bool,
 
 	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
@@ -78,6 +84,8 @@ impl Default for Preferences {
 		Self {
 			paths: PrefsPaths::default().into(),
 			window_size: None,
+			main_window_left_column_width: None,
+			main_window_right_column_width: None,
 			is_fullscreen: false,
 			fullscreen_display: None,
 			video: Default::default(),
