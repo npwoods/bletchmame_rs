@@ -226,13 +226,13 @@ export component AppWindow inherits Window {
 
     // mode - drives what is visible and what is not
     in property <bool> has-started;
-    function mode() -> string {
-        if !has-started {
+    pure function mode() -> string {
+        if (self.report-message != "") {
+            "report"
+        } else if !has-started {
             "starting"
         } else if (self.running-machine-desc != "") {
             "running"
-        } else if (self.report-message != "") {
-            "report"
         } else {
             "ready"
         }
