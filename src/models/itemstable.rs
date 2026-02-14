@@ -339,7 +339,7 @@ impl ItemsTableModel {
 		let index = *self.items_map.borrow().get(index).unwrap();
 		let index = usize::try_from(index).unwrap();
 		let item = items.get(index)?;
-		let items = vec![make_prefs_item(info_db, item)];
+		let items = vec![make_prefs_item(item)];
 
 		// get the critical information - the description and where (if anyplace) "Browse" would go to
 		let (run_title, run_descs, browse_target, can_configure) = match &item.details {
@@ -509,16 +509,10 @@ impl ItemsTableModel {
 	}
 
 	pub fn current_selection(&self) -> Vec<PrefsItem> {
-		// if we have no InfoDB, we have no SELECTION
-		let info_db = self.info_db.borrow();
-		let Some(info_db) = &*info_db else {
-			return [].into();
-		};
-
 		let result = self.current_selected_index().map(|index| {
 			let items = self.items.borrow();
 			let index = usize::try_from(index).unwrap();
-			make_prefs_item(info_db, &items[index])
+			make_prefs_item(&items[index])
 		});
 
 		result.into_iter().collect()
@@ -533,10 +527,6 @@ impl ItemsTableModel {
 
 	fn set_current_selection(&self, selection: &[PrefsItem]) {
 		debug!(selection=?selection, "ItemsTableModel::set_current_selection()");
-		let info_db = self.info_db.borrow();
-		let Some(info_db) = &*info_db else {
-			return;
-		};
 
 		// we only support single selection now
 		let selection = selection.iter().next();
@@ -551,7 +541,7 @@ impl ItemsTableModel {
 				.find(|(_, map_index)| {
 					let map_index = usize::try_from(**map_index).unwrap();
 					let item = &items[map_index];
-					is_item_match(info_db, selection, item)
+					is_item_match(selection, item)
 				})
 				.map(|(index, _)| index)
 		});
@@ -668,7 +658,7 @@ impl From<ItemDetails> for Item {
 	}
 }
 
-fn make_prefs_item(_info_db: &InfoDb, item: &Item) -> PrefsItem {
+fn make_prefs_item(item: &Item) -> PrefsItem {
 	let video = item.video.clone();
 	let details = match &item.details {
 		ItemDetails::Machine {
@@ -856,8 +846,8 @@ fn column_text<'a>(_info_db: &'a InfoDb, item: &'a Item, column: ColumnType) -> 
 	}
 }
 
-fn is_item_match(info_db: &InfoDb, prefs_item: &PrefsItem, item: &Item) -> bool {
-	make_prefs_item(info_db, item) == *prefs_item
+fn is_item_match(prefs_item: &PrefsItem, item: &Item) -> bool {
+	make_prefs_item(item) == *prefs_item
 }
 
 fn run_item_text(text: &str) -> String {
