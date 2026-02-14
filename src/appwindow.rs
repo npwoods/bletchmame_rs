@@ -323,7 +323,7 @@ impl AppModel {
 
 			// child window visibility
 			if let Some(child_window) = &*self.child_window.borrow() {
-				child_window.set_active(running.is_some());
+				child_window.set_active(running.is_some() && report.is_none());
 			}
 
 			// report view
@@ -394,6 +394,10 @@ impl AppModel {
 			update_prefs(self);
 			quit_event_loop().unwrap()
 		}
+	}
+
+	pub fn stop(self: &Rc<Self>) {
+		self.update_state(AppState::stop);
 	}
 
 	pub fn issue_command(&self, command: MameCommand) {
@@ -882,7 +886,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 
 	match action {
 		Action::FileStop => {
-			model.maybe_stop_warning(|model| model.issue_command(MameCommand::stop()));
+			model.maybe_stop_warning(|model| model.stop());
 		}
 		Action::FilePause => {
 			let is_paused = model

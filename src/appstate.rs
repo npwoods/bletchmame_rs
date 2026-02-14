@@ -14,6 +14,7 @@ use smol_str::SmolStr;
 use smol_str::ToSmolStr;
 use smol_str::format_smolstr;
 use throttle::Throttle;
+use tracing::debug;
 
 use crate::action::Action;
 use crate::canceller::Canceller;
@@ -44,6 +45,7 @@ pub struct AppState {
 	pub preferences: Preferences,
 	info_db_build: Option<InfoDbBuild>,
 	live: Option<Live>,
+	expecting: Option<Expecting>,
 	failure: Option<Failure>,
 	last_save_state: Option<Box<str>>,
 	video_override: Option<PrefsVideo>,
@@ -88,6 +90,12 @@ enum Failure {
 	StatusValidationProblem(ValidationError),
 	InfoDbBuild(Error),
 	InfoDbBuildCancelled,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum Expecting {
+	Start,
+	Stop,
 }
 
 struct Fixed {
@@ -144,6 +152,7 @@ impl AppState {
 			preferences: Preferences::default(),
 			info_db_build: None,
 			live: None,
+			expecting: None,
 			failure: None,
 			last_save_state: None,
 			video_override: None,
@@ -283,6 +292,9 @@ impl AppState {
 		// access the live session (which had better be present)
 		let session = self.live.as_mut().unwrap().session.as_mut().unwrap();
 
+		// we're expecting to run
+		self.expecting = Some(Expecting::Start);
+
 		// is the session live and ready?
 		if let Some(command_sender) = &session.command_sender
 			&& self.video_override == start_args.video
@@ -297,6 +309,13 @@ impl AppState {
 			session.post_session_end = Some(PostSessionEnd::Restart { command });
 		}
 		true
+	}
+
+	pub fn stop(&mut self) -> bool {
+		let changed = self.expecting != Some(Expecting::Stop);
+		self.expecting = Some(Expecting::Stop);
+		self.issue_command(MameCommand::stop());
+		changed
 	}
 
 	/// Issues a command to MAME
@@ -449,6 +468,19 @@ impl AppState {
 			self.failure = Some(failure);
 		}
 
+		// update expectations
+		let is_running = self
+			.live
+			.as_ref()
+			.and_then(|l| l.session.as_ref())
+			.and_then(|s| s.status.as_deref())
+			.is_some_and(|s| s.running.is_some());
+		if self.expecting == Some(Expecting::Start) && is_running
+			|| self.expecting == Some(Expecting::Stop) && !is_running
+		{
+			self.expecting = None;
+		}
+
 		// kick off an InfoDb rebuild if appropriate
 		if rebuild_info_db {
 			self.infodb_rebuild();
@@ -537,6 +569,8 @@ impl AppState {
 		enum ReportType<'a> {
 			InfoDbBuild(Option<&'a str>),
 			Resetting,
+			Starting,
+			Stopping,
 			ShuttingDown,
 			PreflightFailure(&'a [PreflightProblem]),
 			SessionError(&'a SessionError),
@@ -547,44 +581,43 @@ impl AppState {
 
 		// upfront logic to determine the type of report presented, if any; keep
 		// this logic distinct from the mechanics of displaying the report
-		let (is_starting_up, is_shutting_down) = self
-			.live
-			.as_ref()
-			.and_then(|live| live.session.as_ref())
-			.map(|session| {
-				(
-					session.status.is_none(),
-					matches!(session.post_session_end, Some(PostSessionEnd::Shutdown)),
-				)
-			})
-			.unwrap_or_default();
+		let session = self.live.as_ref().and_then(|live| live.session.as_ref());
+		let is_starting_up = session.is_some_and(|session| session.status.is_none());
+		let is_session_stopping = session.is_some_and(|session| session.command_sender.is_none());
+		let is_shutting_down =
+			session.is_some_and(|session| matches!(session.post_session_end, Some(PostSessionEnd::Shutdown)));
+		debug!(info_db_build=?self.info_db_build.as_ref().map(|_| "..."), expecting=?self.expecting.as_ref(), failure=?self.failure.as_ref(), ?is_starting_up, ?is_shutting_down, "AppState::report()");
 		let report_type = match (
 			self.info_db_build.as_ref(),
+			self.expecting.as_ref(),
 			self.failure.as_ref(),
 			is_starting_up,
 			is_shutting_down,
 		) {
-			(Some(info_db_build), _, _, _) => {
+			(Some(info_db_build), _, _, _, _) => {
 				Some(ReportType::InfoDbBuild(info_db_build.machine_description.as_deref()))
 			}
-			(None, _, _, true) => Some(ReportType::ShuttingDown),
-			(None, _, true, false) => Some(ReportType::Resetting),
-			(None, Some(Failure::Preflight(preflight_problems)), false, false) => {
+			(None, Some(Expecting::Start), None, _, _) => Some(ReportType::Starting),
+			(None, Some(Expecting::Stop), None, _, _) => Some(ReportType::Stopping),
+			(None, _, _, _, true) => Some(ReportType::ShuttingDown),
+			(None, _, _, true, false) => Some(ReportType::Resetting),
+			(None, _, Some(Failure::Preflight(preflight_problems)), false, false) => {
 				Some(ReportType::PreflightFailure(preflight_problems.as_ref()))
 			}
-			(None, Some(Failure::SessionError(e)), false, false) => Some(ReportType::SessionError(e)),
-			(None, Some(Failure::StatusValidationProblem(ValidationError::Invalid(e))), false, false) => {
+			(None, _, Some(Failure::SessionError(e)), false, false) => Some(ReportType::SessionError(e)),
+			(None, _, Some(Failure::StatusValidationProblem(ValidationError::Invalid(e))), false, false) => {
 				Some(ReportType::InvalidStatusUpdate(e.as_slice()))
 			}
 			(
 				None,
+				_,
 				Some(Failure::StatusValidationProblem(ValidationError::VersionMismatch(status_build, infodb_build))),
 				false,
 				false,
 			) => Some(ReportType::InfoDbStatusMismatch(status_build, infodb_build)),
-			(None, Some(Failure::InfoDbBuild(e)), false, false) => Some(ReportType::InfoDbBuildFailure(Some(e))),
-			(None, Some(Failure::InfoDbBuildCancelled), false, false) => Some(ReportType::InfoDbBuildFailure(None)),
-			(None, None, false, false) => None,
+			(None, _, Some(Failure::InfoDbBuild(e)), false, false) => Some(ReportType::InfoDbBuildFailure(Some(e))),
+			(None, _, Some(Failure::InfoDbBuildCancelled), false, false) => Some(ReportType::InfoDbBuildFailure(None)),
+			(None, None, None, false, false) => None,
 		};
 
 		report_type.map(|report_type| match report_type {
@@ -605,6 +638,24 @@ impl AppState {
 			}
 			ReportType::Resetting => Report {
 				message: "Resetting MAME...".into(),
+				is_spinning: true,
+				..Default::default()
+			},
+			ReportType::Starting => {
+				let submessage = match (is_session_stopping, is_starting_up) {
+					(true, _) => "MAME needs to be reset to run this emulation",
+					(false, true) => "MAME is reinitializing",
+					(false, false) => "Waiting for emulation startup to be complete"
+				};
+				Report {
+					message: "Starting emulation...".into(),
+					submessage: Some(submessage.into()),
+					is_spinning: true,
+					..Default::default()
+				}
+			},
+			ReportType::Stopping => Report {
+				message: "Stopping emulation...".into(),
 				is_spinning: true,
 				..Default::default()
 			},
