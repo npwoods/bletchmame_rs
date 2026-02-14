@@ -16,9 +16,15 @@ impl SelectionManager {
 		C: ComponentHandle + 'static,
 	{
 		let component_weak = component.as_weak();
-		let getter = Box::from(move || getter(&component_weak.unwrap())) as Box<dyn Fn() -> i32>;
+		let getter = move || getter(&component_weak.unwrap());
 		let component_weak = component.as_weak();
-		let setter = Rc::from(move |index| setter(&component_weak.unwrap(), index)) as Rc<dyn Fn(i32)>;
+		let setter = move |index| setter(&component_weak.unwrap(), index);
+		Self::new_internal(getter, setter)
+	}
+
+	pub fn new_internal(getter: impl Fn() -> i32 + 'static, setter: impl Fn(i32) + 'static) -> Self {
+		let getter = Box::from(getter) as Box<dyn Fn() -> i32>;
+		let setter = Rc::from(setter) as Rc<dyn Fn(i32)>;
 		Self {
 			getter,
 			setter,
