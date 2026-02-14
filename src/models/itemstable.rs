@@ -255,39 +255,15 @@ impl ItemsTableModel {
 
 					Some(PrefsCollection::Folder { name: _, items }) => items
 						.iter()
-						.filter_map(|item| {
-							let video = item.video.clone();
-							match &item.details {
-								PrefsItemDetails::Machine(item) => {
-									let machine_config = MachineConfig::from_machine_name_and_slots(
-										info_db.clone(),
-										&item.machine_name,
-										&item.slots,
-									)
-									.ok()?;
-									let images = item.images.clone();
-									let ram_size = item.ram_size;
-									let bios: Option<String> = item.bios.clone();
-									let details = ItemDetails::Machine {
-										machine_config,
-										images,
-										ram_size,
-										bios,
-									};
-									Some(Item { video, details })
-								}
-								PrefsItemDetails::Software(software_item) => {
-									let item =
-										software_folder_item(&mut dispenser, software_item).unwrap_or_else(|error| {
-											let details = ItemDetails::Unrecognized {
-												details: item.details.clone(),
-												error: Rc::new(error),
-											};
-											details.into()
-										});
-									Some(item)
-								}
-							}
+						.map(|item| {
+							folder_item(info_db, &mut dispenser, item).unwrap_or_else(|error| {
+								let video = item.video.clone();
+								let details = ItemDetails::Unrecognized {
+									details: item.details.clone(),
+									error: Rc::new(error),
+								};
+								Item { video, details }
+							})
 						})
 						.collect::<Rc<[_]>>(),
 
@@ -577,6 +553,27 @@ impl Model for ItemsTableModel {
 	}
 }
 
+fn folder_item(info_db: &Rc<InfoDb>, dispenser: &mut SoftwareListDispenser<'_>, item: &PrefsItem) -> Result<Item> {
+	let video = item.video.clone();
+	match &item.details {
+		PrefsItemDetails::Machine(item) => {
+			let machine_config =
+				MachineConfig::from_machine_name_and_slots(info_db.clone(), &item.machine_name, &item.slots)?;
+			let images = item.images.clone();
+			let ram_size = item.ram_size;
+			let bios: Option<String> = item.bios.clone();
+			let details = ItemDetails::Machine {
+				machine_config,
+				images,
+				ram_size,
+				bios,
+			};
+			Ok(Item { video, details })
+		}
+		PrefsItemDetails::Software(software_item) => software_folder_item(dispenser, software_item),
+	}
+}
+
 fn software_folder_item(dispenser: &mut SoftwareListDispenser, item: &PrefsSoftwareItem) -> Result<Item> {
 	let (info, software_list) = dispenser.get(&item.software_list)?;
 	let software = software_list
@@ -833,16 +830,17 @@ fn column_text<'a>(_info_db: &'a InfoDb, item: &'a Item, column: ColumnType) -> 
 			ColumnType::Year => software.year.as_str().into(),
 			ColumnType::Provider => software.publisher.as_str().into(),
 		},
-		ItemDetails::Unrecognized { details, .. } => {
-			let PrefsItemDetails::Software(item) = &details else {
-				todo!()
-			};
-			match column {
+		ItemDetails::Unrecognized { details, .. } => match details {
+			PrefsItemDetails::Machine(item) => match column {
+				ColumnType::Name => item.machine_name.as_str().into(),
+				_ => "".into(),
+			},
+			PrefsItemDetails::Software(item) => match column {
 				ColumnType::Name => item.software.clone().into(),
 				ColumnType::SourceFile => format!("{}.xml", item.software_list).into(),
 				_ => "".into(),
-			}
-		}
+			},
+		},
 	}
 }
 
@@ -917,7 +915,66 @@ impl From<LocalItemContextMenuInfo> for ItemContextMenuInfo {
 impl MenuDesc {
 	pub fn encode_for_slint(self) -> SimpleMenuEntry {
 		let action = self.action.as_ref().map(Action::encode_for_slint).unwrap_or_default();
-		let title = self.title.clone();
+		let title = self.title;
 		SimpleMenuEntry { action, title }
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use std::io::Cursor;
+	use std::ops::ControlFlow;
+	use std::rc::Rc;
+
+	use itertools::Itertools;
+	use test_case::test_case;
+
+	use crate::info::InfoDb;
+	use crate::prefs::Preferences;
+	use crate::prefs::PrefsCollection;
+	use crate::selection::SelectionManager;
+
+	use super::ItemsTableModel;
+	use super::make_prefs_item;
+
+	#[test_case(0, include_str!("../info/test_data/listxml_coco.xml"), include_str!("../prefs/test_data/prefs01.json"), "Favorites")]
+	pub fn update_with_folder_count(_index: usize, info_xml: &str, prefs_xml: &str, folder_name: &str) {
+		// set up the model
+		let selection = SelectionManager::new_internal(|| 0, |_| {});
+		let model = ItemsTableModel::new(selection, |_| {});
+
+		// prepare an InfoDb
+		let info_db = InfoDb::from_listxml_output(info_xml.as_bytes(), |_| ControlFlow::Continue(()))
+			.unwrap()
+			.unwrap();
+		let info_db = Rc::new(info_db);
+
+		// get the prefs and find the folder
+		let prefs_cursor = Cursor::new(prefs_xml);
+		let prefs = Preferences::load_reader(prefs_cursor).unwrap();
+		let collection = prefs
+			.collections
+			.into_iter()
+			.filter(|collection| matches!(&**collection, PrefsCollection::Folder { name, .. } if name == folder_name))
+			.exactly_one()
+			.unwrap();
+
+		// do the update
+		model.update(
+			Some(Some(info_db)),
+			None,
+			Some(collection.clone()),
+			None,
+			None,
+			None,
+			None,
+		);
+
+		// verify that the number of collections match
+		let PrefsCollection::Folder { items, .. } = collection.as_ref() else {
+			unreachable!()
+		};
+		let new_items = model.items.borrow().iter().map(make_prefs_item).collect::<Vec<_>>();
+		assert_eq!(items.as_slice(), new_items.as_slice());
 	}
 }

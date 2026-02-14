@@ -468,6 +468,11 @@ impl Preferences {
 		result
 	}
 
+	#[cfg(test)]
+	pub fn load_reader(reader: impl Read) -> Result<Self> {
+		load_prefs_from_reader(reader)
+	}
+
 	pub fn save(&self, prefs_path: &Path) -> Result<()> {
 		ensure_directory(&prefs_path);
 		let path = prefs_filename(prefs_path, PREFS)?;
