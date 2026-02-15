@@ -230,28 +230,33 @@ impl ItemsTableModel {
 						})
 						.collect::<Rc<[_]>>(),
 
-					Some(PrefsCollection::MachineSoftware { machine_name }) => info_db
-						.machines()
-						.find(machine_name)
-						.into_iter()
-						.flat_map(|x| x.machine_software_lists().iter().collect::<Vec<_>>())
-						.filter_map(|x| dispenser.get(x.software_list().name()).ok())
-						.flat_map(|(_, list)| {
-							list.software
+					Some(PrefsCollection::MachineSoftware { machine_name }) => {
+						let machine_index = info_db.machines().find_index(machine_name).ok();
+						let items = machine_index.map(|machine_index| {
+							let machine = info_db.machines().get(machine_index).unwrap();
+							machine
+								.machine_software_lists()
 								.iter()
-								.map(|s| (list.clone(), s.clone()))
-								.collect::<Vec<_>>()
-						})
-						.map(|(software_list, software)| {
-							let details = ItemDetails::Software {
-								software_list,
-								software,
-								machine_indexes: Vec::default(),
-								preferred_machines: None,
-							};
-							details.into()
-						})
-						.collect::<Rc<[_]>>(),
+								.filter_map(|x| dispenser.get(x.software_list().name()).ok())
+								.flat_map(|(_, list)| {
+									list.software
+										.iter()
+										.map(|s| (list.clone(), s.clone()))
+										.collect::<Vec<_>>()
+								})
+								.map(|(software_list, software)| {
+									let details = ItemDetails::Software {
+										software_list,
+										software,
+										machine_indexes: vec![machine_index],
+										preferred_machines: None,
+									};
+									details.into()
+								})
+								.collect::<Rc<[_]>>()
+						});
+						items.unwrap_or_default()
+					}
 
 					Some(PrefsCollection::Folder { name: _, items }) => items
 						.iter()
