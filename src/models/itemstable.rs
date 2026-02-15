@@ -833,12 +833,12 @@ fn column_text<'a>(_info_db: &'a InfoDb, item: &'a Item, column: ColumnType) -> 
 		ItemDetails::Unrecognized { details, .. } => match details {
 			PrefsItemDetails::Machine(item) => match column {
 				ColumnType::Name => item.machine_name.as_str().into(),
-				_ => "".into(),
+				_ => "???".into(),
 			},
 			PrefsItemDetails::Software(item) => match column {
 				ColumnType::Name => item.software.clone().into(),
 				ColumnType::SourceFile => format!("{}.xml", item.software_list).into(),
-				_ => "".into(),
+				_ => "???".into(),
 			},
 		},
 	}
