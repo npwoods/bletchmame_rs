@@ -22,6 +22,7 @@ use slint::SharedString;
 use slint::StandardListViewItem;
 use slint::ToSharedString;
 use slint::VecModel;
+use smallvec::SmallVec;
 use smol_str::SmolStr;
 use tracing::debug;
 use tracing::debug_span;
@@ -218,7 +219,7 @@ impl ItemsTableModel {
 								info.compatible_for_machines().iter(),
 							)
 							.map(|x| x.index())
-							.collect::<Vec<_>>();
+							.collect();
 
 							let details = ItemDetails::Software {
 								software_list,
@@ -238,17 +239,15 @@ impl ItemsTableModel {
 								.machine_software_lists()
 								.iter()
 								.filter_map(|x| dispenser.get(x.software_list().name()).ok())
-								.flat_map(|(_, list)| {
-									list.software
-										.iter()
-										.map(|s| (list.clone(), s.clone()))
-										.collect::<Vec<_>>()
+								.flat_map(move |(_, list)| {
+									(0..list.software.len())
+										.map(move |index| (list.clone(), list.software[index].clone()))
 								})
 								.map(|(software_list, software)| {
 									let details = ItemDetails::Software {
 										software_list,
 										software,
-										machine_indexes: vec![machine_index],
+										machine_indexes: [machine_index].into_iter().collect(),
 										preferred_machines: None,
 									};
 									details.into()
@@ -605,14 +604,14 @@ fn software_folder_item(dispenser: &mut SoftwareListDispenser, item: &PrefsSoftw
 			.iter()
 			.flat_map(|machine_name| dispenser.info_db.machines().find(machine_name).ok())
 			.map(|machine| machine.index())
-			.collect::<Vec<_>>()
+			.collect()
 	} else {
 		Iterator::chain(
 			info.original_for_machines().iter(),
 			info.compatible_for_machines().iter(),
 		)
 		.map(|x| x.index())
-		.collect::<Vec<_>>()
+		.collect()
 	};
 
 	let preferred_machines = item.preferred_machines.as_ref().map(|x| x.iter().join("\0").into());
@@ -657,7 +656,7 @@ enum ItemDetails {
 	Software {
 		software_list: Arc<SoftwareList>,
 		software: Arc<Software>,
-		machine_indexes: Vec<usize>,
+		machine_indexes: SmallVec<[usize; 2]>,
 		preferred_machines: Option<Box<str>>, // NUL delimited
 	},
 	Unrecognized {
