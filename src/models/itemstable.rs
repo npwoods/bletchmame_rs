@@ -499,6 +499,18 @@ impl ItemsTableModel {
 		result.into_iter().collect()
 	}
 
+	pub fn get_row_tooltip(&self, row: usize) -> Option<String> {
+		let index = *self.items_map.borrow().get(row)?;
+		let index = usize::try_from(index).unwrap();
+		let items = self.items.borrow();
+		let item = items.get(index)?;
+
+		match &item.details {
+			ItemDetails::Unrecognized { error, .. } => Some(error.to_string()),
+			_ => None,
+		}
+	}
+
 	fn current_selected_index(&self) -> Option<u32> {
 		self.selection
 			.selected_index()

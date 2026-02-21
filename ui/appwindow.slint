@@ -22,6 +22,7 @@ import {
 import { SimpleMenuEntry } from "common.slint";
 import { Icons } from "icons.slint";
 import { HorizontalSplitter } from "splitter.slint";
+import { ToolTipArea } from "tooltip.slint";
 
 struct CollectionContextMenuInfo {
     move-up-action: string,
@@ -195,6 +196,7 @@ export component AppWindow inherits Window {
         // set-current-row() to bring that row into view
         items-table-view.set-current-row(index);
     }
+    in property <string> items-view-tooltip;
 
     // snapshot and history
     in property <string> current-snap-view;
@@ -720,6 +722,9 @@ export component AppWindow inherits Window {
         }
     }
 
+    // tooltip
+    tooltip := ToolTipArea { }
+
     VerticalBox {
         padding: 0px;
 
@@ -824,23 +829,32 @@ export component AppWindow inherits Window {
                     }
 
                     // items table
-                    items-table-view := StandardTableView {
+                    items-table-touch-area := TouchArea {
                         vertical-stretch: 1;
-                        rows: items-model;
-                        current-row <=> items-view-selected-index;
-                        columns <=> items-columns;
                         min-height: 0px;
-                        sort-ascending(index) => {
-                            items-sort-ascending(index)
+                        items-table-view := StandardTableView {
+                            width: 100%;
+                            height: 100%;
+                            rows: items-model;
+                            current-row <=> items-view-selected-index;
+                            columns <=> items-columns;
+                            sort-ascending(index) => {
+                                items-sort-ascending(index)
+                            }
+                            sort-descending(index) => {
+                                items-sort-descending(index)
+                            }
+                            current-row-changed(index) => {
+                                items-current-row-changed()
+                            }
+                            row-pointer-event(row, event, point) => {
+                                items-row-pointer-event(row, event, { x: point.x + self.absolute-position.x, y: point.y + self.absolute-position.y });
+                                tooltip.show-tooltip(items-table-touch-area.has-hover, items-table-touch-area.absolute-position.x + items-table-touch-area.mouse-x, items-table-touch-area.absolute-position.y + items-table-touch-area.mouse-y, items-view-tooltip);
+                            }
                         }
-                        sort-descending(index) => {
-                            items-sort-descending(index)
-                        }
-                        current-row-changed(index) => {
-                            items-current-row-changed()
-                        }
-                        row-pointer-event(row, event, point) => {
-                            items-row-pointer-event(row, event, { x: point.x + self.absolute-position.x, y: point.y + self.absolute-position.y })
+
+                        changed has-hover => {
+                            tooltip.show-tooltip(self.has-hover, self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y, items-view-tooltip);
                         }
                     }
 
