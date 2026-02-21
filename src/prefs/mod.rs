@@ -63,6 +63,12 @@ pub struct Preferences {
 	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub fullscreen_display: Option<SmolStr>,
 
+	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub is_collections_list_visible: Option<bool>,
+
+	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub is_picture_area_visible: Option<bool>,
+
 	#[serde(flatten)]
 	pub video: PrefsVideo,
 
@@ -88,6 +94,8 @@ impl Default for Preferences {
 			main_window_right_column_width: None,
 			is_fullscreen: false,
 			fullscreen_display: None,
+			is_collections_list_visible: None,
+			is_picture_area_visible: None,
 			video: Default::default(),
 			items_columns: [].into(),
 			collections: [].into(),

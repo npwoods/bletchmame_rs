@@ -498,6 +498,12 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	if let Some(main_window_right_column_width) = preferences.main_window_right_column_width {
 		app_window.set_column_right_width(main_window_right_column_width);
 	}
+	if let Some(is_collections_list_visible) = preferences.is_collections_list_visible {
+		app_window.set_is_collections_list_visible(is_collections_list_visible);
+	}
+	if let Some(is_picture_area_visible) = preferences.is_picture_area_visible {
+		app_window.set_is_picture_area_visible(is_picture_area_visible);
+	}
 
 	// create the window stack
 	let modal_stack = ModalStack::new(args.backend_runtime.clone(), app_window);
@@ -1774,6 +1780,10 @@ fn update_prefs(model: &Rc<AppModel>) {
 		// splitter columns
 		prefs.main_window_left_column_width = Some(app_window.get_column_left_width());
 		prefs.main_window_right_column_width = Some(app_window.get_column_right_width());
+
+		// collections view and picture area
+		prefs.is_collections_list_visible = Some(app_window.get_is_collections_list_visible());
+		prefs.is_picture_area_visible = Some(app_window.get_is_picture_area_visible());
 
 		// items columns
 		let items_columns = app_window.get_items_columns();
