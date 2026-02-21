@@ -11,6 +11,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Instant;
 
+use i_slint_core::items::PointerEventKind;
 use itertools::Itertools;
 use levenshtein::levenshtein;
 use nu_utils::IgnoreCaseExt;
@@ -728,6 +729,14 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 					.app_window()
 					.invoke_show_item_context_menu(context_commands, position);
 			}
+		}
+		if evt.kind == PointerEventKind::Move {
+			let index = usize::try_from(index).unwrap();
+			let text = model_clone
+				.with_items_table_model(|x| x.get_row_tooltip(index))
+				.unwrap_or_default()
+				.into();
+			model_clone.app_window().set_items_view_tooltip(text);
 		}
 	});
 
