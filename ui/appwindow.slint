@@ -165,6 +165,7 @@ export component AppWindow inherits Window {
     // the collections view on the left
     in property <[NavigationItem]> collections-model;
     in-out property <int> collections-view-selected-index;
+    in-out property <bool> is-collections-list-visible: true;
     callback collections-view-selected(int);
     callback collections-row-pointer-event(int, PointerEvent, Point);
 
@@ -201,6 +202,7 @@ export component AppWindow inherits Window {
     // snapshot and history
     in property <string> current-snap-view;
     in property <bool> history-xml-is-loading;
+    in-out property <bool> is-picture-area-visible: true;
     pure callback get-snap-image(string) -> image;
     pure callback get-history-text(string) -> string;
     in-out property <int> snap-image-salt;
@@ -445,6 +447,21 @@ export component AppWindow inherits Window {
                 muda-accelerator: "ScrollLock";
                 activated => {
                     menu-item-action(root.menu-action-options-toggle-menubar);
+                }
+            }
+
+            Menu {
+                title: @tr("MenuBar" => "Views");
+                MenuItem {
+                    title: @tr("MenuBar" => "Collections List");
+                    checkable: true;
+                    checked <=> is-collections-list-visible;
+                }
+
+                MenuItem {
+                    title: @tr("MenuBar" => "Picture Area");
+                    checkable: true;
+                    checked <=> is-picture-area-visible;
                 }
             }
 
@@ -738,7 +755,7 @@ export component AppWindow inherits Window {
                 visible: root.mode() == "ready";
 
                 // collections list view on the left
-                VerticalLayout {
+                if root.is-collections-list-visible: VerticalLayout {
                     alignment: start;
                     width: root.column-left-width;
                     min-height: 0px;
@@ -755,12 +772,10 @@ export component AppWindow inherits Window {
                         }
                     }
                 }
-
-                HorizontalSplitter {
+                if root.is-collections-list-visible: HorizontalSplitter {
                     value <=> root.column-left-width;
                     min-value: 80px;
                 }
-
                 VerticalLayout {
                     min-width: 10px;
                     alignment: stretch;
@@ -865,13 +880,12 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                HorizontalSplitter {
+                if root.is-picture-area-visible: HorizontalSplitter {
                     value <=> root.column-right-width;
                     min-value: 10px;
                     multiple: -1.0;
                 }
-
-                VerticalLayout {
+                if root.is-picture-area-visible: VerticalLayout {
                     width: root.column-right-width;
                     alignment: center;
                     Image {
