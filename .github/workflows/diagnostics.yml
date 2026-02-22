@@ -1,0 +1,55 @@
+########################################
+# BletchMAME Diagnostics Github Action #
+########################################
+
+on:
+    push:
+        branches:
+        - master
+    pull_request:
+        branches:
+        - master
+
+name: Diagnostics
+
+jobs:
+  diagnostics:
+    name: Diagnostics
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      # Checks out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+
+      # Install Rust toolchain
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      # Install Linux Dependencies
+      - name: Install Linux Dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt update
+          sudo apt install -y libxdo-dev libpango1.0-dev libgtk-3-dev libudev-dev mame
+
+      # Caching
+      - name: Caching
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+
+      # Run Diagnostics
+      - name: Diagnostics
+        run: |
+          mame -listxml | cargo run --release -- --process-listxml
