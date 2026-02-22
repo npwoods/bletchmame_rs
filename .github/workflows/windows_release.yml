@@ -1,0 +1,106 @@
+############################################
+# BletchMAME Windows Release Github Action #
+############################################
+
+on:
+    push:
+        branches:
+        - master
+    pull_request:
+        branches:
+        - master
+
+name: Windows Release
+
+jobs:
+  windows-release:
+    name: Windows Release Build
+    runs-on: windows-latest
+    steps:
+      # Checks out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+
+      # Install Rust toolchain
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      # Caching
+      - name: Caching
+        uses: Swatinem/rust-cache@v2
+        
+      # Build
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --no-default-features --release --locked
+
+      # Install PanDoc
+      - name: Install PanDoc
+        shell: bash
+        run: |
+            mkdir -p deps
+            curl -L -f "https://github.com/jgm/pandoc/releases/download/3.9/pandoc-3.9-windows-x86_64.zip" > deps/pandoc-windows-x86_64.zip
+            7z x deps/pandoc-windows-x86_64.zip -odeps
+
+      # Generate readme.html
+      - name: Generate readme.html
+        run: deps/pandoc-3.9/pandoc.exe README.md -o readme.html
+
+      # Add WiX to PATH
+      - name: Add WiX to PATH
+        shell: pwsh
+        run: |
+          $wixRoot = Get-ChildItem "C:\Program Files (x86)" -Directory |
+            Where-Object { $_.Name -like "WiX Toolset v*" } |
+            Sort-Object Name -Descending |
+            Select-Object -First 1
+
+          if (-not $wixRoot) {
+            Write-Error "WiX not found"
+            exit 1
+          }
+
+          $wixBin = Join-Path $wixRoot.FullName "bin"
+          echo $wixBin >> $env:GITHUB_PATH
+          Write-Host "Using WiX from $wixBin"
+    
+      # Build MSI - Candle (replace 'echo' with 'git describe --tags' when we have actual tags)
+      - name: Build MSI - Candle
+        shell: bash
+        run: candle -v bletchmame.wxs -dVERSION=`echo v3.0 | perl scripts/process_version.pl` -out bletchmame.wixobj
+            
+      # Build MSI - Light
+      - name: Build MSI - Light
+        run: light -v -ext WixUIExtension -ext WixUtilExtension bletchmame.wixobj -out BletchMAME.msi
+
+      # Prepare Artifacts (replace 'echo' with 'git describe --tags' when we have actual tags)
+      - name: Prepare Artifacts
+        shell: bash
+        run: |
+          mkdir rel
+          echo v3.0 | perl scripts/process_version.pl > rel/version_latest.txt
+          mv BletchMAME.msi rel/BletchMAME_latest.msi
+          7z a rel/BletchMAME_latest.zip ./target/release/BletchMAME.exe
+          7z a rel/BletchMAME_latest.zip readme.html
+          7z a rel/BletchMAME_latest.zip plugins
+
+      # Set date as env variable (PowerShell)
+      - name: Set date as env variable (PowerShell)
+        id: set_date
+        shell: pwsh
+        if: success() && github.ref == 'refs/heads/master'
+        run: |
+          $d = Get-Date -Format "yyyyMMddHHmm"
+          echo "ARTIFACT_DATE=$d" >> $env:GITHUB_ENV
+
+      # Upload build output
+      - name: Upload build output
+        uses: actions/upload-artifact@v4
+        if: success() && github.ref == 'refs/heads/master'
+        with:
+          name: BletchMAME_latest_${{ env.ARTIFACT_DATE }}
+          path: rel
