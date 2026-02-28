@@ -17,7 +17,7 @@ jobs:
     name: Diagnostics
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       # Checks out your repository under $GITHUB_WORKSPACE, so your job can access it
@@ -30,18 +30,31 @@ jobs:
           toolchain: stable
           override: true
 
-      # Install Linux Dependencies
-      - name: Install Linux Dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt update
-          sudo apt install -y libxdo-dev libpango1.0-dev libgtk-3-dev libudev-dev mame
+      # Install MSYS2
+      - name: Install MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: false
+          release: false
+          install: parallel p7zip
 
       # Caching
       - name: Caching
         uses: Swatinem/rust-cache@v2
 
-      # Run Diagnostics
-      - name: Diagnostics
+      # Build
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --locked --release
+
+      # Run integration testing with actual MAME
+      - name: Run integration testing with actual MAME
+        shell: msys2 {0}
         run: |
-          mame -listxml | cargo run --locked --release -- --process-listxml
+          sh scripts/test_mame_interactions.sh mame0260
+          sh scripts/test_mame_interactions.sh mame0280
+          
+
