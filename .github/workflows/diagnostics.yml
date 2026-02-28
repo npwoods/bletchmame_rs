@@ -44,4 +44,4 @@ jobs:
       # Run Diagnostics
       - name: Diagnostics
         run: |
-          mame -listxml | cargo run --release -- --process-listxml
+          mame -listxml | cargo run --locked --release -- --process-listxml

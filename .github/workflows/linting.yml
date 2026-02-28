@@ -59,7 +59,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: ${{ matrix.features }} --all-targets -- -D warnings
+          args: --locked ${{ matrix.features }} --all-targets -- -D warnings
 
   fmt:
     name: Rustfmt
