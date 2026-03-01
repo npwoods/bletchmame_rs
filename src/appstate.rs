@@ -53,7 +53,6 @@ pub struct AppState {
 }
 
 /// Represents the state of an InfoDb build (-listxml) job
-#[derive(Clone)]
 struct InfoDbBuild {
 	job: Job<Result<Option<InfoDb>>>,
 	canceller: Canceller,
@@ -327,11 +326,7 @@ impl AppState {
 	}
 
 	pub fn infodb_build_progress(&mut self, machine_description: String) -> bool {
-		let info_db_build = InfoDbBuild {
-			machine_description: Some(machine_description),
-			..self.info_db_build.as_ref().unwrap().clone()
-		};
-		self.info_db_build = Some(info_db_build);
+		self.info_db_build.as_mut().unwrap().machine_description = Some(machine_description);
 		true
 	}
 
