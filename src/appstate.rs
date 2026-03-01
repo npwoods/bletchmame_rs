@@ -45,7 +45,6 @@ pub struct AppState {
 	pub preferences: Preferences,
 	info_db_build: Option<InfoDbBuild>,
 	live: Option<Live>,
-	expecting: Option<Expecting>,
 	failure: Option<Failure>,
 	last_save_state: Option<Box<str>>,
 	video_override: Option<PrefsVideo>,
@@ -53,7 +52,6 @@ pub struct AppState {
 }
 
 /// Represents the state of an InfoDb build (-listxml) job
-#[derive(Clone)]
 struct InfoDbBuild {
 	job: Job<Result<Option<InfoDb>>>,
 	canceller: Canceller,
@@ -74,6 +72,7 @@ struct Session {
 	command_sender: Option<Arc<Sender<MameCommand>>>,
 	status: Option<Rc<Status>>,
 	pending_status: Option<Rc<Status>>,
+	expecting: Option<Expecting>,
 	post_session_end: Option<PostSessionEnd>,
 }
 
@@ -92,7 +91,7 @@ enum Failure {
 	InfoDbBuildCancelled,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum Expecting {
 	Start,
 	Stop,
@@ -152,7 +151,6 @@ impl AppState {
 			preferences: Preferences::default(),
 			info_db_build: None,
 			live: None,
-			expecting: None,
 			failure: None,
 			last_save_state: None,
 			video_override: None,
@@ -226,6 +224,7 @@ impl AppState {
 			job,
 			command_sender,
 			status: None,
+			expecting: None,
 			pending_status: None,
 			post_session_end: None,
 		}
@@ -293,7 +292,7 @@ impl AppState {
 		let session = self.live.as_mut().unwrap().session.as_mut().unwrap();
 
 		// we're expecting to run
-		self.expecting = Some(Expecting::Start);
+		session.expecting = Some(Expecting::Start);
 
 		// is the session live and ready?
 		if let Some(command_sender) = &session.command_sender
@@ -312,8 +311,11 @@ impl AppState {
 	}
 
 	pub fn stop(&mut self) -> bool {
-		let changed = self.expecting != Some(Expecting::Stop);
-		self.expecting = Some(Expecting::Stop);
+		// access the live session (which had better be present)
+		let session = self.live.as_mut().unwrap().session.as_mut().unwrap();
+
+		let changed = session.expecting != Some(Expecting::Stop);
+		session.expecting = Some(Expecting::Stop);
 		self.issue_command(MameCommand::stop());
 		changed
 	}
@@ -327,11 +329,7 @@ impl AppState {
 	}
 
 	pub fn infodb_build_progress(&mut self, machine_description: String) -> bool {
-		let info_db_build = InfoDbBuild {
-			machine_description: Some(machine_description),
-			..self.info_db_build.as_ref().unwrap().clone()
-		};
-		self.info_db_build = Some(info_db_build);
+		self.info_db_build.as_mut().unwrap().machine_description = Some(machine_description);
 		true
 	}
 
@@ -469,16 +467,13 @@ impl AppState {
 		}
 
 		// update expectations
-		let is_running = self
-			.live
-			.as_ref()
-			.and_then(|l| l.session.as_ref())
-			.and_then(|s| s.status.as_deref())
-			.is_some_and(|s| s.running.is_some());
-		if self.expecting == Some(Expecting::Start) && is_running
-			|| self.expecting == Some(Expecting::Stop) && !is_running
-		{
-			self.expecting = None;
+		if let Some(session) = self.live.as_mut().and_then(|l| l.session.as_mut()) {
+			let is_running = session.status.as_deref().is_some_and(|s| s.running.is_some());
+			if session.expecting == Some(Expecting::Start) && is_running
+				|| session.expecting == Some(Expecting::Stop) && !is_running
+			{
+				session.expecting = None;
+			}
 		}
 
 		// kick off an InfoDb rebuild if appropriate
@@ -582,14 +577,15 @@ impl AppState {
 		// upfront logic to determine the type of report presented, if any; keep
 		// this logic distinct from the mechanics of displaying the report
 		let session = self.live.as_ref().and_then(|live| live.session.as_ref());
+		let expecting = session.and_then(|session| session.expecting.as_ref());
 		let is_starting_up = session.is_some_and(|session| session.status.is_none());
 		let is_session_stopping = session.is_some_and(|session| session.command_sender.is_none());
 		let is_shutting_down =
 			session.is_some_and(|session| matches!(session.post_session_end, Some(PostSessionEnd::Shutdown)));
-		debug!(info_db_build=?self.info_db_build.as_ref().map(|_| "..."), expecting=?self.expecting.as_ref(), failure=?self.failure.as_ref(), ?is_starting_up, ?is_shutting_down, "AppState::report()");
+		debug!(info_db_build=?self.info_db_build.as_ref().map(|_| "..."), ?expecting, failure=?self.failure.as_ref(), ?is_starting_up, ?is_shutting_down, "AppState::report()");
 		let report_type = match (
 			self.info_db_build.as_ref(),
-			self.expecting.as_ref(),
+			expecting,
 			self.failure.as_ref(),
 			is_starting_up,
 			is_shutting_down,
