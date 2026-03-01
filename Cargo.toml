@@ -66,11 +66,11 @@ zerocopy = { version = "0.8.40", features = ["derive"] }
 zip = "7.2.0"
 
 # Slint dependencies
-i-slint-backend-qt = { git = "https://github.com/npwoods/slint.git", rev = "3a4fb4bd0f8cd2a02b1b16547a5796e724c509c3", optional = true }
-i-slint-backend-winit = { git = "https://github.com/npwoods/slint.git", rev = "3a4fb4bd0f8cd2a02b1b16547a5796e724c509c3" }
-i-slint-common = { git = "https://github.com/npwoods/slint.git", rev = "3a4fb4bd0f8cd2a02b1b16547a5796e724c509c3" }
-i-slint-core = { git = "https://github.com/npwoods/slint.git", rev = "3a4fb4bd0f8cd2a02b1b16547a5796e724c509c3" }
-slint = { git = "https://github.com/npwoods/slint.git", rev = "3a4fb4bd0f8cd2a02b1b16547a5796e724c509c3", features = [
+i-slint-backend-qt = { git = "https://github.com/npwoods/slint.git", rev = "775084f4d1073ac543928562c38cdb3b6ff3ab61", optional = true }
+i-slint-backend-winit = { git = "https://github.com/npwoods/slint.git", rev = "775084f4d1073ac543928562c38cdb3b6ff3ab61" }
+i-slint-common = { git = "https://github.com/npwoods/slint.git", rev = "775084f4d1073ac543928562c38cdb3b6ff3ab61" }
+i-slint-core = { git = "https://github.com/npwoods/slint.git", rev = "775084f4d1073ac543928562c38cdb3b6ff3ab61" }
+slint = { git = "https://github.com/npwoods/slint.git", rev = "775084f4d1073ac543928562c38cdb3b6ff3ab61", features = [
     "raw-window-handle-06",
 ] }
 
@@ -102,8 +102,8 @@ test-case = "3.3.1"
 [build-dependencies]
 cpp_build = "0.5.10"
 ico = "0.5.0"
-slint-build = { git = "https://github.com/npwoods/slint.git", rev = "3a4fb4bd0f8cd2a02b1b16547a5796e724c509c3" }
-slint-material-components = { git = "https://github.com/npwoods/slint.git", rev = "3a4fb4bd0f8cd2a02b1b16547a5796e724c509c3" }
+slint-build = { git = "https://github.com/npwoods/slint.git", rev = "775084f4d1073ac543928562c38cdb3b6ff3ab61" }
+slint-material-components = { git = "https://github.com/npwoods/slint.git", rev = "775084f4d1073ac543928562c38cdb3b6ff3ab61" }
 winresource = "0.1.30"
 
 [profile.dev]
