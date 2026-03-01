@@ -109,7 +109,7 @@ impl BackendRuntime {
 			Self::Winit(backend) => backend.install_muda_accelerator_handler(window, callback),
 
 			#[cfg(feature = "slint-qt-backend")]
-			Self::Qt(_backend) => todo!(),
+			Self::Qt(_backend) => {}
 		}
 	}
 
