@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 use std::ffi::OsStr;
 use std::ffi::OsString;
-use std::rc::Rc;
 use std::sync::Arc;
 
 use smol_str::SmolStr;
@@ -26,7 +25,7 @@ impl MameArguments {
 		video_override: Option<&PrefsVideo>,
 		windowing: &MameWindowing,
 		skip_file_system_checks: bool,
-	) -> MameArgumentsResult {
+	) -> Result<Self, MameArgumentsError> {
 		// run preflight first
 		let preflight_problems = prefs.paths.preflight(skip_file_system_checks);
 		if !preflight_problems.is_empty() {
@@ -87,13 +86,11 @@ impl MameArguments {
 	}
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct MameArgumentsError {
 	pub program: Option<SmolStr>,
-	pub preflight_problems: Rc<[PreflightProblem]>,
+	pub preflight_problems: Box<[PreflightProblem]>,
 }
-
-pub type MameArgumentsResult = std::result::Result<MameArguments, MameArgumentsError>;
 
 /// Returns platform specific arguments to MAME
 fn platform_specific_args() -> Vec<&'static str> {

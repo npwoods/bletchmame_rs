@@ -286,7 +286,7 @@ impl AppModel {
 			}
 
 			// did the InfoDB change?
-			Option::zip(old_info_db.as_ref(), state.info_db())
+			!Option::zip(old_info_db.as_ref(), state.info_db())
 				.map_or(old_info_db.is_none() && state.info_db().is_none(), |(old, new)| {
 					Rc::ptr_eq(old, new)
 				})
