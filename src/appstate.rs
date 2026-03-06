@@ -9,6 +9,7 @@ use std::time::Duration;
 
 use anyhow::Error;
 use anyhow::Result;
+use more_asserts::assert_gt;
 use slint::invoke_from_event_loop;
 use smol_str::SmolStr;
 use smol_str::ToSmolStr;
@@ -28,7 +29,6 @@ use crate::runtime::MameStartArgs;
 use crate::runtime::MameStderr;
 use crate::runtime::MameWindowing;
 use crate::runtime::args::MameArguments;
-use crate::runtime::args::MameArgumentsError;
 use crate::runtime::command::MameCommand;
 use crate::runtime::session::spawn_mame_session_thread;
 use crate::status::Status;
@@ -166,13 +166,24 @@ impl AppState {
 		)
 	}
 
-	fn make_mame_args(&self) -> std::result::Result<MameArguments, MameArgumentsError> {
-		MameArguments::new(
+	fn make_mame_args(&mut self) -> std::result::Result<MameArguments, ()> {
+		// clear out any failures
+		self.failure = None;
+
+		// create MAME arguments
+		let mame_args_result = MameArguments::new(
 			&self.preferences,
 			self.video_override.as_ref(),
 			&self.fixed.mame_windowing,
 			false,
-		)
+		);
+
+		// if we failed, report it
+		mame_args_result.map_err(|e| {
+			// failed preflight? report the problems
+			assert_gt!(e.preflight_problems.len(), 0);
+			self.failure = Some(Failure::Preflight(e.preflight_problems));
+		})
 	}
 
 	pub fn activate(&mut self) -> bool {
@@ -190,19 +201,8 @@ impl AppState {
 		});
 
 		if let Some(info_db) = info_db {
-			let (session, failure) = match mame_args_result {
-				Ok(mame_args) => {
-					let session = self.start_session(mame_args);
-					(Some(session), None)
-				}
-				Err(e) => {
-					let failure = Failure::Preflight(e.preflight_problems);
-					(None, Some(failure))
-				}
-			};
-
+			let session = mame_args_result.map(|mame_args| self.start_session(mame_args)).ok();
 			self.live = Some(Live { info_db, session });
-			self.failure = failure;
 			true
 		} else {
 			// we don't have InfoDb; force a rebuild
@@ -234,38 +234,17 @@ impl AppState {
 		}
 
 		// access the MAME executable path (or preflight errors if we don't have them)
-		let mame_arguments_result = self.make_mame_args();
-		let mame_executable_path_result = match mame_arguments_result.as_ref() {
-			Ok(mame_args) => Ok(mame_args.program.as_str()),
-			Err(e) => {
-				if let Some(program) = &e.program {
-					Ok(program.as_str())
-				} else {
-					Err(&e.preflight_problems)
-				}
-			}
-		};
-
-		// and based on whether we had success or failure, built the new state
-		match mame_executable_path_result {
-			Ok(mame_executable_path) => {
-				let prefs_path = &self.fixed.prefs_path;
-				let callback = self.fixed.callback.clone();
-				let (job, canceller) = spawn_infodb_build_thread(prefs_path, mame_executable_path, callback);
-				let info_db_build = InfoDbBuild {
-					job,
-					canceller,
-					machine_description: None,
-				};
-				self.info_db_build = Some(info_db_build);
-			}
-
-			Err(preflight_problems) => {
-				assert!(!preflight_problems.is_empty());
-				let preflight_problems = preflight_problems.clone();
-				let failure = Failure::Preflight(preflight_problems);
-				self.failure = Some(failure);
-			}
+		if let Ok(mame_args) = self.make_mame_args() {
+			let mame_executable_path = mame_args.program.as_str();
+			let prefs_path = &self.fixed.prefs_path;
+			let callback = self.fixed.callback.clone();
+			let (job, canceller) = spawn_infodb_build_thread(prefs_path, mame_executable_path, callback);
+			let info_db_build = InfoDbBuild {
+				job,
+				canceller,
+				machine_description: None,
+			};
+			self.info_db_build = Some(info_db_build);
 		};
 		true
 	}
@@ -390,9 +369,10 @@ impl AppState {
 					session.pending_status = pending_status;
 				} else {
 					// no session; create a new one
-					let mame_args = self.make_mame_args().unwrap();
-					self.live.as_mut().unwrap().session = Some(self.start_session(mame_args));
-					self.failure = None;
+					if let Ok(mame_args) = self.make_mame_args() {
+						let session = self.start_session(mame_args);
+						self.live.as_mut().unwrap().session = Some(session);
+					}
 				};
 			}
 
