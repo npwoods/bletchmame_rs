@@ -6,7 +6,9 @@ use std::io::Write;
 use std::os::windows::io::FromRawHandle;
 use std::os::windows::io::RawHandle;
 use std::os::windows::process::CommandExt;
+use std::process::Child;
 use std::process::Command;
+use std::process::Stdio;
 
 use anyhow::Error;
 use anyhow::Result;
@@ -15,6 +17,7 @@ use i_slint_backend_winit::WinitWindowAccessor;
 use raw_window_handle::RawWindowHandle;
 use slint::Window;
 use tracing::info;
+use uuid::Uuid;
 use win32job::Job;
 use windows::Win32::Foundation::GENERIC_READ;
 use windows::Win32::Foundation::GENERIC_WRITE;
@@ -96,6 +99,33 @@ pub impl Window {
 			window.set_enable(enabled);
 		});
 	}
+}
+
+pub fn win_console_init(title: &str) -> Result<(Child, File)> {
+	let exe_path = std::env::current_exe()?;
+
+	let guid = Uuid::new_v4();
+	let pipe_name = format!("\\\\.\\pipe\\bletchmame_pipe_{guid}");
+	let pipe = WinNamedPipe::new(&pipe_name)?;
+
+	// launch a new process with the --echo-console argument
+	let process = Command::new(exe_path)
+		.arg("--echo-console")
+		.arg(pipe_name)
+		.stdin(Stdio::null())
+		.stdout(Stdio::null())
+		.stderr(Stdio::null())
+		.create_new_console()
+		.spawn()?;
+
+	// create the file
+	let mut pipe_file = pipe.connect()?;
+
+	// set the title
+	let _ = write!(pipe_file, "\x1B]0;{title}\x07");
+
+	// and set us up
+	Ok((process, pipe_file))
 }
 
 /// Windows specific "echo console" - this is simpler on other platforms
