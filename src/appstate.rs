@@ -59,14 +59,12 @@ struct InfoDbBuild {
 }
 
 /// Represents so-called "live" state; we have an InfoDb and maybe a build
-#[derive(Clone)]
 struct Live {
 	info_db: Rc<InfoDb>,
 	session: Option<Session>,
 }
 
 /// Represents a session and associated communication
-#[derive(Clone)]
 struct Session {
 	job: Job<SessionResult<()>>,
 	command_sender: Option<Arc<Sender<MameCommand>>>,
@@ -76,7 +74,7 @@ struct Session {
 	post_session_end: Option<PostSessionEnd>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 enum PostSessionEnd {
 	Shutdown,
 	Restart { command: Option<MameCommand> },
@@ -91,7 +89,7 @@ enum Failure {
 	InfoDbBuildCancelled,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 enum Expecting {
 	Start,
 	Stop,
@@ -358,78 +356,72 @@ impl AppState {
 		let result = if cancel { Ok(None) } else { result };
 
 		// this next bit is pretty involved
-		let (live, failure) = match (result, self.live.as_ref()) {
-			// the rebuild succeeded, incorporate it into the new `Live`
-			(Ok(Some(info_db)), live) => {
-				let old_session = live.and_then(|live| live.session.as_ref());
-				let (new_session, failure) = if let Some(old_session) = old_session {
+		match result {
+			// the rebuild succeeded
+			Ok(Some(info_db)) => {
+				// put the info_db into the "live" (creating one if we have)
+				let info_db = Rc::new(info_db);
+				if let Some(live) = self.live.as_mut() {
+					live.info_db = info_db;
+				} else {
+					let live = Live { info_db, session: None };
+					self.live = Some(live);
+				}
+
+				let live = self.live.as_mut().unwrap();
+				let info_db = live.info_db.as_ref();
+				if let Some(session) = live.session.as_mut() {
 					// we do have a session; we need to validate and apply any pending status update
 					let (status, pending_status, result) = validate_and_update_status(
-						old_session.status.as_ref(),
-						old_session.pending_status.as_ref(),
+						session.status.as_ref(),
+						session.pending_status.as_ref(),
 						None,
-						&info_db,
+						info_db,
 					);
-					let (command_sender, failure) = if let Err(e) = result {
-						(None, Some(Failure::StatusValidationProblem(e)))
-					} else {
-						(old_session.command_sender.clone(), None)
-					};
 
-					let new_session = Session {
-						status,
-						pending_status,
-						command_sender,
-						..old_session.clone()
-					};
-					(Some(new_session), failure)
+					if let Err(e) = result {
+						session.command_sender = None;
+						self.failure = Some(Failure::StatusValidationProblem(e));
+					} else {
+						self.failure = None;
+					}
+
+					session.status = status;
+					session.pending_status = pending_status;
 				} else {
 					// no session; create a new one
 					let mame_args = self.make_mame_args().unwrap();
-					let session = self.start_session(mame_args);
-					(Some(session), None)
+					self.live.as_mut().unwrap().session = Some(self.start_session(mame_args));
+					self.failure = None;
 				};
-				let new_live = Live {
-					info_db: Rc::new(info_db),
-					session: new_session,
-				};
-				(Some(new_live), failure)
 			}
 
-			// the user cancelled and we're not live - show the cancel as a "failure"
-			(Ok(None), None) => (None, Some(Failure::InfoDbBuildCancelled)),
-
-			// the user cancelled but we're live - no need to report anything
-			(Ok(None), Some(live)) => (Some(live.clone()), None),
+			// the user cancelled; present an error if we're not live
+			Ok(None) => {
+				if self.live.is_none() {
+					self.failure = Some(Failure::InfoDbBuildCancelled);
+				}
+			}
 
 			// an unexpected error occurred; shut down the live session (if any) and report the error
-			(Err(e), live) => {
-				let live = live.map(|live| {
-					let session = live.session.as_ref().map(|session| Session {
-						command_sender: None,
-						..session.clone()
-					});
-					Live {
-						session,
-						..live.clone()
-					}
-				});
-				let failure = Some(Failure::InfoDbBuild(e));
-				(live, failure)
+			Err(e) => {
+				let session = self.live.as_mut().and_then(|live| live.session.as_mut());
+				if let Some(session) = session {
+					session.command_sender = None;
+				}
+				self.failure = Some(Failure::InfoDbBuild(e));
 			}
 		};
 
 		// and return
-		self.live = live;
-		self.failure = failure;
 		self.info_db_build = None;
 		true
 	}
 
 	/// Apply a `worker_ui` status update
 	pub fn status_update(&mut self, update: Update) -> bool {
-		let live = self.live.as_ref().unwrap();
-		let session = live.session.as_ref().unwrap();
+		let live = self.live.as_mut().unwrap();
+		let session = live.session.as_mut().unwrap();
 
 		// ignore status updates when we're shutting down
 		if session.command_sender.is_none() {
@@ -452,16 +444,8 @@ impl AppState {
 		};
 
 		// and munge this into the new state
-		let new_session = Session {
-			status: new_status,
-			pending_status: new_pending_status,
-			..session.clone()
-		};
-		let new_live = Live {
-			session: Some(new_session),
-			..live.clone()
-		};
-		self.live = Some(new_live);
+		session.status = new_status;
+		session.pending_status = new_pending_status;
 		if let Some(failure) = failure {
 			self.failure = Some(failure);
 		}
