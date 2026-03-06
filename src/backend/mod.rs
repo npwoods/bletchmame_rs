@@ -27,7 +27,7 @@ use crate::backend::qt::QtBackendRuntime;
 #[cfg(feature = "slint-qt-backend")]
 use crate::backend::qt::QtChildWindow;
 
-#[derive(Debug, EnumString)]
+#[derive(Clone, Debug, EnumString)]
 pub enum SlintBackend {
 	#[strum(ascii_case_insensitive)]
 	Winit,

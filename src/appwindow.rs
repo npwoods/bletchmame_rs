@@ -147,7 +147,7 @@ pub struct AppArgs {
 	pub backend_runtime: BackendRuntime,
 }
 
-#[derive(Debug, Default, EnumString)]
+#[derive(Clone, Debug, Default, EnumString)]
 pub enum AppWindowing {
 	#[default]
 	#[strum(ascii_case_insensitive)]

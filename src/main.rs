@@ -43,11 +43,11 @@ use std::process::ExitCode;
 use std::rc::Rc;
 
 use appwindow::AppWindowing;
+use clap::Parser;
 use dirs::config_local_dir;
 use slint::ComponentHandle;
 use slint::run_event_loop;
 use slint::spawn_local;
-use structopt::StructOpt;
 use tracing_subscriber::EnvFilter;
 
 use crate::appwindow::AppArgs;
@@ -64,36 +64,36 @@ mod ui {
 	slint::include_modules!();
 }
 
-#[derive(StructOpt, Debug)]
-#[structopt(name = "basic")]
+#[derive(Parser, Debug)]
+#[command(name = "basic")]
 struct Opt {
-	#[structopt(long, parse(from_os_str))]
+	#[arg(long, value_parser = clap::value_parser!(PathBuf))]
 	prefs_path: Option<PathBuf>,
 
-	#[structopt(long)]
+	#[arg(long)]
 	mame_windowing: Option<AppWindowing>,
 
-	#[cfg_attr(feature = "slint-qt-backend", structopt(long))]
+	#[cfg_attr(feature = "slint-qt-backend", arg(long))]
 	slint_backend: Option<SlintBackend>,
 
 	#[cfg(target_os = "windows")]
-	#[structopt(long)]
+	#[arg(long)]
 	echo_console: Option<String>,
 
 	#[cfg(feature = "diagnostics")]
-	#[structopt(long)]
+	#[arg(long)]
 	process_listxml: bool,
 
 	#[cfg(feature = "diagnostics")]
-	#[structopt(long)]
+	#[arg(long, value_parser = clap::value_parser!(PathBuf))]
 	process_listxml_file: Option<PathBuf>,
 
-	#[cfg_attr(feature = "diagnostics", structopt(long))]
-	#[cfg_attr(not(feature = "diagnostics"), structopt(skip))]
+	#[cfg_attr(feature = "diagnostics", arg(long))]
+	#[cfg_attr(not(feature = "diagnostics"), arg(skip))]
 	log: Option<String>,
 
-	#[cfg_attr(feature = "diagnostics", structopt(long))]
-	#[cfg_attr(not(feature = "diagnostics"), structopt(skip))]
+	#[cfg_attr(feature = "diagnostics", arg(long))]
+	#[cfg_attr(not(feature = "diagnostics"), arg(skip))]
 	no_capture_mame_stderr: bool,
 }
 
@@ -102,7 +102,7 @@ fn main() -> ExitCode {
 	let _platform_specific = platform_init().unwrap();
 
 	// get the command line arguments
-	let opts = Opt::from_args();
+	let opts = Opt::parse();
 
 	// set up logging
 	let log = opts.log.or_else(|| std::env::var("RUST_ENV").ok());
@@ -187,14 +187,14 @@ fn main() -> ExitCode {
 #[cfg(test)]
 mod test {
 	use assert_matches::assert_matches;
-	use structopt::StructOpt;
+	use clap::Parser;
 
 	use super::Opt;
 
 	#[test]
 	fn opts_from_args() {
-		let empty_args = Vec::<&str>::new();
-		let attrs = Opt::from_iter_safe(empty_args.iter());
+		let empty_args = vec!["bletchmame"];
+		let attrs = Opt::try_parse_from(empty_args);
 		assert_matches!(attrs, Ok(_));
 	}
 }
