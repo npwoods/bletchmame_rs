@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::cell::Cell;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -169,6 +170,7 @@ struct AppModel {
 	child_window: RefCell<Option<ChildWindow>>,
 	history_loader: RefCell<Option<HistoryLoader>>,
 	searchbar_actions: RefCell<Vec<SharedString>>,
+	shutting_down: Cell<bool>,
 }
 
 impl AppModel {
@@ -393,7 +395,8 @@ impl AppModel {
 		});
 		if shutdown {
 			update_prefs(self);
-			quit_event_loop().unwrap()
+			quit_event_loop().unwrap();
+			self.shutting_down.set(true);
 		}
 	}
 
@@ -531,6 +534,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		child_window: RefCell::new(child_window),
 		history_loader: RefCell::new(None),
 		searchbar_actions: RefCell::new([].into()),
+		shutting_down: Cell::new(false),
 	};
 	let model = Rc::new(model);
 
@@ -703,9 +707,15 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	// for when we shut down
 	let model_clone = model.clone();
 	app_window.window().on_close_requested(move || {
-		let action = Action::FileExit;
-		handle_action(&model_clone, action);
-		CloseRequestResponse::KeepWindowShown
+		// we need to check to see if we're shutting down; the Qt back end likes to invoke this callback
+		// after quit_event_loop() is called
+		if model_clone.shutting_down.get() {
+			CloseRequestResponse::HideWindow
+		} else {
+			let action = Action::FileExit;
+			handle_action(&model_clone, action);
+			CloseRequestResponse::KeepWindowShown
+		}
 	});
 
 	// collections popup menus
