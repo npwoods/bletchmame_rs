@@ -28,7 +28,7 @@ use crate::runtime::MameStartArgs;
 use crate::runtime::MameStderr;
 use crate::runtime::MameWindowing;
 use crate::runtime::args::MameArguments;
-use crate::runtime::args::MameArgumentsResult;
+use crate::runtime::args::MameArgumentsError;
 use crate::runtime::command::MameCommand;
 use crate::runtime::session::spawn_mame_session_thread;
 use crate::status::Status;
@@ -82,7 +82,7 @@ enum PostSessionEnd {
 
 #[derive(Debug)]
 enum Failure {
-	Preflight(Rc<[PreflightProblem]>),
+	Preflight(Box<[PreflightProblem]>),
 	SessionError(SessionError),
 	StatusValidationProblem(ValidationError),
 	InfoDbBuild(Error),
@@ -166,7 +166,7 @@ impl AppState {
 		)
 	}
 
-	fn make_mame_args(&self) -> MameArgumentsResult {
+	fn make_mame_args(&self) -> std::result::Result<MameArguments, MameArgumentsError> {
 		MameArguments::new(
 			&self.preferences,
 			self.video_override.as_ref(),
