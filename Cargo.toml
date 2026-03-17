@@ -12,17 +12,17 @@ binary-search = "0.1.3"
 byte-unit = "5.2.0"
 byteorder = "1.5.0"
 clap = { version = "4", features = ["derive"] }
-console = { version = "0.16.2", optional = true }
+console = { version = "0.16.3", optional = true }
 cpp = "0.5.10"
 crc32fast = "1.5.0"
 default-ext = "0.1.0"
 dirs = "6.0.0"
 dpi = "0.1.2"
-easy-ext = "1.0.2"
-glob = "0.3.1"
+easy-ext = "1.0.3"
+glob = "0.3.3"
 hex = "0.4.3"
 hostname-validator = "1.1.1"
-image = "0.25.9"
+image = "0.25.10"
 is_executable = "1.0.5"
 itertools = "0.14.0"
 levenshtein = "1.0.5"
@@ -39,17 +39,17 @@ raw-window-handle = "0.6.2"
 rfd = "0.17.2"
 serde = { version = "1.0.228", features = ["rc"] }
 serde_json = "1.0.149"
-serialport = "4.8.1"
+serialport = "4.9.0"
 sha1 = "0.10.6"
 showfile = "0.1.1"
 smallvec = "1.15.1"
-smol_str = { version = "0.3.5", features = ["serde"] }
+smol_str = { version = "0.3.6", features = ["serde"] }
 splitty = "1.0.2"
 strum = { version = "0.27.2", features = ["derive"] }
 strum_macros = "0.27.2"
 thiserror = "2.0.18"
 throttle = "0.1.0"
-tokio = { version = "1.49.0", features = [
+tokio = { version = "1.50.0", features = [
     "rt",
     "rt-multi-thread",
     "time",
@@ -59,11 +59,11 @@ tracing = { version = "0.1.44", features = [
     "max_level_trace",
     "release_max_level_info",
 ] }
-tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 unicase = "2.9.0"
-uuid = { version = "1.21.0", features = ["v4"] }
-winit = "0.30.12"
-zerocopy = { version = "0.8.40", features = ["derive"] }
+uuid = { version = "1.22.0", features = ["v4"] }
+winit = "0.30.13"
+zerocopy = { version = "0.8.42", features = ["derive"] }
 zip = "7.2.0"
 
 # Slint dependencies
@@ -105,7 +105,7 @@ cpp_build = "0.5.10"
 ico = "0.5.0"
 slint-build = { git = "https://github.com/npwoods/slint.git", rev = "378de47ea6765f743b4ac4035a0360f3484f8d96" }
 slint-material-components = { git = "https://github.com/npwoods/slint.git", rev = "378de47ea6765f743b4ac4035a0360f3484f8d96" }
-winresource = "0.1.30"
+winresource = "0.1.31"
 
 [profile.dev]
 opt-level = 0
