@@ -24,6 +24,11 @@ impl MameCommand {
 		self.0.as_ref()
 	}
 
+	#[cfg(feature = "diagnostics")]
+	pub fn from_text(text: impl Into<String>) -> Self {
+		Self(text.into().into())
+	}
+
 	pub fn start(start_args: &MameStartArgs) -> Self {
 		// RAM size
 		let ram_size_args_iter = if let Some(ram_size) = start_args.ram_size {

@@ -1,3 +1,6 @@
+mod script;
+
+use std::cell::RefCell;
 use std::fs::File;
 use std::io::BufReader;
 use std::io::Read;
@@ -6,17 +9,29 @@ use std::io::stdin;
 use std::io::stdout;
 use std::ops::ControlFlow;
 use std::path::Path;
+use std::process::Child;
+use std::process::Command;
 use std::process::ExitCode;
+use std::process::Stdio;
 use std::time::Duration;
 use std::time::Instant;
 
 use anyhow::Error;
+use anyhow::Result;
 use byte_unit::Byte;
 use console::style;
+use glob::GlobError;
+use glob::PatternError;
+use glob::glob;
+use itertools::Itertools;
 use throttle::Throttle;
 
+use crate::console::EmitType;
+use crate::diagnostics::script::Script;
 use crate::info::InfoDb;
 use crate::info::View;
+use crate::runtime::command::MameCommand;
+use crate::runtime::session::interact_with_mame;
 
 #[derive(thiserror::Error, Debug)]
 enum ThisError {
@@ -26,6 +41,10 @@ enum ThisError {
 	BuildingInfoDb(Error),
 	#[error("InfoDb build process created corrupt database")]
 	Validation(Vec<Error>),
+	#[error("Error with glob: {0:?}")]
+	Glob(Vec<GlobError>),
+	#[error("Error with glob pattern: {0:?}")]
+	GlobPattern(PatternError),
 }
 
 pub fn info_db_from_xml_file(path: Option<impl AsRef<Path>>) -> ExitCode {
@@ -136,4 +155,61 @@ fn internal_info_db_from_xml_file(
 
 	// and return!
 	Ok((info_db, start_instant.elapsed()))
+}
+
+pub fn exercise_mame_tests(pattern: &str, args: &[impl AsRef<str>]) -> ExitCode {
+	match internal_exercise_mame_tests(pattern, args) {
+		Ok(()) => ExitCode::SUCCESS,
+		Err(e) => {
+			println!("Error:  {e}");
+			ExitCode::FAILURE
+		}
+	}
+}
+
+fn internal_exercise_mame_tests(pattern: &str, command_line: &[impl AsRef<str>]) -> Result<()> {
+	let (scripts, errors): (Vec<_>, Vec<_>) = glob(pattern).map_err(ThisError::GlobPattern)?.partition_result();
+	if !errors.is_empty() {
+		return Err(ThisError::Glob(errors).into());
+	}
+
+	for script in scripts.iter() {
+		let mut mame_child = Command::new(command_line.first().unwrap().as_ref())
+			.args(command_line[1..].iter().map(|s| s.as_ref()))
+			.stdin(Stdio::piped())
+			.stdout(Stdio::piped())
+			.stderr(Stdio::null())
+			.spawn()?;
+
+		exercise_mame(&mut mame_child, script)?;
+
+		let _ = mame_child.wait()?;
+	}
+	Ok(())
+}
+
+fn exercise_mame(mame_child: &mut Child, script: &Path) -> Result<()> {
+	// parse the script
+	let file = File::open(script)?;
+	let reader = BufReader::new(file);
+	let script = Script::parse(reader)?;
+	let commands_iter = script.commands.iter();
+	let commands_iter = RefCell::new(commands_iter);
+
+	// and exercise MAME
+	let receiver = move |_| {
+		commands_iter
+			.borrow_mut()
+			.next()
+			.map_or(MameCommand::exit(), |s| MameCommand::from_text(s.as_ref()))
+	};
+	let emit_console = |emit_type: EmitType, s: &str| {
+		let ansi_code = emit_type.ansi_code();
+		println!("{ansi_code}{s}");
+	};
+	let event_callback = |_event| {};
+	interact_with_mame(mame_child, &receiver, &emit_console, &event_callback)?;
+
+	// and we're done!
+	Ok(())
 }

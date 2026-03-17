@@ -57,9 +57,6 @@ use crate::platform::platform_init;
 use crate::runtime::MameStderr;
 use crate::ui::AppWindow;
 
-#[cfg(feature = "diagnostics")]
-use crate::diagnostics::info_db_from_xml_file;
-
 mod ui {
 	slint::include_modules!();
 }
@@ -95,6 +92,14 @@ struct Opt {
 	#[cfg_attr(feature = "diagnostics", arg(long))]
 	#[cfg_attr(not(feature = "diagnostics"), arg(skip))]
 	no_capture_mame_stderr: bool,
+
+	#[cfg(feature = "diagnostics")]
+	#[arg(long = "exercise-mame-tests", value_parser = clap::value_parser!(String))]
+	exercise_mame_tests: Option<String>,
+
+	#[cfg(feature = "diagnostics")]
+	#[arg(last = true)]
+	last: Vec<String>,
 }
 
 fn main() -> ExitCode {
@@ -113,6 +118,9 @@ fn main() -> ExitCode {
 	// are we doing diagnostics
 	#[cfg(feature = "diagnostics")]
 	{
+		use crate::diagnostics::exercise_mame_tests;
+		use crate::diagnostics::info_db_from_xml_file;
+
 		let process_listxml = match (opts.process_listxml, opts.process_listxml_file.as_deref()) {
 			(false, None) => None,
 			(true, None) => Some(None),
@@ -122,6 +130,10 @@ fn main() -> ExitCode {
 
 		if let Some(path) = process_listxml {
 			return info_db_from_xml_file(path);
+		}
+
+		if let Some(path) = opts.exercise_mame_tests.as_deref() {
+			return exercise_mame_tests(path, &opts.last);
 		}
 	}
 
