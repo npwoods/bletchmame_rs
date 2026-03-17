@@ -28,7 +28,10 @@ curl -f -L "https://github.com/mamedev/mame/releases/download/${MAME_VERSION}/${
 7z -y x deps/${MAME_VERSION}b_64bit.exe -odeps/${MAME_VERSION}
 
 # Ensure we can digest -listxml from this MAME
-deps/${MAME_VERSION}/${MAME_EXE} -listxml | ./target/release/bletchmame.exe --process-listxml
+./deps/${MAME_VERSION}/${MAME_EXE} -listxml | ./target/release/bletchmame.exe --process-listxml
+
+# Exercise MAME with the `worker_ui` against our scripts
+./target/release/bletchmame.exe --exercise-mame-tests 'src/diagnostics/scripts/*.xml' -- deps/${MAME_VERSION}/${MAME_EXE} alienar -rompath deps/roms -skip_gameinfo -sound none -video none -nothrottle -pluginspath "deps/${MAME_VERSION}/plugins;plugins" -plugin worker_ui
 
 # Finally clean up after ourselves
 rm -rf deps/${MAME_VERSION}b_64bit.exe deps/${MAME_VERSION}/
