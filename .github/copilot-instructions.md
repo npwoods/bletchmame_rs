@@ -46,4 +46,5 @@ This file contains concise, actionable information to help an AI agent be produc
   - External MAME binary: required for diagnostics and InfoDb (`mame -listxml`). CI installs `mame` only for diagnostics job.
   - Optional Qt support via `slint-qt-backend` feature — requires Qt to be installed when enabled (CI uses `jurplel/install-qt-action`).
 
-If any of these sections are unclear or you want more examples (call sites, common edits, or tests to add), tell me which area to expand and I will iterate the file.
+
+- XML parsing is done with wrappers in `src/xml.rs`.  These are wrappers for the `quick-xml` crate.  The preferred pattern for code that parses XML is to have a `Phase` enum that identifies where in the XML structure one is, and to match on a tuple of the `Phase` and the `name()` of the XML.  If significant enough, have a `State` struct with methods like `handle_start()` and `handle_end()`. Examples of this pattern are in `src/info/build.rs`, `src/status/parse.rs`, `src/history_xml/parse.rs` and `src/diagnostics/script.rs`.

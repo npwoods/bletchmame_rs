@@ -25,7 +25,7 @@ pub enum EmitType {
 }
 
 impl EmitType {
-	fn ansi_code(&self) -> &'static str {
+	pub fn ansi_code(&self) -> &'static str {
 		self.get_str("AnsiCode").unwrap()
 	}
 }

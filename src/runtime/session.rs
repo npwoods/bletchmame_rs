@@ -65,7 +65,7 @@ enum ThisError {
 }
 
 #[derive(Debug)]
-enum MameEvent {
+pub enum MameEvent {
 	SessionEnded,
 	StatusUpdate(Update),
 }
@@ -122,7 +122,17 @@ fn execute_mame(
 		.map_err(|e| ThisError::LaunchingMame(e.into()))?;
 
 	// interact with MAME, do our thing
-	let mame_result = interact_with_mame(&mut child, receiver, console, &event_callback);
+	let receiver = |timeout| match receiver.recv_timeout(timeout) {
+		Ok(command) => command,
+		Err(RecvTimeoutError::Timeout) => MameCommand::ping(),
+		Err(RecvTimeoutError::Disconnected) => MameCommand::exit(),
+	};
+	let mame_result = interact_with_mame(
+		&mut child,
+		&receiver,
+		&|emit_type, s| emit_console(console, emit_type, s),
+		&event_callback,
+	);
 
 	// if we either errored, try to kill the process
 	if mame_result.is_err() {
@@ -159,11 +169,11 @@ fn execute_mame(
 	}
 }
 
-fn interact_with_mame(
+pub fn interact_with_mame(
 	child: &mut Child,
-	receiver: &Receiver<MameCommand>,
-	console: &Mutex<Option<Console>>,
-	event_callback: &impl Fn(MameEvent),
+	receiver: &dyn Fn(Duration) -> MameCommand,
+	emit_console: &dyn for<'a> Fn(EmitType, &'a str),
+	event_callback: &dyn Fn(MameEvent),
 ) -> anyhow::Result<()> {
 	// set up what we need to interact with MAME as a child process
 	let mut mame_stdin = BufWriter::new(child.stdin.take().unwrap());
@@ -174,7 +184,7 @@ fn interact_with_mame(
 
 	loop {
 		info!("Calling read_response_from_mame()");
-		let (update, is_signal) = read_response_from_mame(&mut mame_stdout, console, &mut line)?;
+		let (update, is_signal) = read_response_from_mame(&mut mame_stdout, &emit_console, &mut line)?;
 
 		if let Some(update) = update {
 			is_running = update.is_running();
@@ -185,14 +195,14 @@ fn interact_with_mame(
 			if is_exiting {
 				break Ok(());
 			}
-			is_exiting = process_event_from_front_end(receiver, &mut mame_stdin, is_running, console)?;
+			is_exiting = process_event_from_front_end(&receiver, &mut mame_stdin, is_running, &emit_console)?;
 		}
 	}
 }
 
 fn read_response_from_mame(
 	mame_stdout: &mut impl BufRead,
-	console: &Mutex<Option<Console>>,
+	emit_console: &dyn for<'a> Fn(EmitType, &'a str),
 	line: &mut String,
 ) -> anyhow::Result<(Option<Update>, bool)> {
 	#[derive(Debug, Clone, Copy, PartialEq)]
@@ -207,7 +217,7 @@ fn read_response_from_mame(
 		Ok(()) => {
 			let line_without_eolns = line.trim_end_matches(&['\r', '\n'][..]);
 			if let Some(status_line) = line.strip_prefix("@") {
-				emit_console(console, EmitType::Response, line_without_eolns);
+				emit_console(EmitType::Response, line_without_eolns);
 				let (msg, comment) = if let Some((msg, comment)) = status_line.split_once("###") {
 					(msg.trim_end(), Some(comment.trim()))
 				} else {
@@ -224,7 +234,7 @@ fn read_response_from_mame(
 
 				(result, comment)
 			} else {
-				emit_console(console, EmitType::Cruft, line_without_eolns);
+				emit_console(EmitType::Cruft, line_without_eolns);
 				(Ok(ResponseLine::Cruft), Some(line.as_str()))
 			}
 		}
@@ -283,29 +293,24 @@ fn read_text_from_reader(read: &mut impl Read) -> SmolStr {
 }
 
 fn process_event_from_front_end(
-	receiver: &Receiver<MameCommand>,
+	receiver: &dyn Fn(Duration) -> MameCommand,
 	mame_stdin: &mut BufWriter<impl Write>,
 	is_running: bool,
-	console: &Mutex<Option<Console>>,
+	emit_console: &dyn for<'a> Fn(EmitType, &'a str),
 ) -> anyhow::Result<bool> {
 	let timeout = if is_running {
 		Duration::from_secs(1)
 	} else {
 		Duration::from_secs(10)
 	};
-	let (command, is_exit) = match receiver.recv_timeout(timeout) {
-		Ok(command) => (command, false),
-		Err(RecvTimeoutError::Timeout) => (MameCommand::ping(), false),
-		Err(RecvTimeoutError::Disconnected) => (MameCommand::exit(), true),
-	};
-
+	let command = receiver(timeout);
 	info!(?command);
 
-	emit_console(console, EmitType::Command, command.text());
+	emit_console(EmitType::Command, command.text());
 	writeln!(mame_stdin, "{}", command.text()).map_err(|e| ThisError::WritingToMame(e.into()))?;
 	mame_stdin.flush().map_err(|e| ThisError::WritingToMame(e.into()))?;
 
-	Ok(is_exit)
+	Ok(command == MameCommand::exit())
 }
 
 // emits a line to an active console, if present
