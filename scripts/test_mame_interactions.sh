@@ -27,6 +27,10 @@ curl -f -L "https://github.com/mamedev/mame/releases/download/${MAME_VERSION}/${
 # Extract the archive
 7z -y x deps/${MAME_VERSION}b_64bit.exe -odeps/${MAME_VERSION}
 
+# Get `alienar` ROM
+mkdir -p deps/roms
+curl -L "https://www.mamedev.org/roms/alienar/alienar.zip" > deps/roms/alienar.zip
+
 # Ensure we can digest -listxml from this MAME
 ./deps/${MAME_VERSION}/${MAME_EXE} -listxml | ./target/release/bletchmame.exe --process-listxml
 

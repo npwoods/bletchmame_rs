@@ -178,7 +178,6 @@ fn internal_exercise_mame_tests(pattern: &str, command_line: &[impl AsRef<str>])
 			.args(command_line[1..].iter().map(|s| s.as_ref()))
 			.stdin(Stdio::piped())
 			.stdout(Stdio::piped())
-			.stderr(Stdio::null())
 			.spawn()?;
 
 		exercise_mame(&mut mame_child, script)?;
