@@ -1389,7 +1389,9 @@ function startplugin()
 				invoke_command_line(conth.result)
 
 				-- continue on reading
-				conth:start(scr)
+				if state ~= "EXITING" then
+					conth:start(scr)
+				end
 			end
 		end
 	end

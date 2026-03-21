@@ -2,6 +2,7 @@ mod script;
 
 use std::cell::RefCell;
 use std::fs::File;
+use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Read;
 use std::io::Write;
@@ -13,6 +14,10 @@ use std::process::Child;
 use std::process::Command;
 use std::process::ExitCode;
 use std::process::Stdio;
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
+use std::thread::spawn;
 use std::time::Duration;
 use std::time::Instant;
 
@@ -45,6 +50,8 @@ enum ThisError {
 	Glob(Vec<GlobError>),
 	#[error("Error with glob pattern: {0:?}")]
 	GlobPattern(PatternError),
+	#[error("Encountered MAME LUA error")]
+	MameLuaError,
 }
 
 pub fn info_db_from_xml_file(path: Option<impl AsRef<Path>>) -> ExitCode {
@@ -178,6 +185,7 @@ fn internal_exercise_mame_tests(pattern: &str, command_line: &[impl AsRef<str>])
 			.args(command_line[1..].iter().map(|s| s.as_ref()))
 			.stdin(Stdio::piped())
 			.stdout(Stdio::piped())
+			.stderr(Stdio::piped())
 			.spawn()?;
 
 		exercise_mame(&mut mame_child, script)?;
@@ -195,6 +203,23 @@ fn exercise_mame(mame_child: &mut Child, script: &Path) -> Result<()> {
 	let commands_iter = script.commands.iter();
 	let commands_iter = RefCell::new(commands_iter);
 
+	// we want to capture stderr
+	let has_mame_lua_error = Arc::new(AtomicBool::new(false));
+	let has_mame_lua_error_clone = has_mame_lua_error.clone();
+	let mame_stderr = BufReader::new(mame_child.stderr.take().unwrap());
+	let stderr_thread = spawn(move || {
+		for line in mame_stderr.lines() {
+			let line = line.unwrap();
+			let is_mame_lua_error = line.starts_with("[LUA ERROR]");
+			if is_mame_lua_error {
+				println!("\x1B[1;31m{line}\x1B[0m");
+				has_mame_lua_error_clone.store(true, Ordering::Relaxed);
+			} else {
+				println!("\x1B[33m{line}\x1B[0m");
+			}
+		}
+	});
+
 	// and exercise MAME
 	let receiver = move |_| {
 		commands_iter
@@ -208,6 +233,14 @@ fn exercise_mame(mame_child: &mut Child, script: &Path) -> Result<()> {
 	};
 	let event_callback = |_event| {};
 	interact_with_mame(mame_child, &receiver, &emit_console, &event_callback)?;
+
+	// wait for stderr to complete
+	stderr_thread.join().unwrap();
+
+	// have we seen any MAME Lua errors?
+	if has_mame_lua_error.load(Ordering::Relaxed) {
+		return Err(ThisError::MameLuaError.into());
+	}
 
 	// and we're done!
 	Ok(())
