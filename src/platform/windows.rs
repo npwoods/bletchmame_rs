@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Write;
+use std::mem::forget;
 use std::os::windows::io::FromRawHandle;
 use std::os::windows::io::RawHandle;
 use std::os::windows::process::CommandExt;
@@ -62,8 +63,12 @@ pub fn win_platform_init() -> Result<impl Any, Error> {
 	job.set_extended_limit_info(&info)?;
 	job.assign_current_process()?;
 
+	// leak the job; we don't want the handle to be closed when the process
+	// exits (somewhat sloppy but better than the alternatives)
+	forget(job);
+
 	// and return!
-	Ok(job)
+	Ok(())
 }
 
 #[ext(WinCommandExt)]
