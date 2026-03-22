@@ -54,7 +54,4 @@ jobs:
       - name: Run integration testing with actual MAME
         shell: msys2 {0}
         run: |
-          sh scripts/test_mame_interactions.sh mame0260
-          sh scripts/test_mame_interactions.sh mame0280
-          
-
+          sh scripts/run_mame_integration_testing.sh
