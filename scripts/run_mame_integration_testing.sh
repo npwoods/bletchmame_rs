@@ -26,4 +26,4 @@ mkdir -p $DEPS_DIR/roms
 curl -L "https://www.mamedev.org/roms/alienar/alienar.zip" > $DEPS_DIR/roms/alienar.zip
 
 # Run it
-parallel --joblog - $SCRIPTS_DIR/test_mame_interactions.sh ::: mame0260 mame0280
+parallel --joblog - $SCRIPTS_DIR/test_mame_interactions.sh ::: mame0230 mame0240 mame0260 mame0280
