@@ -196,13 +196,14 @@ fn internal_exercise_mame_tests(pattern: &str, command_line: &[impl AsRef<str>])
 	Ok(())
 }
 
-fn exercise_mame(mame_child: &mut Child, script: &Path) -> Result<()> {
+fn exercise_mame(mame_child: &mut Child, script_path: &Path) -> Result<()> {
 	// styles
+	let script_name_style = Style::new().bold().underlined();
 	let stderr_style = Style::new().yellow();
 	let bad_stderr_style = Style::new().red().bold();
 
 	// parse the script
-	let file = File::open(script)?;
+	let file = File::open(script_path)?;
 	let reader = BufReader::new(file);
 	let script = Script::parse(reader)?;
 	let commands_iter = script.commands.iter();
@@ -225,6 +226,9 @@ fn exercise_mame(mame_child: &mut Child, script: &Path) -> Result<()> {
 			println!("{}", style.apply_to(line));
 		}
 	});
+
+	// print the name of the script we're running
+	println!("{}", script_name_style.apply_to(script_path.to_string_lossy()));
 
 	// and exercise MAME
 	let receiver = move |_| {
