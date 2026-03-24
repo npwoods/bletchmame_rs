@@ -3,7 +3,7 @@ use std::io::Write;
 use std::process::Child;
 
 use anyhow::Result;
-use strum::EnumProperty;
+use console::Style;
 
 use crate::platform::console_init;
 
@@ -12,21 +12,22 @@ pub struct Console {
 	pipe_file: File,
 }
 
-#[derive(Debug, EnumProperty)]
+#[derive(Debug)]
 pub enum EmitType {
-	#[strum(props(AnsiCode = "\x1B[1;37m"))]
 	CommandLine,
-	#[strum(props(AnsiCode = "\x1B[1;33m"))]
 	Command,
-	#[strum(props(AnsiCode = "\x1B[1;32m"))]
 	Response,
-	#[strum(props(AnsiCode = "\x1B[0;37m"))]
 	Cruft,
 }
 
 impl EmitType {
-	pub fn ansi_code(&self) -> &'static str {
-		self.get_str("AnsiCode").unwrap()
+	pub fn style(&self) -> Style {
+		match self {
+			EmitType::CommandLine => Style::new().white().bold(),
+			EmitType::Command => Style::new().yellow().bold(),
+			EmitType::Response => Style::new().green().bold(),
+			EmitType::Cruft => Style::new().white(),
+		}
 	}
 }
 
@@ -37,8 +38,8 @@ impl Console {
 	}
 
 	pub fn emit(&mut self, emit_type: EmitType, data: &str) -> Result<()> {
-		let ansi_code = emit_type.ansi_code();
-		Ok(writeln!(self.pipe_file, "{ansi_code}{data}")?)
+		let style = emit_type.style();
+		Ok(writeln!(self.pipe_file, "{}", style.apply_to(data))?)
 	}
 
 	pub fn is_running(&mut self) -> bool {

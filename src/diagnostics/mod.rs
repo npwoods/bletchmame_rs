@@ -24,7 +24,7 @@ use std::time::Instant;
 use anyhow::Error;
 use anyhow::Result;
 use byte_unit::Byte;
-use console::style;
+use console::Style;
 use glob::GlobError;
 use glob::PatternError;
 use glob::glob;
@@ -78,6 +78,7 @@ fn print_stats(info_db: &InfoDb, elapsed_time: Duration) {
 	let count_width = 8;
 	let (total_size, total_size_unit) = Byte::from(info_db.data_len()).get_exact_unit(true);
 	let (strings_size, strings_size_unit) = Byte::from(info_db.strings_len()).get_exact_unit(true);
+	let info_db_build_style = Style::new().reverse();
 
 	// these are all of the entry counts and associated labels
 	let entry_counts = [
@@ -112,7 +113,7 @@ fn print_stats(info_db: &InfoDb, elapsed_time: Duration) {
 	// figure out how wide the largest label is
 	let max_label_width = entry_counts.iter().map(|(label, _)| label.len()).max().unwrap();
 
-	println!("{}", style(info_db.build()).reverse());
+	println!("{}", info_db_build_style.apply_to(info_db.build()));
 	for (label, count) in entry_counts {
 		println!("{:<max_label_width$}: {:>count_width$}", label, count);
 	}
@@ -196,6 +197,10 @@ fn internal_exercise_mame_tests(pattern: &str, command_line: &[impl AsRef<str>])
 }
 
 fn exercise_mame(mame_child: &mut Child, script: &Path) -> Result<()> {
+	// styles
+	let stderr_style = Style::new().yellow();
+	let bad_stderr_style = Style::new().red().bold();
+
 	// parse the script
 	let file = File::open(script)?;
 	let reader = BufReader::new(file);
@@ -211,12 +216,13 @@ fn exercise_mame(mame_child: &mut Child, script: &Path) -> Result<()> {
 		for line in mame_stderr.lines() {
 			let line = line.unwrap();
 			let is_mame_lua_error = line.starts_with("[LUA ERROR]");
-			if is_mame_lua_error {
-				println!("\x1B[1;31m{line}\x1B[0m");
+			let style = if is_mame_lua_error {
 				has_mame_lua_error_clone.store(true, Ordering::Relaxed);
+				&bad_stderr_style
 			} else {
-				println!("\x1B[33m{line}\x1B[0m");
-			}
+				&stderr_style
+			};
+			println!("{}", style.apply_to(line));
 		}
 	});
 
@@ -228,8 +234,8 @@ fn exercise_mame(mame_child: &mut Child, script: &Path) -> Result<()> {
 			.map_or(MameCommand::exit(), |s| MameCommand::from_text(s.as_ref()))
 	};
 	let emit_console = |emit_type: EmitType, s: &str| {
-		let ansi_code = emit_type.ansi_code();
-		println!("{ansi_code}{s}");
+		let style = emit_type.style();
+		println!("{}", style.apply_to(s));
 	};
 	let event_callback = |_event| {};
 	interact_with_mame(mame_child, &receiver, &emit_console, &event_callback)?;
