@@ -228,8 +228,8 @@ fn exercise_mame(mame_child: &mut Child, script: &Path) -> Result<()> {
 			.map_or(MameCommand::exit(), |s| MameCommand::from_text(s.as_ref()))
 	};
 	let emit_console = |emit_type: EmitType, s: &str| {
-		let ansi_code = emit_type.ansi_code();
-		println!("{ansi_code}{s}");
+		let style = emit_type.style();
+		println!("{}", style.apply_to(s));
 	};
 	let event_callback = |_event| {};
 	interact_with_mame(mame_child, &receiver, &emit_console, &event_callback)?;
