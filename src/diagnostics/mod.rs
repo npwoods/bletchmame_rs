@@ -24,6 +24,7 @@ use std::time::Instant;
 use anyhow::Error;
 use anyhow::Result;
 use byte_unit::Byte;
+use console::Style;
 use console::style;
 use glob::GlobError;
 use glob::PatternError;
@@ -196,6 +197,10 @@ fn internal_exercise_mame_tests(pattern: &str, command_line: &[impl AsRef<str>])
 }
 
 fn exercise_mame(mame_child: &mut Child, script: &Path) -> Result<()> {
+	// styles
+	let stderr_style = Style::new().yellow();
+	let bad_stderr_style = Style::new().red().bold();
+
 	// parse the script
 	let file = File::open(script)?;
 	let reader = BufReader::new(file);
@@ -211,12 +216,13 @@ fn exercise_mame(mame_child: &mut Child, script: &Path) -> Result<()> {
 		for line in mame_stderr.lines() {
 			let line = line.unwrap();
 			let is_mame_lua_error = line.starts_with("[LUA ERROR]");
-			if is_mame_lua_error {
-				println!("\x1B[1;31m{line}\x1B[0m");
+			let style = if is_mame_lua_error {
 				has_mame_lua_error_clone.store(true, Ordering::Relaxed);
+				&bad_stderr_style
 			} else {
-				println!("\x1B[33m{line}\x1B[0m");
-			}
+				&stderr_style
+			};
+			println!("{}", style.apply_to(line));
 		}
 	});
 
