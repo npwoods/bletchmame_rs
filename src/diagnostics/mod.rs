@@ -25,7 +25,6 @@ use anyhow::Error;
 use anyhow::Result;
 use byte_unit::Byte;
 use console::Style;
-use console::style;
 use glob::GlobError;
 use glob::PatternError;
 use glob::glob;
@@ -79,6 +78,7 @@ fn print_stats(info_db: &InfoDb, elapsed_time: Duration) {
 	let count_width = 8;
 	let (total_size, total_size_unit) = Byte::from(info_db.data_len()).get_exact_unit(true);
 	let (strings_size, strings_size_unit) = Byte::from(info_db.strings_len()).get_exact_unit(true);
+	let info_db_build_style = Style::new().reverse();
 
 	// these are all of the entry counts and associated labels
 	let entry_counts = [
@@ -113,7 +113,7 @@ fn print_stats(info_db: &InfoDb, elapsed_time: Duration) {
 	// figure out how wide the largest label is
 	let max_label_width = entry_counts.iter().map(|(label, _)| label.len()).max().unwrap();
 
-	println!("{}", style(info_db.build()).reverse());
+	println!("{}", info_db_build_style.apply_to(info_db.build()));
 	for (label, count) in entry_counts {
 		println!("{:<max_label_width$}: {:>count_width$}", label, count);
 	}
