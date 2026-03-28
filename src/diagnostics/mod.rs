@@ -37,6 +37,7 @@ use crate::info::InfoDb;
 use crate::info::View;
 use crate::runtime::command::MameCommand;
 use crate::runtime::session::interact_with_mame;
+use crate::version::MameVersion;
 
 #[derive(thiserror::Error, Debug)]
 enum ThisError {
@@ -176,36 +177,65 @@ pub fn exercise_mame_tests(pattern: &str, args: &[impl AsRef<str>]) -> ExitCode 
 }
 
 fn internal_exercise_mame_tests(pattern: &str, command_line: &[impl AsRef<str>]) -> Result<()> {
+	// styles
+	let script_name_style = Style::new().bold().underlined();
+	let skipping_style = Style::new().italic();
+
+	// parse the glob pattern to find the scripts we want to run
 	let (scripts, errors): (Vec<_>, Vec<_>) = glob(pattern).map_err(ThisError::GlobPattern)?.partition_result();
 	if !errors.is_empty() {
 		return Err(ThisError::Glob(errors).into());
 	}
 
-	for script in scripts.iter() {
-		let mut mame_child = Command::new(command_line.first().unwrap().as_ref())
-			.args(command_line[1..].iter().map(|s| s.as_ref()))
-			.stdin(Stdio::piped())
-			.stdout(Stdio::piped())
-			.stderr(Stdio::piped())
-			.spawn()?;
+	// iterate through all scripts
+	let mame_path = Path::new(command_line.first().unwrap().as_ref());
+	let mut mame_version = None;
+	for script_path in scripts.iter() {
+		// parse the script
+		let file = File::open(script_path)?;
+		let reader = BufReader::new(file);
+		let script = Script::parse(reader)?;
 
-		exercise_mame(&mut mame_child, script)?;
+		// do we skip this script?
+		let skipping_message = if let Some(required_version) = script.required_version.as_ref() {
+			if mame_version.is_none() {
+				mame_version = Some(get_mame_version(mame_path)?);
+			}
+			(mame_version.as_ref().unwrap() < required_version)
+				.then(|| format!("skipping; requires MAME {}", required_version))
+		} else {
+			None
+		};
 
-		let _ = mame_child.wait()?;
+		let script_path_styled = script_name_style.apply_to(script_path.to_string_lossy());
+		if let Some(skipping_message) = skipping_message.as_deref() {
+			// print the name of the script we're skipping
+			println!("{} ({})", script_path_styled, skipping_style.apply_to(skipping_message));
+		} else {
+			// print the name of the script we're running
+			println!("{}", script_path_styled);
+
+			// launch MAME
+			let mut mame_child = Command::new(mame_path)
+				.args(command_line[1..].iter().map(|s| s.as_ref()))
+				.stdin(Stdio::piped())
+				.stdout(Stdio::piped())
+				.stderr(Stdio::piped())
+				.spawn()?;
+
+			// and exercise it
+			exercise_mame(&mut mame_child, &script)?;
+			let _ = mame_child.wait()?;
+		}
 	}
 	Ok(())
 }
 
-fn exercise_mame(mame_child: &mut Child, script_path: &Path) -> Result<()> {
-	// styles
-	let script_name_style = Style::new().bold().underlined();
+fn exercise_mame(mame_child: &mut Child, script: &Script) -> Result<()> {
 	let stderr_style = Style::new().yellow();
 	let bad_stderr_style = Style::new().red().bold();
 
 	// parse the script
-	let file = File::open(script_path)?;
-	let reader = BufReader::new(file);
-	let script = Script::parse(reader)?;
 	let commands_iter = script.commands.iter();
 	let commands_iter = RefCell::new(commands_iter);
 
@@ -226,9 +256,6 @@ fn exercise_mame(mame_child: &mut Child, script_path: &Path) -> Result<()> {
 			println!("{}", style.apply_to(line));
 		}
 	});
-
-	// print the name of the script we're running
-	println!("{}", script_name_style.apply_to(script_path.to_string_lossy()));
 
 	// and exercise MAME
 	let receiver = move |_| {
@@ -254,4 +281,11 @@ fn exercise_mame(mame_child: &mut Child, script_path: &Path) -> Result<()> {
 
 	// and we're done!
 	Ok(())
+}
+
+fn get_mame_version(mame_path: &Path) -> Result<MameVersion> {
+	let output = Command::new(mame_path).arg("-version").output()?;
+	let version_string = String::from_utf8_lossy(&output.stdout);
+	let version = MameVersion::from(version_string);
+	Ok(version)
 }

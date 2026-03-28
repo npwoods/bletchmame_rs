@@ -9,7 +9,6 @@ use crate::xml::XmlReader;
 
 #[derive(Debug)]
 pub struct Script {
-	#[allow(dead_code)]
 	pub required_version: Option<MameVersion>,
 	pub commands: Box<[Box<str>]>,
 }
