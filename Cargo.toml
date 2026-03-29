@@ -19,7 +19,7 @@ default-ext = "0.1.0"
 dirs = "6.0.0"
 dpi = "0.1.2"
 easy-ext = "1.0.3"
-glob = "0.3.3"
+glob = { version = "0.3.3", optional = true }
 hex = "0.4.3"
 hostname-validator = "1.1.1"
 image = "0.25.10"
@@ -118,5 +118,5 @@ panic = "abort"
 
 [features]
 default = ["diagnostics"]
-diagnostics = []
+diagnostics = ["dep:glob"]
 slint-qt-backend = ["dep:i-slint-backend-qt", "dep:qttypes"]
