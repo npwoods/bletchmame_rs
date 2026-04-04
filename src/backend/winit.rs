@@ -193,6 +193,17 @@ impl CustomApplicationHandler for WinitBackendRuntime {
 				EventResult::Propagate
 			}
 
+			WindowEvent::KeyboardInput { .. } => {
+				if let Some((child_window, find_result_type)) = self.find_child_window(&window_id)
+					&& find_result_type == FindResultType::Child
+				{
+					// retargetting is necessary for menu shortcuts to work
+					EventResult::Retarget(child_window.parent_window_id)
+				} else {
+					EventResult::Propagate
+				}
+			}
+
 			WindowEvent::Destroyed => {
 				let mut state = self.0.borrow_mut();
 				state
