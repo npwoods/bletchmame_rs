@@ -53,11 +53,10 @@ enum ThisError {
 	CannotFindDisplay(String),
 }
 
-#[derive(Debug)]
-enum FindResult {
-	None,
-	Parent(Rc<WinitChildWindow>),
-	Child(Rc<WinitChildWindow>),
+#[derive(Debug, PartialEq, Eq)]
+enum FindResultType {
+	Parent,
+	Child,
 }
 
 impl WinitBackendRuntime {
@@ -145,22 +144,21 @@ impl WinitBackendRuntime {
 		}
 	}
 
-	fn find_child_window(&self, window_id: &WindowId) -> FindResult {
+	fn find_child_window(&self, window_id: &WindowId) -> Option<(Rc<WinitChildWindow>, FindResultType)> {
 		self.0
 			.borrow()
 			.live
 			.iter()
 			.filter_map(|x| {
 				if &x.parent_window_id == window_id {
-					Some(FindResult::Parent(x.clone()))
+					Some((x.clone(), FindResultType::Parent))
 				} else if x.window.id() == *window_id {
-					Some(FindResult::Child(x.clone()))
+					Some((x.clone(), FindResultType::Child))
 				} else {
 					None
 				}
 			})
 			.next()
-			.unwrap_or(FindResult::None)
 	}
 }
 
@@ -183,20 +181,27 @@ impl CustomApplicationHandler for WinitBackendRuntime {
 
 		match event {
 			WindowEvent::Focused(true) => {
-				match self.find_child_window(&window_id) {
-					FindResult::Parent(child_window) => {
-						if child_window.is_active() {
-							child_window.fix_focus();
-						}
+				if let Some((child_window, find_result_type)) = self.find_child_window(&window_id) {
+					let expected_child_window_active = match find_result_type {
+						FindResultType::Parent => false,
+						FindResultType::Child => true,
+					};
+					if expected_child_window_active != child_window.is_active() {
+						child_window.set_active(true);
 					}
-					FindResult::Child(child_window) => {
-						if !child_window.is_active() {
-							child_window.fix_focus();
-						}
-					}
-					FindResult::None => {}
 				};
 				EventResult::Propagate
+			}
+
+			WindowEvent::KeyboardInput { .. } => {
+				if let Some((child_window, find_result_type)) = self.find_child_window(&window_id)
+					&& find_result_type == FindResultType::Child
+				{
+					// retargetting is necessary for menu shortcuts to work
+					EventResult::Retarget(child_window.parent_window_id)
+				} else {
+					EventResult::Propagate
+				}
 			}
 
 			WindowEvent::Destroyed => {
