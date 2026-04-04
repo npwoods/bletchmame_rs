@@ -276,7 +276,7 @@ export component AppWindow inherits Window {
             MenuItem {
                 title: @tr("MenuBar" => "Quick Load State");
                 enabled: has-last-save-state;
-                muda-accelerator: "F7";
+                shortcut: @keys(F7);
                 activated => {
                     menu-item-action(root.menu-action-file-quick-load-state);
                 }
@@ -285,7 +285,7 @@ export component AppWindow inherits Window {
             MenuItem {
                 title: @tr("MenuBar" => "Quick Save State");
                 enabled: has-last-save-state;
-                muda-accelerator: "Shift+F7";
+                shortcut: @keys(Shift + F7);
                 activated => {
                     menu-item-action(root.menu-action-file-quick-save-state);
                 }
@@ -294,7 +294,7 @@ export component AppWindow inherits Window {
             MenuItem {
                 title: @tr("MenuBar" => "Load State...");
                 enabled: mode() == "running";
-                muda-accelerator: "Ctrl+F7";
+                shortcut: @keys(Control + F7);
                 activated => {
                     menu-item-action(root.menu-action-file-load-state);
                 }
@@ -303,7 +303,7 @@ export component AppWindow inherits Window {
             MenuItem {
                 title: @tr("MenuBar" => "Save State...");
                 enabled: mode() == "running";
-                muda-accelerator: "Ctrl+Shift+F7";
+                shortcut: @keys(Control + X);
                 activated => {
                     menu-item-action(root.menu-action-file-save-state);
                 }
@@ -314,7 +314,7 @@ export component AppWindow inherits Window {
             MenuItem {
                 title: @tr("MenuBar" => "Save Screenshot...");
                 enabled: mode() == "running";
-                muda-accelerator: "F12";
+                shortcut: @keys(F12);
                 activated => {
                     menu-item-action(root.menu-action-file-save-screenshot);
                 }
@@ -323,7 +323,7 @@ export component AppWindow inherits Window {
             MenuItem {
                 title: is-recording ? @tr("MenuBar" => "Stop Recording") : @tr("MenuBar" => "Record Movie...");
                 enabled: can-record-movie;
-                muda-accelerator: "Shift+F12";
+                shortcut: @keys(Shift + F12);
                 activated => {
                     menu-item-action(root.menu-action-file-record-movie);
                 }
@@ -360,7 +360,7 @@ export component AppWindow inherits Window {
             MenuItem {
                 title: @tr("MenuBar" => "Exit");
                 enabled: true;
-                muda-accelerator: "Ctrl+Shift+KeyX";
+                shortcut: @keys(Control + Shift + X);
                 activated => {
                     menu-item-action(root.menu-action-file-exit);
                 }
@@ -388,7 +388,7 @@ export component AppWindow inherits Window {
 
                 MenuItem {
                     title: @tr("MenuBar" => "Increase Speed");
-                    muda-accelerator: "F9";
+                    shortcut: @keys(F9);
                     activated => {
                         menu-item-action(root.menu-action-options-throttle-speed-increase);
                     }
@@ -396,7 +396,7 @@ export component AppWindow inherits Window {
 
                 MenuItem {
                     title: @tr("MenuBar" => "Decrease Speed");
-                    muda-accelerator: "F8";
+                    shortcut: @keys(F8);
                     activated => {
                         menu-item-action(root.menu-action-options-throttle-speed-decrease);
                     }
@@ -406,7 +406,7 @@ export component AppWindow inherits Window {
                     title: @tr("MenuBar" => "Warp mode");
                     checkable: true;
                     checked: !is-throttled;
-                    muda-accelerator: "F10";
+                    shortcut: @keys(F10);
                     activated => {
                         menu-item-action(root.menu-action-options-toggle-warp);
                     }
@@ -435,7 +435,7 @@ export component AppWindow inherits Window {
                 enabled: true;
                 checkable: true;
                 checked: is-fullscreen;
-                muda-accelerator: "F11";
+                shortcut: @keys(F11);
                 activated => {
                     menu-item-action(root.menu-action-options-toggle-fullscreen);
                 }
@@ -444,7 +444,7 @@ export component AppWindow inherits Window {
             MenuItem {
                 title: @tr("MenuBar" => "Toggle Menu Bar");
                 enabled: mode() == "running";
-                muda-accelerator: "ScrollLock";
+                shortcut: @keys(ScrollLock);
                 activated => {
                     menu-item-action(root.menu-action-options-toggle-menubar);
                 }
