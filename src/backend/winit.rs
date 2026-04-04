@@ -1,9 +1,6 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
-use std::str::FromStr;
 
-use anyhow::Error;
 use anyhow::Result;
 use easy_ext::ext;
 use i_slint_backend_winit::CustomApplicationHandler;
@@ -14,17 +11,9 @@ use raw_window_handle::RawWindowHandle;
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::Sender;
 use tracing::debug;
-use tracing::info;
 use tracing::info_span;
-use winit::event::ElementState;
 use winit::event::WindowEvent;
 use winit::event_loop::ActiveEventLoop;
-use winit::keyboard::Key;
-use winit::keyboard::KeyCode;
-use winit::keyboard::ModifiersState;
-use winit::keyboard::NamedKey;
-use winit::keyboard::NativeKey;
-use winit::keyboard::SmolStr;
 use winit::monitor::MonitorHandle;
 use winit::window::Fullscreen;
 use winit::window::Window;
@@ -40,12 +29,8 @@ pub struct WinitBackendRuntime(Rc<RefCell<WinitBackendRuntimeInner>>);
 struct WinitBackendRuntimeInner {
 	pending: Vec<WinitPendingChildWindow>,
 	live: Vec<Rc<WinitChildWindow>>,
-	muda_accelerator_callbacks: MudaAcceleratorMap,
-	modifiers_state: ModifiersState,
 	modal_parent_raw_handle: Option<RawWindowHandle>,
 }
-
-type MudaAcceleratorMap = HashMap<WindowId, Box<dyn Fn(&WinitAccelerator) -> bool>>;
 
 #[derive(Debug)]
 pub struct WinitChildWindow {
@@ -60,20 +45,12 @@ struct WinitPendingChildWindow {
 	sender: Sender<Result<WinitChildWindow>>,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct WinitAccelerator {
-	key: KeyCode,
-	modifiers: ModifiersState,
-}
-
 #[derive(thiserror::Error, Debug)]
 enum ThisError {
 	#[error("unknown raw handle type")]
 	UnknownRawHandleType,
 	#[error("cannot find display \"{0}\"")]
 	CannotFindDisplay(String),
-	#[error("unknown key \"{0}\"")]
-	UnknownKey(String),
 }
 
 #[derive(Debug)]
@@ -146,19 +123,6 @@ impl WinitBackendRuntime {
 
 		// and return the result
 		Ok(result)
-	}
-
-	pub fn install_muda_accelerator_handler(
-		&self,
-		window: &slint::Window,
-		callback: impl Fn(&WinitAccelerator) -> bool + 'static,
-	) {
-		let window_id = window.with_winit_window(|x| x.id()).unwrap();
-		let callback = Box::new(callback) as Box<_>;
-		self.0
-			.borrow_mut()
-			.muda_accelerator_callbacks
-			.insert(window_id, callback);
 	}
 
 	pub fn with_modal_parent<R>(&self, window: &slint::Window, callback: impl FnOnce() -> R) -> R {
@@ -235,44 +199,11 @@ impl CustomApplicationHandler for WinitBackendRuntime {
 				EventResult::Propagate
 			}
 
-			WindowEvent::KeyboardInput { event, .. } => {
-				let state = self.0.borrow();
-				if event.state == ElementState::Pressed
-					&& !event.repeat
-					&& let Some(accelerator) =
-						WinitAccelerator::from_logical_key_and_modifiers(&event.logical_key, state.modifiers_state)
-				{
-					info!(accelerator=?accelerator, "window_event(): Muda accelerator detected");
-
-					let window_id = state
-						.live
-						.iter()
-						.find(|x| x.window.id() == window_id)
-						.map(|x| &x.parent_window_id)
-						.unwrap_or(&window_id);
-					if let Some(callback) = state.muda_accelerator_callbacks.get(window_id)
-						&& callback(&accelerator)
-					{
-						EventResult::PreventDefault
-					} else {
-						EventResult::Propagate
-					}
-				} else {
-					EventResult::Propagate
-				}
-			}
-
-			WindowEvent::ModifiersChanged(modifiers) => {
-				self.0.borrow_mut().modifiers_state = modifiers.state();
-				EventResult::Propagate
-			}
-
 			WindowEvent::Destroyed => {
 				let mut state = self.0.borrow_mut();
 				state
 					.live
 					.retain(|x| x.parent_window_id != window_id && x.window.id() != window_id);
-				state.muda_accelerator_callbacks.remove(&window_id);
 				EventResult::Propagate
 			}
 			_ => EventResult::Propagate,
@@ -374,71 +305,6 @@ impl WinitChildWindow {
 
 			_ => Err(ThisError::UnknownRawHandleType.into()),
 		}
-	}
-}
-
-impl WinitAccelerator {
-	pub fn from_logical_key_and_modifiers(logical_key: &Key<SmolStr>, modifiers: ModifiersState) -> Option<Self> {
-		let key = match logical_key {
-			Key::Character(s) => {
-				if s.as_str() == "x" {
-					Some(KeyCode::KeyX)
-				} else {
-					None
-				}
-			}
-			Key::Unidentified(NativeKey::Windows(0x0058)) => Some(KeyCode::KeyX),
-			Key::Named(NamedKey::Escape) => Some(KeyCode::Escape),
-			Key::Named(NamedKey::F7) => Some(KeyCode::F7),
-			Key::Named(NamedKey::F8) => Some(KeyCode::F8),
-			Key::Named(NamedKey::F9) => Some(KeyCode::F9),
-			Key::Named(NamedKey::F10) => Some(KeyCode::F10),
-			Key::Named(NamedKey::F11) => Some(KeyCode::F11),
-			Key::Named(NamedKey::F12) => Some(KeyCode::F12),
-			Key::Named(NamedKey::Pause) => Some(KeyCode::Pause),
-			Key::Named(NamedKey::ScrollLock) => Some(KeyCode::ScrollLock),
-			_ => None,
-		}?;
-		Some(Self { key, modifiers })
-	}
-}
-
-impl FromStr for WinitAccelerator {
-	type Err = Error;
-
-	fn from_str(value: &str) -> Result<Self> {
-		fn strip_modifier<'a>(
-			value: &'a str,
-			modifiers: ModifiersState,
-			prefix: &str,
-			m: ModifiersState,
-		) -> (&'a str, ModifiersState) {
-			if let Some(value) = value.strip_prefix(prefix) {
-				(value, modifiers | m)
-			} else {
-				(value, modifiers)
-			}
-		}
-
-		let modifiers = ModifiersState::default();
-		let (value, modifiers) = strip_modifier(value, modifiers, "Ctrl+", ModifiersState::CONTROL);
-		let (value, modifiers) = strip_modifier(value, modifiers, "Shift+", ModifiersState::SHIFT);
-		let (value, modifiers) = strip_modifier(value, modifiers, "Alt+", ModifiersState::ALT);
-
-		let key = match value {
-			"X" => Ok(KeyCode::KeyX),
-			"Esc" => Ok(KeyCode::Escape),
-			"F7" => Ok(KeyCode::F7),
-			"F8" => Ok(KeyCode::F8),
-			"F9" => Ok(KeyCode::F9),
-			"F10" => Ok(KeyCode::F10),
-			"F11" => Ok(KeyCode::F11),
-			"F12" => Ok(KeyCode::F12),
-			"Pause" => Ok(KeyCode::Pause),
-			"ScrLk" => Ok(KeyCode::ScrollLock),
-			_ => Err(ThisError::UnknownKey(value.into())),
-		}?;
-		Ok(Self { key, modifiers })
 	}
 }
 
