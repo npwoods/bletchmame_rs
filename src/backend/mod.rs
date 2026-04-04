@@ -20,8 +20,6 @@ use crate::backend::winit::WinitBackendRuntime;
 use crate::backend::winit::WinitChildWindow;
 use crate::backend::winit::WinitWindowExt;
 
-pub use crate::backend::winit::WinitAccelerator;
-
 #[cfg(feature = "slint-qt-backend")]
 use crate::backend::qt::QtBackendRuntime;
 #[cfg(feature = "slint-qt-backend")]
@@ -98,19 +96,6 @@ impl BackendRuntime {
 			Self::Qt(backend) => ChildWindow::Qt(backend.create_child_window(parent)?),
 		};
 		Ok(child_window)
-	}
-
-	pub fn install_muda_accelerator_handler(
-		&self,
-		window: &Window,
-		callback: impl Fn(&WinitAccelerator) -> bool + 'static,
-	) {
-		match self {
-			Self::Winit(backend) => backend.install_muda_accelerator_handler(window, callback),
-
-			#[cfg(feature = "slint-qt-backend")]
-			Self::Qt(_backend) => {}
-		}
 	}
 
 	pub fn with_modal_parent<R>(&self, window: &Window, callback: impl FnOnce() -> R) -> R {

@@ -1,14 +1,12 @@
 use std::borrow::Cow;
 use std::cell::Cell;
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::collections::HashSet;
 use std::ffi::OsString;
 use std::ops::ControlFlow;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -45,7 +43,6 @@ use crate::appstate::AppState;
 use crate::backend::BackendRuntime;
 use crate::backend::ChildWindow;
 use crate::backend::WindowExt as _;
-use crate::backend::WinitAccelerator;
 use crate::channel::Channel;
 use crate::collections::add_items_to_existing_folder_collection;
 use crate::collections::add_items_to_new_folder_collection;
@@ -163,7 +160,6 @@ pub enum AppWindowing {
 
 struct AppModel {
 	app_window_weak: Weak<AppWindow>,
-	backend_runtime: BackendRuntime,
 	modal_stack: ModalStack,
 	state: RefCell<AppState>,
 	status_changed_channel: Channel<Status>,
@@ -508,9 +504,6 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		app_window.set_is_picture_area_visible(is_picture_area_visible);
 	}
 
-	// create the window stack
-	let modal_stack = ModalStack::new(args.backend_runtime.clone(), app_window);
-
 	// create the child window
 	let (child_window, mame_windowing) = match args.mame_windowing {
 		AppWindowing::Integrated => {
@@ -524,10 +517,12 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		AppWindowing::Fullscreen => (None, MameWindowing::Fullscreen),
 	};
 
+	// create the window stack
+	let modal_stack = ModalStack::new(args.backend_runtime, app_window);
+
 	// create the model
 	let model = AppModel {
 		app_window_weak: app_window.as_weak(),
-		backend_runtime: args.backend_runtime,
 		modal_stack,
 		state: RefCell::new(AppState::bogus()),
 		status_changed_channel: Channel::default(),
@@ -570,40 +565,6 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 			child_window.update_bounds(model.app_window().window(), position, size);
 		}
 	});
-
-	// set up the accelerator map
-	let accelerator_command_map = [
-		("Ctrl+Pause", Action::FileStop),
-		("Pause", Action::FilePause),
-		("F7", Action::FileQuickLoadState),
-		("Shift+F7", Action::FileQuickLoadState),
-		("Ctrl+F7", Action::FileLoadState),
-		("Ctrl+Shift+F7", Action::FileLoadState),
-		("F12", Action::FileSaveScreenshot),
-		("Shift+F12", Action::FileRecordMovie),
-		("Ctrl+Alt+X", Action::FileExit),
-		("F9", Action::OptionsThrottleSpeedIncrease),
-		("F8", Action::OptionsThrottleSpeedDecrease),
-		("F10", Action::OptionsToggleWarp),
-		("F11", Action::OptionsToggleFullScreen),
-		("ScrLk", Action::OptionsToggleMenuBar),
-	];
-	let accelerator_command_map = HashMap::<WinitAccelerator, Action>::from_iter(
-		accelerator_command_map.into_iter().map(|(accelerator, command)| {
-			let accelerator = WinitAccelerator::from_str(accelerator).unwrap();
-			(accelerator, command)
-		}),
-	);
-	let model_clone = model.clone();
-	model
-		.backend_runtime
-		.install_muda_accelerator_handler(app_window.window(), move |accelerator| {
-			let command = accelerator_command_map.get(accelerator);
-			if let Some(command) = command {
-				handle_action(&model_clone, command.clone());
-			}
-			command.is_some()
-		});
 
 	// set up the collections view model
 	let collections_view_model = CollectionsViewModel::new(app_window.as_weak());
