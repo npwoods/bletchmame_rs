@@ -143,6 +143,7 @@ pub struct AppArgs {
 	pub mame_stderr: MameStderr,
 	pub mame_windowing: AppWindowing,
 	pub backend_runtime: BackendRuntime,
+	pub console: bool,
 }
 
 #[derive(Clone, Debug, Default, EnumString)]
@@ -853,6 +854,11 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 
 	// and we've started
 	app_window.set_has_started(true);
+
+	// launch console if requested
+	if args.console {
+		let _ = model.state.borrow().show_console();
+	}
 
 	// and show the window and we're done!
 	app_window.show().unwrap();
