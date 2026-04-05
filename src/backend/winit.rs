@@ -187,7 +187,7 @@ impl CustomApplicationHandler for WinitBackendRuntime {
 						FindResultType::Child => true,
 					};
 					if expected_child_window_active != child_window.is_active() {
-						child_window.set_active(true);
+						child_window.fix_focus();
 					}
 				};
 				EventResult::Propagate
