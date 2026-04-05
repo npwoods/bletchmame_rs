@@ -77,6 +77,9 @@ struct Opt {
 	#[arg(long)]
 	echo_console: Option<String>,
 
+	#[arg(long)]
+	console: bool,
+
 	#[cfg(feature = "diagnostics")]
 	#[arg(long)]
 	process_listxml: bool,
@@ -181,6 +184,7 @@ fn main() -> ExitCode {
 		mame_stderr,
 		mame_windowing,
 		backend_runtime,
+		console: opts.console,
 	};
 	let app_window = AppWindow::new().expect("Failed to create main window");
 	let app_window = Rc::new(app_window);
