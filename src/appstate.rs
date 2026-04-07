@@ -481,7 +481,16 @@ impl AppState {
 
 		// do we need to issue a command?
 		if let Some(command) = command {
-			self.issue_command(command);
+			// we do intend to issue a command, but verify that reactivation succeeded in creating one
+			let session = self.live.as_mut().and_then(|live| live.session.as_mut());
+			let has_session = session.is_some();
+			if let Some(session) = session {
+				// if we have a command, its because we're expecting an emulation to start
+				session.expecting = Some(Expecting::Start);
+			}
+			if has_session {
+				self.issue_command(command);
+			}
 		}
 
 		// and we're done!
