@@ -250,6 +250,7 @@ export component AppWindow inherits Window {
             MenuItem {
                 title: @tr("MenuBar" => "Stop");
                 enabled: mode() == "running";
+                shortcut: @keys(Control + Pause);
                 activated => {
                     menu-item-action(root.menu-action-file-stop);
                 }
@@ -258,6 +259,7 @@ export component AppWindow inherits Window {
             MenuItem {
                 title: @tr("MenuBar" => "Pause");
                 enabled: mode() == "running";
+                shortcut: @keys(Pause);
                 activated => {
                     menu-item-action(root.menu-action-file-pause);
                 }
