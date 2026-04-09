@@ -50,7 +50,7 @@ pub enum Action {
 	OptionsToggleSound,
 	OptionsCheats,
 	OptionsClassic,
-	OptionsConsole,
+	OptionsInteractionMonitor,
 
 	// Settings menu
 	SettingsInput(InputClass),

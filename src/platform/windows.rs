@@ -106,16 +106,16 @@ pub impl Window {
 	}
 }
 
-pub fn win_console_init(title: &str) -> Result<(Child, File)> {
+pub fn win_interaction_monitor_init(title: &str) -> Result<(Child, File)> {
 	let exe_path = std::env::current_exe()?;
 
 	let guid = Uuid::new_v4();
 	let pipe_name = format!("\\\\.\\pipe\\bletchmame_pipe_{guid}");
 	let pipe = WinNamedPipe::new(&pipe_name)?;
 
-	// launch a new process with the --echo-console argument
+	// launch a new process with the --echo-interaction-monitor argument
 	let process = Command::new(exe_path)
-		.arg("--echo-console")
+		.arg("--echo-interaction-monitor")
 		.arg(pipe_name)
 		.stdin(Stdio::null())
 		.stdout(Stdio::null())
@@ -133,8 +133,8 @@ pub fn win_console_init(title: &str) -> Result<(Child, File)> {
 	Ok((process, pipe_file))
 }
 
-/// Windows specific "echo console" - this is simpler on other platforms
-pub fn win_echo_console_main(pipe_name: &str) -> Result<()> {
+/// Windows specific "echo interaction monitor" - this is simpler on other platforms
+pub fn win_echo_interaction_monitor_main(pipe_name: &str) -> Result<()> {
 	let mut output = unsafe {
 		FreeConsole()?;
 		AllocConsole()?;

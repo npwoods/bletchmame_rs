@@ -5,9 +5,9 @@ use std::process::Child;
 use anyhow::Result;
 use console::Style;
 
-use crate::platform::console_init;
+use crate::platform::interaction_monitor_init;
 
-pub struct Console {
+pub struct InteractionMonitor {
 	process: Child,
 	pipe_file: File,
 }
@@ -31,9 +31,9 @@ impl EmitType {
 	}
 }
 
-impl Console {
+impl InteractionMonitor {
 	pub fn new() -> Result<Self> {
-		let (process, pipe_file) = console_init("MAME Console")?;
+		let (process, pipe_file) = interaction_monitor_init("MAME Interaction Monitor")?;
 		Ok(Self { process, pipe_file })
 	}
 
@@ -47,7 +47,7 @@ impl Console {
 	}
 }
 
-impl Drop for Console {
+impl Drop for InteractionMonitor {
 	fn drop(&mut self) {
 		let _ = self.process.kill();
 		let _ = self.process.wait();

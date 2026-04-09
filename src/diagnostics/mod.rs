@@ -31,10 +31,10 @@ use glob::glob;
 use itertools::Itertools;
 use throttle::Throttle;
 
-use crate::console::EmitType;
 use crate::diagnostics::script::Script;
 use crate::info::InfoDb;
 use crate::info::View;
+use crate::interaction_monitor::EmitType;
 use crate::runtime::command::MameCommand;
 use crate::runtime::session::interact_with_mame;
 use crate::version::MameVersion;

@@ -110,7 +110,7 @@ export component AppWindow inherits Window {
     in property <string> menu-action-options-toggle-sound;
     in property <string> menu-action-options-cheats;
     in property <string> menu-action-options-classic;
-    in property <string> menu-action-options-console;
+    in property <string> menu-action-options-interaction-monitor;
     in property <string> menu-action-settings-input-controller;
     in property <string> menu-action-settings-input-keyboard;
     in property <string> menu-action-settings-input-misc;
@@ -494,10 +494,10 @@ export component AppWindow inherits Window {
             }
 
             MenuItem {
-                title: @tr("MenuBar" => "Console");
+                title: @tr("MenuBar" => "Interaction Monitor");
                 enabled: true;
                 activated => {
-                    menu-item-action(root.menu-action-options-console);
+                    menu-item-action(root.menu-action-options-interaction-monitor);
                 }
             }
         }

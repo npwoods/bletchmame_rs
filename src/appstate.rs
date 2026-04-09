@@ -19,8 +19,8 @@ use tracing::debug;
 
 use crate::action::Action;
 use crate::canceller::Canceller;
-use crate::console::Console;
 use crate::info::InfoDb;
+use crate::interaction_monitor::InteractionMonitor;
 use crate::job::Job;
 use crate::prefs::Preferences;
 use crate::prefs::PreflightProblem;
@@ -99,7 +99,7 @@ struct Fixed {
 	prefs_path: PathBuf,
 	mame_stderr: MameStderr,
 	mame_windowing: MameWindowing,
-	console: Arc<Mutex<Option<Console>>>,
+	interaction_monitor: Arc<Mutex<Option<InteractionMonitor>>>,
 	callback: CommandCallback,
 }
 
@@ -136,13 +136,13 @@ impl AppState {
 		mame_windowing: MameWindowing,
 		callback: impl Fn(Action) + 'static,
 	) -> Self {
-		let console = Arc::new(Mutex::new(None));
+		let interaction_monitor = Arc::new(Mutex::new(None));
 		let callback = Rc::from(callback);
 		let fixed = Fixed {
 			prefs_path,
 			mame_stderr,
 			mame_windowing,
-			console,
+			interaction_monitor,
 			callback,
 		};
 		Self {
@@ -214,7 +214,7 @@ impl AppState {
 		let (job, command_sender) = spawn_mame_session_thread(
 			mame_args,
 			self.fixed.mame_stderr,
-			self.fixed.console.clone(),
+			self.fixed.interaction_monitor.clone(),
 			self.fixed.callback.clone(),
 		);
 		let command_sender = Some(Arc::new(command_sender));
@@ -735,10 +735,13 @@ impl AppState {
 		true
 	}
 
-	pub fn show_console(&self) -> Result<()> {
-		let mut console = self.fixed.console.lock().unwrap();
-		if console.as_mut().is_none_or(|console| !console.is_running()) {
-			*console = Some(Console::new()?);
+	pub fn show_interaction_monitor(&self) -> Result<()> {
+		let mut interaction_monitor = self.fixed.interaction_monitor.lock().unwrap();
+		if interaction_monitor
+			.as_mut()
+			.is_none_or(|interaction_monitor| !interaction_monitor.is_running())
+		{
+			*interaction_monitor = Some(InteractionMonitor::new()?);
 		}
 		Ok(())
 	}

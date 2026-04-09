@@ -7,7 +7,7 @@ use std::process::Stdio;
 use anyhow::Result;
 use uuid::Uuid;
 
-pub fn unix_console_init(title: &str) -> Result<(Child, File)> {
+pub fn unix_interaction_monitor_init(title: &str) -> Result<(Child, File)> {
 	// create a temp file for console output and spawn xterm to tail it
 	let mut path = std::env::temp_dir();
 	let filename = format!("bletchmame_console_{0}", Uuid::new_v4());
