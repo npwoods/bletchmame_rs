@@ -143,7 +143,7 @@ pub struct AppArgs {
 	pub mame_stderr: MameStderr,
 	pub mame_windowing: AppWindowing,
 	pub backend_runtime: BackendRuntime,
-	pub console: bool,
+	pub interaction_monitor: bool,
 }
 
 #[derive(Clone, Debug, Default, EnumString)]
@@ -822,7 +822,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		app_window.set_menu_action_options_toggle_sound(OptionsToggleSound.encode_for_slint());
 		app_window.set_menu_action_options_cheats(OptionsCheats.encode_for_slint());
 		app_window.set_menu_action_options_classic(OptionsClassic.encode_for_slint());
-		app_window.set_menu_action_options_console(OptionsConsole.encode_for_slint());
+		app_window.set_menu_action_options_interaction_monitor(OptionsInteractionMonitor.encode_for_slint());
 		app_window.set_menu_action_settings_input_controller(SettingsInput(InputClass::Controller).encode_for_slint());
 		app_window.set_menu_action_settings_input_keyboard(SettingsInput(InputClass::Keyboard).encode_for_slint());
 		app_window.set_menu_action_settings_input_misc(SettingsInput(InputClass::Misc).encode_for_slint());
@@ -855,9 +855,9 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	// and we've started
 	app_window.set_has_started(true);
 
-	// launch console if requested
-	if args.console {
-		let _ = model.state.borrow().show_console();
+	// launch interaction monitor if requested
+	if args.interaction_monitor {
+		let _ = model.state.borrow().show_interaction_monitor();
 	}
 
 	// and show the window and we're done!
@@ -1127,8 +1127,8 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 		Action::OptionsClassic => {
 			model.issue_command(MameCommand::classic_menu());
 		}
-		Action::OptionsConsole => {
-			let _ = model.state.borrow().show_console();
+		Action::OptionsInteractionMonitor => {
+			let _ = model.state.borrow().show_interaction_monitor();
 		}
 		Action::SettingsInput(class) => {
 			let status_update_channel = model.status_changed_channel.clone();

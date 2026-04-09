@@ -9,7 +9,6 @@ mod canceller;
 mod channel;
 mod chd;
 mod collections;
-mod console;
 mod debugstr;
 mod devimageconfig;
 mod dialogs;
@@ -20,6 +19,7 @@ mod icon;
 mod imagedesc;
 mod importmameini;
 mod info;
+mod interaction_monitor;
 mod job;
 mod mconfig;
 mod models;
@@ -75,10 +75,10 @@ struct Opt {
 
 	#[cfg(target_os = "windows")]
 	#[arg(long)]
-	echo_console: Option<String>,
+	echo_interaction_monitor: Option<String>,
 
 	#[arg(long)]
-	console: bool,
+	interaction_monitor: bool,
 
 	#[cfg(feature = "diagnostics")]
 	#[arg(long)]
@@ -142,8 +142,8 @@ fn main() -> ExitCode {
 
 	// echo console?
 	#[cfg(target_os = "windows")]
-	if let Some(pipe_name) = opts.echo_console.as_deref() {
-		return if crate::platform::win_echo_console_main(pipe_name).is_ok() {
+	if let Some(pipe_name) = opts.echo_interaction_monitor.as_deref() {
+		return if crate::platform::win_echo_interaction_monitor_main(pipe_name).is_ok() {
 			ExitCode::SUCCESS
 		} else {
 			ExitCode::FAILURE
@@ -184,7 +184,7 @@ fn main() -> ExitCode {
 		mame_stderr,
 		mame_windowing,
 		backend_runtime,
-		console: opts.console,
+		interaction_monitor: opts.interaction_monitor,
 	};
 	let app_window = AppWindow::new().expect("Failed to create main window");
 	let app_window = Rc::new(app_window);

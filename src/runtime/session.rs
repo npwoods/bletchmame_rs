@@ -27,8 +27,8 @@ use tracing::info;
 use tracing::span;
 
 use crate::action::Action;
-use crate::console::Console;
-use crate::console::EmitType;
+use crate::interaction_monitor::EmitType;
+use crate::interaction_monitor::InteractionMonitor;
 use crate::job::Job;
 use crate::platform::CommandExt;
 use crate::runtime::MameStderr;
@@ -73,7 +73,7 @@ pub enum MameEvent {
 pub fn spawn_mame_session_thread(
 	mame_args: MameArguments,
 	mame_stderr: MameStderr,
-	console: Arc<Mutex<Option<Console>>>,
+	interaction_monitor: Arc<Mutex<Option<InteractionMonitor>>>,
 	callback: Rc<dyn Fn(Action) + 'static>,
 ) -> (Job<Result<()>>, Sender<MameCommand>) {
 	let callback_bubble = ThreadLocalBubble::new(callback);
@@ -90,7 +90,15 @@ pub fn spawn_mame_session_thread(
 	};
 	let (sender, receiver) = channel();
 
-	let job = Job::new(move || execute_mame(&mame_args, &receiver, &event_callback, mame_stderr, console.as_ref()));
+	let job = Job::new(move || {
+		execute_mame(
+			&mame_args,
+			&receiver,
+			&event_callback,
+			mame_stderr,
+			interaction_monitor.as_ref(),
+		)
+	});
 	(job, sender)
 }
 
@@ -99,7 +107,7 @@ fn execute_mame(
 	receiver: &Receiver<MameCommand>,
 	event_callback: &impl Fn(MameEvent),
 	mame_stderr: MameStderr,
-	console: &Mutex<Option<Console>>,
+	interaction_monitor: &Mutex<Option<InteractionMonitor>>,
 ) -> Result<()> {
 	let span = span!(Level::INFO, "execute_mame");
 	let _guard = span.enter();
@@ -111,7 +119,7 @@ fn execute_mame(
 		MameStderr::Capture => (Stdio::piped(), true),
 		MameStderr::Inherit => (Stdio::inherit(), false),
 	};
-	emit_console_command_line(console, mame_args);
+	emit_interaction_monitor_command_line(interaction_monitor, mame_args);
 	let mut child = Command::new(&mame_args.program)
 		.args(args.clone())
 		.stdin(Stdio::piped())
@@ -130,7 +138,7 @@ fn execute_mame(
 	let mame_result = interact_with_mame(
 		&mut child,
 		&receiver,
-		&|emit_type, s| emit_console(console, emit_type, s),
+		&|emit_type, s| emit_interaction_monitor(interaction_monitor, emit_type, s),
 		&event_callback,
 	);
 
@@ -172,7 +180,7 @@ fn execute_mame(
 pub fn interact_with_mame(
 	child: &mut Child,
 	receiver: &dyn Fn(Duration) -> MameCommand,
-	emit_console: &dyn for<'a> Fn(EmitType, &'a str),
+	emit_interaction_monitor: &dyn for<'a> Fn(EmitType, &'a str),
 	event_callback: &dyn Fn(MameEvent),
 ) -> anyhow::Result<()> {
 	// set up what we need to interact with MAME as a child process
@@ -184,7 +192,7 @@ pub fn interact_with_mame(
 
 	loop {
 		info!("Calling read_response_from_mame()");
-		let (update, is_signal) = read_response_from_mame(&mut mame_stdout, &emit_console, &mut line)?;
+		let (update, is_signal) = read_response_from_mame(&mut mame_stdout, &emit_interaction_monitor, &mut line)?;
 
 		if let Some(update) = update {
 			is_running = update.is_running();
@@ -195,14 +203,15 @@ pub fn interact_with_mame(
 			if is_exiting {
 				break Ok(());
 			}
-			is_exiting = process_event_from_front_end(&receiver, &mut mame_stdin, is_running, &emit_console)?;
+			is_exiting =
+				process_event_from_front_end(&receiver, &mut mame_stdin, is_running, &emit_interaction_monitor)?;
 		}
 	}
 }
 
 fn read_response_from_mame(
 	mame_stdout: &mut impl BufRead,
-	emit_console: &dyn for<'a> Fn(EmitType, &'a str),
+	emit_interaction_monitor: &dyn for<'a> Fn(EmitType, &'a str),
 	line: &mut String,
 ) -> anyhow::Result<(Option<Update>, bool)> {
 	#[derive(Debug, Clone, Copy, PartialEq)]
@@ -217,7 +226,7 @@ fn read_response_from_mame(
 		Ok(()) => {
 			let line_without_eolns = line.trim_end_matches(&['\r', '\n'][..]);
 			if let Some(status_line) = line.strip_prefix("@") {
-				emit_console(EmitType::Response, line_without_eolns);
+				emit_interaction_monitor(EmitType::Response, line_without_eolns);
 				let (msg, comment) = if let Some((msg, comment)) = status_line.split_once("###") {
 					(msg.trim_end(), Some(comment.trim()))
 				} else {
@@ -234,7 +243,7 @@ fn read_response_from_mame(
 
 				(result, comment)
 			} else {
-				emit_console(EmitType::Cruft, line_without_eolns);
+				emit_interaction_monitor(EmitType::Cruft, line_without_eolns);
 				(Ok(ResponseLine::Cruft), Some(line.as_str()))
 			}
 		}
@@ -296,7 +305,7 @@ fn process_event_from_front_end(
 	receiver: &dyn Fn(Duration) -> MameCommand,
 	mame_stdin: &mut BufWriter<impl Write>,
 	is_running: bool,
-	emit_console: &dyn for<'a> Fn(EmitType, &'a str),
+	emit_interaction_monitor: &dyn for<'a> Fn(EmitType, &'a str),
 ) -> anyhow::Result<bool> {
 	let timeout = if is_running {
 		Duration::from_secs(1)
@@ -306,30 +315,35 @@ fn process_event_from_front_end(
 	let command = receiver(timeout);
 	info!(?command);
 
-	emit_console(EmitType::Command, command.text());
+	emit_interaction_monitor(EmitType::Command, command.text());
 	writeln!(mame_stdin, "{}", command.text()).map_err(|e| ThisError::WritingToMame(e.into()))?;
 	mame_stdin.flush().map_err(|e| ThisError::WritingToMame(e.into()))?;
 
 	Ok(command == MameCommand::exit())
 }
 
-// emits a line to an active console, if present
-fn emit_console(console: &Mutex<Option<Console>>, emit_type: EmitType, s: &str) {
-	with_active_console(console, |console| console.emit(emit_type, s));
-}
-
-fn emit_console_command_line(console: &Mutex<Option<Console>>, mame_args: &MameArguments) {
-	with_active_console(console, |console| {
-		let args = mame_args.args.iter().map(|x| x.to_string_lossy());
-		let text = std::iter::once(Cow::Borrowed(mame_args.program.as_str()))
-			.chain(args)
-			.map(quote_argument_for_console)
-			.join(" ");
-		console.emit(EmitType::CommandLine, &text)
+// emits a line to an active interaction monitor, if present
+fn emit_interaction_monitor(interaction_monitor: &Mutex<Option<InteractionMonitor>>, emit_type: EmitType, s: &str) {
+	with_active_interaction_monitor(interaction_monitor, |interaction_monitor| {
+		interaction_monitor.emit(emit_type, s)
 	});
 }
 
-fn quote_argument_for_console<'a>(s: impl Into<Cow<'a, str>>) -> Cow<'a, str> {
+fn emit_interaction_monitor_command_line(
+	interaction_monitor: &Mutex<Option<InteractionMonitor>>,
+	mame_args: &MameArguments,
+) {
+	with_active_interaction_monitor(interaction_monitor, |interaction_monitor| {
+		let args = mame_args.args.iter().map(|x| x.to_string_lossy());
+		let text = std::iter::once(Cow::Borrowed(mame_args.program.as_str()))
+			.chain(args)
+			.map(quote_argument_for_interaction_monitor)
+			.join(" ");
+		interaction_monitor.emit(EmitType::CommandLine, &text)
+	});
+}
+
+fn quote_argument_for_interaction_monitor<'a>(s: impl Into<Cow<'a, str>>) -> Cow<'a, str> {
 	let s = s.into();
 	if s.is_empty() || s.contains(' ') || s.contains('\"') {
 		let s = s.replace('\"', "\\\"");
@@ -339,10 +353,16 @@ fn quote_argument_for_console<'a>(s: impl Into<Cow<'a, str>>) -> Cow<'a, str> {
 	}
 }
 
-fn with_active_console(console: &Mutex<Option<Console>>, f: impl FnOnce(&mut Console) -> anyhow::Result<()>) {
-	let mut console = console.lock().unwrap();
-	if console.as_mut().is_none_or(|console| f(console).is_err()) {
-		*console = None;
+fn with_active_interaction_monitor(
+	interaction_monitor: &Mutex<Option<InteractionMonitor>>,
+	f: impl FnOnce(&mut InteractionMonitor) -> anyhow::Result<()>,
+) {
+	let mut interaction_monitor = interaction_monitor.lock().unwrap();
+	if interaction_monitor
+		.as_mut()
+		.is_none_or(|interaction_monitor| f(interaction_monitor).is_err())
+	{
+		*interaction_monitor = None;
 	}
 }
 
@@ -366,8 +386,8 @@ mod test {
 	#[test_case(2, "\"foo\"", "\"\\\"foo\\\"\"")]
 	#[test_case(3, "foo bar", "\"foo bar\"")]
 
-	fn quote_argument_for_console(_index: usize, s: &str, expected: &str) {
-		let actual = super::quote_argument_for_console(s);
+	fn quote_argument_for_interaction_monitor(_index: usize, s: &str, expected: &str) {
+		let actual = super::quote_argument_for_interaction_monitor(s);
 		assert_eq!(actual, expected);
 	}
 }

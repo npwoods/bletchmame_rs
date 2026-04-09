@@ -11,8 +11,8 @@ mod unix;
 #[rustfmt::skip]
 pub use {
     windows::win_platform_init as platform_init,
-    windows::win_console_init as console_init,
-    windows::win_echo_console_main,
+    windows::win_interaction_monitor_init as interaction_monitor_init,
+    windows::win_echo_interaction_monitor_main,
     windows::WinCommandExt as CommandExt,
     windows::WinWindowAttributesExt as WindowAttributesExt,
     windows::WinWindowExt as WindowExt
@@ -23,7 +23,7 @@ pub use {
 #[rustfmt::skip]
 pub use {
     other::other_platform_init as platform_init,
-    unix::unix_console_init as console_init,
+    unix::unix_interaction_monitor_init as interaction_monitor_init,
     other::OtherCommandExt as CommandExt,
     other::OtherWindowAttributesExt as WindowAttributesExt,
     other::OtherWindowExt as WindowExt,
@@ -34,7 +34,7 @@ pub use {
 #[rustfmt::skip]
 pub use {
     other::other_platform_init as platform_init,
-    other::other_console_init as console_init,
+    other::other_interaction_monitor_init as interaction_monitor_init,
     other::OtherCommandExt as CommandExt,
     other::OtherWindowAttributesExt as WindowAttributesExt,
     other::OtherWindowExt as WindowExt

@@ -42,6 +42,6 @@ pub impl Window {
 	}
 }
 
-pub fn other_console_init(_title: &str) -> Result<(Child, File)> {
-	Err(Error::msg("Console is not supported on this platform"))
+pub fn other_interaction_monitor_init(_title: &str) -> Result<(Child, File)> {
+	Err(Error::msg("Interaction monitor is not supported on this platform"))
 }
