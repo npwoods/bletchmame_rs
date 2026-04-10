@@ -220,6 +220,7 @@ fn access_paths(path_type: PathType) -> (fn(&PrefsPaths) -> &[SmolStr], PathsSto
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct PrefsVideo {
 	pub prescale: u8,
 
@@ -392,6 +393,7 @@ pub enum BuiltinCollection {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct HistoryEntry {
 	#[serde(flatten)]
 	pub collection: Rc<PrefsCollection>,
