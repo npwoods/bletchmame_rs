@@ -246,9 +246,9 @@ export component AppWindow inherits Window {
     // Slint's crude menu bar
     if menubar-visible: MenuBar {
         Menu {
-            title: @tr("MenuBar" => "File");
+            title: @tr("MenuBar" => "&File");
             MenuItem {
-                title: @tr("MenuBar" => "Stop");
+                title: @tr("MenuBar" => "&Stop");
                 enabled: mode() == "running";
                 shortcut: @keys(Control + Pause);
                 activated => {
@@ -257,7 +257,7 @@ export component AppWindow inherits Window {
             }
 
             MenuItem {
-                title: @tr("MenuBar" => "Pause");
+                title: @tr("MenuBar" => "&Pause");
                 enabled: mode() == "running";
                 shortcut: @keys(Pause);
                 activated => {
@@ -268,7 +268,7 @@ export component AppWindow inherits Window {
             MenuSeparator { }
 
             MenuItem {
-                title: @tr("MenuBar" => "Devices and Images...");
+                title: @tr("MenuBar" => "&Devices and Images...");
                 enabled: mode() == "running";
                 activated => {
                     menu-item-action(root.menu-action-file-devices-and-images);
@@ -294,7 +294,7 @@ export component AppWindow inherits Window {
             }
 
             MenuItem {
-                title: @tr("MenuBar" => "Load State...");
+                title: @tr("MenuBar" => "&Load State...");
                 enabled: mode() == "running";
                 shortcut: @keys(Control + F7);
                 activated => {
@@ -303,7 +303,7 @@ export component AppWindow inherits Window {
             }
 
             MenuItem {
-                title: @tr("MenuBar" => "Save State...");
+                title: @tr("MenuBar" => "S&ave State...");
                 enabled: mode() == "running";
                 shortcut: @keys(Control + X);
                 activated => {
@@ -314,7 +314,7 @@ export component AppWindow inherits Window {
             MenuSeparator { }
 
             MenuItem {
-                title: @tr("MenuBar" => "Save Screenshot...");
+                title: @tr("MenuBar" => "Save Sc&reenshot...");
                 enabled: mode() == "running";
                 shortcut: @keys(F12);
                 activated => {
@@ -342,17 +342,17 @@ export component AppWindow inherits Window {
             }
 
             Menu {
-                title: @tr("MenuBar" => "Reset");
+                title: @tr("MenuBar" => "&Reset");
                 enabled: mode() == "running";
                 MenuItem {
-                    title: @tr("MenuBar" => "Soft Reset");
+                    title: @tr("MenuBar" => "&Soft Reset");
                     activated => {
                         menu-item-action(root.menu-action-file-reset-soft);
                     }
                 }
 
                 MenuItem {
-                    title: @tr("MenuBar" => "Hard Reset");
+                    title: @tr("MenuBar" => "&Hard Reset");
                     activated => {
                         menu-item-action(root.menu-action-file-reset-hard);
                     }
@@ -360,7 +360,7 @@ export component AppWindow inherits Window {
             }
 
             MenuItem {
-                title: @tr("MenuBar" => "Exit");
+                title: @tr("MenuBar" => "E&xit");
                 enabled: true;
                 shortcut: @keys(Control + Shift + X);
                 activated => {
@@ -370,9 +370,9 @@ export component AppWindow inherits Window {
         }
 
         Menu {
-            title: @tr("MenuBar" => "Options");
+            title: @tr("MenuBar" => "&Options");
             Menu {
-                title: @tr("MenuBar" => "Throttle");
+                title: @tr("MenuBar" => "&Throttle");
                 enabled: mode() == "running";
                 for entry[index] in menu-entries-throttle: MenuItem {
                     title: entry.title;
@@ -389,7 +389,7 @@ export component AppWindow inherits Window {
                 MenuSeparator { }
 
                 MenuItem {
-                    title: @tr("MenuBar" => "Increase Speed");
+                    title: @tr("MenuBar" => "&Increase Speed");
                     shortcut: @keys(F9);
                     activated => {
                         menu-item-action(root.menu-action-options-throttle-speed-increase);
@@ -397,7 +397,7 @@ export component AppWindow inherits Window {
                 }
 
                 MenuItem {
-                    title: @tr("MenuBar" => "Decrease Speed");
+                    title: @tr("MenuBar" => "&Decrease Speed");
                     shortcut: @keys(F8);
                     activated => {
                         menu-item-action(root.menu-action-options-throttle-speed-decrease);
@@ -405,7 +405,7 @@ export component AppWindow inherits Window {
                 }
 
                 MenuItem {
-                    title: @tr("MenuBar" => "Warp mode");
+                    title: @tr("MenuBar" => "&Warp mode");
                     checkable: true;
                     checked: !is-throttled;
                     shortcut: @keys(F10);
@@ -416,7 +416,7 @@ export component AppWindow inherits Window {
             }
 
             Menu {
-                title: @tr("MenuBar" => "Frame Skip");
+                title: @tr("MenuBar" => "Frame S&kip");
                 enabled: mode() == "running";
                 for entry[index] in menu-entries-frameskip: MenuItem {
                     title: entry.title;
@@ -433,7 +433,7 @@ export component AppWindow inherits Window {
             }
 
             MenuItem {
-                title: @tr("MenuBar" => "Full Screen");
+                title: @tr("MenuBar" => "&Full Screen");
                 enabled: true;
                 checkable: true;
                 checked: is-fullscreen;
@@ -444,7 +444,7 @@ export component AppWindow inherits Window {
             }
 
             MenuItem {
-                title: @tr("MenuBar" => "Toggle Menu Bar");
+                title: @tr("MenuBar" => "&Toggle Menu Bar");
                 enabled: mode() == "running";
                 shortcut: @keys(ScrollLock);
                 activated => {
@@ -453,22 +453,22 @@ export component AppWindow inherits Window {
             }
 
             Menu {
-                title: @tr("MenuBar" => "Views");
+                title: @tr("MenuBar" => "&Views");
                 MenuItem {
-                    title: @tr("MenuBar" => "Collections List");
+                    title: @tr("MenuBar" => "&Collections List");
                     checkable: true;
                     checked <=> is-collections-list-visible;
                 }
 
                 MenuItem {
-                    title: @tr("MenuBar" => "Picture Area");
+                    title: @tr("MenuBar" => "&Picture Area");
                     checkable: true;
                     checked <=> is-picture-area-visible;
                 }
             }
 
             MenuItem {
-                title: @tr("MenuBar" => "Sound");
+                title: @tr("MenuBar" => "&Sound");
                 enabled: mode() == "running";
                 checkable: true;
                 checked: is-sound-enabled;
@@ -478,7 +478,7 @@ export component AppWindow inherits Window {
             }
 
             MenuItem {
-                title: @tr("MenuBar" => "Cheats...");
+                title: @tr("MenuBar" => "&Cheats...");
                 enabled: has-cheats;
                 activated => {
                     menu-item-action(root.menu-action-options-cheats);
@@ -488,7 +488,7 @@ export component AppWindow inherits Window {
             MenuSeparator { }
 
             MenuItem {
-                title: @tr("MenuBar" => "Classic MAME Menu");
+                title: @tr("MenuBar" => "Classic MAME Men&u");
                 enabled: has-classic-mame-menu;
                 activated => {
                     menu-item-action(root.menu-action-options-classic);
@@ -496,7 +496,7 @@ export component AppWindow inherits Window {
             }
 
             MenuItem {
-                title: @tr("MenuBar" => "Interaction Monitor");
+                title: @tr("MenuBar" => "&Interaction Monitor");
                 enabled: true;
                 activated => {
                     menu-item-action(root.menu-action-options-interaction-monitor);
@@ -505,9 +505,9 @@ export component AppWindow inherits Window {
         }
 
         Menu {
-            title: @tr("MenuBar" => "Settings");
+            title: @tr("MenuBar" => "&Settings");
             MenuItem {
-                title: @tr("MenuBar" => "Joysticks and Controllers...");
+                title: @tr("MenuBar" => "&Joysticks and Controllers...");
                 enabled: has-input-class-controller;
                 activated => {
                     menu-item-action(root.menu-action-settings-input-controller);
@@ -515,7 +515,7 @@ export component AppWindow inherits Window {
             }
 
             MenuItem {
-                title: @tr("MenuBar" => "Keyboard...");
+                title: @tr("MenuBar" => "&Keyboard...");
                 enabled: has-input-class-keyboard;
                 activated => {
                     menu-item-action(root.menu-action-settings-input-keyboard);
@@ -523,7 +523,7 @@ export component AppWindow inherits Window {
             }
 
             MenuItem {
-                title: @tr("MenuBar" => "Miscellaneous Input...");
+                title: @tr("MenuBar" => "&Miscellaneous Input...");
                 enabled: has-input-class-misc;
                 activated => {
                     menu-item-action(root.menu-action-settings-input-misc);
@@ -531,7 +531,7 @@ export component AppWindow inherits Window {
             }
 
             MenuItem {
-                title: @tr("MenuBar" => "Configuration...");
+                title: @tr("MenuBar" => "&Configuration...");
                 enabled: has-input-class-config;
                 activated => {
                     menu-item-action(root.menu-action-settings-input-config);
@@ -539,7 +539,7 @@ export component AppWindow inherits Window {
             }
 
             MenuItem {
-                title: @tr("MenuBar" => "DIP Switches...");
+                title: @tr("MenuBar" => "&DIP Switches...");
                 enabled: has-input-class-dipswitch;
                 activated => {
                     menu-item-action(root.menu-action-settings-input-dipswitch);
@@ -549,7 +549,7 @@ export component AppWindow inherits Window {
             MenuSeparator { }
 
             MenuItem {
-                title: @tr("MenuBar" => "Video...");
+                title: @tr("MenuBar" => "&Video...");
                 enabled: mode() == "ready" || mode() == "report";
                 activated => {
                     menu-item-action(root.menu-action-settings-video);
@@ -557,7 +557,7 @@ export component AppWindow inherits Window {
             }
 
             MenuItem {
-                title: @tr("MenuBar" => "Paths...");
+                title: @tr("MenuBar" => "&Paths...");
                 enabled: mode() == "ready" || mode() == "report";
                 activated => {
                     menu-item-action(root.menu-action-settings-paths);
@@ -565,7 +565,7 @@ export component AppWindow inherits Window {
             }
 
             Menu {
-                title: @tr("MenuBar" => "Builtin Collections");
+                title: @tr("MenuBar" => "&Builtin Collections");
                 enabled: true;
                 for entry[index] in menu-entries-builtin-collections: MenuItem {
                     title: entry.title;
@@ -578,7 +578,7 @@ export component AppWindow inherits Window {
             }
 
             MenuItem {
-                title: @tr("MenuBar" => "Reset Settings To Default");
+                title: @tr("MenuBar" => "&Reset Settings To Default");
                 enabled: true;
                 activated => {
                     menu-item-action(root.menu-action-settings-reset);
@@ -586,7 +586,7 @@ export component AppWindow inherits Window {
             }
 
             MenuItem {
-                title: @tr("MenuBar" => "Import MAME INI...");
+                title: @tr("MenuBar" => "&Import MAME INI...");
                 enabled: true;
                 activated => {
                     menu-item-action(root.menu-action-settings-import-mame-ini);
@@ -595,9 +595,9 @@ export component AppWindow inherits Window {
         }
 
         Menu {
-            title: @tr("MenuBar" => "Help");
+            title: @tr("MenuBar" => "&Help");
             MenuItem {
-                title: @tr("MenuBar" => "Reset MAME");
+                title: @tr("MenuBar" => "&Reset MAME");
                 enabled: mode() == "ready";
                 activated => {
                     menu-item-action(root.menu-action-help-reset-mame);
@@ -605,7 +605,7 @@ export component AppWindow inherits Window {
             }
 
             MenuItem {
-                title: @tr("MenuBar" => "Refresh MAME machine info");
+                title: @tr("MenuBar" => "Re&fresh MAME machine info");
                 enabled: can-refresh-info-db;
                 activated => {
                     menu-item-action(root.menu-action-help-refresh-info-db);
@@ -615,7 +615,7 @@ export component AppWindow inherits Window {
             MenuSeparator { }
 
             MenuItem {
-                title: @tr("MenuBar" => "BletchMAME web site...");
+                title: @tr("MenuBar" => "&BletchMAME web site...");
                 enabled: true;
                 activated => {
                     menu-item-action(root.menu-action-help-website);
@@ -623,7 +623,7 @@ export component AppWindow inherits Window {
             }
 
             MenuItem {
-                title: @tr("MenuBar" => "About...");
+                title: @tr("MenuBar" => "&About...");
                 enabled: true;
                 activated => {
                     menu-item-action(root.menu-action-help-about);
