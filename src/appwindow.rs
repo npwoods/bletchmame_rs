@@ -22,6 +22,7 @@ use slint::LogicalPosition;
 use slint::LogicalSize;
 use slint::Model;
 use slint::ModelRc;
+use slint::PhysicalSize;
 use slint::SharedString;
 use slint::TableColumn;
 use slint::ToSharedString;
@@ -509,6 +510,17 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	let (child_window, mame_windowing) = match args.mame_windowing {
 		AppWindowing::Integrated => {
 			let parent = app_window.window();
+
+			// the following is a stupid hack only needed for winit where we need to force some `WindowEvent`'s to
+			// fire so that the child window can be properly created
+			let size = app_window.window().size();
+			parent.set_size(PhysicalSize {
+				width: size.width + 1,
+				..size
+			});
+			parent.set_size(size);
+
+			// finally create the child window
 			let child_window = args.backend_runtime.create_child_window(parent).await.unwrap();
 			let child_window_text = child_window.text();
 			(Some(child_window), MameWindowing::Attached(child_window_text.into()))
