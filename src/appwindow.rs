@@ -513,12 +513,14 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 
 			// the following is a stupid hack only needed for winit where we need to force some `WindowEvent`'s to
 			// fire so that the child window can be properly created
-			let size = app_window.window().size();
-			parent.set_size(PhysicalSize {
-				width: size.width + 1,
-				..size
-			});
-			parent.set_size(size);
+			if preferences.window_size.is_none() {
+				let size = app_window.window().size();
+				parent.set_size(PhysicalSize {
+					width: size.width + 1,
+					..size
+				});
+				parent.set_size(size);
+			}
 
 			// finally create the child window
 			let child_window = args.backend_runtime.create_child_window(parent).await.unwrap();
