@@ -144,21 +144,27 @@ impl WinitBackendRuntime {
 		}
 	}
 
-	fn find_child_window(&self, window_id: &WindowId) -> Option<(Rc<WinitChildWindow>, FindResultType)> {
+	fn with_child_window<R>(
+		&self,
+		window_id: &WindowId,
+		callback: impl FnOnce(&WinitChildWindow, FindResultType) -> R,
+	) -> Option<R> {
 		self.0
 			.borrow()
 			.live
 			.iter()
-			.filter_map(|x| {
-				if &x.parent_window_id == window_id {
-					Some((x.clone(), FindResultType::Parent))
-				} else if x.window.id() == *window_id {
-					Some((x.clone(), FindResultType::Child))
+			.map(Rc::as_ref)
+			.filter_map(|child_window| {
+				if &child_window.parent_window_id == window_id {
+					Some((child_window, FindResultType::Parent))
+				} else if child_window.window.id() == *window_id {
+					Some((child_window, FindResultType::Child))
 				} else {
 					None
 				}
 			})
 			.next()
+			.map(|(child_window, find_result_type)| callback(child_window, find_result_type))
 	}
 }
 
@@ -174,14 +180,14 @@ impl CustomApplicationHandler for WinitBackendRuntime {
 		// tracing
 		let span = info_span!("window_event");
 		let _guard = span.enter();
-		debug!(event=?event, window_id=?window_id, "window_event");
+		debug!(?event, ?window_id, "window_event");
 
 		// take this opportunity to create pending children, regardless of what is going on
 		self.create_pending_child_windows(event_loop);
 
 		match event {
 			WindowEvent::Focused(true) => {
-				if let Some((child_window, find_result_type)) = self.find_child_window(&window_id) {
+				self.with_child_window(&window_id, |child_window, find_result_type| {
 					let expected_child_window_active = match find_result_type {
 						FindResultType::Parent => false,
 						FindResultType::Child => true,
@@ -189,20 +195,17 @@ impl CustomApplicationHandler for WinitBackendRuntime {
 					if expected_child_window_active != child_window.is_active() {
 						child_window.fix_focus();
 					}
-				};
+				});
 				EventResult::Propagate
 			}
 
-			WindowEvent::KeyboardInput { .. } => {
-				if let Some((child_window, find_result_type)) = self.find_child_window(&window_id)
-					&& find_result_type == FindResultType::Child
-				{
-					// retargetting is necessary for menu shortcuts to work
-					EventResult::Retarget(child_window.parent_window_id)
-				} else {
-					EventResult::Propagate
-				}
-			}
+			WindowEvent::KeyboardInput { .. } => self
+				.with_child_window(&window_id, |child_window, find_result_type| {
+					(find_result_type == FindResultType::Child)
+						.then_some(EventResult::Retarget(child_window.parent_window_id))
+				})
+				.flatten()
+				.unwrap_or(EventResult::Propagate),
 
 			WindowEvent::Destroyed => {
 				let mut state = self.0.borrow_mut();

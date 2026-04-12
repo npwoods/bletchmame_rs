@@ -30,6 +30,7 @@ use smol_str::SmolStr;
 use strum::EnumIter;
 use strum::EnumProperty;
 use strum::EnumString;
+use tracing::error;
 use tracing::info;
 
 use crate::history::History;
@@ -464,7 +465,11 @@ impl Preferences {
 		// try to load the preferences
 		let path = prefs_filename(prefs_path, PREFS)?;
 		let result = load_prefs(&path);
-		info!("result" = ?result.as_ref().map(|_| ()), "Preferences::load()");
+		if result.is_ok() {
+			info!("result" = ?result.as_ref().map(|_| ()), "Preferences::load()");
+		} else {
+			error!("result" = ?result.as_ref().map(|_| ()), "Preferences::load()");
+		};
 
 		// did we error?
 		if result.is_err() {
