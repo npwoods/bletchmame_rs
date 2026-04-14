@@ -489,9 +489,13 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		.unwrap_or_else(|| Preferences::fresh(prefs_path.to_str().map(|x| x.into())));
 
 	// update window preferences
-	if let Some(window_size) = &preferences.window_size {
-		let physical_size = LogicalSize::from(*window_size).to_physical(app_window.window().scale_factor());
-		app_window.window().set_size(physical_size);
+	let default_window_size = app_window.window().size();
+	let window_physical_size = preferences
+		.window_size
+		.as_ref()
+		.map(|size| LogicalSize::from(*size).to_physical(app_window.window().scale_factor()));
+	if let Some(window_physical_size) = window_physical_size {
+		app_window.window().set_size(window_physical_size);
 	}
 	if let Some(main_window_left_column_width) = preferences.main_window_left_column_width {
 		app_window.set_column_left_width(main_window_left_column_width);
@@ -513,13 +517,12 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 
 			// the following is a stupid hack only needed for winit where we need to force some `WindowEvent`'s to
 			// fire so that the child window can be properly created
-			if preferences.window_size.is_none() {
-				let size = app_window.window().size();
+			if window_physical_size.is_none_or(|size| size == default_window_size) {
 				parent.set_size(PhysicalSize {
-					width: size.width + 1,
-					..size
+					width: default_window_size.width + 1,
+					..default_window_size
 				});
-				parent.set_size(size);
+				parent.set_size(default_window_size);
 			}
 
 			// finally create the child window
