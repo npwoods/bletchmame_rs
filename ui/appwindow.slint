@@ -216,6 +216,10 @@ export component AppWindow inherits Window {
         return get-history-text(current-snap-view);
     }
 
+    // status bar
+    in property <string> statusbar-speed-text;
+    in property <string> statusbar-current-item-desc;
+
     // the report view
     in property <string> report-message;
     in property <string> report-submessage;
@@ -992,6 +996,17 @@ export component AppWindow inherits Window {
                             }
                         }
                     }
+                }
+            }
+        }
+
+        if menubar-visible: Rectangle {
+            vertical-stretch: 0;
+            background: Palette.control-background;
+            HorizontalBox {
+                alignment: start;
+                Text {
+                    text: mode() == "running" ? statusbar-speed-text : statusbar-current-item-desc;
                 }
             }
         }
