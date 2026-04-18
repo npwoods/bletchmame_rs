@@ -96,6 +96,14 @@ struct Opt {
 	#[cfg_attr(not(feature = "diagnostics"), arg(skip))]
 	no_capture_mame_stderr: bool,
 
+	#[cfg_attr(feature = "diagnostics", arg(long))]
+	#[cfg_attr(not(feature = "diagnostics"), arg(skip))]
+	title: Option<String>,
+
+	#[cfg_attr(feature = "diagnostics", arg(long))]
+	#[cfg_attr(not(feature = "diagnostics"), arg(skip))]
+	prefix_title_with_mode: bool,
+
 	#[cfg(feature = "diagnostics")]
 	#[arg(long = "exercise-mame-tests", value_parser = clap::value_parser!(String))]
 	exercise_mame_tests: Option<String>,
@@ -187,6 +195,10 @@ fn main() -> ExitCode {
 		interaction_monitor: opts.interaction_monitor,
 	};
 	let app_window = AppWindow::new().expect("Failed to create main window");
+	if let Some(title) = opts.title {
+		app_window.set_apptitle(title.into());
+	}
+	app_window.set_prefix_title_with_mode(opts.prefix_title_with_mode);
 	let app_window = Rc::new(app_window);
 	let app_window_clone = app_window.clone();
 	let fut = async move {
