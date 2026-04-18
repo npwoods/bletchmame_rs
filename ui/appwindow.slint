@@ -29,7 +29,8 @@ struct CollectionContextMenuInfo {
     move-down-action: string,
     delete-action: string,
     rename-action: string,
-    new-collection-action: string}
+    new-collection-action: string
+}
 
 struct ItemContextMenuInfo {
     run-title: string,
@@ -41,14 +42,9 @@ struct ItemContextMenuInfo {
     remove-from-folder-desc: SimpleMenuEntry,
 }
 
-struct SearchBarItem {
-    icon: image,
-    text: string,
-    action: string}
+struct SearchBarItem { icon: image, text: string, action: string}
 
-struct ReportIssue {
-    text: string,
-    button-text: string}
+struct ReportIssue { text: string, button-text: string}
 
 export component AppWindow inherits Window {
     // positioning and title
@@ -245,7 +241,6 @@ export component AppWindow inherits Window {
             "ready"
         }
     }
-
 
     // Slint's crude menu bar
     if menubar-visible: MenuBar {
@@ -785,7 +780,7 @@ export component AppWindow inherits Window {
                 VerticalLayout {
                     min-width: 10px;
                     alignment: stretch;
-                        
+
                     // toolbar below the current collection
                     HorizontalBox {
                         vertical-stretch: 0;
@@ -839,7 +834,7 @@ export component AppWindow inherits Window {
                             }
                         }
                     }
-                        
+
                     // current collection label
                     Text {
                         vertical-stretch: 0;
