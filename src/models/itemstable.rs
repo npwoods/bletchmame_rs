@@ -517,6 +517,20 @@ impl ItemsTableModel {
 			.or_else(|| self.selected_index.get())
 	}
 
+	pub fn current_selection_text(&self, column: ColumnType) -> Option<SharedString> {
+		let row = self.current_selected_index()?;
+		let row = usize::try_from(row).unwrap();
+
+		let text = {
+			let info_db = self.info_db.borrow();
+			let info_db = info_db.as_deref()?;
+			let items = self.items.borrow();
+			let item = items.get(row)?;
+			column_text(info_db, item, column).to_shared_string()
+		};
+		Some(text)
+	}
+
 	fn set_current_selection(&self, selection: &[PrefsItem]) {
 		debug!(selection=?selection, "ItemsTableModel::set_current_selection()");
 

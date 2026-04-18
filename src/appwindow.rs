@@ -86,6 +86,7 @@ use crate::models::collectionsview::CollectionsViewModel;
 use crate::models::itemstable::EmptyReason;
 use crate::models::itemstable::ItemsTableModel;
 use crate::prefs::BuiltinCollection;
+use crate::prefs::ColumnType;
 use crate::prefs::Preferences;
 use crate::prefs::PrefsCollection;
 use crate::prefs::SortOrder;
@@ -326,6 +327,13 @@ impl AppModel {
 			if let Some(child_window) = &*self.child_window.borrow() {
 				child_window.set_active(running.is_some() && report.is_none());
 			}
+
+			// status bar
+			let statusbar_speed_text = status
+				.and_then(|s| s.running.as_ref())
+				.map(|r| format!("{}%", r.speed_percent * 100.0).into())
+				.unwrap_or_default();
+			app_window.set_statusbar_speed_text(statusbar_speed_text);
 
 			// report view
 			app_window.set_report_message(
@@ -1658,6 +1666,12 @@ fn update_ui_for_current_history_item(model: &AppModel) {
 
 	// update search text bar
 	app_window.set_items_search_text(SharedString::from(&search));
+
+	// update current item desc
+	let desc = model
+		.with_items_table_model(|m| m.current_selection_text(ColumnType::Description))
+		.unwrap_or_default();
+	app_window.set_statusbar_current_item_desc(desc);
 
 	// identify the currently selected collection
 	let (collection, collection_index) = prefs.current_collection();
