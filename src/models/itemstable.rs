@@ -109,7 +109,16 @@ impl ItemsTableModel {
 		// tracing
 		let span = debug_span!("ItemsTableModel::update");
 		let _guard = span.enter();
-		debug!(info_db=?info_db, software_list_paths=?software_list_paths, collection=?collection, column_types=?column_types, search=?search, sorting=?sorting, selection=?selection, "ItemsTableModel::update()");
+		debug!(
+			?info_db,
+			?software_list_paths,
+			?collection,
+			?column_types,
+			?search,
+			?sorting,
+			?selection,
+			"ItemsTableModel::update()"
+		);
 
 		// update the state that forces items refreshes
 		let mut must_refresh_items = false;
@@ -532,7 +541,7 @@ impl ItemsTableModel {
 	}
 
 	fn set_current_selection(&self, selection: &[PrefsItem]) {
-		debug!(selection=?selection, "ItemsTableModel::set_current_selection()");
+		debug!(?selection, "ItemsTableModel::set_current_selection()");
 
 		// we only support single selection now
 		let selection = selection.iter().next();
@@ -661,7 +670,7 @@ struct Item {
 #[derive(Clone)]
 enum ItemDetails {
 	Machine {
-		// Commentary:  `MachineConfig` has its own `InfoDb`; maybe we need a lighter `MachineConfigPartial`?
+		// commentary:  `MachineConfig` has its own `InfoDb`; maybe we need a lighter `MachineConfigPartial`?
 		machine_config: MachineConfig,
 		images: HashMap<String, ImageDesc>,
 		ram_size: Option<u64>,
