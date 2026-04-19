@@ -6,6 +6,7 @@ use std::rc::Rc;
 use crate::prefs::HistoryEntry;
 use crate::prefs::Preferences;
 use crate::prefs::PrefsCollection;
+use crate::prefs::PrefsCollectionRef;
 
 const MAX_HISTORY_LEN: usize = 10;
 
@@ -35,7 +36,7 @@ where
 		let (history, position) = self.entries_mut();
 
 		let history_entry: HistoryEntry = HistoryEntry {
-			collection: sanitize_collection(collection),
+			collection: reference_collection(collection),
 			search: "".into(),
 			sort_suppressed: false,
 			selection: Vec::default(),
@@ -61,16 +62,27 @@ where
 
 	fn current_collection(&self) -> (Rc<PrefsCollection>, Option<usize>) {
 		let collections = self.collections();
-		let target_collection = &self.current_history_entry().collection;
+		let target_collection_ref = &self.current_history_entry().collection;
 
 		let (collection, collection_index) = if let Some((index, collection)) = collections
 			.iter()
 			.enumerate()
-			.find(|(_, collection)| &sanitize_collection((*collection).clone()) == target_collection)
+			.find(|(_, collection)| &reference_collection(collection) == target_collection_ref)
 		{
+			let collection = collection.clone();
 			(collection, Some(index))
 		} else {
-			(target_collection, None)
+			let collection = match target_collection_ref {
+				PrefsCollectionRef::Builtin(name) => PrefsCollection::Builtin(*name),
+				PrefsCollectionRef::MachineSoftware { machine_name } => PrefsCollection::MachineSoftware {
+					machine_name: machine_name.clone(),
+				},
+				PrefsCollectionRef::Folder { name } => {
+					panic!("History entry references folder {name} which does not exist in collections")
+				}
+			};
+			let collection = Rc::new(collection);
+			(collection, None)
 		};
 		(collection.clone(), collection_index)
 	}
@@ -103,8 +115,8 @@ where
 
 		let (entries, _) = self.entries_mut();
 		for entry in entries.iter_mut() {
-			if matches!(entry.collection.as_ref(), PrefsCollection::Folder { name, .. } if name == &old_name) {
-				entry.collection = sanitize_collection(new_collection.clone());
+			if matches!(&entry.collection, PrefsCollectionRef::Folder { name, .. } if name == &old_name) {
+				entry.collection = reference_collection(&new_collection);
 			}
 		}
 	}
@@ -124,7 +136,7 @@ where
 		// and retain everything - except folders that are no longer named
 		let history_entries = take(history);
 		let (new_history, new_position) = retain_with_position(history_entries, *position, |entry| {
-			collection_folder_name(&entry.collection).is_none_or(|x| folder_names.contains(x))
+			collection_ref_folder_name(&entry.collection).is_none_or(|x| folder_names.contains(x))
 		});
 
 		// override the old history
@@ -139,21 +151,26 @@ fn advance_position(position: usize, length: usize, delta: isize) -> Option<usiz
 	(position < length).then_some(position)
 }
 
-fn sanitize_collection(collection: Rc<PrefsCollection>) -> Rc<PrefsCollection> {
-	if let PrefsCollection::Folder { name, items: _ } = collection.as_ref() {
-		let name = name.clone();
-		let collection = PrefsCollection::Folder {
-			name,
-			items: Vec::default(),
-		};
-		Rc::new(collection)
-	} else {
-		collection
+fn reference_collection(collection: impl AsRef<PrefsCollection>) -> PrefsCollectionRef {
+	match collection.as_ref() {
+		PrefsCollection::Builtin(col) => PrefsCollectionRef::Builtin(*col),
+		PrefsCollection::MachineSoftware { machine_name } => PrefsCollectionRef::MachineSoftware {
+			machine_name: machine_name.clone(),
+		},
+		PrefsCollection::Folder { name, items: _ } => PrefsCollectionRef::Folder { name: name.clone() },
 	}
 }
 
 fn collection_folder_name(collection: &PrefsCollection) -> Option<&str> {
 	if let PrefsCollection::Folder { name, items: _ } = collection {
+		Some(name)
+	} else {
+		None
+	}
+}
+
+fn collection_ref_folder_name(collection_ref: &PrefsCollectionRef) -> Option<&str> {
+	if let PrefsCollectionRef::Folder { name, .. } = collection_ref {
 		Some(name)
 	} else {
 		None

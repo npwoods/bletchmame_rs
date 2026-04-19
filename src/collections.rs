@@ -37,14 +37,18 @@ pub fn add_items_to_new_folder_collection(
 pub fn add_items_to_existing_folder_collection(
 	collections: &mut [Rc<PrefsCollection>],
 	folder_index: usize,
-	mut new_items: Vec<PrefsItem>,
+	new_items: &[PrefsItem],
 ) {
 	let mut col = Rc::unwrap_or_clone(collections[folder_index].clone());
 	let PrefsCollection::Folder { items, .. } = &mut col else {
 		panic!("Expected PrefsCollection::Folder");
 	};
 
-	new_items.retain(|x| !items.contains(x));
+	let new_items = new_items
+		.iter()
+		.filter(|x| !items.contains(x))
+		.cloned()
+		.collect::<Vec<_>>();
 	items.extend(new_items);
 
 	collections[folder_index] = Rc::new(col);
@@ -53,7 +57,7 @@ pub fn add_items_to_existing_folder_collection(
 pub fn remove_items_from_folder_collection(
 	collections: &mut [Rc<PrefsCollection>],
 	folder_name: String,
-	items: &[PrefsItem],
+	ids: &[impl AsRef<str>],
 ) {
 	let (index, old_items) = collections
 		.iter()
@@ -70,7 +74,10 @@ pub fn remove_items_from_folder_collection(
 
 	let new_items = old_items
 		.iter()
-		.filter(|x| !items.contains(x))
+		.filter(|x| {
+			let id = x.id.get_opt();
+			!ids.iter().any(|y| Some(y.as_ref()) == id.as_deref())
+		})
 		.cloned()
 		.collect::<Vec<_>>();
 

@@ -1315,12 +1315,12 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 		}
 		Action::AddToExistingFolder(folder_index, new_items) => {
 			model.modify_prefs(|prefs| {
-				add_items_to_existing_folder_collection(&mut prefs.collections, folder_index, new_items);
+				add_items_to_existing_folder_collection(&mut prefs.collections, folder_index, &new_items);
 			});
 		}
 		Action::AddToNewFolder(name, items) => {
 			model.modify_prefs(|prefs| {
-				add_items_to_new_folder_collection(&mut prefs.collections, name, items);
+				add_items_to_new_folder_collection(&mut prefs.collections, name, items.iter().cloned().collect());
 			});
 		}
 		Action::AddToNewFolderDialog(items) => {
@@ -1689,7 +1689,7 @@ fn update_ui_for_current_history_item(model: &AppModel) {
 	app_window.set_collections_view_selected_index(collection_index);
 
 	// update the snap view
-	let current_snap_view = snap_view_string(prefs.current_history_entry().selection.first());
+	let current_snap_view = snap_view_string(&collection, prefs.current_history_entry().selection.first());
 	app_window.set_current_snap_view(current_snap_view);
 
 	// and finish tracing

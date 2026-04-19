@@ -687,6 +687,7 @@ dependencies = [
  "anyhow",
  "assert-json-diff",
  "assert_matches",
+ "base64",
  "binary-search",
  "byte-unit",
  "byteorder",

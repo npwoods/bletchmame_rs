@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::fs::File;
 use std::fs::metadata;
@@ -17,16 +18,15 @@ use slint::Image;
 use slint::Rgba8Pixel;
 use slint::SharedPixelBuffer;
 use slint::SharedString;
+use slint::ToSharedString;
 use tracing::debug;
 use tracing::warn;
 use zip::ZipArchive;
 use zip::result::ZipError;
 
 use crate::history_xml::HistoryXml;
-use crate::prefs::PrefsItem;
-use crate::prefs::PrefsItemDetails;
-use crate::prefs::PrefsMachineItem;
-use crate::prefs::PrefsSoftwareItem;
+use crate::prefs::PrefsCollection;
+use crate::prefs::PrefsItemRef;
 
 #[derive(Debug)]
 pub enum MultiPath {
@@ -36,15 +36,38 @@ pub enum MultiPath {
 
 pub struct HistoryLoader(CancelableWorker<PathBuf, Result<HistoryXml>>);
 
-pub fn snap_view_string(item: Option<&PrefsItem>) -> SharedString {
-	match item.map(|x| &x.details) {
+pub fn snap_view_string(collection: &PrefsCollection, item: Option<&PrefsItemRef>) -> SharedString {
+	let item = if let Some(PrefsItemRef::Id(id)) = item {
+		let items = if let PrefsCollection::Folder { items, .. } = collection {
+			items.as_slice()
+		} else {
+			&[]
+		};
+		let item = items.iter().find(|x| Some(id) == x.id.get_opt().as_ref());
+		let item = match item.map(|x| &x.details) {
+			None => None,
+			Some(crate::prefs::PrefsItemDetails::Machine(details)) => Some(PrefsItemRef::Machine {
+				machine_name: details.machine_name.as_str().into(),
+			}),
+			Some(crate::prefs::PrefsItemDetails::Software(details)) => Some(PrefsItemRef::Software {
+				software_list: details.software_list.as_str().into(),
+				software: details.software.as_str().into(),
+			}),
+		};
+		item.map(Cow::Owned)
+	} else {
+		item.map(Cow::Borrowed)
+	};
+
+	match item.as_deref() {
 		None => "".into(),
-		Some(PrefsItemDetails::Machine(PrefsMachineItem { machine_name, .. })) => machine_name.into(),
-		Some(PrefsItemDetails::Software(PrefsSoftwareItem {
+		Some(PrefsItemRef::Id(_)) => unreachable!(),
+		Some(PrefsItemRef::Machine { machine_name, .. }) => machine_name.to_shared_string(),
+		Some(PrefsItemRef::Software {
 			software_list,
 			software,
 			..
-		})) => format!("{software_list}/{software}").into(),
+		}) => format!("{software_list}/{software}").into(),
 	}
 }
 
