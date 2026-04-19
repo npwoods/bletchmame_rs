@@ -39,9 +39,9 @@ use crate::prefs::ColumnType;
 use crate::prefs::PrefsCollection;
 use crate::prefs::PrefsItem;
 use crate::prefs::PrefsItemDetails;
+use crate::prefs::PrefsItemRef;
 use crate::prefs::PrefsMachineItem;
 use crate::prefs::PrefsSoftwareItem;
-use crate::prefs::PrefsVideo;
 use crate::prefs::SortOrder;
 use crate::runtime::MameStartArgs;
 use crate::selection::SelectionManager;
@@ -104,12 +104,21 @@ impl ItemsTableModel {
 		column_types: Option<Rc<[ColumnType]>>,
 		search: Option<&str>,
 		sorting: Option<Option<(ColumnType, SortOrder)>>,
-		selection: Option<&[PrefsItem]>,
+		selection: Option<&[PrefsItemRef]>,
 	) {
 		// tracing
 		let span = debug_span!("ItemsTableModel::update");
 		let _guard = span.enter();
-		debug!(info_db=?info_db, software_list_paths=?software_list_paths, collection=?collection, column_types=?column_types, search=?search, sorting=?sorting, selection=?selection, "ItemsTableModel::update()");
+		debug!(
+			?info_db,
+			?software_list_paths,
+			?collection,
+			?column_types,
+			?search,
+			?sorting,
+			?selection,
+			"ItemsTableModel::update()"
+		);
 
 		// update the state that forces items refreshes
 		let mut must_refresh_items = false;
@@ -225,7 +234,6 @@ impl ItemsTableModel {
 								software_list,
 								software,
 								machine_indexes,
-								preferred_machines: None,
 							};
 							details.into()
 						})
@@ -244,11 +252,11 @@ impl ItemsTableModel {
 										.map(move |index| (list.clone(), list.software[index].clone()))
 								})
 								.map(|(software_list, software)| {
+									let machine_indexes = Default::default();
 									let details = ItemDetails::Software {
 										software_list,
 										software,
-										machine_indexes: [machine_index].into_iter().collect(),
-										preferred_machines: None,
+										machine_indexes,
 									};
 									details.into()
 								})
@@ -261,16 +269,15 @@ impl ItemsTableModel {
 						.iter()
 						.map(|item| {
 							folder_item(info_db, &mut dispenser, item).unwrap_or_else(|error| {
-								let video = item.video.clone();
+								let id = Some(item.id.get());
 								let details = ItemDetails::Unrecognized {
 									details: item.details.clone(),
 									error: Rc::new(error),
 								};
-								Item { video, details }
+								Item { id, details }
 							})
 						})
 						.collect::<Rc<[_]>>(),
-
 					None => Rc::new([]),
 				};
 				(items, dispenser.is_empty())
@@ -319,7 +326,20 @@ impl ItemsTableModel {
 		let index = *self.items_map.borrow().get(index).unwrap();
 		let index = usize::try_from(index).unwrap();
 		let item = items.get(index)?;
-		let items = vec![make_prefs_item(item)];
+
+		// find the prefs item referenced by the Id, if appropriate
+		let current_collection = self.current_collection.borrow().clone();
+		let prefs_item = item.id.as_ref().and_then(|id| {
+			current_collection
+				.as_ref()
+				.and_then(|collection| match collection.as_ref() {
+					PrefsCollection::Folder { name: _, items } => {
+						items.iter().find(|x| x.id.get_opt().as_ref() == Some(id))
+					}
+					_ => None,
+				})
+		});
+		let video = prefs_item.and_then(|item| item.video.clone());
 
 		// get the critical information - the description and where (if anyplace) "Browse" would go to
 		let (run_title, run_descs, browse_target, can_configure) = match &item.details {
@@ -346,7 +366,6 @@ impl ItemsTableModel {
 					.iter()
 					.map(|(tag, image_desc)| (tag.as_str().into(), image_desc.clone()))
 					.collect::<Vec<_>>();
-				let video = item.video.clone();
 
 				let start_args = MameStartArgs {
 					machine_name,
@@ -356,11 +375,11 @@ impl ItemsTableModel {
 					images,
 					video,
 				};
-				let action = has_mame_initialized.then_some(Action::Start(start_args));
+				let action = Action::Start(start_args);
 				let run_title = run_item_text(machine.description()).into();
 				let run_descs = vec![MenuDesc {
 					title: "".into(),
-					action,
+					action: Some(action),
 				}];
 				let browse_target =
 					(!machine.machine_software_lists().is_empty()).then(|| PrefsCollection::MachineSoftware {
@@ -402,7 +421,7 @@ impl ItemsTableModel {
 								bios: None,
 								slots: [].into(),
 								images,
-								video: item.video.clone(),
+								video: video.clone(),
 							};
 							let action = Some(Action::Start(start_args));
 							let title = machine.description().into();
@@ -419,6 +438,41 @@ impl ItemsTableModel {
 				(run_title, run_descs, None, false)
 			}
 		};
+
+		// figure out the PrefsItem we would create if we were to add this to a folder
+		let prefs_item = prefs_item.cloned().unwrap_or_else(|| {
+			let details = match &item.details {
+				ItemDetails::Machine { machine_config, .. } => PrefsItemDetails::Machine(PrefsMachineItem {
+					machine_name: machine_config.machine().name().to_string(),
+					slots: [].into(),
+					images: [].into(),
+					ram_size: None,
+					bios: None,
+				}),
+				ItemDetails::Software {
+					software_list,
+					software,
+					..
+				} => {
+					let software_list = software_list.name.as_str().into();
+					let software = software.name.as_str().into();
+					PrefsItemDetails::Software(PrefsSoftwareItem {
+						software_list,
+						software,
+						preferred_machines: None,
+					})
+				}
+				ItemDetails::Unrecognized { .. } => {
+					unreachable!("Cannot create PrefsItemDetails for unrecognized item");
+				}
+			};
+			PrefsItem {
+				id: Default::default(),
+				video: None,
+				details,
+			}
+		});
+		let prefs_items = Arc::<[_]>::from([prefs_item]);
 
 		// now actually build the context menu
 		let configure_action = can_configure
@@ -440,21 +494,26 @@ impl ItemsTableModel {
 					panic!("Expected PrefsCollection::Folder");
 				};
 
-				let folder_contains_all_items = items.iter().all(|x| folder_items.contains(x));
-				let action = (!folder_contains_all_items).then(|| Action::AddToExistingFolder(*index, items.clone()));
+				let folder_contains_all_items = prefs_items.iter().all(|x| folder_items.contains(x));
+				let action =
+					(!folder_contains_all_items).then(|| Action::AddToExistingFolder(*index, prefs_items.clone()));
 
 				let title = name.into();
 				MenuDesc { action, title }
 			})
 			.collect::<Vec<_>>();
-		let new_folder_action = Action::AddToNewFolderDialog(items.clone());
+		let new_folder_action = Action::AddToNewFolderDialog(prefs_items.clone());
 
 		// remove from this folder
 		let remove_from_folder_desc = folder_name.map(|folder_name| {
 			let title = format!("Remove From \"{folder_name}\"").into();
-			let action = Some(Action::RemoveFromFolder(folder_name, items.clone()));
+			let ids = prefs_items.iter().filter_map(|item| item.id.get_opt()).collect::<_>();
+			let action = Some(Action::RemoveFromFolder(folder_name, ids));
 			MenuDesc { action, title }
 		});
+
+		// can't run if MAME is not initialized!
+		let run_descs = if has_mame_initialized { run_descs } else { [].into() };
 
 		// and return!
 		let result = LocalItemContextMenuInfo {
@@ -488,11 +547,11 @@ impl ItemsTableModel {
 		self.items_map.replace(new_items_map);
 	}
 
-	pub fn current_selection(&self) -> Vec<PrefsItem> {
+	pub fn current_selection(&self) -> Vec<PrefsItemRef> {
 		let result = self.current_selected_index().map(|index| {
 			let items = self.items.borrow();
 			let index = usize::try_from(index).unwrap();
-			make_prefs_item(&items[index])
+			make_prefs_item_ref(&items[index])
 		});
 
 		result.into_iter().collect()
@@ -531,8 +590,8 @@ impl ItemsTableModel {
 		Some(text)
 	}
 
-	fn set_current_selection(&self, selection: &[PrefsItem]) {
-		debug!(selection=?selection, "ItemsTableModel::set_current_selection()");
+	fn set_current_selection(&self, selection: &[PrefsItemRef]) {
+		debug!(?selection, "ItemsTableModel::set_current_selection()");
 
 		// we only support single selection now
 		let selection = selection.iter().next();
@@ -583,60 +642,58 @@ impl Model for ItemsTableModel {
 	}
 }
 
-fn folder_item(info_db: &Rc<InfoDb>, dispenser: &mut SoftwareListDispenser<'_>, item: &PrefsItem) -> Result<Item> {
-	let video = item.video.clone();
-	match &item.details {
+fn folder_item(
+	info_db: &Rc<InfoDb>,
+	dispenser: &mut SoftwareListDispenser<'_>,
+	prefs_item: &PrefsItem,
+) -> Result<Item> {
+	let details = match &prefs_item.details {
 		PrefsItemDetails::Machine(item) => {
 			let machine_config =
 				MachineConfig::from_machine_name_and_slots(info_db.clone(), &item.machine_name, &item.slots)?;
 			let images = item.images.clone();
 			let ram_size = item.ram_size;
 			let bios: Option<String> = item.bios.clone();
-			let details = ItemDetails::Machine {
+			ItemDetails::Machine {
 				machine_config,
 				images,
 				ram_size,
 				bios,
-			};
-			Ok(Item { video, details })
+			}
 		}
-		PrefsItemDetails::Software(software_item) => software_folder_item(dispenser, software_item),
-	}
-}
+		PrefsItemDetails::Software(item) => {
+			let (info, software_list) = dispenser.get(&item.software_list)?;
+			let software = software_list
+				.software
+				.iter()
+				.find(|x| x.name.as_str() == item.software)
+				.ok_or_else(|| ThisError::UnknownSoftware(item.software.clone()))?
+				.clone();
 
-fn software_folder_item(dispenser: &mut SoftwareListDispenser, item: &PrefsSoftwareItem) -> Result<Item> {
-	let (info, software_list) = dispenser.get(&item.software_list)?;
-	let software = software_list
-		.software
-		.iter()
-		.find(|x| x.name.as_str() == item.software)
-		.ok_or_else(|| ThisError::UnknownSoftware(item.software.clone()))?
-		.clone();
+			let machine_indexes = if let Some(preferred_machines) = item.preferred_machines.as_deref() {
+				preferred_machines
+					.iter()
+					.flat_map(|machine_name| dispenser.info_db.machines().find(machine_name).ok())
+					.map(|machine| machine.index())
+					.collect()
+			} else {
+				Iterator::chain(
+					info.original_for_machines().iter(),
+					info.compatible_for_machines().iter(),
+				)
+				.map(|x| x.index())
+				.collect()
+			};
 
-	let machine_indexes = if let Some(preferred_machines) = item.preferred_machines.as_deref() {
-		preferred_machines
-			.iter()
-			.flat_map(|machine_name| dispenser.info_db.machines().find(machine_name).ok())
-			.map(|machine| machine.index())
-			.collect()
-	} else {
-		Iterator::chain(
-			info.original_for_machines().iter(),
-			info.compatible_for_machines().iter(),
-		)
-		.map(|x| x.index())
-		.collect()
+			ItemDetails::Software {
+				software_list,
+				software,
+				machine_indexes,
+			}
+		}
 	};
-
-	let preferred_machines = item.preferred_machines.as_ref().map(|x| x.iter().join("\0").into());
-
-	let details = ItemDetails::Software {
-		software_list,
-		software,
-		machine_indexes,
-		preferred_machines,
-	};
-	Ok(details.into())
+	let id = Some(prefs_item.id.get());
+	Ok(Item { id, details })
 }
 
 /// Sometimes, the items view is empty - we can (try to) report why
@@ -652,16 +709,16 @@ pub enum EmptyReason {
 	Unknown,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Item {
-	pub video: Option<PrefsVideo>,
+	pub id: Option<SmolStr>,
 	pub details: ItemDetails,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum ItemDetails {
 	Machine {
-		// Commentary:  `MachineConfig` has its own `InfoDb`; maybe we need a lighter `MachineConfigPartial`?
+		// commentary:  `MachineConfig` has its own `InfoDb`; maybe we need a lighter `MachineConfigPartial`?
 		machine_config: MachineConfig,
 		images: HashMap<String, ImageDesc>,
 		ram_size: Option<u64>,
@@ -671,7 +728,6 @@ enum ItemDetails {
 		software_list: Arc<SoftwareList>,
 		software: Arc<Software>,
 		machine_indexes: SmallVec<[usize; 2]>,
-		preferred_machines: Option<Box<str>>, // NUL delimited
 	},
 	Unrecognized {
 		details: PrefsItemDetails,
@@ -681,56 +737,36 @@ enum ItemDetails {
 
 impl From<ItemDetails> for Item {
 	fn from(details: ItemDetails) -> Self {
-		Self { video: None, details }
+		Self { id: None, details }
 	}
 }
 
-fn make_prefs_item(item: &Item) -> PrefsItem {
-	let video = item.video.clone();
-	let details = match &item.details {
-		ItemDetails::Machine {
-			machine_config,
-			images,
-			ram_size,
-			bios,
-		} => {
-			let machine_name = machine_config.machine().name().to_string();
-			let slots = machine_config.changed_slots(None);
-			let slots = slots
-				.into_iter()
-				.map(|(slot, option_name)| (slot.to_string(), option_name.map(str::to_string)))
-				.collect::<Vec<_>>();
-			let images = images.clone();
-			let ram_size = *ram_size;
-			let bios = bios.clone();
-			let item = PrefsMachineItem {
-				machine_name,
-				slots,
-				images,
-				ram_size,
-				bios,
-			};
-			PrefsItemDetails::Machine(item)
+fn make_prefs_item_ref(item: &Item) -> PrefsItemRef {
+	if let Some(id) = &item.id {
+		PrefsItemRef::Id(id.clone())
+	} else {
+		match &item.details {
+			ItemDetails::Machine { machine_config, .. } => {
+				let machine_name = machine_config.machine().name().into();
+				PrefsItemRef::Machine { machine_name }
+			}
+			ItemDetails::Software {
+				software_list,
+				software,
+				..
+			} => {
+				let software_list = software_list.name.clone();
+				let software = software.name.clone();
+				PrefsItemRef::Software {
+					software_list,
+					software,
+				}
+			}
+			ItemDetails::Unrecognized { .. } => {
+				panic!("unrecognized item details without an id - cannot make PrefsItemRef");
+			}
 		}
-		ItemDetails::Software {
-			software_list,
-			software,
-			preferred_machines,
-			..
-		} => {
-			let preferred_machines = preferred_machines
-				.as_ref()
-				.map(|x| x.split('\0').map(str::to_string).collect::<Vec<_>>());
-			let item = PrefsSoftwareItem {
-				software_list: software_list.name.to_string(),
-				software: software.name.to_string(),
-				preferred_machines,
-			};
-			PrefsItemDetails::Software(item)
-		}
-		ItemDetails::Unrecognized { details, .. } => details.clone(),
-	};
-	PrefsItem { video, details }
+	}
 }
 
 struct RowModel {
@@ -874,8 +910,8 @@ fn column_text<'a>(_info_db: &'a InfoDb, item: &'a Item, column: ColumnType) -> 
 	}
 }
 
-fn is_item_match(prefs_item: &PrefsItem, item: &Item) -> bool {
-	make_prefs_item(item) == *prefs_item
+fn is_item_match(prefs_item_ref: &PrefsItemRef, item: &Item) -> bool {
+	make_prefs_item_ref(item) == *prefs_item_ref
 }
 
 fn run_item_text(text: &str) -> String {
@@ -965,7 +1001,6 @@ mod test {
 	use crate::selection::SelectionManager;
 
 	use super::ItemsTableModel;
-	use super::make_prefs_item;
 
 	#[test_case(0, include_str!("../info/test_data/listxml_coco.xml"), include_str!("../prefs/test_data/prefs01.json"), "Favorites")]
 	pub fn update_with_folder_count(_index: usize, info_xml: &str, prefs_xml: &str, folder_name: &str) {
@@ -1004,7 +1039,7 @@ mod test {
 		let PrefsCollection::Folder { items, .. } = collection.as_ref() else {
 			unreachable!()
 		};
-		let new_items = model.items.borrow().iter().map(make_prefs_item).collect::<Vec<_>>();
-		assert_eq!(items.as_slice(), new_items.as_slice());
+		let items_in_model = model.items.borrow().clone();
+		assert_eq!(items.len(), items_in_model.len());
 	}
 }

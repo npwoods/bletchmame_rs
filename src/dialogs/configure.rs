@@ -619,7 +619,8 @@ impl State {
 		let video = (!dialog.get_video_use_default_settings())
 			.then(|| PrefsVideo::try_from(&dialog.get_video_settings()).unwrap());
 
-		PrefsItem { details, video }
+		let id = Default::default();
+		PrefsItem { id, details, video }
 	}
 
 	pub fn set_slot_entry_option(&self, entry_index: usize, new_option_name: Option<&str>) {

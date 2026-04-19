@@ -17,9 +17,12 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::str::FromStr;
+use std::sync::Mutex;
 
 use anyhow::Error;
 use anyhow::Result;
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD_NO_PAD;
 use itertools::Itertools;
 use num::clamp;
 use serde::Deserialize;
@@ -32,6 +35,7 @@ use strum::EnumProperty;
 use strum::EnumString;
 use tracing::error;
 use tracing::info;
+use uuid::Uuid;
 
 use crate::history::History;
 use crate::icon::Icon;
@@ -395,23 +399,10 @@ pub enum BuiltinCollection {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct HistoryEntry {
-	#[serde(flatten)]
-	pub collection: Rc<PrefsCollection>,
-
-	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
-	pub search: String,
-
-	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
-	pub sort_suppressed: bool,
-
-	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
-	pub selection: Vec<PrefsItem>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
 pub struct PrefsItem {
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub id: PrefsIdentifier,
+
 	#[serde(default, flatten, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub video: Option<PrefsVideo>,
 
@@ -419,11 +410,55 @@ pub struct PrefsItem {
 	pub details: PrefsItemDetails,
 }
 
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct PrefsIdentifier(Mutex<Option<SmolStr>>);
+
+impl PrefsIdentifier {
+	pub fn get(&self) -> SmolStr {
+		let mut lock = self.0.lock().unwrap();
+		lock.as_ref().cloned().unwrap_or_else(|| {
+			let uuid = Uuid::new_v4();
+			let bytes = uuid.as_bytes();
+			let id = SmolStr::from(STANDARD_NO_PAD.encode(bytes));
+			*lock = Some(id.clone());
+			id
+		})
+	}
+
+	pub fn get_opt(&self) -> Option<SmolStr> {
+		self.0.lock().unwrap().clone()
+	}
+}
+
+impl Clone for PrefsIdentifier {
+	fn clone(&self) -> Self {
+		Self(Mutex::new(self.0.lock().unwrap().clone()))
+	}
+}
+
+impl PartialEq for PrefsIdentifier {
+	fn eq(&self, other: &Self) -> bool {
+		std::ptr::eq(self, other) || self.0.lock().unwrap().as_ref() == other.0.lock().unwrap().as_ref()
+	}
+}
+
+impl Eq for PrefsIdentifier {}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", tag = "type")]
 pub enum PrefsItemDetails {
 	Machine(PrefsMachineItem),
 	Software(PrefsSoftwareItem),
+}
+
+impl From<PrefsItemDetails> for PrefsItem {
+	fn from(details: PrefsItemDetails) -> Self {
+		Self {
+			id: Default::default(),
+			video: None,
+			details,
+		}
+	}
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -509,6 +544,129 @@ impl Preferences {
 		result_paths.inis = prefs_path.iter().cloned().collect();
 		result_paths.nvram = prefs_path;
 		result
+	}
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoryEntry {
+	#[serde(flatten)]
+	pub collection: PrefsCollectionRef,
+
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub search: String,
+
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub sort_suppressed: bool,
+
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub selection: Vec<PrefsItemRef>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", tag = "type")]
+pub enum PrefsCollectionRef {
+	Builtin(BuiltinCollection),
+	MachineSoftware {
+		#[serde(rename = "machine")]
+		machine_name: String,
+	},
+	Folder {
+		name: String,
+	},
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum PrefsItemRef {
+	Id(SmolStr),
+	Machine { machine_name: SmolStr },
+	Software { software_list: SmolStr, software: SmolStr },
+}
+
+impl Serialize for PrefsItemRef {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: serde::Serializer,
+	{
+		use serde::ser::SerializeMap;
+
+		let mut map = serializer.serialize_map(Some(1))?;
+		match self {
+			PrefsItemRef::Id(id) => {
+				map.serialize_entry("id", id)?;
+			}
+			PrefsItemRef::Machine { machine_name } => {
+				map.serialize_entry("machine", machine_name)?;
+			}
+			PrefsItemRef::Software {
+				software_list,
+				software,
+			} => {
+				map.serialize_entry("softwareList", software_list)?;
+				map.serialize_entry("software", software)?;
+			}
+		}
+		map.end()
+	}
+}
+
+impl<'de> serde::Deserialize<'de> for PrefsItemRef {
+	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+	where
+		D: serde::Deserializer<'de>,
+	{
+		struct HistoryItemVisitor;
+
+		impl<'de> serde::de::Visitor<'de> for HistoryItemVisitor {
+			type Value = PrefsItemRef;
+
+			fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+				write!(f, "an object with either an 'id' field or PrefsItemDetails fields")
+			}
+
+			fn visit_map<A>(self, mut map: A) -> Result<PrefsItemRef, A::Error>
+			where
+				A: serde::de::MapAccess<'de>,
+			{
+				use serde_json::Value;
+
+				// Collect into a temporary map so we can inspect it
+				let mut temp = serde_json::Map::new();
+
+				while let Some((key, value)) = map.next_entry::<String, Value>()? {
+					temp.insert(key, value);
+				}
+
+				let id = temp.remove("id");
+				let machine = temp.get("machine");
+				let software_list = temp.get("softwareList");
+				let software = temp.get("software");
+				match (id, machine, software_list, software) {
+					(Some(id), None, None, None) => {
+						let id = serde_json::from_value(id).map_err(serde::de::Error::custom)?;
+						Ok(PrefsItemRef::Id(id))
+					}
+					(None, Some(machine), None, None) => {
+						let machine_name = serde_json::from_value(machine.clone()).map_err(serde::de::Error::custom)?;
+						Ok(PrefsItemRef::Machine { machine_name })
+					}
+					(None, None, Some(software_list), Some(software)) => {
+						let software_list =
+							serde_json::from_value(software_list.clone()).map_err(serde::de::Error::custom)?;
+						let software = serde_json::from_value(software.clone()).map_err(serde::de::Error::custom)?;
+						Ok(PrefsItemRef::Software {
+							software_list,
+							software,
+						})
+					}
+					_ => Err(serde::de::Error::custom(
+						"Expected either an 'id' field or 'machine' field or both 'softwareList' and 'software' fields, but got an invalid combination",
+					)),
+				}
+			}
+		}
+
+		deserializer.deserialize_map(HistoryItemVisitor)
 	}
 }
 
@@ -603,6 +761,7 @@ mod test {
 	use test_case::test_case;
 
 	use super::Preferences;
+	use super::PrefsIdentifier;
 	use super::load_prefs_from_reader;
 	use super::save_prefs_to_string;
 
@@ -647,5 +806,11 @@ mod test {
 		// try to create a file in that dir
 		let result = File::create(path.join("file_in_ensured_dir.txt")).map(|_| ());
 		assert_matches!(result, Ok(_));
+	}
+
+	#[test]
+	pub fn identifier_identify_compare() {
+		let id = PrefsIdentifier::default();
+		assert_eq!(id, id);
 	}
 }

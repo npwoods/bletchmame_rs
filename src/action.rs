@@ -1,6 +1,7 @@
 use std::ffi::OsStr;
 use std::path::Path;
 use std::str::FromStr;
+use std::sync::Arc;
 
 use serde::Deserialize;
 use serde::Serialize;
@@ -79,10 +80,10 @@ pub enum Action {
 	SearchText(String),
 	ItemsSort(usize, SortOrder),
 	ItemsSelectedChanged,
-	AddToExistingFolder(usize, Vec<PrefsItem>),
-	AddToNewFolder(String, Vec<PrefsItem>),
-	AddToNewFolderDialog(Vec<PrefsItem>),
-	RemoveFromFolder(String, Vec<PrefsItem>),
+	AddToExistingFolder(usize, Arc<[PrefsItem]>),
+	AddToNewFolder(String, Arc<[PrefsItem]>),
+	AddToNewFolderDialog(Arc<[PrefsItem]>),
+	RemoveFromFolder(String, Box<[SmolStr]>),
 	MoveCollection {
 		old_index: usize,
 		new_index: Option<usize>,
