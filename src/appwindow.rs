@@ -298,7 +298,9 @@ impl AppModel {
 			let info_db = self.state.borrow().info_db().cloned();
 			self.with_items_table_model(|items_model| {
 				let info_db = info_db.clone();
-				items_model.update(Some(info_db), None, None, None, None, None, None);
+				let state = self.state.borrow();
+				let entry = state.preferences.current_history_entry(); // InfoDb changes can usually mean that we need to reinforce the current selection
+				items_model.update(Some(info_db), None, None, None, None, None, Some(&entry.selection));
 			});
 			self.with_collections_view_model(|collections_model| {
 				let state = self.state.borrow();
