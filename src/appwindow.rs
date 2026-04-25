@@ -500,10 +500,18 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 
 	// update window preferences
 	let default_window_size = app_window.window().size();
+	let window_physical_position = preferences
+		.window_position
+		.as_ref()
+		.map(|pos| LogicalPosition::from(*pos).to_physical(app_window.window().scale_factor()));
 	let window_physical_size = preferences
 		.window_size
 		.as_ref()
 		.map(|size| LogicalSize::from(*size).to_physical(app_window.window().scale_factor()));
+
+	if let Some(window_physical_position) = window_physical_position {
+		app_window.window().set_position(window_physical_position);
+	}
 	if let Some(window_physical_size) = window_physical_size {
 		app_window.window().set_size(window_physical_size);
 	}
@@ -1781,8 +1789,13 @@ fn update_builtin_collections_menu_checked(model: &AppModel, prefs: &Preferences
 
 fn update_prefs(model: &Rc<AppModel>) {
 	model.modify_prefs(|prefs| {
-		// update window size
+		// update window position
 		let app_window = model.app_window();
+		let physical_position = app_window.window().position();
+		let logical_position = physical_position.to_logical(app_window.window().scale_factor());
+		prefs.window_position = Some(logical_position.into());
+
+		// update window size
 		let physical_size = app_window.window().size();
 		let logical_size = physical_size.to_logical(app_window.window().scale_factor());
 		prefs.window_size = Some(logical_size.into());

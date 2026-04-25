@@ -27,6 +27,7 @@ use itertools::Itertools;
 use num::clamp;
 use serde::Deserialize;
 use serde::Serialize;
+use slint::LogicalPosition;
 use slint::LogicalSize;
 use slint::ToSharedString;
 use smol_str::SmolStr;
@@ -53,6 +54,9 @@ use crate::prefs::var::resolve_paths_string;
 pub struct Preferences {
 	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub paths: Rc<PrefsPaths>,
+
+	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub window_position: Option<PrefsPosition>,
 
 	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub window_size: Option<PrefsSize>,
@@ -94,6 +98,7 @@ impl Default for Preferences {
 	fn default() -> Self {
 		Self {
 			paths: PrefsPaths::default().into(),
+			window_position: None,
 			window_size: None,
 			main_window_left_column_width: None,
 			main_window_right_column_width: None,
@@ -286,6 +291,25 @@ impl PreflightProblem {
 	pub fn problem_type(&self) -> Option<PathType> {
 		let s = self.get_str("ProblemType")?;
 		Some(PathType::from_str(s).unwrap())
+	}
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PrefsPosition {
+	pub x: f32,
+	pub y: f32,
+}
+
+impl From<LogicalPosition> for PrefsPosition {
+	fn from(value: LogicalPosition) -> Self {
+		Self { x: value.x, y: value.y }
+	}
+}
+
+impl From<PrefsPosition> for LogicalPosition {
+	fn from(value: PrefsPosition) -> Self {
+		Self { x: value.x, y: value.y }
 	}
 }
 
