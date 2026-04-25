@@ -333,7 +333,7 @@ impl AppModel {
 			// status bar
 			let statusbar_speed_text = status
 				.and_then(|s| s.running.as_ref())
-				.map(|r| format!("{}%", r.speed_percent * 100.0).into())
+				.map(|r| format!("{:.2}%", r.speed_percent * 100.0).into())
 				.unwrap_or_default();
 			app_window.set_statusbar_speed_text(statusbar_speed_text);
 
