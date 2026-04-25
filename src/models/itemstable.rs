@@ -569,25 +569,22 @@ impl ItemsTableModel {
 		}
 	}
 
+	pub fn row_text_by_column_type(&self, row: usize, column: ColumnType) -> Option<SharedString> {
+		let info_db = self.info_db.borrow();
+		let info_db = info_db.as_deref()?;
+		let row = *self.items_map.borrow().get(row)?;
+		let row = usize::try_from(row).unwrap();
+		let items = self.items.borrow();
+		let item = items.get(row)?;
+		let text = column_text(info_db, item, column);
+		Some(text.to_shared_string())
+	}
+
 	fn current_selected_index(&self) -> Option<u32> {
 		self.selection
 			.selected_index()
 			.and_then(|x| self.items_map.borrow().get(x).cloned())
 			.or_else(|| self.selected_index.get())
-	}
-
-	pub fn current_selection_text(&self, column: ColumnType) -> Option<SharedString> {
-		let row = self.current_selected_index()?;
-		let row = usize::try_from(row).unwrap();
-
-		let text = {
-			let info_db = self.info_db.borrow();
-			let info_db = info_db.as_deref()?;
-			let items = self.items.borrow();
-			let item = items.get(row)?;
-			column_text(info_db, item, column).to_shared_string()
-		};
-		Some(text)
 	}
 
 	fn set_current_selection(&self, selection: &[PrefsItemRef]) {

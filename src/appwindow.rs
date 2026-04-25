@@ -620,6 +620,14 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	let items_model = ItemsTableModel::new(selection, empty_callback);
 	let items_model_clone = items_model.clone();
 	app_window.set_items_model(ModelRc::new(items_model_clone));
+	let model_clone = model.clone();
+	app_window.on_get_statusbar_current_item_desc(move |row| {
+		let row = row.try_into().unwrap();
+		model_clone.with_items_table_model(|x| {
+			x.row_text_by_column_type(row, ColumnType::Description)
+				.unwrap_or_default()
+		})
+	});
 
 	// bind collection selection changes to the items view model
 	let collections_view_model_clone = collections_view_model.clone();
@@ -1676,12 +1684,6 @@ fn update_ui_for_current_history_item(model: &AppModel) {
 
 	// update search text bar
 	app_window.set_items_search_text(SharedString::from(&search));
-
-	// update current item desc
-	let desc = model
-		.with_items_table_model(|m| m.current_selection_text(ColumnType::Description))
-		.unwrap_or_default();
-	app_window.set_statusbar_current_item_desc(desc);
 
 	// identify the currently selected collection
 	let (collection, collection_index) = prefs.current_collection();
