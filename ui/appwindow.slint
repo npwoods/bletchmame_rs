@@ -196,6 +196,7 @@ export component AppWindow inherits Window {
         items-table-view.set-current-row(index);
     }
     in property <string> items-view-tooltip;
+    pure callback get-statusbar-current-item-desc(int) -> string;
 
     // snapshot and history
     in property <string> current-snap-view;
@@ -216,7 +217,6 @@ export component AppWindow inherits Window {
 
     // status bar
     in property <string> statusbar-speed-text;
-    in property <string> statusbar-current-item-desc;
 
     // the report view
     in property <string> report-message;
@@ -1003,7 +1003,9 @@ export component AppWindow inherits Window {
             HorizontalBox {
                 alignment: start;
                 Text {
-                    text: mode() == "running" ? statusbar-speed-text : statusbar-current-item-desc;
+                    text: mode() == "running"
+                        ? statusbar-speed-text
+                        : mode() == "ready" ? root.get-statusbar-current-item-desc(items-view-selected-index) : "";
                 }
             }
         }
