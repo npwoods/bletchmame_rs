@@ -11,6 +11,7 @@ use raw_window_handle::RawWindowHandle;
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::Sender;
 use tracing::debug;
+use tracing::info;
 use tracing::info_span;
 use winit::event::WindowEvent;
 use winit::event_loop::ActiveEventLoop;
@@ -61,8 +62,11 @@ enum FindResultType {
 
 impl WinitBackendRuntime {
 	pub fn create_slint_backend(&self) -> Result<Box<dyn slint::platform::Platform>> {
+		let renderer = std::env::var("SLINT_WINIT_RENDERER").ok();
+		info!(?renderer, "WinitBackendRuntime::create_slint_backend");
+
 		let self_clone = self.clone();
-		let slint_backend = i_slint_backend_winit::Backend::builder()
+		let mut builder = i_slint_backend_winit::Backend::builder()
 			.with_custom_application_handler(Box::new(self.clone()))
 			.with_window_attributes_hook(move |attr| {
 				// this is necessary to make the menu bar visible in full screen mode (as per https://github.com/slint-ui/slint/issues/8793)
@@ -74,8 +78,11 @@ impl WinitBackendRuntime {
 				} else {
 					attr
 				}
-			})
-			.build()?;
+			});
+		if let Some(renderer) = renderer {
+			builder = builder.with_renderer_name(renderer);
+		}
+		let slint_backend = builder.build()?;
 		Ok(Box::new(slint_backend) as Box<_>)
 	}
 
