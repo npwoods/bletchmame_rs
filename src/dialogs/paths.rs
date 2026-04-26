@@ -111,7 +111,7 @@ pub async fn dialog_paths(
 	let model = PathEntriesModel::new(state.clone());
 	let model = Rc::new(model);
 	let model = ModelRc::from(model);
-	modal.dialog().set_path_entries(model);
+	modal.dialog().set_path_entries(model.clone());
 
 	// respond to path label index changed events
 	let state_clone = state.clone();
@@ -137,6 +137,11 @@ pub async fn dialog_paths(
 	} else {
 		// if `path_label_index` is zero, we don't have to do the above buffoonery
 		state.update_dialog_from_paths();
+	}
+
+	// select the first entry if appropriate
+	if PathEntriesModel::get_model(&model).row_count() > 0 {
+		modal.dialog().set_path_entry_index(0);
 	}
 
 	// present the modal dialog

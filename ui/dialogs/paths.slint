@@ -116,7 +116,7 @@ export component PathsDialog inherits Window {
     in property <[PathsListViewItem]> path-entries;
     in property <bool> ok-enabled;
     in-out property <int> path-label-index;
-    out property <int> path-entry-index <=> entries-view.current-entry-index;
+    in-out property <int> path-entry-index <=> entries-view.current-entry-index;
 
     // callbacks
     callback ok-clicked();
