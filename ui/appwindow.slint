@@ -53,7 +53,11 @@ export component AppWindow inherits Window {
     max-width: 10000px;
     max-height: 10000px;
     icon: Icons.bletchmame;
-    title: (prefix-title-with-mode ? "[" + mode() + "] " : "") + root.apptitle + (running-machine-desc != "" ? ": " + running-machine-desc : "");
+    title: (prefix-title-with-mode ? display-mode() + " " : "") + root.apptitle + (running-machine-desc != "" ? ": " + running-machine-desc : "");
+
+    function display-mode() -> string {
+        return "[" + mode() + "]" + (mode() == "report" && report-spinning ? "[busy]" : "");
+    }
 
     // properties that influence the title
     in property <bool> prefix-title-with-mode: false;
