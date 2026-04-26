@@ -28,6 +28,7 @@ use crate::prefs::pathtype::PathType;
 use crate::ui::PathsDialog;
 use crate::ui::PathsListViewItem;
 
+#[derive(Clone)]
 struct State {
 	dialog_weak: Weak<PathsDialog>,
 	paths: RefCell<PrefsPaths>,
@@ -148,7 +149,7 @@ pub async fn dialog_paths(
 	let accepted = modal.run(async { rx.recv().await.unwrap() }).await;
 
 	// if the user hit "ok", return
-	accepted.then(|| Rc::try_unwrap(state).unwrap().paths.into_inner())
+	accepted.then(|| Rc::unwrap_or_clone(state).paths.into_inner())
 }
 
 impl State {
