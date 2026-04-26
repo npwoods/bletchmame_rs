@@ -7,6 +7,7 @@ import {
     ListView,
 } from "std-widgets.slint";
 import { Icons } from "../icons.slint";
+import { HorizontalSplitter } from "../splitter.slint";
 
 export struct ImportMameIniDialogEntry {
     path-type: string,
@@ -15,15 +16,16 @@ export struct ImportMameIniDialogEntry {
     dispositions: [string]
 }
 
-export component ImportMameIniDialog inherits Window {
+export component ImportMameIniDialog inherits Dialog {
     title: "Import MAME INI";
     icon: Icons.bletchmame;
     preferred-width: 600px;
     preferred-height: 500px;
+    forward-focus: cancel-button;
 
     // properties
-    in property <length> splitter-1: 120px;
-    in property <length> splitter-2: root.width - 150px;
+    in-out property <length> column-1-width: 150px;
+    in-out property <length> column-2-width: 150px;
     in-out property <[ImportMameIniDialogEntry]> entries;
     in property <string> message-text;
     in property <bool> ok-enabled;
@@ -39,21 +41,32 @@ export component ImportMameIniDialog inherits Window {
         }
 
         ListView {
-            for entry[idx] in entries: Rectangle {
+            for entry[idx] in entries: HorizontalLayout {
                 height: 30px;
                 width: parent.width;
+
                 Text {
-                    x: 0px;
+                    width: root.column-1-width;
                     text: entry.path-type;
                 }
 
+                HorizontalSplitter {
+                    value <=> root.column-1-width;
+                    min-value: 10px;
+                }
+
                 Text {
-                    x: splitter-1;
                     text: entry.path;
                 }
 
+                HorizontalSplitter {
+                    value <=> root.column-2-width;
+                    min-value: 10px;
+                    multiple: -1.0;
+                }
+
                 ComboBox {
-                    x: splitter-2;
+                    width: root.column-2-width;
                     model: entry.dispositions;
                     current-index: entry.current-disposition-index;
                     enabled: entry.dispositions.length > 1;
@@ -79,7 +92,7 @@ export component ImportMameIniDialog inherits Window {
                 }
             }
 
-            StandardButton {
+            cancel-button := StandardButton {
                 kind: cancel;
                 horizontal-stretch: 0;
                 clicked => {
