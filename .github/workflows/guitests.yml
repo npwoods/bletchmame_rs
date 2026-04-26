@@ -1,0 +1,138 @@
+########################################
+# BletchMAME GUI Tests Github Action   #
+########################################
+
+on:
+  push:
+      branches:
+      - master
+  pull_request:
+      branches:
+      - master
+  workflow_dispatch:
+    inputs:
+      guitest_build:
+        description: 'Build type: debug or release'
+        required: false
+        default: 'release'
+      log:
+        description: 'Value to pass to executable as --log (empty = none)'
+        required: false
+        default: 'debug'
+
+name: GUI Tests
+
+jobs:
+  guitests-windows:
+    name: GUI Tests (Windows)
+    runs-on: windows-latest
+    env:
+      GUITEST_BUILD: ${{ github.event.inputs.guitest_build || vars.GUITEST_BUILD || 'release' }}
+      SLINT_WINIT_RENDERER: software
+    steps:
+      # Checks out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+
+      # Install Rust toolchain
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      # Caching
+      - name: Caching
+        uses: Swatinem/rust-cache@v2
+
+      # Build the binary (release by default, debug if GUITEST_BUILD=debug)
+      - name: Build Binary
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: ${{ env.GUITEST_BUILD == 'debug' && '--locked' || '--locked --release' }}
+
+      # Install Python dependencies for GUI testing
+      - name: Install Python GUI Testing Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyautogui pygetwindow pillow
+
+      # Discover and run all GUI tests
+      - name: Run GUI Tests
+        shell: pwsh
+        run: |
+          if ($env:GUITEST_BUILD -eq 'debug') {
+            Write-Host "Using debug build and enabling RUST_BACKTRACE=1"
+            $env:RUST_BACKTRACE = "1"
+            $exePath = "${{ github.workspace }}\target\debug\BletchMAME.exe"
+          } else {
+            Write-Host "Using release build"
+            $exePath = "${{ github.workspace }}\target\release\BletchMAME.exe"
+          }
+
+          if (-not (Test-Path $exePath)) {
+            Write-Error "Executable not found at $exePath"
+            exit 1
+          }
+          
+          $guitestsDir = "${{ github.workspace }}\scripts\guitests"
+          if (-not (Test-Path $guitestsDir)) {
+            Write-Error "GUI tests directory not found at $guitestsDir"
+            exit 1
+          }
+
+          # Directory to collect screenshots from tests
+          $screenshotDir = "${{ github.workspace }}\test-screenshots"
+          if (-not (Test-Path $screenshotDir)) {
+            New-Item -ItemType Directory -Force -Path $screenshotDir | Out-Null
+          }
+          
+          # Find all Python scripts in guitests directory, sorted by name
+          $testScripts = Get-ChildItem -Path $guitestsDir -Filter "*.py" -File | Sort-Object Name
+          
+          if ($testScripts.Count -eq 0) {
+            Write-Error "No test scripts found in $guitestsDir"
+            exit 1
+          }
+          
+          Write-Host "Found $($testScripts.Count) test script(s)" -ForegroundColor Green
+          $failedTests = @()
+          
+          foreach ($script in $testScripts) {
+            Write-Host "`n========================================" -ForegroundColor Cyan
+            Write-Host "Running: $($script.Name)" -ForegroundColor Cyan
+            Write-Host "========================================" -ForegroundColor Cyan
+            
+            # Pass a screenshot directory so tests can save captures on pauses/errors
+            python "$($script.FullName)" "$exePath" --log "${{github.event.inputs.log}}" --screenshot_dir "$screenshotDir"
+            
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "✗ Test failed: $($script.Name)" -ForegroundColor Red
+              $failedTests += $script.Name
+            } else {
+              Write-Host "✓ Test passed: $($script.Name)" -ForegroundColor Green
+            }
+          }
+          
+          Write-Host "`n========================================" -ForegroundColor Cyan
+          Write-Host "Test Summary" -ForegroundColor Cyan
+          Write-Host "========================================" -ForegroundColor Cyan
+          Write-Host "Total tests: $($testScripts.Count)"
+          Write-Host "Passed: $($testScripts.Count - $failedTests.Count)"
+          Write-Host "Failed: $($failedTests.Count)"
+          
+          if ($failedTests.Count -gt 0) {
+            Write-Host "`nFailed tests:" -ForegroundColor Red
+            foreach ($test in $failedTests) {
+              Write-Host "  - $test" -ForegroundColor Red
+            }
+            exit 1
+          }
+
+      # Upload screenshots directory so artifacts are available to workflow users
+      - name: Upload GUI Test screenshots
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: guitest-screenshots
+          path: ${{ github.workspace }}\test-screenshots
