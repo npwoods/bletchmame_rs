@@ -55,7 +55,20 @@ jobs:
       - name: Install Python GUI Testing Dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pyautogui pygetwindow pillow
+          python -m pip install pyautogui pygetwindow pillow pyperclip
+
+      # Setup MAME (download, extract, create config)
+      - name: Setup MAME
+        shell: pwsh
+        run: |
+          Write-Host "Running setup_mame.py to download and prepare MAME"
+          python "${{ github.workspace }}\scripts\setup_mame.py" mame0280 --outdir "${{ github.workspace }}\mame"
+          Write-Host "Listing files in mame directory from workflow"
+          if (Test-Path "${{ github.workspace }}\mame") {
+            Get-ChildItem -Path "${{ github.workspace }}\mame" -Recurse | ForEach-Object { Write-Host $_.FullName }
+          } else {
+            Write-Host "MAME directory not found: ${{ github.workspace }}\mame"
+          }
 
       # Discover and run all GUI tests
       - name: Run GUI Tests
@@ -87,8 +100,8 @@ jobs:
             New-Item -ItemType Directory -Force -Path $screenshotDir | Out-Null
           }
           
-          # Find all Python scripts in guitests directory, sorted by name
-          $testScripts = Get-ChildItem -Path $guitestsDir -Filter "*.py" -File | Sort-Object Name
+          # Find all Python scripts in guitests directory, sorted by name, but ignore common.py
+          $testScripts = Get-ChildItem -Path $guitestsDir -Filter "*.py" -File | Where-Object { $_.Name -ne 'common.py' } | Sort-Object Name
           
           if ($testScripts.Count -eq 0) {
             Write-Error "No test scripts found in $guitestsDir"
@@ -103,9 +116,9 @@ jobs:
             Write-Host "Running: $($script.Name)" -ForegroundColor Cyan
             Write-Host "========================================" -ForegroundColor Cyan
             
-            # Pass a screenshot directory so tests can save captures on pauses/errors
-            python "$($script.FullName)" "$exePath" --log "${{github.event.inputs.log}}" --screenshot_dir "$screenshotDir"
-            
+            # Pass the screenshots and MAME directories
+            python "$($script.FullName)" "$exePath" --log "${{github.event.inputs.log}}" --screenshot_dir "$screenshotDir" --mame-dir "${{ github.workspace }}\mame"
+
             if ($LASTEXITCODE -ne 0) {
               Write-Host "✗ Test failed: $($script.Name)" -ForegroundColor Red
               $failedTests += $script.Name
