@@ -4,6 +4,7 @@ use std::cell::Cell;
 use std::cell::RefCell;
 use std::cmp::Reverse;
 use std::collections::HashMap;
+use std::iter::once;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Instant;
@@ -645,7 +646,7 @@ fn build_items_machine_software<'a>(
 			(0..list.software.len()).map(move |index| (list.clone(), list.software[index].clone()))
 		})
 		.map(|(software_list, software)| {
-			let machine_indexes = Default::default();
+			let machine_indexes = once(machine_index).collect();
 			let details = ItemDetails::Software {
 				software_list,
 				software,
@@ -1026,16 +1027,63 @@ mod test {
 	use std::io::Cursor;
 	use std::ops::ControlFlow;
 	use std::rc::Rc;
+	use std::sync::Arc;
 
+	use anyhow::Result;
 	use itertools::Itertools;
 	use test_case::test_case;
 
 	use crate::info::InfoDb;
+	use crate::info::View;
 	use crate::prefs::Preferences;
 	use crate::prefs::PrefsCollection;
 	use crate::selection::SelectionManager;
+	use crate::software::SoftwareList;
 
+	use super::ItemDetails;
 	use super::ItemsTableModel;
+	use super::SoftwareListDispenserTrait;
+
+	struct MockSoftwareListDispenser<'a> {
+		info_db: &'a InfoDb,
+		software_lists: Vec<(crate::info::SoftwareList<'a>, Arc<SoftwareList>)>,
+	}
+
+	impl<'a> MockSoftwareListDispenser<'a> {
+		pub fn new(info_db: &'a InfoDb) -> Self {
+			let mut result = Self {
+				info_db,
+				software_lists: Vec::new(),
+			};
+			result.add(
+				"coco_cart",
+				include_str!("../software/test_data/softlist_coco_cart.xml"),
+			);
+			result
+		}
+
+		pub fn add(&mut self, name: &str, xml: &str) {
+			let info_software_list = self.info_db.software_lists().find(name).unwrap();
+			let software_list = SoftwareList::from_reader(xml.as_bytes()).unwrap();
+			let software_list = Arc::new(software_list);
+			self.software_lists.push((info_software_list, software_list));
+		}
+	}
+
+	impl<'a> SoftwareListDispenserTrait<'a> for MockSoftwareListDispenser<'a> {
+		fn get(&mut self, software_list_name: &str) -> Result<(crate::info::SoftwareList<'a>, Arc<SoftwareList>)> {
+			let (info_software_list, software_list) = self
+				.software_lists
+				.iter()
+				.find(|(info, _)| info.name() == software_list_name)
+				.ok_or_else(|| anyhow::anyhow!("software list not found"))?;
+			Ok((*info_software_list, software_list.clone()))
+		}
+
+		fn get_all(&mut self) -> Vec<(crate::info::SoftwareList<'a>, Arc<SoftwareList>)> {
+			self.software_lists.clone()
+		}
+	}
 
 	#[test_case(0, include_str!("../info/test_data/listxml_coco.xml"), include_str!("../prefs/test_data/prefs01.json"), "Favorites")]
 	pub fn update_with_folder_count(_index: usize, info_xml: &str, prefs_xml: &str, folder_name: &str) {
@@ -1076,5 +1124,31 @@ mod test {
 		};
 		let items_in_model = model.items.borrow().clone();
 		assert_eq!(items.len(), items_in_model.len());
+	}
+
+	#[test_case(0, include_str!("../info/test_data/listxml_coco.xml"), "coco2b", 112)]
+	pub fn build_items_machine_software(_index: usize, info_xml: &str, machine_name: &str, expected_item_count: usize) {
+		// prepare an InfoDb and a mock software list dispenser
+		let info_db = InfoDb::from_listxml_output(info_xml.as_bytes(), |_| ControlFlow::Continue(()))
+			.unwrap()
+			.unwrap();
+		let info_db = Rc::new(info_db);
+		let mut dispenser = MockSoftwareListDispenser::new(&info_db);
+
+		// get the items and validate
+		let actual_items = super::build_items_machine_software(&info_db, machine_name, &mut dispenser).unwrap();
+		assert_eq!(expected_item_count, actual_items.len());
+
+		// ensure that each of these items are software items, and each only references the specified machine
+		for item in actual_items.iter() {
+			let ItemDetails::Software { machine_indexes, .. } = &item.details else {
+				panic!("expected software item");
+			};
+			let actual_item_machine_names = machine_indexes
+				.iter()
+				.map(|idx| info_db.machines().get(*idx).unwrap().name())
+				.collect::<Vec<_>>();
+			assert_eq!(&[machine_name], actual_item_machine_names.as_slice());
+		}
 	}
 }
