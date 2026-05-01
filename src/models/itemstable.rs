@@ -4,6 +4,7 @@ use std::cell::Cell;
 use std::cell::RefCell;
 use std::cmp::Reverse;
 use std::collections::HashMap;
+use std::iter::once;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Instant;
@@ -197,90 +198,19 @@ impl ItemsTableModel {
 				let mut dispenser = SoftwareListDispenser::new(info_db, &software_list_paths);
 
 				let items = match collection.as_deref() {
-					Some(PrefsCollection::Builtin(BuiltinCollection::All)) => info_db
-						.machines()
-						.iter()
-						.enumerate()
-						.filter(|(_, machine)| machine.runnable())
-						.map(|(machine_index, _)| {
-							let machine_config = MachineConfig::from_machine_index(info_db.clone(), machine_index);
-							let details = ItemDetails::Machine {
-								machine_config,
-								images: Default::default(),
-								ram_size: None,
-								bios: None,
-							};
-							details.into()
-						})
-						.collect::<Rc<[_]>>(),
-					Some(PrefsCollection::Builtin(BuiltinCollection::AllSoftware)) => dispenser
-						.get_all()
-						.into_iter()
-						.flat_map(|(info, list)| {
-							list.software
-								.iter()
-								.map(|s| (list.clone(), s.clone(), info))
-								.collect::<Vec<_>>()
-						})
-						.map(|(software_list, software, info)| {
-							let machine_indexes = Iterator::chain(
-								info.original_for_machines().iter(),
-								info.compatible_for_machines().iter(),
-							)
-							.map(|x| x.index())
-							.collect();
-
-							let details = ItemDetails::Software {
-								software_list,
-								software,
-								machine_indexes,
-							};
-							details.into()
-						})
-						.collect::<Rc<[_]>>(),
-
-					Some(PrefsCollection::MachineSoftware { machine_name }) => {
-						let machine_index = info_db.machines().find_index(machine_name).ok();
-						let items = machine_index.map(|machine_index| {
-							let machine = info_db.machines().get(machine_index).unwrap();
-							machine
-								.machine_software_lists()
-								.iter()
-								.filter_map(|x| dispenser.get(x.software_list().name()).ok())
-								.flat_map(move |(_, list)| {
-									(0..list.software.len())
-										.map(move |index| (list.clone(), list.software[index].clone()))
-								})
-								.map(|(software_list, software)| {
-									let machine_indexes = Default::default();
-									let details = ItemDetails::Software {
-										software_list,
-										software,
-										machine_indexes,
-									};
-									details.into()
-								})
-								.collect::<Rc<[_]>>()
-						});
-						items.unwrap_or_default()
+					Some(PrefsCollection::Builtin(BuiltinCollection::All)) => Some(build_items_builtin_all(info_db)),
+					Some(PrefsCollection::Builtin(BuiltinCollection::AllSoftware)) => {
+						Some(build_items_builtin_all_software(&mut dispenser))
 					}
-
-					Some(PrefsCollection::Folder { name: _, items }) => items
-						.iter()
-						.map(|item| {
-							folder_item(info_db, &mut dispenser, item).unwrap_or_else(|error| {
-								let id = Some(item.id.get());
-								let details = ItemDetails::Unrecognized {
-									details: item.details.clone(),
-									error: Rc::new(error),
-								};
-								Item { id, details }
-							})
-						})
-						.collect::<Rc<[_]>>(),
-					None => Rc::new([]),
+					Some(PrefsCollection::MachineSoftware { machine_name }) => {
+						build_items_machine_software(info_db, machine_name, &mut dispenser).ok()
+					}
+					Some(PrefsCollection::Folder { name: _, items }) => {
+						Some(build_items_folder(info_db, items, &mut dispenser))
+					}
+					None => None,
 				};
-				(items, dispenser.is_empty())
+				(items.unwrap_or_default(), dispenser.is_empty())
 			})
 			.unwrap_or_else(|| (Rc::new([]), true));
 
@@ -389,6 +319,7 @@ impl ItemsTableModel {
 				(run_title, run_descs, browse_target, true)
 			}
 			ItemDetails::Software {
+				software_list,
 				software,
 				machine_indexes,
 				..
@@ -398,7 +329,13 @@ impl ItemsTableModel {
 					.filter_map(|&index| {
 						// get the machine out of the InfoDB
 						let machine = info_db.machines().get(index).unwrap();
-						assert!(machine.runnable());
+						assert!(
+							machine.runnable(),
+							"software item {} from software list {}is associated with machine {} which is not runnable",
+							software.name,
+							software_list.name,
+							machine.name()
+						);
 
 						// identify all parts of the software
 						let parts_with_devices = software
@@ -639,9 +576,119 @@ impl Model for ItemsTableModel {
 	}
 }
 
-fn folder_item(
+trait SoftwareListDispenserTrait<'a> {
+	fn get(&mut self, software_list_name: &str) -> Result<(crate::info::SoftwareList<'a>, Arc<SoftwareList>)>;
+	fn get_all(&mut self) -> Vec<(crate::info::SoftwareList<'a>, Arc<SoftwareList>)>;
+}
+
+impl<'a> SoftwareListDispenserTrait<'a> for SoftwareListDispenser<'a> {
+	fn get(&mut self, software_list_name: &str) -> Result<(crate::info::SoftwareList<'a>, Arc<SoftwareList>)> {
+		self.get(software_list_name)
+	}
+
+	fn get_all(&mut self) -> Vec<(crate::info::SoftwareList<'a>, Arc<SoftwareList>)> {
+		self.get_all()
+	}
+}
+
+fn build_items_builtin_all(info_db: &Rc<InfoDb>) -> Rc<[Item]> {
+	info_db
+		.machines()
+		.iter()
+		.enumerate()
+		.filter(|(_, machine)| machine.runnable())
+		.map(|(machine_index, _)| {
+			let machine_config = MachineConfig::from_machine_index(info_db.clone(), machine_index);
+			let details = ItemDetails::Machine {
+				machine_config,
+				images: Default::default(),
+				ram_size: None,
+				bios: None,
+			};
+			details.into()
+		})
+		.collect::<Rc<[_]>>()
+}
+
+fn build_items_builtin_all_software<'a>(dispenser: &mut impl SoftwareListDispenserTrait<'a>) -> Rc<[Item]> {
+	dispenser
+		.get_all()
+		.into_iter()
+		.flat_map(|(info, list)| {
+			list.software
+				.iter()
+				.map(|s| (list.clone(), s.clone(), info))
+				.collect::<Vec<_>>()
+		})
+		.map(|(software_list, software, info)| {
+			let machine_indexes = Iterator::chain(
+				info.original_for_machines().iter(),
+				info.compatible_for_machines().iter(),
+			)
+			.filter(|machine| machine.runnable())
+			.map(|x| x.index())
+			.collect();
+
+			let details = ItemDetails::Software {
+				software_list,
+				software,
+				machine_indexes,
+			};
+			details.into()
+		})
+		.collect::<Rc<[_]>>()
+}
+
+fn build_items_machine_software<'a>(
 	info_db: &Rc<InfoDb>,
-	dispenser: &mut SoftwareListDispenser<'_>,
+	machine_name: &str,
+	dispenser: &mut impl SoftwareListDispenserTrait<'a>,
+) -> Result<Rc<[Item]>> {
+	let machine_index = info_db.machines().find_index(machine_name)?;
+	let machine = info_db.machines().get(machine_index).unwrap();
+	let items = machine
+		.machine_software_lists()
+		.iter()
+		.filter_map(|x| dispenser.get(x.software_list().name()).ok())
+		.flat_map(move |(_, list)| {
+			(0..list.software.len()).map(move |index| (list.clone(), list.software[index].clone()))
+		})
+		.map(|(software_list, software)| {
+			let machine_indexes = once(machine_index).collect();
+			let details = ItemDetails::Software {
+				software_list,
+				software,
+				machine_indexes,
+			};
+			details.into()
+		})
+		.collect::<Rc<[_]>>();
+	Ok(items)
+}
+
+fn build_items_folder<'a>(
+	info_db: &Rc<InfoDb>,
+	folder_items: &[PrefsItem],
+	dispenser: &mut impl SoftwareListDispenserTrait<'a>,
+) -> Rc<[Item]> {
+	folder_items
+		.iter()
+		.map(|item| {
+			folder_item(info_db, dispenser, item).unwrap_or_else(|error| {
+				let id = Some(item.id.get());
+				let details = ItemDetails::Unrecognized {
+					details: item.details.clone(),
+					error: Rc::new(error),
+				};
+				Item { id, details }
+			})
+		})
+		.collect::<Rc<[_]>>()
+}
+
+fn folder_item<'a>(
+	info_db: &Rc<InfoDb>,
+	dispenser: &mut impl SoftwareListDispenserTrait<'a>,
 	prefs_item: &PrefsItem,
 ) -> Result<Item> {
 	let details = match &prefs_item.details {
@@ -670,7 +717,7 @@ fn folder_item(
 			let machine_indexes = if let Some(preferred_machines) = item.preferred_machines.as_deref() {
 				preferred_machines
 					.iter()
-					.flat_map(|machine_name| dispenser.info_db.machines().find(machine_name).ok())
+					.flat_map(|machine_name| info_db.machines().find(machine_name).ok())
 					.map(|machine| machine.index())
 					.collect()
 			} else {
@@ -988,16 +1035,63 @@ mod test {
 	use std::io::Cursor;
 	use std::ops::ControlFlow;
 	use std::rc::Rc;
+	use std::sync::Arc;
 
+	use anyhow::Result;
 	use itertools::Itertools;
 	use test_case::test_case;
 
 	use crate::info::InfoDb;
+	use crate::info::View;
 	use crate::prefs::Preferences;
 	use crate::prefs::PrefsCollection;
 	use crate::selection::SelectionManager;
+	use crate::software::SoftwareList;
 
+	use super::ItemDetails;
 	use super::ItemsTableModel;
+	use super::SoftwareListDispenserTrait;
+
+	struct MockSoftwareListDispenser<'a> {
+		info_db: &'a InfoDb,
+		software_lists: Vec<(crate::info::SoftwareList<'a>, Arc<SoftwareList>)>,
+	}
+
+	impl<'a> MockSoftwareListDispenser<'a> {
+		pub fn new(info_db: &'a InfoDb) -> Self {
+			let mut result = Self {
+				info_db,
+				software_lists: Vec::new(),
+			};
+			result.add(
+				"coco_cart",
+				include_str!("../software/test_data/softlist_coco_cart.xml"),
+			);
+			result
+		}
+
+		pub fn add(&mut self, name: &str, xml: &str) {
+			let info_software_list = self.info_db.software_lists().find(name).unwrap();
+			let software_list = SoftwareList::from_reader(xml.as_bytes()).unwrap();
+			let software_list = Arc::new(software_list);
+			self.software_lists.push((info_software_list, software_list));
+		}
+	}
+
+	impl<'a> SoftwareListDispenserTrait<'a> for MockSoftwareListDispenser<'a> {
+		fn get(&mut self, software_list_name: &str) -> Result<(crate::info::SoftwareList<'a>, Arc<SoftwareList>)> {
+			let (info_software_list, software_list) = self
+				.software_lists
+				.iter()
+				.find(|(info, _)| info.name() == software_list_name)
+				.ok_or_else(|| anyhow::anyhow!("software list not found"))?;
+			Ok((*info_software_list, software_list.clone()))
+		}
+
+		fn get_all(&mut self) -> Vec<(crate::info::SoftwareList<'a>, Arc<SoftwareList>)> {
+			self.software_lists.clone()
+		}
+	}
 
 	#[test_case(0, include_str!("../info/test_data/listxml_coco.xml"), include_str!("../prefs/test_data/prefs01.json"), "Favorites")]
 	pub fn update_with_folder_count(_index: usize, info_xml: &str, prefs_xml: &str, folder_name: &str) {
@@ -1038,5 +1132,74 @@ mod test {
 		};
 		let items_in_model = model.items.borrow().clone();
 		assert_eq!(items.len(), items_in_model.len());
+	}
+
+	#[test_case(0, include_str!("../info/test_data/listxml_coco.xml"), "coco_cart", "baseball", &["coco", "coco2b", "coco2bh", "coco3", "coco3h", "coco3p", "cocoh"])]
+	#[test_case(1, include_str!("../info/test_data/listxml_fake.xml"), "coco_cart", "baseball", &["fake"])]
+	pub fn build_items_builtin_all_software(
+		_index: usize,
+		info_xml: &str,
+		software_list_name: &str,
+		software_name: &str,
+		expected_machine_names: &[&str],
+	) {
+		// prepare an InfoDb and a mock software list dispenser
+		let info_db = InfoDb::from_listxml_output(info_xml.as_bytes(), |_| ControlFlow::Continue(()))
+			.unwrap()
+			.unwrap();
+		let info_db = Rc::new(info_db);
+		let mut dispenser = MockSoftwareListDispenser::new(&info_db);
+
+		// get the item and validate
+		let actual_items = super::build_items_builtin_all_software(&mut dispenser);
+		let actual_item_machine_names = actual_items
+			.iter()
+			.filter_map(|item| {
+				if let ItemDetails::Software {
+					software_list,
+					software,
+					machine_indexes,
+				} = &item.details
+					&& software_list.name == software_list_name
+					&& software.name == software_name
+				{
+					let machine_names = machine_indexes
+						.iter()
+						.map(|idx| info_db.machines().get(*idx).unwrap().name())
+						.collect::<Vec<_>>();
+					Some(machine_names)
+				} else {
+					None
+				}
+			})
+			.exactly_one()
+			.unwrap();
+		assert_eq!(expected_machine_names, actual_item_machine_names.as_slice());
+	}
+
+	#[test_case(0, include_str!("../info/test_data/listxml_coco.xml"), "coco2b", 112)]
+	pub fn build_items_machine_software(_index: usize, info_xml: &str, machine_name: &str, expected_item_count: usize) {
+		// prepare an InfoDb and a mock software list dispenser
+		let info_db = InfoDb::from_listxml_output(info_xml.as_bytes(), |_| ControlFlow::Continue(()))
+			.unwrap()
+			.unwrap();
+		let info_db = Rc::new(info_db);
+		let mut dispenser = MockSoftwareListDispenser::new(&info_db);
+
+		// get the items and validate
+		let actual_items = super::build_items_machine_software(&info_db, machine_name, &mut dispenser).unwrap();
+		assert_eq!(expected_item_count, actual_items.len());
+
+		// ensure that each of these items are software items, and each only references the specified machine
+		for item in actual_items.iter() {
+			let ItemDetails::Software { machine_indexes, .. } = &item.details else {
+				panic!("expected software item");
+			};
+			let actual_item_machine_names = machine_indexes
+				.iter()
+				.map(|idx| info_db.machines().get(*idx).unwrap().name())
+				.collect::<Vec<_>>();
+			assert_eq!(&[machine_name], actual_item_machine_names.as_slice());
+		}
 	}
 }

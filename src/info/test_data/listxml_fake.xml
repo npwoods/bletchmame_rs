@@ -194,6 +194,7 @@
 		<device_ref name="floppy_connector" tag=":ext:fdc:wd17xx:1"/>
 		<device_ref name="floppy_525_dd" tag=":ext:fdc:wd17xx:1:525dd"/>
 		<device_ref name="<<INVALID>>"/>
+		<softwarelist tag=":cart_list" name="coco_cart" status="original"/>
 	</machine>
 	<machine name="blah" sourcefile="fake_machine.cpp" cloneof="fake">
 		<description>Fake Machine</description>
@@ -245,5 +246,6 @@
 		<chip type="audio" tag=":flopsndout" name="Speaker"/>
 		<chip type="audio" tag=":floppysound" name="Floppy sound" clock="44100"/>
 		<sound channels="1"/>
+		<softwarelist tag=":cart_list" name="coco_cart" status="original"/>
 	</machine>
 </mame>
