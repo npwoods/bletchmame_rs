@@ -319,6 +319,7 @@ impl ItemsTableModel {
 				(run_title, run_descs, browse_target, true)
 			}
 			ItemDetails::Software {
+				software_list,
 				software,
 				machine_indexes,
 				..
@@ -328,7 +329,13 @@ impl ItemsTableModel {
 					.filter_map(|&index| {
 						// get the machine out of the InfoDB
 						let machine = info_db.machines().get(index).unwrap();
-						assert!(machine.runnable());
+						assert!(
+							machine.runnable(),
+							"software item {} from software list {}is associated with machine {} which is not runnable",
+							software.name,
+							software_list.name,
+							machine.name()
+						);
 
 						// identify all parts of the software
 						let parts_with_devices = software
@@ -618,6 +625,7 @@ fn build_items_builtin_all_software<'a>(dispenser: &mut impl SoftwareListDispens
 				info.original_for_machines().iter(),
 				info.compatible_for_machines().iter(),
 			)
+			.filter(|machine| machine.runnable())
 			.map(|x| x.index())
 			.collect();
 
@@ -1124,6 +1132,49 @@ mod test {
 		};
 		let items_in_model = model.items.borrow().clone();
 		assert_eq!(items.len(), items_in_model.len());
+	}
+
+	#[test_case(0, include_str!("../info/test_data/listxml_coco.xml"), "coco_cart", "baseball", &["coco", "coco2b", "coco2bh", "coco3", "coco3h", "coco3p", "cocoh"])]
+	#[test_case(1, include_str!("../info/test_data/listxml_fake.xml"), "coco_cart", "baseball", &["fake"])]
+	pub fn build_items_builtin_all_software(
+		_index: usize,
+		info_xml: &str,
+		software_list_name: &str,
+		software_name: &str,
+		expected_machine_names: &[&str],
+	) {
+		// prepare an InfoDb and a mock software list dispenser
+		let info_db = InfoDb::from_listxml_output(info_xml.as_bytes(), |_| ControlFlow::Continue(()))
+			.unwrap()
+			.unwrap();
+		let info_db = Rc::new(info_db);
+		let mut dispenser = MockSoftwareListDispenser::new(&info_db);
+
+		// get the item and validate
+		let actual_items = super::build_items_builtin_all_software(&mut dispenser);
+		let actual_item_machine_names = actual_items
+			.iter()
+			.filter_map(|item| {
+				if let ItemDetails::Software {
+					software_list,
+					software,
+					machine_indexes,
+				} = &item.details
+					&& software_list.name == software_list_name
+					&& software.name == software_name
+				{
+					let machine_names = machine_indexes
+						.iter()
+						.map(|idx| info_db.machines().get(*idx).unwrap().name())
+						.collect::<Vec<_>>();
+					Some(machine_names)
+				} else {
+					None
+				}
+			})
+			.exactly_one()
+			.unwrap();
+		assert_eq!(expected_machine_names, actual_item_machine_names.as_slice());
 	}
 
 	#[test_case(0, include_str!("../info/test_data/listxml_coco.xml"), "coco2b", 112)]
