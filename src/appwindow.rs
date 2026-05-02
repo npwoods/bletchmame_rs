@@ -1296,7 +1296,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 			model.update_state_possible_shutdown(AppState::session_ended);
 		}
 		Action::MameStatusUpdate(update) => {
-			model.update_state(|state| state.status_update(update));
+			model.update_state(|state| state.status_update(*update));
 
 			// special check to restore the menu bar if we're not in the emulation
 			if model.state.borrow().status().is_none_or(|s| s.running.is_none()) {

@@ -67,7 +67,7 @@ enum ThisError {
 #[derive(Debug)]
 pub enum MameEvent {
 	SessionEnded,
-	StatusUpdate(Update),
+	StatusUpdate(Box<Update>),
 }
 
 pub fn spawn_mame_session_thread(
@@ -196,7 +196,7 @@ pub fn interact_with_mame(
 
 		if let Some(update) = update {
 			is_running = update.is_running();
-			event_callback(MameEvent::StatusUpdate(update))
+			event_callback(MameEvent::StatusUpdate(update.into()))
 		}
 
 		if is_signal {

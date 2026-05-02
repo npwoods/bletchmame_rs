@@ -69,7 +69,7 @@ pub enum Action {
 	// MAME communication
 	MameSessionEnded,
 	#[strum(props(IsFrequent = "true"))]
-	MameStatusUpdate(Update),
+	MameStatusUpdate(Box<Update>),
 	ErrorMessageBox(String),
 
 	// Other
