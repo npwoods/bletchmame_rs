@@ -80,6 +80,7 @@ pub enum Action {
 	SearchText(String),
 	ItemsSort(usize, SortOrder),
 	ItemsSelectedChanged,
+	SelectedItemRun,
 	SelectedItemContextMenu,
 	AddToExistingFolder(usize, Arc<[PrefsItem]>),
 	AddToNewFolder(String, Arc<[PrefsItem]>),

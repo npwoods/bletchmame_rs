@@ -126,6 +126,7 @@ export component AppWindow inherits Window {
     in property <string> menu-action-help-refresh-info-db;
     in property <string> menu-action-help-website;
     in property <string> menu-action-help-about;
+    in property <string> key-action-selected-item-run;
     in property <string> key-action-selected-item-context-menu;
 
     // content area position
@@ -887,6 +888,13 @@ export component AppWindow inherits Window {
                                 row-pointer-event(row, event, point) => {
                                     items-row-pointer-event(row, event, { x: point.x + self.absolute-position.x, y: point.y + self.absolute-position.y });
                                     tooltip.show-tooltip(items-table-touch-area.has-hover, items-table-touch-area.absolute-position.x + items-table-touch-area.mouse-x, items-table-touch-area.absolute-position.y + items-table-touch-area.mouse-y, items-view-tooltip);
+                                }
+                            }
+
+                            KeyBinding {
+                                keys: @keys(Return);
+                                activated => {
+                                    menu-item-action(root.key-action-selected-item-run);
                                 }
                             }
 

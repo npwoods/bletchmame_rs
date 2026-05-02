@@ -483,6 +483,17 @@ impl AppModel {
 		spawn_local(fut).unwrap();
 	}
 
+	pub fn run_selected_item(self: &Rc<Self>) {
+		let Some(row) = self.app_window().get_items_view_selected_row().try_into().ok() else {
+			return;
+		};
+		if let Some(action) = self.with_items_table_model(|items_model| items_model.singular_run_action(row)) {
+			handle_action(self, action);
+		} else {
+			self.item_context_menu(Some(row), None);
+		}
+	}
+
 	pub fn item_context_menu(&self, row: Option<usize>, position: Option<LogicalPosition>) {
 		let Some(row) = row.or_else(|| self.app_window().get_items_view_selected_row().try_into().ok()) else {
 			return;
@@ -889,6 +900,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		app_window.set_menu_action_help_refresh_info_db(HelpRefreshInfoDb.encode_for_slint());
 		app_window.set_menu_action_help_website(Launch(web_site_url).encode_for_slint());
 		app_window.set_menu_action_help_about(HelpAbout.encode_for_slint());
+		app_window.set_key_action_selected_item_run(SelectedItemRun.encode_for_slint());
 		app_window.set_key_action_selected_item_context_menu(SelectedItemContextMenu.encode_for_slint());
 	}
 
@@ -1342,6 +1354,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 				prefs.current_history_entry_mut().selection = selection;
 			});
 		}
+		Action::SelectedItemRun => model.run_selected_item(),
 		Action::SelectedItemContextMenu => model.item_context_menu(None, None),
 		Action::AddToExistingFolder(folder_index, new_items) => {
 			model.modify_prefs(|prefs| {
