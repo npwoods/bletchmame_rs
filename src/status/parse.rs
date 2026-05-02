@@ -11,6 +11,7 @@ use crate::imagedesc::ImageDesc;
 use crate::parse::normalize_tag;
 use crate::parse::parse_mame_bool;
 use crate::runtime::command::SeqType;
+use crate::status::Cassette;
 use crate::status::Cheat;
 use crate::status::CheatParameter;
 use crate::status::CheatParameterItem;
@@ -36,6 +37,7 @@ enum Phase {
 	Status,
 	StatusCheats,
 	StatusImages,
+	StatusCassettes,
 	StatusSlots,
 	StatusInputs,
 	StatusInputDevices,
@@ -162,6 +164,10 @@ impl State {
 				self.running.images = Some(Vec::new());
 				Some(Phase::StatusImages)
 			}
+			(Phase::Status, b"cassettes") => {
+				self.running.cassettes = Some(Vec::new());
+				Some(Phase::StatusCassettes)
+			}
 			(Phase::Status, b"slots") => {
 				self.running.slots = Some(Vec::new());
 				Some(Phase::StatusSlots)
@@ -238,6 +244,54 @@ impl State {
 				};
 				self.running.images.as_mut().unwrap().push(image);
 				Some(Phase::Image)
+			}
+			(Phase::StatusCassettes, b"cassette") => {
+				let [
+					tag,
+					is_stopped,
+					is_playing,
+					is_recording,
+					motor_state,
+					speaker_state,
+					position,
+					length,
+				] = evt.find_attributes([
+					b"tag",
+					b"is_stopped",
+					b"is_playing",
+					b"is_recording",
+					b"motor_state",
+					b"speaker_state",
+					b"position",
+					b"length",
+				])?;
+				let tag = tag.ok_or(ThisError::MissingMandatoryAttribute("tag"))?;
+				let tag = normalize_tag(tag).into();
+				let is_stopped =
+					parse_mame_bool(is_stopped.ok_or(ThisError::MissingMandatoryAttribute("is_stopped"))?)?;
+				let is_playing =
+					parse_mame_bool(is_playing.ok_or(ThisError::MissingMandatoryAttribute("is_playing"))?)?;
+				let is_recording =
+					parse_mame_bool(is_recording.ok_or(ThisError::MissingMandatoryAttribute("is_recording"))?)?;
+				let motor_state =
+					parse_mame_bool(motor_state.ok_or(ThisError::MissingMandatoryAttribute("motor_state"))?)?;
+				let speaker_state =
+					parse_mame_bool(speaker_state.ok_or(ThisError::MissingMandatoryAttribute("speaker_state"))?)?;
+				let position = position.map(|s| s.parse()).transpose()?.unwrap_or_default();
+				let length = length.map(|s| s.parse()).transpose()?.unwrap_or_default();
+
+				let cassette = Cassette {
+					tag,
+					is_stopped,
+					is_playing,
+					is_recording,
+					motor_state,
+					speaker_state,
+					position,
+					length,
+				};
+				self.running.cassettes.as_mut().unwrap().push(cassette);
+				None
 			}
 			(Phase::Cheat, b"parameter") => {
 				let current_cheat = self.running.cheats.as_mut().unwrap().last_mut().unwrap();
