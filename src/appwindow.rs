@@ -610,7 +610,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	// set up items view model
 	let selection = SelectionManager::new(
 		app_window,
-		AppWindow::get_items_view_selected_index,
+		AppWindow::get_items_view_selected_row,
 		AppWindow::invoke_items_view_select,
 	);
 	let model_clone = model.clone();
@@ -738,13 +738,13 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 
 	// items popup menus
 	let model_clone = model.clone();
-	app_window.on_items_row_pointer_event(move |index, evt, position| {
+	app_window.on_items_row_pointer_event(move |row, evt, position| {
 		if is_context_menu_event(&evt) {
-			let index = usize::try_from(index).unwrap();
+			let row = usize::try_from(row).unwrap();
 			let folder_info = get_folder_collections(&model_clone.state.borrow().preferences.collections);
 			let has_mame_initialized = model_clone.state.borrow().status().is_some();
 			if let Some(context_commands) =
-				model_clone.with_items_table_model(|x| x.context_commands(index, &folder_info, has_mame_initialized))
+				model_clone.with_items_table_model(|x| x.context_commands(row, &folder_info, has_mame_initialized))
 			{
 				model_clone
 					.app_window()
@@ -752,9 +752,9 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 			}
 		}
 		if evt.kind == PointerEventKind::Move {
-			let index = usize::try_from(index).unwrap();
+			let row = usize::try_from(row).unwrap();
 			let text = model_clone
-				.with_items_table_model(|x| x.get_row_tooltip(index))
+				.with_items_table_model(|x| x.get_row_tooltip(row))
 				.unwrap_or_default()
 				.into();
 			model_clone.app_window().set_items_view_tooltip(text);

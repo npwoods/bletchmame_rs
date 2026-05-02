@@ -235,7 +235,7 @@ impl ItemsTableModel {
 
 	pub fn context_commands(
 		&self,
-		index: usize,
+		row: usize,
 		folder_info: &[(usize, Rc<PrefsCollection>)],
 		has_mame_initialized: bool,
 	) -> Option<ItemContextMenuInfo> {
@@ -253,7 +253,7 @@ impl ItemsTableModel {
 
 		// access the selection
 		let items = self.items.borrow();
-		let index = *self.items_map.borrow().get(index).unwrap();
+		let index = *self.items_map.borrow().get(row).unwrap();
 		let index = usize::try_from(index).unwrap();
 		let item = items.get(index)?;
 

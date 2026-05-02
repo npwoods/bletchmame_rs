@@ -185,7 +185,7 @@ export component AppWindow inherits Window {
 
     // the items view
     in property <string> is-empty-reason;
-    in-out property <int> items-view-selected-index;
+    in-out property <int> items-view-selected-row;
     in-out property <[TableColumn]> items-columns;
     callback items-search-text-changed(string);
     callback items-search-item-activated(int) -> bool;
@@ -194,10 +194,10 @@ export component AppWindow inherits Window {
     callback items-current-row-changed();
     callback items-row-pointer-event(int, PointerEvent, Point);
     in property <[[StandardListViewItem]]> items-model;
-    public function items-view-select(index: int) {
-        // it is insufficient to update items-view-selected-index; it is necessary that we call
+    public function items-view-select(row: int) {
+        // it is insufficient to update items-view-selected-row; it is necessary that we call
         // set-current-row() to bring that row into view
-        items-table-view.set-current-row(index);
+        items-table-view.set-current-row(row);
     }
     in property <string> items-view-tooltip;
     pure callback get-statusbar-current-item-desc(int) -> string;
@@ -858,15 +858,15 @@ export component AppWindow inherits Window {
                             width: 100%;
                             height: 100%;
                             rows: items-model;
-                            current-row <=> items-view-selected-index;
+                            current-row <=> items-view-selected-row;
                             columns <=> items-columns;
-                            sort-ascending(index) => {
-                                items-sort-ascending(index)
+                            sort-ascending(row) => {
+                                items-sort-ascending(row)
                             }
-                            sort-descending(index) => {
-                                items-sort-descending(index)
+                            sort-descending(row) => {
+                                items-sort-descending(row)
                             }
-                            current-row-changed(index) => {
+                            current-row-changed(row) => {
                                 items-current-row-changed()
                             }
                             row-pointer-event(row, event, point) => {
@@ -1007,9 +1007,7 @@ export component AppWindow inherits Window {
             HorizontalBox {
                 alignment: start;
                 Text {
-                    text: mode() == "running"
-                        ? statusbar-speed-text
-                        : mode() == "ready" ? root.get-statusbar-current-item-desc(items-view-selected-index) : "";
+                    text: mode() == "running" ? statusbar-speed-text : mode() == "ready" ? root.get-statusbar-current-item-desc(items-view-selected-row) : "";
                 }
             }
         }
