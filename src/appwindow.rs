@@ -482,6 +482,24 @@ impl AppModel {
 		};
 		spawn_local(fut).unwrap();
 	}
+
+	pub fn item_context_menu(&self, row: Option<usize>, position: Option<LogicalPosition>) {
+		let Some(row) = row.or_else(|| self.app_window().get_items_view_selected_row().try_into().ok()) else {
+			return;
+		};
+		let folder_info = get_folder_collections(&self.state.borrow().preferences.collections);
+		let has_mame_initialized = self.state.borrow().status().is_some();
+		if let Some(context_commands) =
+			self.with_items_table_model(|x| x.context_commands(row, &folder_info, has_mame_initialized))
+		{
+			let position = position.unwrap_or_else(|| {
+				self.app_window()
+					.invoke_items_view_row_position(row.try_into().unwrap())
+			});
+			self.app_window()
+				.invoke_show_item_context_menu(context_commands, position);
+		}
+	}
 }
 
 pub async fn start(app_window: &AppWindow, args: AppArgs) {
@@ -741,15 +759,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	app_window.on_items_row_pointer_event(move |row, evt, position| {
 		if is_context_menu_event(&evt) {
 			let row = usize::try_from(row).unwrap();
-			let folder_info = get_folder_collections(&model_clone.state.borrow().preferences.collections);
-			let has_mame_initialized = model_clone.state.borrow().status().is_some();
-			if let Some(context_commands) =
-				model_clone.with_items_table_model(|x| x.context_commands(row, &folder_info, has_mame_initialized))
-			{
-				model_clone
-					.app_window()
-					.invoke_show_item_context_menu(context_commands, position);
-			}
+			model_clone.item_context_menu(Some(row), Some(position));
 		}
 		if evt.kind == PointerEventKind::Move {
 			let row = usize::try_from(row).unwrap();
@@ -879,6 +889,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		app_window.set_menu_action_help_refresh_info_db(HelpRefreshInfoDb.encode_for_slint());
 		app_window.set_menu_action_help_website(Launch(web_site_url).encode_for_slint());
 		app_window.set_menu_action_help_about(HelpAbout.encode_for_slint());
+		app_window.set_key_action_selected_item_context_menu(SelectedItemContextMenu.encode_for_slint());
 	}
 
 	// now create the "real initial" state, now that we have a model to work with
@@ -1331,6 +1342,7 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 				prefs.current_history_entry_mut().selection = selection;
 			});
 		}
+		Action::SelectedItemContextMenu => model.item_context_menu(None, None),
 		Action::AddToExistingFolder(folder_index, new_items) => {
 			model.modify_prefs(|prefs| {
 				add_items_to_existing_folder_collection(&mut prefs.collections, folder_index, &new_items);

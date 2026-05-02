@@ -126,6 +126,7 @@ export component AppWindow inherits Window {
     in property <string> menu-action-help-refresh-info-db;
     in property <string> menu-action-help-website;
     in property <string> menu-action-help-about;
+    in property <string> key-action-selected-item-context-menu;
 
     // content area position
     out property <length> content-area-x: content-area.absolute-position.x;
@@ -198,6 +199,19 @@ export component AppWindow inherits Window {
         // it is insufficient to update items-view-selected-row; it is necessary that we call
         // set-current-row() to bring that row into view
         items-table-view.set-current-row(row);
+    }
+    public function items-view-row-position(row: int) -> Point {
+        // bogus implementation but better than nothing
+        let count = items-model.length;
+        if count <= 0 {
+            // fallback: return table top-left
+            items-table-view.absolute-position
+        } else {
+            let row-clamped = row < 0 ? 0 : row >= count ? count - 1 : row;
+            let cx = items-table-view.absolute-position.x + 10px;
+            let cy = items-table-view.absolute-position.y + (row-clamped + 0.5) * items-table-view.height / count;
+            { x: cx, y: cy }
+        }
     }
     in property <string> items-view-tooltip;
     pure callback get-statusbar-current-item-desc(int) -> string;
@@ -854,24 +868,34 @@ export component AppWindow inherits Window {
                     items-table-touch-area := TouchArea {
                         vertical-stretch: 1;
                         min-height: 0px;
-                        items-table-view := StandardTableView {
-                            width: 100%;
-                            height: 100%;
-                            rows: items-model;
-                            current-row <=> items-view-selected-row;
-                            columns <=> items-columns;
-                            sort-ascending(row) => {
-                                items-sort-ascending(row)
+                        FocusScope {
+                            items-table-view := StandardTableView {
+                                width: 100%;
+                                height: 100%;
+                                rows: items-model;
+                                current-row <=> items-view-selected-row;
+                                columns <=> items-columns;
+                                sort-ascending(row) => {
+                                    items-sort-ascending(row)
+                                }
+                                sort-descending(row) => {
+                                    items-sort-descending(row)
+                                }
+                                current-row-changed(row) => {
+                                    items-current-row-changed()
+                                }
+                                row-pointer-event(row, event, point) => {
+                                    items-row-pointer-event(row, event, { x: point.x + self.absolute-position.x, y: point.y + self.absolute-position.y });
+                                    tooltip.show-tooltip(items-table-touch-area.has-hover, items-table-touch-area.absolute-position.x + items-table-touch-area.mouse-x, items-table-touch-area.absolute-position.y + items-table-touch-area.mouse-y, items-view-tooltip);
+                                }
                             }
-                            sort-descending(row) => {
-                                items-sort-descending(row)
-                            }
-                            current-row-changed(row) => {
-                                items-current-row-changed()
-                            }
-                            row-pointer-event(row, event, point) => {
-                                items-row-pointer-event(row, event, { x: point.x + self.absolute-position.x, y: point.y + self.absolute-position.y });
-                                tooltip.show-tooltip(items-table-touch-area.has-hover, items-table-touch-area.absolute-position.x + items-table-touch-area.mouse-x, items-table-touch-area.absolute-position.y + items-table-touch-area.mouse-y, items-view-tooltip);
+
+                            KeyBinding {
+                                // this should really be Shift+F10 but there is a blocking issue (https://github.com/slint-ui/slint/issues/11591)
+                                keys: @keys(Control + Return);
+                                activated => {
+                                    menu-item-action(root.key-action-selected-item-context-menu);
+                                }
                             }
                         }
 
