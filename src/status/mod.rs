@@ -75,6 +75,7 @@ impl Status {
 
 			let cheats = collect_or_clone_existing(running.cheats, &status_running.cheats);
 			let images = collect_or_clone_existing(images, &status_running.images);
+			let cassettes = collect_or_clone_existing(running.cassettes, &status_running.cassettes);
 			let slots = collect_or_clone_existing(running.slots, &status_running.slots);
 			let inputs = collect_or_clone_existing(running.inputs, &status_running.inputs);
 			let input_device_classes =
@@ -94,6 +95,7 @@ impl Status {
 				has_input_using_mouse,
 				cheats,
 				images,
+				cassettes,
 				slots,
 				inputs,
 				input_device_classes,
@@ -135,6 +137,7 @@ pub struct Running {
 	pub has_input_using_mouse: bool,
 	pub cheats: Arc<[Cheat]>,
 	pub images: Arc<[Image]>,
+	pub cassettes: Arc<[Cassette]>,
 	pub slots: Arc<[Slot]>,
 	pub inputs: Arc<[Input]>,
 	pub input_device_classes: Arc<[InputDeviceClass]>,
@@ -192,6 +195,39 @@ pub struct ImageFormat {
 	pub extensions: Vec<SmolStr>,
 }
 
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+pub struct Cassette {
+	pub tag: SmolStr,
+	pub is_stopped: bool,
+	pub is_playing: bool,
+	pub is_recording: bool,
+	pub motor_state: bool,
+	pub speaker_state: bool,
+	pub position: f32,
+	pub length: f32,
+}
+
+impl From<&Cassette> for crate::ui::Cassette {
+	fn from(value: &Cassette) -> Self {
+		fn format_time(time: f32) -> String {
+			let minutes = (time / 60.0) as u32;
+			let seconds = (time % 60.0) as u32;
+			format!("{:02}:{:02}", minutes, seconds)
+		}
+
+		Self {
+			tag: value.tag.as_str().into(),
+			is_stopped: value.is_stopped,
+			is_playing: value.is_playing,
+			is_recording: value.is_recording,
+			motor_state: value.motor_state,
+			speaker_state: value.speaker_state,
+			position: format_time(value.position).into(),
+			length: format_time(value.length).into(),
+		}
+	}
+}
+
 #[derive(Clone, Deserialize, Serialize, PartialEq)]
 pub struct Update {
 	running: Option<RunningUpdate>,
@@ -236,6 +272,7 @@ struct RunningUpdate {
 	pub has_input_using_mouse: Option<bool>,
 	pub cheats: Option<Vec<Cheat>>,
 	pub images: Option<Vec<ImageUpdate>>,
+	pub cassettes: Option<Vec<Cassette>>,
 	pub slots: Option<Vec<Slot>>,
 	pub inputs: Option<Vec<Input>>,
 	pub input_device_classes: Option<Vec<InputDeviceClass>>,

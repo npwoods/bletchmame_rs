@@ -44,6 +44,17 @@ struct ItemContextMenuInfo {
 
 struct SearchBarItem { icon: image, text: string, action: string}
 
+struct Cassette {
+    tag: string,
+    is-stopped: bool,
+    is-playing: bool,
+    is-recording: bool,
+    motor-state: bool,
+    speaker-state: bool,
+    position: string,
+    length: string
+}
+
 struct ReportIssue { text: string, button-text: string}
 
 export component AppWindow inherits Window {
@@ -236,6 +247,7 @@ export component AppWindow inherits Window {
 
     // status bar
     in property <string> statusbar-speed-text;
+    in property <[Cassette]> statusbar-cassettes;
 
     // the report view
     in property <string> report-message;
@@ -1036,10 +1048,39 @@ export component AppWindow inherits Window {
         if menubar-visible: Rectangle {
             vertical-stretch: 0;
             background: Palette.control-background;
-            HorizontalBox {
+            HorizontalLayout {
+                padding-left: 10px;
+                padding-right: 10px;
+                padding-top: 0px;
+                padding-bottom: 0px;
                 alignment: start;
                 Text {
                     text: mode() == "running" ? statusbar-speed-text : mode() == "ready" ? root.get-statusbar-current-item-desc(items-view-selected-row) : "";
+                }
+
+                for cassette in statusbar-cassettes: HorizontalLayout {
+                    if cassette.motor-state: HorizontalLayout {
+                        alignment: center;
+                        padding: 0px;
+                        Image {
+                            source: Icons.cassette;
+                            width: 32px;
+                        }
+
+                        if cassette.is_playing: Text {
+                            text: "►";
+                            color: green;
+                        }
+
+                        if cassette.is-recording: Text {
+                            text: "●";
+                            color: red;
+                        }
+
+                        Text {
+                            text: cassette.position + " / " + cassette.length;
+                        }
+                    }
                 }
             }
         }
