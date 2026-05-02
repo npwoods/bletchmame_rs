@@ -207,6 +207,27 @@ pub struct Cassette {
 	pub length: f32,
 }
 
+impl From<&Cassette> for crate::ui::Cassette {
+	fn from(value: &Cassette) -> Self {
+		fn format_time(time: f32) -> String {
+			let minutes = (time / 60.0) as u32;
+			let seconds = (time % 60.0) as u32;
+			format!("{:02}:{:02}", minutes, seconds)
+		}
+
+		Self {
+			tag: value.tag.as_str().into(),
+			is_stopped: value.is_stopped,
+			is_playing: value.is_playing,
+			is_recording: value.is_recording,
+			motor_state: value.motor_state,
+			speaker_state: value.speaker_state,
+			position: format_time(value.position).into(),
+			length: format_time(value.length).into(),
+		}
+	}
+}
+
 #[derive(Clone, Deserialize, Serialize, PartialEq)]
 pub struct Update {
 	running: Option<RunningUpdate>,

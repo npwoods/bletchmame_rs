@@ -330,12 +330,21 @@ impl AppModel {
 				child_window.set_active(running.is_some() && report.is_none());
 			}
 
-			// status bar
+			// status bar speed text
 			let statusbar_speed_text = status
 				.and_then(|s| s.running.as_ref())
 				.map(|r| format!("{:.2}%", r.speed_percent * 100.0).into())
 				.unwrap_or_default();
 			app_window.set_statusbar_speed_text(statusbar_speed_text);
+
+			// status bar cassettes
+			let statusbar_cassettes = status
+				.and_then(|s| s.running.as_ref())
+				.map(|r| r.cassettes.iter().map(|c| c.into()).collect::<Vec<_>>())
+				.unwrap_or_default();
+			let statusbar_cassettes = VecModel::from(statusbar_cassettes);
+			let statusbar_cassettes = ModelRc::new(statusbar_cassettes);
+			app_window.set_statusbar_cassettes(statusbar_cassettes);
 
 			// report view
 			app_window.set_report_message(
