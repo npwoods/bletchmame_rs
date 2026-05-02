@@ -233,9 +233,14 @@ impl ItemsTableModel {
 		self.items.replace(items);
 	}
 
+	pub fn singular_run_action(&self, row: usize) -> Option<Action> {
+		let (_, run_descs, _, _, _) = self.row_run_info(row)?;
+		run_descs.into_iter().exactly_one().ok().and_then(|desc| desc.action)
+	}
+
 	pub fn context_commands(
 		&self,
-		index: usize,
+		row: usize,
 		folder_info: &[(usize, Rc<PrefsCollection>)],
 		has_mame_initialized: bool,
 	) -> Option<ItemContextMenuInfo> {
@@ -253,7 +258,7 @@ impl ItemsTableModel {
 
 		// access the selection
 		let items = self.items.borrow();
-		let index = *self.items_map.borrow().get(index).unwrap();
+		let index = *self.items_map.borrow().get(row).unwrap();
 		let index = usize::try_from(index).unwrap();
 		let item = items.get(index)?;
 
@@ -463,6 +468,177 @@ impl ItemsTableModel {
 			remove_from_folder_desc,
 		};
 		Some(result.into())
+	}
+
+	#[allow(clippy::type_complexity)]
+	fn row_run_info(
+		&self,
+		row: usize,
+	) -> Option<(SharedString, Vec<MenuDesc>, Option<PrefsCollection>, bool, PrefsItem)> {
+		// access the InfoDB
+		let info_db = self.info_db.borrow();
+		let info_db = info_db.as_ref()?;
+
+		// access the selection
+		let items = self.items.borrow();
+		let index = *self.items_map.borrow().get(row).unwrap();
+		let index = usize::try_from(index).unwrap();
+		let item = items.get(index)?;
+
+		// find the prefs item referenced by the Id, if appropriate
+		let current_collection = self.current_collection.borrow().clone();
+		let prefs_item = item.id.as_ref().and_then(|id| {
+			current_collection
+				.as_ref()
+				.and_then(|collection| match collection.as_ref() {
+					PrefsCollection::Folder { name: _, items } => {
+						items.iter().find(|x| x.id.get_opt().as_ref() == Some(id))
+					}
+					_ => None,
+				})
+		});
+		let video = prefs_item.and_then(|item| item.video.clone());
+
+		// get the critical information - the description and where (if anyplace) "Browse" would go to
+		let (run_title, run_descs, browse_target, can_configure) = match &item.details {
+			ItemDetails::Machine {
+				machine_config,
+				images,
+				ram_size,
+				bios,
+			} => {
+				let machine = machine_config.machine();
+				assert!(machine.runnable());
+				let machine_name = machine.name().into();
+				let ram_size = *ram_size;
+				let bios = bios.clone();
+
+				let slots = machine_config
+					.changed_slots(None)
+					.into_iter()
+					.map(|(slot_name, slot_value)| {
+						(format!("&{slot_name}").into(), slot_value.unwrap_or_default().into())
+					})
+					.collect::<Vec<_>>();
+				let images = images
+					.iter()
+					.map(|(tag, image_desc)| (tag.as_str().into(), image_desc.clone()))
+					.collect::<Vec<_>>();
+
+				let start_args = MameStartArgs {
+					machine_name,
+					ram_size,
+					bios,
+					slots,
+					images,
+					video,
+				};
+				let action = Action::Start(start_args);
+				let run_title = run_item_text(machine.description()).into();
+				let run_descs = vec![MenuDesc {
+					title: "".into(),
+					action: Some(action),
+				}];
+				let browse_target =
+					(!machine.machine_software_lists().is_empty()).then(|| PrefsCollection::MachineSoftware {
+						machine_name: machine.name().to_string(),
+					});
+
+				(run_title, run_descs, browse_target, true)
+			}
+			ItemDetails::Software {
+				software_list,
+				software,
+				machine_indexes,
+				..
+			} => {
+				let run_descs = machine_indexes
+					.iter()
+					.filter_map(|&index| {
+						// get the machine out of the InfoDB
+						let machine = info_db.machines().get(index).unwrap();
+						assert!(
+							machine.runnable(),
+							"software item {} from software list {}is associated with machine {} which is not runnable",
+							software.name,
+							software_list.name,
+							machine.name()
+						);
+
+						// identify all parts of the software
+						let parts_with_devices = software
+							.parts
+							.iter()
+							.map(|part| {
+								machine
+									.devices()
+									.iter()
+									.find(|dev| dev.interfaces().any(|x| x == part.interface))
+									.map(|dev| (dev.tag().into(), ImageDesc::Software(software.name.clone())))
+									.ok_or(())
+							})
+							.collect::<std::result::Result<Vec<_>, ()>>();
+
+						parts_with_devices.ok().map(|images| {
+							let start_args = MameStartArgs {
+								machine_name: machine.name().into(),
+								ram_size: None,
+								bios: None,
+								slots: [].into(),
+								images,
+								video: video.clone(),
+							};
+							let action = Some(Action::Start(start_args));
+							let title = machine.description().into();
+							MenuDesc { action, title }
+						})
+					})
+					.collect::<Vec<_>>();
+				let run_title = run_item_text(&software.description).into();
+				(run_title, run_descs, None, true)
+			}
+			ItemDetails::Unrecognized { error, .. } => {
+				let run_title = error.to_string().into();
+				let run_descs = Vec::new();
+				(run_title, run_descs, None, false)
+			}
+		};
+
+		// figure out the PrefsItem we would create if we were to add this to a folder
+		let prefs_item = prefs_item.cloned().unwrap_or_else(|| {
+			let details = match &item.details {
+				ItemDetails::Machine { machine_config, .. } => PrefsItemDetails::Machine(PrefsMachineItem {
+					machine_name: machine_config.machine().name().to_string(),
+					slots: [].into(),
+					images: [].into(),
+					ram_size: None,
+					bios: None,
+				}),
+				ItemDetails::Software {
+					software_list,
+					software,
+					..
+				} => {
+					let software_list = software_list.name.as_str().into();
+					let software = software.name.as_str().into();
+					PrefsItemDetails::Software(PrefsSoftwareItem {
+						software_list,
+						software,
+						preferred_machines: None,
+					})
+				}
+				ItemDetails::Unrecognized { .. } => {
+					unreachable!("Cannot create PrefsItemDetails for unrecognized item");
+				}
+			};
+			PrefsItem {
+				id: Default::default(),
+				video: None,
+				details,
+			}
+		});
+
+		Some((run_title, run_descs, browse_target, can_configure, prefs_item))
 	}
 
 	fn refresh_map(&self) {
