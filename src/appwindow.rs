@@ -89,6 +89,7 @@ use crate::prefs::BuiltinCollection;
 use crate::prefs::ColumnType;
 use crate::prefs::Preferences;
 use crate::prefs::PrefsCollection;
+use crate::prefs::PrefsSize;
 use crate::prefs::SortOrder;
 use crate::prefs::pathtype::PathType;
 use crate::runtime::MameStderr;
@@ -137,6 +138,11 @@ const FRAMESKIP_RATES: &[Option<u8>] = &[
 
 const MINIMUM_MAME_RECORD_MOVIE: MameVersion = MameVersion::new(0, 221); // recording movies by specifying absolute paths was introduced in MAME 0.221
 const MINIMUM_MAME_CLASSIC_MENU: MameVersion = MameVersion::new(0, 274);
+
+const DEFAULT_SIZE: PrefsSize = PrefsSize {
+	width: 920.0,
+	height: 520.0,
+};
 
 /// Arguments to the application (derivative from the command line); almost all of this
 /// are power user features or diagnostics
@@ -542,17 +548,13 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		.window_position
 		.as_ref()
 		.map(|pos| LogicalPosition::from(*pos).to_physical(app_window.window().scale_factor()));
-	let window_physical_size = preferences
-		.window_size
-		.as_ref()
-		.map(|size| LogicalSize::from(*size).to_physical(app_window.window().scale_factor()));
+	let window_physical_size = LogicalSize::from(preferences.window_size.unwrap_or(DEFAULT_SIZE))
+		.to_physical(app_window.window().scale_factor());
 
 	if let Some(window_physical_position) = window_physical_position {
 		app_window.window().set_position(window_physical_position);
 	}
-	if let Some(window_physical_size) = window_physical_size {
-		app_window.window().set_size(window_physical_size);
-	}
+	app_window.window().set_size(window_physical_size);
 	if let Some(main_window_left_column_width) = preferences.main_window_left_column_width {
 		app_window.set_column_left_width(main_window_left_column_width);
 	}
@@ -573,7 +575,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 
 			// the following is a stupid hack only needed for winit where we need to force some `WindowEvent`'s to
 			// fire so that the child window can be properly created
-			if window_physical_size.is_none_or(|size| size == default_window_size) {
+			if window_physical_size == default_window_size {
 				parent.set_size(PhysicalSize {
 					width: default_window_size.width + 1,
 					..default_window_size
