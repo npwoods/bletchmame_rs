@@ -484,7 +484,7 @@ impl State {
 				let [name, token, code] = evt.find_attributes([b"name", b"token", b"code"])?;
 				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?.into();
 				let token = token.as_deref().ok_or(ThisError::MissingMandatoryAttribute("token"))?;
-				let token = token.try_into().unwrap();
+				let token = token.into();
 				let code = code.ok_or(ThisError::MissingMandatoryAttribute("code"))?.into();
 				let item = InputDeviceItem { name, token, code };
 
