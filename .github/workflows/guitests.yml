@@ -44,18 +44,24 @@ jobs:
       - name: Caching
         uses: Swatinem/rust-cache@v2
 
-      # Build the binary (release by default, debug if GUITEST_BUILD=debug)
-      - name: Build Binary
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: ${{ env.GUITEST_BUILD == 'debug' && '--locked' || '--locked --release' }}
-
       # Install Python dependencies for GUI testing
       - name: Install Python GUI Testing Dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install pyautogui pygetwindow pillow pyperclip
+
+      # Set screen resolution to 1024x768 for the Windows runner (required for consistent GUI screenshots)
+      - name: List available screen resolutions
+        shell: pwsh
+        run: |
+          Write-Host "Listing available screen resolutions"
+          python "${{ github.workspace }}\scripts\change_screen_resolution.py" --list
+
+      - name: Set screen resolution
+        shell: pwsh
+        run: |
+          Write-Host "Setting screen resolution to 1024x768"
+          python "${{ github.workspace }}\scripts\change_screen_resolution.py" --width 1024 --height 768
 
       # Setup MAME (download, extract, create config)
       - name: Setup MAME
@@ -69,6 +75,13 @@ jobs:
           } else {
             Write-Host "MAME directory not found: ${{ github.workspace }}\mame"
           }
+
+      # Build the binary (release by default, debug if GUITEST_BUILD=debug)
+      - name: Build Binary
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: ${{ env.GUITEST_BUILD == 'debug' && '--locked' || '--locked --release' }}
 
       # Discover and run all GUI tests
       - name: Run GUI Tests
