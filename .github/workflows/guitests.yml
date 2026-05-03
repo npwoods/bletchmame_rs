@@ -50,18 +50,19 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install pyautogui pygetwindow pillow pyperclip
 
-      # Set screen resolution to 1152x864 for the Windows runner (required for consistent GUI screenshots)
+      # Diagnostic operation to list available screen resolutions
       - name: List available screen resolutions
         shell: pwsh
         run: |
           Write-Host "Listing available screen resolutions"
-          python "${{ github.workspace }}\scripts\change_screen_resolution.py" --list
+          python "${{ github.workspace }}\scripts\prepare_desktop.py" --list
 
-      - name: Set screen resolution
+      # Prepare desktop for GUI tests by changing the screen resolution and minimizing existing windows
+      - name: Prepare desktop (resolution + minimize)
         shell: pwsh
         run: |
-          Write-Host "Setting screen resolution to 1152x864"
-          python "${{ github.workspace }}\scripts\change_screen_resolution.py" --width 1152 --height 864
+          Write-Host "Setting screen resolution to 1152x864 and minimizing windows"
+          python "${{ github.workspace }}\scripts\prepare_desktop.py" --width 1152 --height 864 --minimize-all
 
       # Setup MAME (download, extract, create config)
       - name: Setup MAME
