@@ -48,7 +48,7 @@ jobs:
       - name: Install Python GUI Testing Dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pyautogui pygetwindow pillow pyperclip
+          python -m pip install pyautogui pygetwindow pillow pyperclip mss imageio imageio-ffmpeg numpy
 
       # Diagnostic operation to list available screen resolutions
       - name: List available screen resolutions
@@ -108,10 +108,10 @@ jobs:
             exit 1
           }
 
-          # Directory to collect screenshots from tests
-          $screenshotDir = "${{ github.workspace }}\test-screenshots"
-          if (-not (Test-Path $screenshotDir)) {
-            New-Item -ItemType Directory -Force -Path $screenshotDir | Out-Null
+          # Directory to collect recordings from tests
+          $recordDir = "${{ github.workspace }}\test-recordings"
+          if (-not (Test-Path $recordDir)) {
+            New-Item -ItemType Directory -Force -Path $recordDir | Out-Null
           }
           
           # Find all Python scripts in guitests directory, sorted by name, but ignore common.py
@@ -130,8 +130,9 @@ jobs:
             Write-Host "Running: $($script.Name)" -ForegroundColor Cyan
             Write-Host "========================================" -ForegroundColor Cyan
             
-            # Pass the screenshots and MAME directories
-            python "$($script.FullName)" "$exePath" --log "${{github.event.inputs.log}}" --screenshot_dir "$screenshotDir" --mame-dir "${{ github.workspace }}\mame"
+            # Pass recording path and MAME directory
+            $outfile = "${recordDir}\$($script.BaseName).mp4"
+            python "$($script.FullName)" "$exePath" --log "${{github.event.inputs.log}}" --record "$outfile" --mame-dir "${{ github.workspace }}\mame"
 
             if ($LASTEXITCODE -ne 0) {
               Write-Host "✗ Test failed: $($script.Name)" -ForegroundColor Red
@@ -157,9 +158,9 @@ jobs:
           }
 
       # Upload screenshots directory so artifacts are available to workflow users
-      - name: Upload GUI Test screenshots
+      - name: Upload GUI Test recordings
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: guitest-screenshots
-          path: ${{ github.workspace }}\test-screenshots
+          name: guitest-recordings
+          path: ${{ github.workspace }}\test-recordings
