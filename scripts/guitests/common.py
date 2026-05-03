@@ -4,23 +4,16 @@ import pathlib
 import subprocess
 import pyautogui
 import inspect
+import threading
 
 # Disable failsafe by default for automated CI use
 pyautogui.FAILSAFE = False
 
-_screenshot_dir = None
-_script_name = None
-_screenshot_counter = 0
-
-
-def set_screenshot_dir(path):
-    global _screenshot_dir, _script_name
-    if path:
-        _screenshot_dir = os.path.abspath(path)
-        _ensure_dir(_screenshot_dir)
-    else:
-        _screenshot_dir = None
-    # script name will be inferred from the caller when taking the first screenshot
+# Recording state
+_record_thread = None
+_record_stop_event = None
+_record_path = None
+_record_fps = 30
 
 
 def _ensure_dir(path):
@@ -31,46 +24,148 @@ def _ensure_dir(path):
 
 
 def take_screenshot(label=None):
-    """Save a screenshot to the configured screenshot dir, if any."""
-    global _screenshot_counter, _script_name
-    if not _screenshot_dir:
-        return None
-    _ensure_dir(_screenshot_dir)
-    # infer caller script name if not set
-    if not _script_name:
-        try:
-            for frame in inspect.stack()[1:]:
-                fname = frame.filename
-                if os.path.basename(fname) != os.path.basename(__file__):
-                    _script_name = pathlib.Path(fname).stem
-                    break
-        except Exception:
-            _script_name = pathlib.Path(__file__).stem
-    _screenshot_counter += 1
-    fname = f"{_script_name}_{_screenshot_counter:02d}"
-    if label:
-        safe_label = ''.join(c if c.isalnum() or c in ('-', '_') else '_' for c in label)[:64]
-        fname = f"{fname}_{safe_label}"
-    path = os.path.join(_screenshot_dir, fname + ".png")
+    # Screenshots disabled — recordings are used instead.
+    return None
+
+
+def start_recording(path, fps=20):
+    """Start recording the entire primary monitor to `path` at `fps` frames per second.
+
+    Recording runs in a background thread and is stopped by calling stop_recording().
+    Performs a quick pre-check to ensure backends (mss, imageio/ffmpeg) are available and can open a writer.
+    Returns True if recording started, False on failure.
+    """
+    global _record_thread, _record_stop_event, _record_path, _record_fps
+    if _record_thread is not None and _record_thread.is_alive():
+        print("[WARN] Recording already in progress")
+        return False
+    _record_path = path
+    _record_fps = fps
+
+    # Pre-check imports and ability to open a writer so failures are surfaced early
     try:
-        img = pyautogui.screenshot()
-        img.save(path)
-        print(f"[INFO]: Saved screenshot: {path}")
-        return path
+        import mss as _mss
+        import numpy as _np
+        import imageio as _imageio
     except Exception as e:
-        print(f"[WARNING]: Failed to save screenshot: {e}")
-        return None
+        print(f"[ERROR] Recording backend import failed: {e}")
+        return False
+    try:
+        # Try creating and closing a writer to ensure ffmpeg is available for mp4
+        _w = _imageio.get_writer(_record_path, fps=_record_fps)
+        _w.close()
+    except Exception as e:
+        print(f"[ERROR] Recording backend cannot open writer (ffmpeg may be missing): {e}")
+        return False
+
+    _record_stop_event = threading.Event()
+
+    def _rec_worker(stop_event, out_path, fps):
+        try:
+            import mss
+            import numpy as np
+            import imageio
+        except Exception as e:
+            print(f"[ERROR] Recording backend import failed: {e}")
+            return
+        writer = None
+        try:
+            with mss.MSS() as s:
+                # Select primary monitor if possible, else fall back to the first one or union
+                monitor = s.monitors[0]
+                for m in s.monitors:
+                    if m.get("is_primary"):
+                        monitor = m
+                        break
+                if monitor == s.monitors[0] and len(s.monitors) > 1:
+                    monitor = s.monitors[1]
+
+                try:
+                    # Use a fast preset for ffmpeg to reduce capture overhead if available
+                    writer = imageio.get_writer(out_path, fps=fps, quality=None, codec='libx264', pixelformat='yuv420p', ffmpeg_params=['-preset', 'ultrafast'])
+                except Exception as e:
+                    # Fallback if params are not supported by the installed imageio/ffmpeg version
+                    try:
+                        writer = imageio.get_writer(out_path, fps=fps)
+                    except Exception as e2:
+                        print(f"[ERROR] Could not open writer inside recorder: {e2}")
+                        return
+
+                print(f"[INFO] Recording started -> {out_path} @ {fps}fps on monitor {monitor.get('name', 'main')}")
+                
+                interval = 1.0 / float(fps)
+                start_time = time.perf_counter()
+                frames_written = 0
+
+                while not stop_event.is_set():
+                    # Capture frame
+                    img = s.grab(monitor)
+                    arr = np.asarray(img)
+                    
+                    # mss returns BGRA; convert to RGB
+                    if arr.shape[2] == 4:
+                        rgb = arr[..., :3][..., ::-1]
+                    else:
+                        rgb = arr[..., ::-1]
+
+                    # Determine how many frames we SHOULD have written by now to maintain real-time speed
+                    now = time.perf_counter()
+                    expected_frames = int((now - start_time) * fps)
+                    
+                    # We must write at least one frame per capture, but if we are behind, 
+                    # we write extra copies of this frame to fill the time.
+                    num_to_write = max(1, expected_frames - frames_written)
+                    
+                    try:
+                        for _ in range(num_to_write):
+                            writer.append_data(rgb)
+                            frames_written += 1
+                    except Exception as e:
+                        print(f"[ERROR] Failed to append frame: {e}")
+                        break
+                    
+                    # Sleep until the next frame is due
+                    next_frame_time = start_time + (frames_written * interval)
+                    sleep_time = next_frame_time - time.perf_counter()
+                    if sleep_time > 0:
+                        time.sleep(sleep_time)
+
+                print(f"[INFO] Stopping recording loop for {out_path}")
+        except Exception as e:
+            print(f"[ERROR] Recording failed during capture: {e}")
+        finally:
+            if writer is not None:
+                try:
+                    writer.close()
+                    print(f"[INFO] Recording finished -> {out_path}")
+                except Exception as e:
+                    print(f"[WARN] Failed to close writer cleanly: {e}")
+
+    _record_thread = threading.Thread(target=_rec_worker, args=(_record_stop_event, _record_path, _record_fps), daemon=True)
+    _record_thread.start()
+    return True
+
+
+def stop_recording():
+    """Stop ongoing recording (if any) and wait for thread to finish."""
+    global _record_thread, _record_stop_event
+    if _record_thread is None:
+        return
+    if _record_stop_event is None:
+        return
+    _record_stop_event.set()
+    _record_thread.join(timeout=5)
+    if _record_thread.is_alive():
+        print("[WARN] Recording thread did not exit promptly")
+    _record_thread = None
+    _record_stop_event = None
+    return
+
 
 
 def sleep_and_maybe_capture(seconds, label=None, force_capture=False):
-    try:
-        time.sleep(seconds)
-    except Exception:
-        if _screenshot_dir:
-            take_screenshot(label or "sleep_interrupted")
-        raise
-    if _screenshot_dir and (force_capture or seconds >= 1.0):
-        take_screenshot(label)
+    # Simplified sleep; screenshots are disabled when recording is used.
+    time.sleep(seconds)
 
 
 def wait_for_window(titles, timeout=30):

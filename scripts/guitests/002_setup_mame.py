@@ -10,7 +10,7 @@ import subprocess
 import traceback
 
 # helpers from common
-from common import set_screenshot_dir, take_screenshot, sleep_and_maybe_capture, wait_for_window, launch_app, activate_window, click_center
+from common import wait_for_window, launch_app, activate_window, click_center, start_recording, stop_recording
 
 import pyautogui
 import re
@@ -41,31 +41,28 @@ def test_import_mame_ini(exe_path, exe_log, mame_dir):
 
     try:
         window = wait_for_window(["[ready] BletchMameAuto", "[report] BletchMameAuto"], timeout=30)
-        take_screenshot("after_start")
 
         activate_window(window)
-        sleep_and_maybe_capture(0.5, "after_activate", force_capture=True)
+        time.sleep(0.5)
         click_center(window)
-        sleep_and_maybe_capture(0.5, "after_click_center")
+        time.sleep(0.5)
 
         # Open Settings menu and choose Paths first (Alt+S, p)
         print("[INFO] Opening Settings menu and selecting Paths (Alt+S, p)...")
         pyautogui.hotkey('alt', 's')
     
-        sleep_and_maybe_capture(0.2, "after_open_settings")
+        time.sleep(0.2)
         pyautogui.press('p')
-        sleep_and_maybe_capture(0.5, "after_select_paths")
-        take_screenshot("paths_dialog_before_wait")
+        time.sleep(0.5)
 
         paths_dialog = wait_for_window("Paths", timeout=5)
-        take_screenshot("paths_dialog")
 
         # In the Paths dialog, tab three times to reach the MAME executable selector, then Enter
         print("[INFO] Navigating Paths dialog: TAB x3, Enter to open file chooser")
         pyautogui.press('tab', presses=3, interval=0.12)
-        sleep_and_maybe_capture(0.15, "after_tab_paths")
+        time.sleep(0.15)
         pyautogui.press('enter')
-        sleep_and_maybe_capture(0.8, "after_open_filechooser")
+        time.sleep(0.8)
 
         # Type the path to mame.exe (mame_dir + mame.exe) or fallback to mame.exe
         import pathlib
@@ -76,27 +73,26 @@ def test_import_mame_ini(exe_path, exe_log, mame_dir):
 
         print(f"[INFO] Typing MAME exe path into file chooser: {chooser_path}")
         paste_text(chooser_path)
-        sleep_and_maybe_capture(0.5, "after_typing_mame_path")
+        time.sleep(0.5)
 
         # Confirm file chooser and then confirm Paths dialog
         pyautogui.press('enter')
-        sleep_and_maybe_capture(0.5, "after_confirm_filechooser")
+        time.sleep(0.5)
         pyautogui.hotkey('shift', 'tab')
         time.sleep(0.1)
         pyautogui.hotkey('shift', 'tab')
         time.sleep(0.1)
         pyautogui.press('enter')
-        sleep_and_maybe_capture(3.0, "after_confirm_paths")
+        time.sleep(3.0)
 
         # Now open Settings -> Import MAME Ini
         print("[INFO] Opening Settings menu for Import MAME Ini (Alt+S)...")
         pyautogui.hotkey('alt', 's')
-        sleep_and_maybe_capture(0.2, "after_open_settings_for_import")
+        time.sleep(0.2)
 
         # Try pressing 'i' (common mnemonic for Import) otherwise navigate
         pyautogui.press('i')
-        sleep_and_maybe_capture(1.0, "after_select_import")
-        take_screenshot("import_dialog_before")
+        time.sleep(1.0)
 
         # Wait for the file dialog titled "Import MAME INI"
         try:
@@ -111,15 +107,15 @@ def test_import_mame_ini(exe_path, exe_log, mame_dir):
         mame_ini_path = str(pathlib.Path(mame_dir) / "mame.ini")
         print(f"[INFO] Typing path: {mame_ini_path}")
         paste_text(mame_ini_path)
-        sleep_and_maybe_capture(0.5, "after_typing_path")
+        time.sleep(0.5)
 
         # Confirm the dialog. Some dialogs require shifting focus; press Shift+Tab then Enter
         pyautogui.press('enter')
         time.sleep(0.5)
         pyautogui.hotkey('shift', 'tab')
-        sleep_and_maybe_capture(0.5, "before_confirm_import")
+        time.sleep(0.5)
         pyautogui.press('enter')
-        sleep_and_maybe_capture(0.25, "after_confirm_import")
+        time.sleep(0.25)
 
         # Wait for the Import dialog to close and for the main window to be responsive
         print("[INFO] Waiting for Import dialog to close and main window to become ready")
@@ -148,18 +144,18 @@ def test_import_mame_ini(exe_path, exe_log, mame_dir):
                 except TimeoutError:
                     pass
 
-            sleep_and_maybe_capture(0.5, "waiting_import_close")
+            time.sleep(0.5)
         else:
             print("[WARN] Import dialog did not close within expected time")
 
-        sleep_and_maybe_capture(3.0, "after_import")
+        time.sleep(3.0)
 
         # Attempt to close app via Alt+F then X (as in other tests)
         print("[INFO] Exiting application via Alt+F, x")
         pyautogui.hotkey('alt', 'f')
-        sleep_and_maybe_capture(0.5, "after_open_file_menu")
+        time.sleep(0.5)
         pyautogui.press('x')
-        sleep_and_maybe_capture(2, "after_exit_press")
+        time.sleep(2.0)
 
         try:
             return_code = process.wait(timeout=30)
@@ -192,15 +188,27 @@ def test_import_mame_ini(exe_path, exe_log, mame_dir):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('exe_path', help='Path to BletchMAME executable')
-    parser.add_argument('--screenshot_dir', '-s', dest='screenshot_dir', help='Directory to save screenshots', default=None)
+    parser.add_argument('--record', dest='record', help='Path to record video (mp4)', default=None)
     parser.add_argument('--log', '-l', dest='log', help='Value to pass to executable as --log', default='')
     parser.add_argument('--mame-dir', dest='mame_dir', help='Path to extracted MAME directory (optional)', default='')
     args = parser.parse_args()
 
-    if args.screenshot_dir:
-        set_screenshot_dir(args.screenshot_dir)
+    if args.record:
+        try:
+            os.makedirs(os.path.dirname(args.record), exist_ok=True)
+            ok = start_recording(args.record)
+            if not ok:
+                print("[WARN] start_recording failed; recording will be disabled for this run")
+        except Exception as e:
+            print(f"[WARN] Failed to start recording: {e}")
 
     success = test_import_mame_ini(args.exe_path, args.log, args.mame_dir)
+
+    try:
+        stop_recording()
+    except Exception:
+        pass
+
     sys.exit(0 if success else 1)
 
 

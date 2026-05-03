@@ -21,7 +21,7 @@ import argparse
 import pathlib
 import datetime
 
-from common import set_screenshot_dir, take_screenshot, sleep_and_maybe_capture, wait_for_window, launch_app, activate_window, click_center
+from common import wait_for_window, launch_app, activate_window, click_center, start_recording, stop_recording
 
 # common.py disables pyautogui.FAILSAFE already
 
@@ -48,7 +48,6 @@ def test_gui(exe_path, exe_log):
             print("[INFO] Activating window...")
             try:
                 window.activate()
-                sleep_and_maybe_capture(0, "after_activate", force_capture=True)
                 
                 # Move cursor into window and click to ensure focus
                 center_x = window.left + window.width // 2
@@ -63,11 +62,11 @@ def test_gui(exe_path, exe_log):
         
         print("[INFO] Opening File menu with Alt+F...")
         pyautogui.hotkey('alt', 'f')
-        sleep_and_maybe_capture(1.5, "after_open_file_menu")
+        time.sleep(1.5)
         
         print("[INFO] Sending 'x' to click Exit...")
         pyautogui.press('x')
-        sleep_and_maybe_capture(2, "after_exit_press")
+        time.sleep(2.0)
         
         # Wait for the process to terminate
         print("[INFO] Waiting for application to exit...")
@@ -137,17 +136,30 @@ def test_gui(exe_path, exe_log):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('exe_path', help='Path to BletchMAME executable')
-    parser.add_argument('--screenshot_dir', '-s', dest='screenshot_dir', help='Directory to save screenshots', default=None)
+    parser.add_argument('--record', dest='record', help='Path to record video (mp4)', default=None)
     parser.add_argument('--log', '-l', dest='log', help='Value to pass to executable as --log', default='')
     # Accept --mame_dir for compatibility but ignore it
     parser.add_argument('--mame-dir', dest='mame_dir', help='Ignored compatibility arg', default='')
     args = parser.parse_args()
 
-    # Configure screenshot directory using common helper
-    if args.screenshot_dir:
-        set_screenshot_dir(args.screenshot_dir)
+    # Start recording if requested
+    if args.record:
+        try:
+            os.makedirs(os.path.dirname(args.record), exist_ok=True)
+            ok = start_recording(args.record)
+            if not ok:
+                print(f"[WARN] start_recording failed; recording will be disabled for this run")
+        except Exception as e:
+            print(f"[WARN] Failed to start recording: {e}")
 
     success = test_gui(args.exe_path, args.log)
+
+    # Stop recording if active
+    try:
+        stop_recording()
+    except Exception:
+        pass
+
     sys.exit(0 if success else 1)
 
 if __name__ == "__main__":
