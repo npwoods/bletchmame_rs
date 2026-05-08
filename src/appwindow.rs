@@ -223,7 +223,7 @@ impl AppModel {
 		if let Some(old_prefs) = old_prefs
 			&& mame_command_line_key(old_prefs) != mame_command_line_key(&prefs)
 		{
-			self.state.borrow_mut().reset();
+			self.update_state(AppState::reset);
 		}
 
 		// react to all of the possible changes
