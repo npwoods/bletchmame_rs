@@ -16,6 +16,7 @@ use smol_str::ToSmolStr;
 use smol_str::format_smolstr;
 use throttle::Throttle;
 use tracing::debug;
+use tracing::info;
 
 use crate::action::Action;
 use crate::canceller::Canceller;
@@ -187,6 +188,8 @@ impl AppState {
 	}
 
 	pub fn activate(&mut self) -> bool {
+		info!("AppState::activate(): starting");
+
 		// if we already have a session (in any form, we're already active) or if we're shutting down, don't proceed
 		if self.live.as_ref().is_some_and(|live| live.session.is_some()) {
 			return false;
