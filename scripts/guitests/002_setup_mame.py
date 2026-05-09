@@ -10,7 +10,10 @@ import subprocess
 import traceback
 
 # helpers from common
-from common import wait_for_window, launch_app, activate_window, click_center, start_recording, stop_recording
+from common import (
+    wait_for_window, launch_app, activate_window, click_center,
+    start_recording, stop_recording, wait_for_process_termination
+)
 
 import pyautogui
 import re
@@ -98,16 +101,7 @@ def test_setup_mame(exe_path, exe_log, mame_dir):
         pyautogui.press('x')
         time.sleep(2.0)
 
-        try:
-            return_code = process.wait(timeout=30)
-        except subprocess.TimeoutExpired:
-            print("[WARN] Application did not exit within 30s; killing")
-            try:
-                process.kill()
-                return_code = process.wait(timeout=5)
-            except Exception as e:
-                print(f"[ERROR] Failed to kill process: {e}")
-                return_code = None
+        return_code = wait_for_process_termination(process)
 
         if return_code == 0:
             print("[OK] Application exited successfully with code 0")
@@ -119,10 +113,7 @@ def test_setup_mame(exe_path, exe_log, mame_dir):
     except Exception as e:
         print(f"[FAIL] Test failed: {e}")
         traceback.print_exc()
-        try:
-            process.kill()
-        except:
-            pass
+        wait_for_process_termination(process, timeout=1)
         return False
 
 

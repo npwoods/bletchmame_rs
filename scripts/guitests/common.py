@@ -231,3 +231,32 @@ def click_center(window):
         pyautogui.click(center_x, center_y)
     except Exception as e:
         print(f"[WARN] Failed clicking center: {e}")
+
+
+def wait_for_process_termination(process, timeout=30):
+    """Wait for a process to terminate, with fallback to terminate/kill.
+    
+    Returns the return code if the process exited, or None if it could not be confirmed.
+    """
+    print("[INFO] Waiting for application to exit...")
+    try:
+        return_code = process.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        print(f"[WARN] Application did not exit within {timeout}s; attempting graceful shutdown")
+        try:
+            process.terminate()
+            try:
+                return_code = process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                print("[WARN] terminate() did not stop process; killing")
+                try:
+                    process.kill()
+                    return_code = process.wait(timeout=5)
+                except Exception as e:
+                    print(f"[ERROR] Failed to kill process: {e}")
+                    return_code = None
+        except Exception as e:
+            print(f"[ERROR] Failed to terminate process: {e}")
+            return_code = None
+    
+    return return_code
