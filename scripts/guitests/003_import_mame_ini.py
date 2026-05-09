@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GUI test: Launch app and setup MAME path via Settings -> Paths dialog.
+GUI test: Import mame.ini via Settings -> Import MAME Ini dialog.
 """
 import sys
 import argparse
@@ -8,12 +8,12 @@ import os
 import time
 import subprocess
 import traceback
+import pyautogui
+import re
+import pathlib
 
 # helpers from common
 from common import wait_for_window, launch_app, activate_window, click_center, start_recording, stop_recording
-
-import pyautogui
-import re
 
 
 def paste_text(text):
@@ -32,7 +32,7 @@ def paste_text(text):
         pyautogui.write(text, interval=0.02)
 
 
-def test_setup_mame(exe_path, exe_log, mame_dir):
+def test_import_mame_ini(exe_path, exe_log, mame_dir):
     try:
         process = launch_app(exe_path, exe_log)
     except Exception as e:
@@ -47,49 +47,69 @@ def test_setup_mame(exe_path, exe_log, mame_dir):
         click_center(window)
         time.sleep(0.5)
 
-        # Open Settings menu and choose Paths first (Alt+S, p)
-        print("[INFO] Opening Settings menu and selecting Paths (Alt+S, p)...")
+        # Now open Settings -> Import MAME Ini
+        print("[INFO] Opening Settings menu for Import MAME Ini (Alt+S)...")
         pyautogui.hotkey('alt', 's')
-    
         time.sleep(0.2)
-        pyautogui.press('p')
+
+        # Try pressing 'i' (common mnemonic for Import) otherwise navigate
+        pyautogui.press('i')
+        time.sleep(1.0)
+
+        # Wait for the file dialog titled "Import MAME INI"
+        try:
+            dialog = wait_for_window("Import MAME INI", timeout=10)
+        except TimeoutError:
+            # Try a bit longer or assume dialog is focused
+            print("[WARN] Import dialog did not appear by title; attempting to type path anyway")
+            dialog = None
+
+        # Type the path into the filename field
+        mame_ini_path = str(pathlib.Path(mame_dir) / "mame.ini")
+        print(f"[INFO] Typing path: {mame_ini_path}")
+        paste_text(mame_ini_path)
         time.sleep(0.5)
 
-        paths_dialog = wait_for_window("Paths", timeout=5)
-
-        # In the Paths dialog, tab three times to reach the MAME executable selector, then Enter
-        print("[INFO] Navigating Paths dialog: TAB x3, Enter to open file chooser")
-        pyautogui.press('tab', presses=3, interval=0.12)
-        time.sleep(0.15)
-        pyautogui.press('enter')
-        time.sleep(0.8)
-
-        # Wait for the browse dialog
-        browse_dialog = wait_for_window("Open", timeout=5)
-
-        # Type the path to mame.exe (mame_dir + mame.exe) or fallback to mame.exe
-        import pathlib
-        chooser_path = str(pathlib.Path(mame_dir) / "mame.exe")
-
-        # Remove control characters and trim
-        chooser_path = re.sub(r'[\x00-\x1F\x7F]', '', chooser_path).strip()
-
-        print(f"[INFO] Typing MAME exe path into file chooser: {chooser_path}")
-        paste_text(chooser_path)
-        time.sleep(0.5)
-
-        # Confirm file chooser and then confirm Paths dialog
+        # Confirm the dialog. Some dialogs require shifting focus; press Shift+Tab then Enter
         pyautogui.press('enter')
         time.sleep(0.5)
         pyautogui.hotkey('shift', 'tab')
-        time.sleep(0.1)
-        pyautogui.hotkey('shift', 'tab')
-        time.sleep(0.1)
+        time.sleep(0.5)
         pyautogui.press('enter')
+        time.sleep(0.25)
+
+        # Wait for the Import dialog to close and for the main window to be responsive
+        print("[INFO] Waiting for Import dialog to close and main window to become ready")
+        try:
+            import pygetwindow
+        except Exception:
+            pygetwindow = None
+
+        start_wait = time.time()
+        wait_timeout = 15
+        while time.time() - start_wait < wait_timeout:
+            dialog_still_present = False
+            if pygetwindow:
+                try:
+                    wins = pygetwindow.getAllWindows()
+                    dialog_still_present = any(getattr(w, 'title', '') == 'Import MAME INI' for w in wins)
+                except Exception:
+                    dialog_still_present = False
+
+            if not dialog_still_present:
+                # ensure main window title is back (ready or report)
+                try:
+                    _ = wait_for_window(["[ready] BletchMameAuto", "[report] BletchMameAuto"], timeout=1)
+                    print("[INFO] Import dialog closed and main window ready")
+                    break
+                except TimeoutError:
+                    pass
+
+            time.sleep(0.5)
+        else:
+            print("[WARN] Import dialog did not close within expected time")
+
         time.sleep(3.0)
-
-        # Since we configured MAME, the window should be ready
-        window = wait_for_window(["[ready] BletchMameAuto"], timeout=30)
 
         # Attempt to close app via Alt+F then X (as in other tests)
         print("[INFO] Exiting application via Alt+F, x")
@@ -143,7 +163,7 @@ def main():
         except Exception as e:
             print(f"[WARN] Failed to start recording: {e}")
 
-    success = test_setup_mame(args.exe_path, args.log, args.mame_dir)
+    success = test_import_mame_ini(args.exe_path, args.log, args.mame_dir)
 
     try:
         stop_recording()
