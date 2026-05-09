@@ -3,10 +3,8 @@
 GUI test: Import mame.ini via Settings -> Import MAME Ini dialog.
 """
 import sys
-import argparse
 import os
 import time
-import subprocess
 import traceback
 import pyautogui
 import re
@@ -15,7 +13,8 @@ import pathlib
 # helpers from common
 from common import (
     wait_for_window, launch_app, activate_window, click_center,
-    start_recording, stop_recording, wait_for_process_termination
+    start_recording, stop_recording, wait_for_process_termination,
+    create_arg_parser
 )
 
 
@@ -138,31 +137,17 @@ def test_import_mame_ini(exe_path, exe_log, mame_dir):
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('exe_path', help='Path to BletchMAME executable')
-    parser.add_argument('--record', dest='record', help='Path to record video (mp4)', default=None)
-    parser.add_argument('--log', '-l', dest='log', help='Value to pass to executable as --log', default='')
-    parser.add_argument('--mame-dir', dest='mame_dir', help='Path to extracted MAME directory (optional)', default='')
+    # Setup
+    parser = create_arg_parser()
     args = parser.parse_args()
+    start_recording(args.record)
 
-    if args.record:
-        try:
-            os.makedirs(os.path.dirname(args.record), exist_ok=True)
-            ok = start_recording(args.record)
-            if not ok:
-                print("[WARN] start_recording failed; recording will be disabled for this run")
-        except Exception as e:
-            print(f"[WARN] Failed to start recording: {e}")
-
+    # Run the test
     success = test_import_mame_ini(args.exe_path, args.log, args.mame_dir)
 
-    try:
-        stop_recording()
-    except Exception:
-        pass
-
+    # Cleanup
+    stop_recording()
     sys.exit(0 if success else 1)
-
 
 if __name__ == '__main__':
     main()
