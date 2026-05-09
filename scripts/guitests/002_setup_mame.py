@@ -64,6 +64,9 @@ def test_import_mame_ini(exe_path, exe_log, mame_dir):
         pyautogui.press('enter')
         time.sleep(0.8)
 
+        # Wait for the browse dialog
+        browse_dialog = wait_for_window("Open", timeout=5)
+
         # Type the path to mame.exe (mame_dir + mame.exe) or fallback to mame.exe
         import pathlib
         chooser_path = str(pathlib.Path(mame_dir) / "mame.exe")
