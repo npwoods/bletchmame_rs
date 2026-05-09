@@ -9,7 +9,6 @@ use i_slint_backend_winit::WinitWindowAccessor;
 use raw_window_handle::HasWindowHandle;
 use raw_window_handle::RawWindowHandle;
 use tokio::sync::oneshot;
-use tokio::sync::oneshot::Sender;
 use tracing::debug;
 use tracing::info;
 use tracing::info_span;
@@ -26,24 +25,21 @@ use crate::platform::WindowAttributesExt;
 #[derive(Clone, Default)]
 pub struct WinitBackendRuntime(Rc<RefCell<WinitBackendRuntimeInner>>);
 
+type InvokeWithActiveEventLoopFunc =
+	Box<dyn Fn(Box<dyn FnOnce(&ActiveEventLoop) + Send>) -> Result<(), i_slint_core::api::EventLoopError> + 'static>;
+
 #[derive(Default)]
 struct WinitBackendRuntimeInner {
-	pending: Vec<WinitPendingChildWindow>,
 	live: Vec<Rc<WinitChildWindow>>,
 	modal_parent_raw_handle: Option<RawWindowHandle>,
+	// Store an invokee that accepts a boxed callback taking the ActiveEventLoop and returns a Result.
+	invoke_with_event_loop: Option<InvokeWithActiveEventLoopFunc>,
 }
 
 #[derive(Debug)]
 pub struct WinitChildWindow {
 	window: Window,
 	parent_window_id: WindowId,
-}
-
-#[derive(Debug)]
-struct WinitPendingChildWindow {
-	parent_window_id: WindowId,
-	window_attributes: WindowAttributes,
-	sender: Sender<Result<WinitChildWindow>>,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -83,6 +79,7 @@ impl WinitBackendRuntime {
 			builder = builder.with_renderer_name(renderer);
 		}
 		let slint_backend = builder.build()?;
+		self.0.borrow_mut().invoke_with_event_loop = Some(slint_backend.get_invoke_with_active_event_loop_func());
 		Ok(Box::new(slint_backend) as Box<_>)
 	}
 
@@ -108,14 +105,15 @@ impl WinitBackendRuntime {
 		// an `ActiveEventLoop`; prepare to receive it
 		let (sender, receiver) = oneshot::channel();
 
-		// create and push the pending window
+		// get the parent window's ID
 		let parent_window_id = parent.with_winit_window(|window| window.id()).unwrap();
-		let pending_child_window = WinitPendingChildWindow {
-			parent_window_id,
-			window_attributes,
-			sender,
-		};
-		self.0.borrow_mut().pending.push(pending_child_window);
+
+		// send an event to create the pending window with the active event loop
+		let callback: Box<dyn FnOnce(&ActiveEventLoop) + Send> = Box::new(move |event_loop| {
+			let result = WinitChildWindow::new(parent_window_id, window_attributes, event_loop);
+			let _ = sender.send(result);
+		});
+		let _ = (self.0.borrow().invoke_with_event_loop.as_ref().unwrap())(callback);
 
 		// and await the result
 		let child_window = receiver.await??;
@@ -139,16 +137,6 @@ impl WinitBackendRuntime {
 		let result = callback();
 		self.0.borrow_mut().modal_parent_raw_handle = None;
 		result
-	}
-
-	fn create_pending_child_windows(&self, event_loop: &ActiveEventLoop) {
-		let mut state = self.0.borrow_mut();
-
-		// we need to create child windows
-		for pending in state.pending.drain(..) {
-			let result = WinitChildWindow::new(pending.parent_window_id, pending.window_attributes, event_loop);
-			let _ = pending.sender.send(result);
-		}
 	}
 
 	fn with_child_window<R>(
@@ -178,7 +166,7 @@ impl WinitBackendRuntime {
 impl CustomApplicationHandler for WinitBackendRuntime {
 	fn window_event(
 		&mut self,
-		event_loop: &ActiveEventLoop,
+		_event_loop: &ActiveEventLoop,
 		window_id: WindowId,
 		_winit_window: Option<&Window>,
 		_slint_window: Option<&slint::Window>,
@@ -188,9 +176,6 @@ impl CustomApplicationHandler for WinitBackendRuntime {
 		let span = info_span!("window_event");
 		let _guard = span.enter();
 		debug!(?event, ?window_id, "window_event");
-
-		// take this opportunity to create pending children, regardless of what is going on
-		self.create_pending_child_windows(event_loop);
 
 		match event {
 			WindowEvent::Focused(true) => {
@@ -223,11 +208,6 @@ impl CustomApplicationHandler for WinitBackendRuntime {
 			}
 			_ => EventResult::Propagate,
 		}
-	}
-
-	fn resumed(&mut self, event_loop: &ActiveEventLoop) -> EventResult {
-		self.create_pending_child_windows(event_loop);
-		EventResult::Propagate
 	}
 }
 
