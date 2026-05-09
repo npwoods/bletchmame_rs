@@ -5,6 +5,7 @@ import subprocess
 import pyautogui
 import inspect
 import threading
+import argparse
 
 # Disable failsafe by default for automated CI use
 pyautogui.FAILSAFE = False
@@ -35,10 +36,22 @@ def start_recording(path, fps=20):
     Performs a quick pre-check to ensure backends (mss, imageio/ffmpeg) are available and can open a writer.
     Returns True if recording started, False on failure.
     """
+    if not path:
+        return False
+
     global _record_thread, _record_stop_event, _record_path, _record_fps
     if _record_thread is not None and _record_thread.is_alive():
         print("[WARN] Recording already in progress")
         return False
+
+    try:
+        out_dir = os.path.dirname(os.path.abspath(path))
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
+    except Exception as e:
+        print(f"[WARN] Failed to create directory for recording: {e}")
+        return False
+
     _record_path = path
     _record_fps = fps
 
@@ -148,19 +161,20 @@ def start_recording(path, fps=20):
 
 def stop_recording():
     """Stop ongoing recording (if any) and wait for thread to finish."""
-    global _record_thread, _record_stop_event
-    if _record_thread is None:
-        return
-    if _record_stop_event is None:
-        return
-    _record_stop_event.set()
-    _record_thread.join(timeout=5)
-    if _record_thread.is_alive():
-        print("[WARN] Recording thread did not exit promptly")
-    _record_thread = None
-    _record_stop_event = None
-    return
-
+    try:
+        global _record_thread, _record_stop_event
+        if _record_thread is None:
+            return
+        if _record_stop_event is None:
+            return
+        _record_stop_event.set()
+        _record_thread.join(timeout=5)
+        if _record_thread.is_alive():
+            print("[WARN] Recording thread did not exit promptly")
+        _record_thread = None
+        _record_stop_event = None
+    except Exception:
+        pass
 
 
 def sleep_and_maybe_capture(seconds, label=None, force_capture=False):
@@ -231,3 +245,42 @@ def click_center(window):
         pyautogui.click(center_x, center_y)
     except Exception as e:
         print(f"[WARN] Failed clicking center: {e}")
+
+
+def wait_for_process_termination(process, timeout=30):
+    """Wait for a process to terminate, with fallback to terminate/kill.
+    
+    Returns the return code if the process exited, or None if it could not be confirmed.
+    """
+    print("[INFO] Waiting for application to exit...")
+    try:
+        return_code = process.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        print(f"[WARN] Application did not exit within {timeout}s; attempting graceful shutdown")
+        try:
+            process.terminate()
+            try:
+                return_code = process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                print("[WARN] terminate() did not stop process; killing")
+                try:
+                    process.kill()
+                    return_code = process.wait(timeout=5)
+                except Exception as e:
+                    print(f"[ERROR] Failed to kill process: {e}")
+                    return_code = None
+        except Exception as e:
+            print(f"[ERROR] Failed to terminate process: {e}")
+            return_code = None
+    
+    return return_code
+
+
+def create_arg_parser(description=None):
+    """Create a standard ArgumentParser for GUI tests."""
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument('exe_path', help='Path to BletchMAME executable')
+    parser.add_argument('--record', dest='record', help='Path to record video (mp4)', default=None)
+    parser.add_argument('--log', '-l', dest='log', help='Value to pass to executable as --log', default='')
+    parser.add_argument('--mame-dir', dest='mame_dir', help='Path to MAME directory (if needed by test)', default='')
+    return parser
