@@ -99,7 +99,6 @@ def test_gui(exe_path, exe_log):
             
     except TimeoutError as e:
         print(f"[FAIL] Test failed: {e}")
-        take_screenshot("timeout_error")
         try:
             process.terminate()
             process.wait(timeout=5)
@@ -113,7 +112,6 @@ def test_gui(exe_path, exe_log):
         print(f"[FAIL] Test failed with error: {e}")
         import traceback
         traceback.print_exc()
-        take_screenshot("exception")
         try:
             process.terminate()
             process.wait(timeout=5)
@@ -125,7 +123,6 @@ def test_gui(exe_path, exe_log):
         return False
     except KeyboardInterrupt:
         print("\n[SCRIPT][FAIL] Test interrupted by user")
-        take_screenshot("keyboard_interrupt")
         try:
             process.terminate()
         except:
