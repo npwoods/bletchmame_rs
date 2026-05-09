@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::env;
 use std::error::Error;
+use std::fs;
 use std::fs::File;
 use std::path::PathBuf;
 
@@ -8,7 +9,7 @@ use ico::IconDirEntry;
 use ico::IconImage;
 use winresource::WindowsResource;
 
-fn main() -> std::io::Result<()> {
+fn main() -> Result<(), Box<dyn Error>> {
 	// constants
 	let icon_png = "ui/icons/bletchmame.png";
 
@@ -57,6 +58,10 @@ fn main() -> std::io::Result<()> {
 		// and embed it
 		WindowsResource::new().set_icon(&icon_ico).compile()?;
 	}
+
+	// we like it when there is a plugins directory next to the BletchMAME executable
+	create_symlink_to_plugins_directory()?;
+
 	Ok(())
 }
 
@@ -72,5 +77,53 @@ fn convert_png_to_ico(input_path: &str, output_path: &str) -> Result<(), Box<dyn
 	// finally, write the ICO file to disk:
 	let file = File::create(output_path)?;
 	icon_dir.write(file)?;
+	Ok(())
+}
+
+fn create_symlink_to_plugins_directory() -> Result<(), Box<dyn Error>> {
+	let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+	let plugins_src = manifest_dir.join("plugins");
+
+	let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+	let mut target_dir = out_dir;
+	while target_dir.file_name().and_then(|s| s.to_str()) != Some("build") {
+		if !target_dir.pop() {
+			break;
+		}
+	}
+	target_dir.pop(); // target/debug or target/release
+
+	let plugins_dst = target_dir.join("plugins");
+	if fs::symlink_metadata(&plugins_dst).is_err() {
+		let result: Result<(), String> = {
+			#[cfg(windows)]
+			{
+				let result = std::process::Command::new("cmd")
+					.arg("/c")
+					.arg("mklink")
+					.arg("/j")
+					.arg(&plugins_dst)
+					.arg(&plugins_src)
+					.status();
+				match result {
+					Ok(s) if s.success() => Ok(()),
+					Ok(s) => Err(format!("mklink command failed with exit code: {}", s)),
+					Err(e) => Err(format!("Failed to execute mklink command: {}", e)),
+				}
+			}
+
+			#[cfg(unix)]
+			{
+				std::os::unix::fs::symlink(&plugins_src, &plugins_dst)
+					.map_err(|e| format!("Failed to create symlink for plugins: {}", e))
+			}
+
+			#[cfg(not(any(windows, unix)))]
+			Ok(())
+		};
+		if let Err(e) = result {
+			eprintln!("cargo:warning={}. The application might not find its plugins", e);
+		}
+	};
 	Ok(())
 }
