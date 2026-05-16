@@ -30,12 +30,12 @@ levenshtein = "1.0.5"
 more-asserts = "0.3.1"
 nu-utils = "0.112.2"
 num = "0.4.3"
-open = "5.3.4"
+open = "5.3.5"
 parallel_worker = "1.0.2"
 path-absolutize = "3.1.1"
 primal = "0.3.3"
 qttypes = { version = "0.2.12", optional = true }
-quick-xml = "0.39.2"
+quick-xml = "0.40.1"
 raw-window-handle = "0.6.2"
 rfd = "0.17.2"
 serde = { version = "1.0.228", features = ["rc"] }
@@ -50,7 +50,7 @@ strum = { version = "0.28.0", features = ["derive"] }
 strum_macros = "0.28.0"
 thiserror = "2.0.18"
 throttle = "0.1.0"
-tokio = { version = "1.52.1", features = [
+tokio = { version = "1.52.3", features = [
     "rt",
     "rt-multi-thread",
     "time",
