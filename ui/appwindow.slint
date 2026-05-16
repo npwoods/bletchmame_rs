@@ -1048,6 +1048,7 @@ export component AppWindow inherits Window {
         }
 
         if menubar-visible: Rectangle {
+            height: 36px;
             vertical-stretch: 0;
             background: Palette.control-background;
             HorizontalLayout {
@@ -1058,6 +1059,7 @@ export component AppWindow inherits Window {
                 alignment: start;
                 Text {
                     text: mode() == "running" ? statusbar-speed-text : mode() == "ready" ? root.get-statusbar-current-item-desc(items-view-selected-row) : "";
+                    vertical-alignment: center;
                 }
 
                 for cassette in statusbar-cassettes: HorizontalLayout {
@@ -1072,15 +1074,18 @@ export component AppWindow inherits Window {
                         if cassette.is_playing: Text {
                             text: "►";
                             color: green;
+                            vertical-alignment: center;
                         }
 
                         if cassette.is-recording: Text {
                             text: "●";
                             color: red;
+                            vertical-alignment: center;
                         }
 
                         Text {
                             text: cassette.position + " / " + cassette.length;
+                            vertical-alignment: center;
                         }
                     }
                 }
