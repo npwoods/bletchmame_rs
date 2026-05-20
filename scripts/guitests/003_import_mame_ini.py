@@ -103,6 +103,9 @@ def test_import_mame_ini(exe_path, exe_log, mame_dir):
                 try:
                     _ = wait_for_window(["[ready] BletchMameAuto", "[report] BletchMameAuto"], timeout=1)
                     print("[INFO] Import dialog closed and main window ready")
+
+                    # NOTE - INTRODUCING SLEEP - remove after regression is fixed
+                    time.sleep(12)
                     break
                 except TimeoutError:
                     pass
