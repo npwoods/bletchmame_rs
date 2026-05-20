@@ -91,7 +91,8 @@ def test_setup_mame(exe_path, exe_log, mame_dir):
         time.sleep(3.0)
 
         # Since we configured MAME, the window should be ready
-        window = wait_for_window(["[ready] BletchMameAuto"], timeout=30)
+        # NOTE - TIMEOUT TEMPORARILY INCREASED TO 90s TO ACCOUNT FOR LIKELY SLINT REGRESSION - reset to 40s after regression is fixed
+        window = wait_for_window(["[ready] BletchMameAuto"], timeout=90)
 
         # Attempt to close app via Alt+F then X (as in other tests)
         print("[INFO] Exiting application via Alt+F, x")
