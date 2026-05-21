@@ -246,8 +246,7 @@ def click_center(window):
     except Exception as e:
         print(f"[WARN] Failed clicking center: {e}")
 
-# NOTE - TIMEOUT TEMPORARILY INCREASED TO 90s TO ACCOUNT FOR LIKELY SLINT REGRESSION - reset to 30s after regression is fixed
-def wait_for_process_termination(process, timeout=90):
+def wait_for_process_termination(process, timeout=30):
     """Wait for a process to terminate, with fallback to terminate/kill.
     
     Returns the return code if the process exited, or None if it could not be confirmed.
