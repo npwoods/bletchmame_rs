@@ -253,7 +253,6 @@ impl AppModel {
 					})
 					.unwrap_or_default()
 			});
-			app_window.set_snap_image_salt(app_window.get_snap_image_salt() + 1);
 		}
 
 		if old_prefs.is_none_or(|old_prefs| prefs.paths.history_file != old_prefs.paths.history_file) {
@@ -1873,7 +1872,6 @@ fn set_history_xml(model: &AppModel, history: Option<HistoryXml>, is_loading: bo
 	let app_window = model.app_window();
 	app_window.on_get_history_styled_text(move |name| get_history_styled_text(history.as_ref(), &name));
 	app_window.set_history_xml_is_loading(is_loading);
-	app_window.set_history_styled_text_salt(app_window.get_history_styled_text_salt() + 1);
 }
 
 fn searchbar_items(model: &AppModel, text: &str) -> Vec<SearchBarItem> {

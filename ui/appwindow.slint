@@ -234,14 +234,10 @@ export component AppWindow inherits Window {
     in-out property <bool> is-picture-area-visible: true;
     pure callback get-snap-image(string) -> image;
     pure callback get-history-styled-text(string) -> styled-text;
-    in-out property <int> snap-image-salt;
-    in-out property <int> history-styled-text-salt;
     function get-snap-image-func() -> image {
-        let _ = snap-image-salt; // force re-evaluation when salt changes
         return get-snap-image(current-snap-view);
     }
     function get-history-styled-text-func() -> styled-text {
-        let _ = history-styled-text-salt; // force re-evaluation when salt changes
         return get-history-styled-text(current-snap-view);
     }
 
