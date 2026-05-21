@@ -18,6 +18,7 @@ use slint::Image;
 use slint::Rgba8Pixel;
 use slint::SharedPixelBuffer;
 use slint::SharedString;
+use slint::StyledText;
 use slint::ToSharedString;
 use tracing::debug;
 use tracing::warn;
@@ -162,7 +163,7 @@ pub fn load_image_from_paths(paths: &[MultiPath], name: &str) -> Result<Option<I
 	Ok(Some(slint::Image::from_rgba8(buffer)))
 }
 
-pub fn get_history_text(history: Option<&HistoryXml>, name: &str) -> SharedString {
+pub fn get_history_styled_text(history: Option<&HistoryXml>, name: &str) -> StyledText {
 	history
 		.and_then(|history| {
 			if name.is_empty() {

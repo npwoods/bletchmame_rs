@@ -6,15 +6,15 @@ use std::io::BufReader;
 use std::path::Path;
 
 use anyhow::Result;
-use slint::SharedString;
+use slint::StyledText;
 use smol_str::SmolStr;
 
 use crate::history_xml::parse::parse_from_reader;
 
 #[derive(Debug, Default)]
 pub struct HistoryXml {
-	systems: HashMap<SmolStr, SharedString>,
-	software: HashMap<(SmolStr, SmolStr), SharedString>,
+	systems: HashMap<SmolStr, StyledText>,
+	software: HashMap<(SmolStr, SmolStr), StyledText>,
 }
 
 impl HistoryXml {
@@ -24,17 +24,18 @@ impl HistoryXml {
 		parse_from_reader(reader, callback)
 	}
 
-	pub fn by_system(&self, system: impl AsRef<str>) -> Option<SharedString> {
+	pub fn by_system(&self, system: impl AsRef<str>) -> Option<StyledText> {
 		self.systems.get(system.as_ref()).cloned()
 	}
 
-	pub fn by_software(&self, list: impl Into<SmolStr>, name: impl Into<SmolStr>) -> Option<SharedString> {
+	pub fn by_software(&self, list: impl Into<SmolStr>, name: impl Into<SmolStr>) -> Option<StyledText> {
 		self.software.get(&(list.into(), name.into())).cloned()
 	}
 }
 
 #[cfg(test)]
 mod tests {
+	use slint::StyledText;
 	use test_case::test_case;
 
 	use super::parse_from_reader;
@@ -45,7 +46,8 @@ mod tests {
 	fn by_system(_index: usize, xml: &str, system: &str, expected: Option<&str>) {
 		let history = parse_from_reader(xml.as_bytes(), || false).unwrap().unwrap();
 		let actual = history.by_system(system);
-		let actual = actual.as_deref();
+
+		let expected = expected.map(StyledText::from_markdown).transpose().unwrap();
 		assert_eq!(expected, actual);
 	}
 
@@ -55,7 +57,8 @@ mod tests {
 	fn by_software(_index: usize, xml: &str, list: &str, name: &str, expected: Option<&str>) {
 		let history = parse_from_reader(xml.as_bytes(), || false).unwrap().unwrap();
 		let actual = history.by_software(list, name);
-		let actual = actual.as_deref();
+
+		let expected = expected.map(StyledText::from_markdown).transpose().unwrap();
 		assert_eq!(expected, actual);
 	}
 }

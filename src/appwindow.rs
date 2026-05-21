@@ -98,7 +98,7 @@ use crate::runtime::command::MameCommand;
 use crate::runtime::command::MovieFormat;
 use crate::selection::SelectionManager;
 use crate::snapview::HistoryLoader;
-use crate::snapview::get_history_text;
+use crate::snapview::get_history_styled_text;
 use crate::snapview::load_image_from_paths;
 use crate::snapview::make_multi_paths;
 use crate::snapview::snap_view_string;
@@ -1871,9 +1871,9 @@ fn start_load_history_xml(model: &AppModel, path: Option<&str>) {
 
 fn set_history_xml(model: &AppModel, history: Option<HistoryXml>, is_loading: bool) {
 	let app_window = model.app_window();
-	app_window.on_get_history_text(move |name| get_history_text(history.as_ref(), &name));
+	app_window.on_get_history_styled_text(move |name| get_history_styled_text(history.as_ref(), &name));
 	app_window.set_history_xml_is_loading(is_loading);
-	app_window.set_history_text_salt(app_window.get_history_text_salt() + 1);
+	app_window.set_history_styled_text_salt(app_window.get_history_styled_text_salt() + 1);
 }
 
 fn searchbar_items(model: &AppModel, text: &str) -> Vec<SearchBarItem> {
