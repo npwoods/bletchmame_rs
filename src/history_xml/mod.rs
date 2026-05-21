@@ -1,3 +1,4 @@
+mod markdown;
 mod parse;
 
 use std::collections::HashMap;
