@@ -1,13 +1,12 @@
-use std::borrow::Cow;
 use std::io::BufRead;
 
 use anyhow::Result;
-use itertools::Itertools;
 use slint::StyledText;
 use smol_str::SmolStr;
 use tracing::info_span;
 
 use crate::history_xml::HistoryXml;
+use crate::history_xml::markdown::markdown_from_history_text;
 use crate::xml::XmlElement;
 use crate::xml::XmlEvent;
 use crate::xml::XmlReader;
@@ -146,99 +145,4 @@ pub fn parse_from_reader(reader: impl BufRead, callback: impl Fn() -> bool) -> R
 		}
 	}
 	Ok(Some(state.history))
-}
-
-fn markdown_from_history_text(text: &str) -> String {
-	text.trim()
-		.lines()
-		.map(|line| {
-			let line = if let Some(line) = line.strip_prefix("- ")
-				&& let Some(line) = line.strip_suffix(" -")
-			{
-				Cow::Owned(format!("**{line}**"))
-			} else {
-				Cow::Borrowed(line)
-			};
-			markdown_urls(line)
-		})
-		.join("\n")
-}
-
-fn markdown_urls<'a>(text: impl Into<Cow<'a, str>>) -> Cow<'a, str> {
-	let text = text.into();
-	let mut result = None;
-	let mut current = text.as_ref();
-
-	while !current.is_empty() {
-		let h = current.find("http://");
-		let hs = current.find("https://");
-
-		let start = match (h, hs) {
-			(Some(i), Some(j)) => i.min(j),
-			(Some(i), None) => i,
-			(None, Some(j)) => j,
-			(None, None) => break,
-		};
-
-		let result = result.get_or_insert_with(|| String::with_capacity(text.len() + 128));
-		result.push_str(&current[..start]);
-		let remainder = &current[start..];
-
-		let end = remainder.find(|c: char| c.is_whitespace()).unwrap_or(remainder.len());
-		let mut url_end = end;
-
-		// backtrack trailing punctuation
-		while url_end > 0 {
-			let last_char = remainder.as_bytes()[url_end - 1];
-			if matches!(
-				last_char,
-				b'.' | b',' | b';' | b':' | b'!' | b'?' | b')' | b']' | b'}' | b'\'' | b'"'
-			) {
-				url_end -= 1;
-			} else {
-				break;
-			}
-		}
-
-		if url_end > 0 {
-			let url = &remainder[..url_end];
-			result.push('[');
-			result.push_str(url);
-			result.push_str("](");
-			result.push_str(url);
-			result.push(')');
-			current = &remainder[url_end..];
-		} else {
-			// this should be impossible because we found http:// or https://, but let's be safe
-			result.push_str(&remainder[..1]);
-			current = &remainder[1..];
-		}
-	}
-
-	if let Some(mut result) = result {
-		result.push_str(current);
-		Cow::Owned(result)
-	} else {
-		text
-	}
-}
-
-#[cfg(test)]
-mod tests {
-	use test_case::test_case;
-
-	#[test_case(0, "no url", "no url")]
-	#[test_case(1, "http://google.com", "[http://google.com](http://google.com)")]
-	#[test_case(2, "https://google.com", "[https://google.com](https://google.com)")]
-	#[test_case(3, "Visit http://google.com for info.", "Visit [http://google.com](http://google.com) for info.")]
-	#[test_case(4, "Check (https://www.mamedev.org)", "Check ([https://www.mamedev.org](https://www.mamedev.org))")]
-	#[test_case(
-		5,
-		"Multiple: http://one.com and https://two.com!",
-		"Multiple: [http://one.com](http://one.com) and [https://two.com](https://two.com)!"
-	)]
-	fn markdown_urls(_index: usize, input: &str, expected: &str) {
-		let actual = super::markdown_urls(input);
-		assert_eq!(&actual, expected);
-	}
 }
