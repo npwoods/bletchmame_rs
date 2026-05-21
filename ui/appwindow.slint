@@ -233,16 +233,12 @@ export component AppWindow inherits Window {
     in property <bool> history-xml-is-loading;
     in-out property <bool> is-picture-area-visible: true;
     pure callback get-snap-image(string) -> image;
-    pure callback get-history-text(string) -> string;
-    in-out property <int> snap-image-salt;
-    in-out property <int> history-text-salt;
+    pure callback get-history-styled-text(string) -> styled-text;
     function get-snap-image-func() -> image {
-        let _ = snap-image-salt; // force re-evaluation when salt changes
         return get-snap-image(current-snap-view);
     }
-    function get-history-text-func() -> string {
-        let _ = history-text-salt; // force re-evaluation when salt changes
-        return get-history-text(current-snap-view);
+    function get-history-styled-text-func() -> styled-text {
+        return get-history-styled-text(current-snap-view);
     }
 
     // status bar
@@ -940,23 +936,28 @@ export component AppWindow inherits Window {
                 }
                 if root.is-picture-area-visible: VerticalLayout {
                     width: root.column-right-width;
-                    alignment: center;
+                    height: 100%;
                     Image {
                         source: get-snap-image-func();
                         min-height: 0px;
                         preferred-height: 300px;
                     }
 
-                    Rectangle {
+                    if get-history-styled-text-func() != @markdown("") || root.history-xml-is-loading: Rectangle {
                         vertical-stretch: 1;
                         min-height: 0px;
                         preferred-height: 300px;
-                        TextEdit {
+                        ScrollView {
                             width: 100%;
                             height: 100%;
-                            text: get-history-text-func();
-                            visible: get-history-text(current-snap-view) != "";
-                            read-only: true;
+                            viewport-width: self.width;
+                            VerticalLayout {
+                                alignment: start;
+                                StyledText {
+                                    text: get-history-styled-text-func();
+                                    visible: self.text != @markdown("");
+                                }
+                            }
                         }
 
                         Spinner {
