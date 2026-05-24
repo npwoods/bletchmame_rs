@@ -22,7 +22,6 @@ import {
 import { SimpleMenuEntry } from "common.slint";
 import { Icons } from "icons.slint";
 import { HorizontalSplitter } from "splitter.slint";
-import { ToolTipArea } from "tooltip.slint";
 
 struct CollectionContextMenuInfo {
     move-up-action: string,
@@ -771,9 +770,6 @@ export component AppWindow inherits Window {
         }
     }
 
-    // tooltip
-    tooltip := ToolTipArea { }
-
     VerticalBox {
         padding: 0px;
 
@@ -897,7 +893,11 @@ export component AppWindow inherits Window {
                                 }
                                 row-pointer-event(row, event, point) => {
                                     items-row-pointer-event(row, event, { x: point.x + self.absolute-position.x, y: point.y + self.absolute-position.y });
-                                    tooltip.show-tooltip(items-table-touch-area.has-hover, items-table-touch-area.absolute-position.x + items-table-touch-area.mouse-x, items-table-touch-area.absolute-position.y + items-table-touch-area.mouse-y, items-view-tooltip);
+                                }
+                                ToolTip {
+                                    placement: pointer;
+                                    text: items-view-tooltip;
+                                    delay: items-view-tooltip != "" ? 0ms : 1000000000s; // hack: if there is no tooltip, set an absurdly long delay to effectively disable the tooltip
                                 }
                             }
 
@@ -915,10 +915,6 @@ export component AppWindow inherits Window {
                                     menu-item-action(root.key-action-selected-item-context-menu);
                                 }
                             }
-                        }
-
-                        changed has-hover => {
-                            tooltip.show-tooltip(self.has-hover, self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y, items-view-tooltip);
                         }
                     }
 

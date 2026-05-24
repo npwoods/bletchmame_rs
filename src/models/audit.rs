@@ -117,7 +117,11 @@ impl Model for AuditModel {
 				.map(|r| r.messages.as_ref())
 				.unwrap_or_default()
 				.iter()
-				.map(|r| format!("{} {}", &asset.name, r))
+				.map(|r| {
+					format!("{} {}", &asset.name, r)
+						.trim_end_matches(['\r', '\n'])
+						.to_string()
+				})
 				.join("\n")
 				.into();
 			let browse_command = audit_result

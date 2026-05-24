@@ -17,13 +17,9 @@ import {
     DevicesAndImagesContextMenuInfo,
 } from "../devimageslist.slint";
 import { Icons } from "../icons.slint";
-import { ToolTipArea } from "../tooltip.slint";
 import { VideoConfigComponent, VideoSettings } from "../videoconfig.slint";
 
-struct SoftwareMachine {
-    machine-index: int,
-    description: string,
-    checked: bool}
+struct SoftwareMachine { machine-index: int, description: string, checked: bool}
 
 struct Asset {
     icon: image,
@@ -209,10 +205,12 @@ export component ConfigureDialog inherits Window {
                                             vertical-alignment: center;
                                         }
                                     }
-                                }
 
-                                changed has-hover => {
-                                    tooltip.show-tooltip(self.has-hover, self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y, asset.tooltip-text);
+                                    ToolTip {
+                                        placement: pointer;
+                                        text: asset.tooltip-text;
+                                        delay: asset.tooltip-text != "" ? 0ms : 1000000000s; // hack: if there is no tooltip, set an absurdly long delay to effectively disable the tooltip
+                                    }
                                 }
                             }
                         }
@@ -311,6 +309,4 @@ export component ConfigureDialog inherits Window {
             }
         }
     }
-
-    tooltip := ToolTipArea { }
 }
