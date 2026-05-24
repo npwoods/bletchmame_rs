@@ -774,6 +774,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 				.with_items_table_model(|x| x.get_row_tooltip(row))
 				.unwrap_or_default()
 				.into();
+			debug!("on_items_row_pointer_event(): setting tool tip for row {row}: {text:?}");
 			model_clone.app_window().set_items_view_tooltip(text);
 		}
 	});
