@@ -1211,10 +1211,10 @@ fn make_asset_flags(asset_hash: &AssetHash, optional: bool, writable: bool, stat
 
 #[cfg(test)]
 mod test {
+	use std::assert_matches;
 	use std::io::BufReader;
 	use std::ops::ControlFlow;
 
-	use assert_matches::assert_matches;
 	use test_case::test_case;
 
 	use super::super::InfoDb;

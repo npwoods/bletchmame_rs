@@ -776,10 +776,10 @@ fn ensure_directory(path: &impl AsRef<Path>) {
 
 #[cfg(test)]
 mod test {
+	use std::assert_matches;
 	use std::fs::File;
 
 	use assert_json_diff::assert_json_eq;
-	use assert_matches::assert_matches;
 	use serde_json::Value;
 	use tempdir::TempDir;
 	use test_case::test_case;

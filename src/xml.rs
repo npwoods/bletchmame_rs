@@ -246,10 +246,10 @@ fn cow_bytes_to_str(cow: Cow<'_, [u8]>) -> Result<Cow<'_, str>> {
 
 #[cfg(test)]
 mod test {
+	use std::assert_matches;
 	use std::borrow::Cow;
 	use std::str::from_utf8;
 
-	use assert_matches::assert_matches;
 	use test_case::test_case;
 
 	use super::XmlEvent;

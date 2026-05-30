@@ -633,9 +633,9 @@ fn statusxml_err(reader: &XmlReader<impl BufRead>, e: impl Into<Error>) -> Error
 
 #[cfg(test)]
 mod test {
+	use std::assert_matches;
 	use std::io::BufReader;
 
-	use assert_matches::assert_matches;
 	use test_case::test_case;
 
 	use crate::status::InputClass;
