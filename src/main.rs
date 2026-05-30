@@ -214,7 +214,8 @@ fn main() -> ExitCode {
 
 #[cfg(test)]
 mod test {
-	use assert_matches::assert_matches;
+	use std::assert_matches;
+
 	use clap::Parser;
 
 	use super::Opt;

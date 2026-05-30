@@ -451,10 +451,10 @@ impl Debug for MachineConfig {
 
 #[cfg(test)]
 mod test {
+	use std::assert_matches;
 	use std::ops::ControlFlow;
 	use std::rc::Rc;
 
-	use assert_matches::assert_matches;
 	use test_case::test_case;
 
 	use crate::info::InfoDb;
