@@ -156,14 +156,8 @@ pub async fn dialog_configure(
 		let ram_option_texts = ModelRc::new(ram_option_texts);
 		modal.dialog().set_ram_sizes_model(ram_option_texts);
 
-		// workaround for https://github.com/slint-ui/slint/issues/7632; please remove hack when fixed
-		let dialog_weak = modal.dialog().as_weak();
-		let fut = async move {
-			tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-			let current_index = current_index.try_into().unwrap();
-			dialog_weak.unwrap().set_ram_sizes_index(current_index);
-		};
-		spawn_local(fut).unwrap();
+		let current_index = current_index.try_into().unwrap();
+		modal.dialog().set_ram_sizes_index(current_index);
 	}
 
 	// BIOS options
@@ -172,14 +166,8 @@ pub async fn dialog_configure(
 		let bios_option_texts = ModelRc::new(bios_option_texts);
 		modal.dialog().set_bios_selection_model(bios_option_texts);
 
-		// workaround for https://github.com/slint-ui/slint/issues/7632; please remove hack when fixed
-		let dialog_weak = modal.dialog().as_weak();
-		let fut = async move {
-			tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-			let current_index = current_index.try_into().unwrap();
-			dialog_weak.unwrap().set_bios_selection_index(current_index);
-		};
-		spawn_local(fut).unwrap();
+		let current_index = current_index.try_into().unwrap();
+		modal.dialog().set_bios_selection_index(current_index);
 	}
 
 	// asset audit button
