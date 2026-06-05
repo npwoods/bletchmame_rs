@@ -123,22 +123,11 @@ pub async fn dialog_paths(
 	// determine the index on the paths dropdown
 	let path_label_index = path_type
 		.and_then(|path_type| PathType::iter().position(|x| x == path_type))
-		.unwrap_or_default();
-	if path_label_index > 0 {
-		// workaround for https://github.com/slint-ui/slint/issues/7632; please remove hack when fixed
-		let state_clone = state.clone();
-		let fut = async move {
-			tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-			let dialog = state_clone.dialog_weak.unwrap();
-			let path_label_index = path_label_index.try_into().unwrap();
-			dialog.set_path_label_index(path_label_index);
-			state_clone.update_dialog_from_paths();
-		};
-		spawn_local(fut).unwrap();
-	} else {
-		// if `path_label_index` is zero, we don't have to do the above buffoonery
-		state.update_dialog_from_paths();
-	}
+		.unwrap_or_default()
+		.try_into()
+		.unwrap();
+	modal.dialog().set_path_label_index(path_label_index);
+	state.update_dialog_from_paths();
 
 	// select the first entry if appropriate
 	if PathEntriesModel::get_model(&model).row_count() > 0 {
