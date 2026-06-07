@@ -102,9 +102,12 @@ use crate::snapview::get_history_styled_text;
 use crate::snapview::load_image_from_paths;
 use crate::snapview::make_multi_paths;
 use crate::snapview::snap_view_string;
+use crate::status::Cassette;
+use crate::status::Image;
 use crate::status::InputClass;
 use crate::status::Status;
 use crate::threadlocalbubble::ThreadLocalBubble;
+use crate::ui;
 use crate::ui::AppWindow;
 use crate::ui::Icons;
 use crate::ui::ListItem;
@@ -342,13 +345,25 @@ impl AppModel {
 			app_window.set_statusbar_speed_text(statusbar_speed_text);
 
 			// status bar cassettes
-			let statusbar_cassettes = status
-				.and_then(|s| s.running.as_ref())
-				.map(|r| r.cassettes.iter().map(|c| c.into()).collect::<Vec<_>>())
-				.unwrap_or_default();
-			let statusbar_cassettes = VecModel::from(statusbar_cassettes);
-			let statusbar_cassettes = ModelRc::new(statusbar_cassettes);
-			app_window.set_statusbar_cassettes(statusbar_cassettes);
+			let statusbar_cassettes = {
+				let cassettes = running.as_ref().map(|r| r.cassettes.as_ref()).unwrap_or_default();
+				let images = running.as_ref().map(|r| r.images.as_ref()).unwrap_or_default();
+				cassettes
+					.iter()
+					.filter_map(|cassette| {
+						images
+							.iter()
+							.find(|image| image.tag == cassette.tag)
+							.map(|image| make_ui_cassette(cassette, image))
+					})
+					.collect::<Vec<_>>()
+			};
+			if app_window.get_statusbar_cassettes().iter().collect::<Vec<_>>() != statusbar_cassettes {
+				// only update if changed; unnecessary updates disrupt the tooltip
+				let statusbar_cassettes = VecModel::from(statusbar_cassettes);
+				let statusbar_cassettes = ModelRc::new(statusbar_cassettes);
+				app_window.set_statusbar_cassettes(statusbar_cassettes);
+			}
 
 			// report view
 			app_window.set_report_message(
@@ -1942,4 +1957,30 @@ fn translate_searchbar_items(model: ModelRc<SearchBarItem>) -> ModelRc<ListItem>
 fn mame_command_line_key(prefs: &Preferences) -> impl Eq + '_ {
 	let args = MameArguments::new(prefs, None, &MameWindowing::Windowed, true);
 	(&prefs.paths.mame_executable, args)
+}
+
+fn make_ui_cassette(cassette: &Cassette, image: &Image) -> ui::Cassette {
+	fn format_time(time: f32) -> String {
+		let minutes = (time / 60.0) as u32;
+		let seconds = (time % 60.0) as u32;
+		format!("{:02}:{:02}", minutes, seconds)
+	}
+
+	let display_name = image
+		.image_desc
+		.as_ref()
+		.map(|x| x.display_name().to_shared_string())
+		.unwrap_or_default();
+
+	ui::Cassette {
+		tag: cassette.tag.as_str().into(),
+		display_name,
+		is_stopped: cassette.is_stopped,
+		is_playing: cassette.is_playing,
+		is_recording: cassette.is_recording,
+		motor_state: cassette.motor_state,
+		speaker_state: cassette.speaker_state,
+		position: format_time(cassette.position).into(),
+		length: format_time(cassette.length).into(),
+	}
 }
