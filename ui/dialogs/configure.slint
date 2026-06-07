@@ -26,7 +26,7 @@ struct Asset {
     overlay: image,
     name: string,
     size: string,
-    tooltip-text: string,
+    audit-messages: [string],
     browse-command: string,
 }
 
@@ -206,9 +206,11 @@ export component ConfigureDialog inherits Window {
                                         }
                                     }
 
-                                    if asset.tooltip-text != "": Tooltip {
-                                        Text {
-                                            text: asset.tooltip-text;
+                                    if asset.audit-messages.length > 0: Tooltip {
+                                        VerticalLayout {
+                                            for message in asset.audit-messages: Text {
+                                                text: asset.name + " " + message;
+                                            }
                                         }
                                     }
                                 }

@@ -3,13 +3,13 @@ use std::cell::RefCell;
 use std::ffi::OsString;
 use std::sync::Arc;
 
-use itertools::Itertools;
 use slint::Image;
 use slint::Model;
 use slint::ModelNotify;
 use slint::ModelRc;
 use slint::ModelTracker;
 use slint::ToSharedString;
+use slint::VecModel;
 use smol_str::SmolStr;
 use tokio::task::spawn_blocking;
 
@@ -108,22 +108,19 @@ impl Model for AuditModel {
 
 	fn row_data(&self, row: usize) -> Option<Self::Data> {
 		let asset = self.assets.get(row)?;
-		let (browse_command, max_severity, tooltip_text) = {
+		let (browse_command, max_severity, audit_messages) = {
 			let audit_results = self.audit_results.borrow();
 			let audit_result = &audit_results[row];
 			let max_severity = audit_result.as_ref().map(AuditResult::severity);
-			let tooltip_text = audit_result
+			let audit_messages = audit_result
 				.as_ref()
 				.map(|r| r.messages.as_ref())
 				.unwrap_or_default()
 				.iter()
-				.map(|r| {
-					format!("{} {}", &asset.name, r)
-						.trim_end_matches(['\r', '\n'])
-						.to_string()
-				})
-				.join("\n")
-				.into();
+				.map(|r| r.to_string().trim_end_matches(['\r', '\n']).to_shared_string())
+				.collect::<Vec<_>>();
+			let audit_messages = VecModel::from(audit_messages);
+			let audit_messages = ModelRc::new(audit_messages);
 			let browse_command = audit_result
 				.as_ref()
 				.and_then(|r| r.path.as_ref())
@@ -135,7 +132,7 @@ impl Model for AuditModel {
 					action.encode_for_slint()
 				})
 				.unwrap_or_default();
-			(browse_command, max_severity, tooltip_text)
+			(browse_command, max_severity, audit_messages)
 		};
 
 		let icon = match asset.kind {
@@ -157,7 +154,7 @@ impl Model for AuditModel {
 			overlay,
 			name,
 			size,
-			tooltip_text,
+			audit_messages,
 			browse_command,
 		};
 		Some(data)
