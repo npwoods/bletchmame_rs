@@ -117,7 +117,7 @@ impl Model for AuditModel {
 				.map(|r| r.messages.as_ref())
 				.unwrap_or_default()
 				.iter()
-				.map(|r| r.to_string().trim_end_matches(['\r', '\n']).to_shared_string())
+				.map(|r| r.to_shared_string())
 				.collect::<Vec<_>>();
 			let audit_messages = VecModel::from(audit_messages);
 			let audit_messages = ModelRc::new(audit_messages);

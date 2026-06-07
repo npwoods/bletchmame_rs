@@ -207,7 +207,7 @@ export component ConfigureDialog inherits Window {
                                     }
 
                                     if asset.audit-messages.length > 0: Tooltip {
-                                        VerticalLayout {
+                                        VerticalBox {
                                             for message in asset.audit-messages: Text {
                                                 text: asset.name + " " + message;
                                             }

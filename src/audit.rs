@@ -215,19 +215,14 @@ impl AuditMessage {
 impl Display for AuditMessage {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Self::NotFound => writeln!(f, "NOT FOUND")?,
-			Self::NotFoundNoGoodDump => writeln!(f, "NOT FOUND - NO GOOD DUMP KNOWN")?,
-			Self::NotFoundButOptional => writeln!(f, "NOT FOUND BUT OPTIONAL")?,
-			Self::WrongLength { expected, found } => writeln!(f, "WRONG LENGTH (expected: {expected} found {found})")?,
-			Self::WrongChecksums { expected, found } => {
-				writeln!(f, "WRONG CHECKSUMS:")?;
-				writeln!(f, "    EXPECTED: {expected}")?;
-				writeln!(f, "       FOUND: {found}")?;
-			}
-			Self::NeedsRedump => writeln!(f, "NEEDS REDUMP")?,
-			Self::NoGoodDump => writeln!(f, "NO GOOD DUMP KNOWN")?,
+			Self::NotFound => write!(f, "NOT FOUND"),
+			Self::NotFoundNoGoodDump => write!(f, "NOT FOUND - NO GOOD DUMP KNOWN"),
+			Self::NotFoundButOptional => write!(f, "NOT FOUND BUT OPTIONAL"),
+			Self::WrongLength { expected, found } => write!(f, "WRONG LENGTH (expected: {expected} found {found})"),
+			Self::WrongChecksums { expected, found } => write!(f, "WRONG CHECKSUMS EXPECTED {expected} FOUND {found}"),
+			Self::NeedsRedump => write!(f, "NEEDS REDUMP"),
+			Self::NoGoodDump => write!(f, "NO GOOD DUMP KNOWN"),
 		}
-		Ok(())
 	}
 }
 
