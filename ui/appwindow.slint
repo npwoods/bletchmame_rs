@@ -45,6 +45,7 @@ struct SearchBarItem { icon: image, text: string, action: string}
 
 struct Cassette {
     tag: string,
+    display-name: string,
     is-stopped: bool,
     is-playing: bool,
     is-recording: bool,
@@ -1054,35 +1055,60 @@ export component AppWindow inherits Window {
                 padding-top: 0px;
                 padding-bottom: 0px;
                 alignment: start;
-                Text {
-                    text: mode() == "running" ? statusbar-speed-text : mode() == "ready" ? root.get-statusbar-current-item-desc(items-view-selected-row) : "";
+
+                // current item
+                if mode() == "ready": Text {
+                    text: root.get-statusbar-current-item-desc(items-view-selected-row);
+                    vertical-alignment: center;
+                }
+
+                // speed text
+                if mode() == "running": Text {
+                    width: 50px;
+                    text: statusbar-speed-text;
                     vertical-alignment: center;
                 }
 
                 for cassette in statusbar-cassettes: HorizontalLayout {
-                    if cassette.motor-state: HorizontalLayout {
-                        alignment: center;
-                        padding: 0px;
-                        Image {
-                            source: Icons.cassette;
-                            width: 32px;
+                    if cassette.display-name != "": Rectangle {
+                        HorizontalLayout {
+                            alignment: center;
+                            padding: 0px;
+                            Image {
+                                source: Icons.cassette;
+                                width: 32px;
+                            }
+
+                            if cassette.is_playing: Text {
+                                text: "►";
+                                color: green;
+                                vertical-alignment: center;
+                            }
+
+                            if cassette.is-recording: Text {
+                                text: "●";
+                                color: red;
+                                vertical-alignment: center;
+                            }
+
+                            if cassette.is-stopped: Text {
+                                text: "■";
+                                color: black;
+                                vertical-alignment: center;
+                            }
+
+                            Text {
+                                text: cassette.position + " / " + cassette.length;
+                                vertical-alignment: center;
+                            }
                         }
 
-                        if cassette.is_playing: Text {
-                            text: "►";
-                            color: green;
-                            vertical-alignment: center;
-                        }
-
-                        if cassette.is-recording: Text {
-                            text: "●";
-                            color: red;
-                            vertical-alignment: center;
-                        }
-
-                        Text {
-                            text: cassette.position + " / " + cassette.length;
-                            vertical-alignment: center;
+                        Tooltip {
+                            HorizontalBox {
+                                Text {
+                                    text: cassette.display-name;
+                                }
+                            }
                         }
                     }
                 }
