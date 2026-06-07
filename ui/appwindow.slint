@@ -894,10 +894,10 @@ export component AppWindow inherits Window {
                                 row-pointer-event(row, event, point) => {
                                     items-row-pointer-event(row, event, { x: point.x + self.absolute-position.x, y: point.y + self.absolute-position.y });
                                 }
-                                ToolTip {
-                                    placement: pointer;
-                                    text: items-view-tooltip;
-                                    delay: items-view-tooltip != "" ? 0ms : 1000000000s; // hack: if there is no tooltip, set an absurdly long delay to effectively disable the tooltip
+                                if items-view-tooltip != "": Tooltip {
+                                    Text {
+                                        text: items-view-tooltip;
+                                    }
                                 }
                             }
 

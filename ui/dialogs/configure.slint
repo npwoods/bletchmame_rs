@@ -206,10 +206,10 @@ export component ConfigureDialog inherits Window {
                                         }
                                     }
 
-                                    ToolTip {
-                                        placement: pointer;
-                                        text: asset.tooltip-text;
-                                        delay: asset.tooltip-text != "" ? 0ms : 1000000000s; // hack: if there is no tooltip, set an absurdly long delay to effectively disable the tooltip
+                                    if asset.tooltip-text != "": Tooltip {
+                                        Text {
+                                            text: asset.tooltip-text;
+                                        }
                                     }
                                 }
                             }
