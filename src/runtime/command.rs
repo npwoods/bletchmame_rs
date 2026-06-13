@@ -235,6 +235,12 @@ impl MameCommand {
 		build("SET_MOUSE_ENABLED", [enabled])
 	}
 
+	pub fn cassette_seek(tag: impl AsRef<str>, position: f32, origin: MameSeek) -> Self {
+		let tag = tag.as_ref();
+		let position = position.to_string();
+		build("CASSETTE_SEEK", [tag, position.as_str(), origin.mame_text()])
+	}
+
 	pub fn ping() -> Self {
 		Self("PING".into())
 	}
@@ -303,6 +309,20 @@ pub enum SeqType {
 impl SeqType {
 	pub fn suffix(&self) -> &'static str {
 		self.get_str("Suffix").unwrap()
+	}
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, EnumProperty)]
+pub enum MameSeek {
+	#[strum(props(MameText = "set"))]
+	Start,
+	#[strum(props(MameText = "cur"))]
+	Current,
+}
+
+impl MameSeek {
+	pub fn mame_text(&self) -> &'static str {
+		self.get_str("MameText").unwrap()
 	}
 }
 

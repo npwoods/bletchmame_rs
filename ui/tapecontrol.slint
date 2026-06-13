@@ -1,0 +1,193 @@
+import {
+    Button,
+    Slider,
+    HorizontalBox,
+    LineEdit,
+} from "std-widgets.slint";
+import { Icons } from "icons.slint";
+
+export struct Cassette {
+    display-name: string,
+    is-stopped: bool,
+    is-playing: bool,
+    is-recording: bool,
+    motor-state: bool,
+    speaker-state: bool,
+    position: float,
+    length: float
+}
+
+component TimeText {
+    in property <float> time;
+    in property <bool> editable;
+    in property <bool> read-only;
+
+    // functions
+    function format-time(time: float) -> string {
+        let minutes = floor(time / 60.0);
+        let seconds = floor(time - (minutes * 60.0));
+        return minutes + ":" + (seconds < 10.0 ? "0" : "") + seconds;
+    }
+
+    HorizontalLayout {
+        width: 48px;
+        Text {
+            text: format-time(time);
+        }
+    }
+}
+
+export component TapeControl {
+    // general properties
+    in property <Cassette> cassette;
+    property <bool> editable: false;
+    property <float> timer-adjustment: 0.0;
+
+    // const parameters
+    property <length> button-length: 32px;
+    property <length> slider-width: 150px;
+    property <float> fast-forward-multiple: 10.0;
+
+    // callbacks
+    callback set-position-absolute(position: float);
+    callback set-position-relative(delta: float);
+
+    VerticalLayout {
+        vertical-stretch: 0;
+        if editable: HorizontalLayout {
+            alignment: center;
+
+            Button {
+                width: button-length;
+                height: button-length;
+                text: "|<<";  // should be ⏮
+                enabled: root.cassette.position > 0.0;
+                clicked => {
+                    root.set-position-absolute(0.0);
+                }
+            }
+
+            Button {
+                width: button-length;
+                height: button-length;
+                text: "<<";  // should be ⏪︎
+                enabled: root.cassette.position > 0.0;
+                changed pressed => {
+                    root.timer-adjustment = self.pressed ? -1.0 : 0.0;
+                }
+            }
+
+            Button {
+                width: button-length;
+                height: button-length;
+                text: "⏹";
+            }
+
+            Button {
+                width: button-length;
+                height: button-length;
+                text: "▶";
+            }
+
+            Button {
+                width: button-length;
+                height: button-length;
+                text: "⏺";
+            }
+
+            Button {
+                width: button-length;
+                height: button-length;
+                text: ">>"; // should be ⏩︎
+                enabled: root.cassette.position < root.cassette.length;
+                changed pressed => {
+                    root.timer-adjustment = self.pressed ? 1.0 : 0.0;
+                }
+            }
+
+            Button {
+                width: button-length;
+                height: button-length;
+                text: ">>|";  // should be ⏭
+                enabled: root.cassette.position < root.cassette.length;
+                clicked => {
+                    root.set-position-absolute(root.cassette.length);
+                }
+            }
+
+            Slider {
+                width: slider-width;
+                minimum: 0.0;
+                maximum: root.cassette.length;
+                value: root.cassette.position;
+            }
+        }
+
+        TouchArea {
+            height: 32px;
+            HorizontalLayout {
+                alignment: start;
+                padding: 0px;
+                Image {
+                    source: Icons.cassette;
+                    width: 32px;
+                }
+
+                if cassette.is_playing: Text {
+                    text: "►";
+                    color: green;
+                    vertical-alignment: center;
+                }
+
+                if cassette.is-recording: Text {
+                    text: "●";
+                    color: red;
+                    vertical-alignment: center;
+                }
+
+                if cassette.is-stopped: Text {
+                    text: "■";
+                    color: black;
+                    vertical-alignment: center;
+                }
+
+                TimeText {
+                    editable: root.editable;
+                    read-only: false;
+                    time: root.cassette.position;
+                }
+
+                Text {
+                    text: "/";
+                    vertical-alignment: center;
+                }
+
+                TimeText {
+                    editable: root.editable;
+                    read-only: true;
+                    time: root.cassette.length;
+                }
+            }
+
+            Tooltip {
+                HorizontalBox {
+                    Text {
+                        text: cassette.display-name;
+                    }
+                }
+            }
+
+            clicked => {
+                root.editable = !root.editable;
+            }
+        }
+    }
+
+    Timer {
+        interval: 100ms;
+        running: root.timer-adjustment != 0.0;
+        triggered => {
+            root.set-position-relative(self.interval / 1s * root.timer-adjustment * root.fast-forward-multiple);
+        }
+    }
+}
