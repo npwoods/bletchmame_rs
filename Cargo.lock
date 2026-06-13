@@ -34,21 +34,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e8c61bee90b42a772d39d06a740207dc71a4e780004ace1db8d99fb1baaa954"
 dependencies = [
  "accesskit",
- "accesskit_consumer 0.36.0",
+ "accesskit_consumer",
  "atspi-common",
  "phf",
  "serde",
  "zvariant",
-]
-
-[[package]]
-name = "accesskit_consumer"
-version = "0.35.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53cf47daed85312e763fbf85ceca136e0d7abc68e0a7e12abe11f48172bc3b10"
-dependencies = [
- "accesskit",
- "hashbrown 0.16.1",
 ]
 
 [[package]]
@@ -62,13 +52,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "accesskit_ios"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4f907f6793e18524b69a4530528f8a8fb6dc8b4e162f782b97a9618401e7f2e3"
+dependencies = [
+ "accesskit",
+ "accesskit_consumer",
+ "hashbrown 0.16.1",
+ "objc2 0.5.2",
+ "objc2-foundation 0.2.2",
+ "objc2-ui-kit 0.2.2",
+]
+
+[[package]]
 name = "accesskit_macos"
 version = "0.26.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4c5c87e8d94f2ec10cce590aadff24c76f576dab5502d45d0aed9fc3065d4451"
 dependencies = [
  "accesskit",
- "accesskit_consumer 0.36.0",
+ "accesskit_consumer",
  "hashbrown 0.16.1",
  "objc2 0.5.2",
  "objc2-app-kit 0.2.2",
@@ -95,12 +99,12 @@ dependencies = [
 
 [[package]]
 name = "accesskit_windows"
-version = "0.32.1"
+version = "0.33.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eff7009f1a532e917d66970a1e80c965140c6cfbbabbdde3d64e5431e6c78e21"
+checksum = "8e329f630e4379b9b3464c1a4cf22d5dab05d66964d77d623855e803647ca565"
 dependencies = [
  "accesskit",
- "accesskit_consumer 0.35.0",
+ "accesskit_consumer",
  "hashbrown 0.16.1",
  "static_assertions",
  "windows 0.62.2",
@@ -109,11 +113,12 @@ dependencies = [
 
 [[package]]
 name = "accesskit_winit"
-version = "0.32.2"
+version = "0.33.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1fe9a94394896352cc4660ca2288bd4ef883d83238853c038b44070c8f134313"
+checksum = "79f3b48f109814c181d6e9b6033641a11b25887d0aec706be8eb16b83ae9d27b"
 dependencies = [
  "accesskit",
+ "accesskit_ios",
  "accesskit_macos",
  "accesskit_unix",
  "accesskit_windows",
@@ -1184,7 +1189,7 @@ dependencies = [
 [[package]]
 name = "const-field-offset"
 version = "0.2.0"
-source = "git+https://github.com/npwoods/slint.git?rev=fea49e0d7ff9f09cc20d3c0a00fddd75091632b4#fea49e0d7ff9f09cc20d3c0a00fddd75091632b4"
+source = "git+https://github.com/npwoods/slint.git?rev=12b8c4cba45f34d601e0df81c70b24dd01094844#12b8c4cba45f34d601e0df81c70b24dd01094844"
 dependencies = [
  "const-field-offset-macro",
  "field-offset",
@@ -1193,7 +1198,7 @@ dependencies = [
 [[package]]
 name = "const-field-offset-macro"
 version = "0.2.0"
-source = "git+https://github.com/npwoods/slint.git?rev=fea49e0d7ff9f09cc20d3c0a00fddd75091632b4#fea49e0d7ff9f09cc20d3c0a00fddd75091632b4"
+source = "git+https://github.com/npwoods/slint.git?rev=12b8c4cba45f34d601e0df81c70b24dd01094844#12b8c4cba45f34d601e0df81c70b24dd01094844"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2451,7 +2456,7 @@ dependencies = [
 [[package]]
 name = "i-slint-backend-linuxkms"
 version = "1.17.0"
-source = "git+https://github.com/npwoods/slint.git?rev=fea49e0d7ff9f09cc20d3c0a00fddd75091632b4#fea49e0d7ff9f09cc20d3c0a00fddd75091632b4"
+source = "git+https://github.com/npwoods/slint.git?rev=12b8c4cba45f34d601e0df81c70b24dd01094844#12b8c4cba45f34d601e0df81c70b24dd01094844"
 dependencies = [
  "bytemuck",
  "calloop 0.14.4",
@@ -2465,7 +2470,7 @@ dependencies = [
  "i-slint-renderer-software",
  "input",
  "memmap2",
- "nix 0.30.1",
+ "nix 0.31.3",
  "raw-window-handle",
  "xkbcommon",
 ]
@@ -2473,7 +2478,7 @@ dependencies = [
 [[package]]
 name = "i-slint-backend-qt"
 version = "1.17.0"
-source = "git+https://github.com/npwoods/slint.git?rev=fea49e0d7ff9f09cc20d3c0a00fddd75091632b4#fea49e0d7ff9f09cc20d3c0a00fddd75091632b4"
+source = "git+https://github.com/npwoods/slint.git?rev=12b8c4cba45f34d601e0df81c70b24dd01094844#12b8c4cba45f34d601e0df81c70b24dd01094844"
 dependencies = [
  "const-field-offset",
  "cpp",
@@ -2491,10 +2496,12 @@ dependencies = [
 [[package]]
 name = "i-slint-backend-selector"
 version = "1.17.0"
-source = "git+https://github.com/npwoods/slint.git?rev=fea49e0d7ff9f09cc20d3c0a00fddd75091632b4#fea49e0d7ff9f09cc20d3c0a00fddd75091632b4"
+source = "git+https://github.com/npwoods/slint.git?rev=12b8c4cba45f34d601e0df81c70b24dd01094844#12b8c4cba45f34d601e0df81c70b24dd01094844"
 dependencies = [
  "cfg-if",
+ "cfg_aliases",
  "i-slint-backend-linuxkms",
+ "i-slint-backend-testing",
  "i-slint-backend-winit",
  "i-slint-common",
  "i-slint-core",
@@ -2503,9 +2510,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "i-slint-backend-testing"
+version = "1.17.0"
+source = "git+https://github.com/npwoods/slint.git?rev=12b8c4cba45f34d601e0df81c70b24dd01094844#12b8c4cba45f34d601e0df81c70b24dd01094844"
+dependencies = [
+ "cfg_aliases",
+ "i-slint-common",
+ "i-slint-core",
+ "i-slint-renderer-software",
+ "vtable",
+]
+
+[[package]]
 name = "i-slint-backend-winit"
 version = "1.17.0"
-source = "git+https://github.com/npwoods/slint.git?rev=fea49e0d7ff9f09cc20d3c0a00fddd75091632b4#fea49e0d7ff9f09cc20d3c0a00fddd75091632b4"
+source = "git+https://github.com/npwoods/slint.git?rev=12b8c4cba45f34d601e0df81c70b24dd01094844#12b8c4cba45f34d601e0df81c70b24dd01094844"
 dependencies = [
  "accesskit",
  "accesskit_winit",
@@ -2551,7 +2570,7 @@ dependencies = [
 [[package]]
 name = "i-slint-common"
 version = "1.17.0"
-source = "git+https://github.com/npwoods/slint.git?rev=fea49e0d7ff9f09cc20d3c0a00fddd75091632b4#fea49e0d7ff9f09cc20d3c0a00fddd75091632b4"
+source = "git+https://github.com/npwoods/slint.git?rev=12b8c4cba45f34d601e0df81c70b24dd01094844#12b8c4cba45f34d601e0df81c70b24dd01094844"
 dependencies = [
  "derive_more",
  "fontique",
@@ -2566,7 +2585,7 @@ dependencies = [
 [[package]]
 name = "i-slint-compiler"
 version = "1.17.0"
-source = "git+https://github.com/npwoods/slint.git?rev=fea49e0d7ff9f09cc20d3c0a00fddd75091632b4#fea49e0d7ff9f09cc20d3c0a00fddd75091632b4"
+source = "git+https://github.com/npwoods/slint.git?rev=12b8c4cba45f34d601e0df81c70b24dd01094844#12b8c4cba45f34d601e0df81c70b24dd01094844"
 dependencies = [
  "annotate-snippets",
  "by_address",
@@ -2598,7 +2617,7 @@ dependencies = [
 [[package]]
 name = "i-slint-core"
 version = "1.17.0"
-source = "git+https://github.com/npwoods/slint.git?rev=fea49e0d7ff9f09cc20d3c0a00fddd75091632b4#fea49e0d7ff9f09cc20d3c0a00fddd75091632b4"
+source = "git+https://github.com/npwoods/slint.git?rev=12b8c4cba45f34d601e0df81c70b24dd01094844#12b8c4cba45f34d601e0df81c70b24dd01094844"
 dependencies = [
  "async-channel",
  "auto_enums",
@@ -2650,7 +2669,7 @@ dependencies = [
 [[package]]
 name = "i-slint-core-macros"
 version = "1.17.0"
-source = "git+https://github.com/npwoods/slint.git?rev=fea49e0d7ff9f09cc20d3c0a00fddd75091632b4#fea49e0d7ff9f09cc20d3c0a00fddd75091632b4"
+source = "git+https://github.com/npwoods/slint.git?rev=12b8c4cba45f34d601e0df81c70b24dd01094844#12b8c4cba45f34d601e0df81c70b24dd01094844"
 dependencies = [
  "quote",
  "serde_json",
@@ -2660,7 +2679,7 @@ dependencies = [
 [[package]]
 name = "i-slint-renderer-femtovg"
 version = "1.17.0"
-source = "git+https://github.com/npwoods/slint.git?rev=fea49e0d7ff9f09cc20d3c0a00fddd75091632b4#fea49e0d7ff9f09cc20d3c0a00fddd75091632b4"
+source = "git+https://github.com/npwoods/slint.git?rev=12b8c4cba45f34d601e0df81c70b24dd01094844#12b8c4cba45f34d601e0df81c70b24dd01094844"
 dependencies = [
  "cfg-if",
  "const-field-offset",
@@ -2681,7 +2700,7 @@ dependencies = [
 [[package]]
 name = "i-slint-renderer-skia"
 version = "1.17.0"
-source = "git+https://github.com/npwoods/slint.git?rev=fea49e0d7ff9f09cc20d3c0a00fddd75091632b4#fea49e0d7ff9f09cc20d3c0a00fddd75091632b4"
+source = "git+https://github.com/npwoods/slint.git?rev=12b8c4cba45f34d601e0df81c70b24dd01094844#12b8c4cba45f34d601e0df81c70b24dd01094844"
 dependencies = [
  "bytemuck",
  "cfg-if",
@@ -2717,7 +2736,7 @@ dependencies = [
 [[package]]
 name = "i-slint-renderer-software"
 version = "1.17.0"
-source = "git+https://github.com/npwoods/slint.git?rev=fea49e0d7ff9f09cc20d3c0a00fddd75091632b4#fea49e0d7ff9f09cc20d3c0a00fddd75091632b4"
+source = "git+https://github.com/npwoods/slint.git?rev=12b8c4cba45f34d601e0df81c70b24dd01094844#12b8c4cba45f34d601e0df81c70b24dd01094844"
 dependencies = [
  "bytemuck",
  "clru",
@@ -3032,9 +3051,9 @@ dependencies = [
 
 [[package]]
 name = "input"
-version = "0.9.1"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fbdc09524a91f9cacd26f16734ff63d7dc650daffadd2b6f84d17a285bd875a9"
+checksum = "f9793345a65d71317763a33066b5d8351f8760dde8d4930fe9e39b5f14a7959d"
 dependencies = [
  "bitflags 2.13.0",
  "input-sys",
@@ -3632,9 +3651,9 @@ dependencies = [
 
 [[package]]
 name = "muda"
-version = "0.18.0"
+version = "0.19.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b20e2339ef964849496bd6dab1bcd8ceb7a3a5a268dc64c8b84c833e75d66dab"
+checksum = "47a2e3dff89cd322c66647942668faee0a2b1f88ea6cbb4d374b4a8d7e92528c"
 dependencies = [
  "crossbeam-channel",
  "dpi",
@@ -3644,7 +3663,7 @@ dependencies = [
  "objc2-core-foundation",
  "objc2-foundation 0.3.2",
  "once_cell",
- "png 0.17.16",
+ "png 0.18.1",
  "thiserror 2.0.18",
  "windows-sys 0.60.2",
 ]
@@ -3702,18 +3721,6 @@ dependencies = [
  "libc",
  "memoffset 0.7.1",
  "pin-utils",
-]
-
-[[package]]
-name = "nix"
-version = "0.30.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74523f3a35e05aba87a1d978330aef40f67b0304ac79c1c00b294c9830543db6"
-dependencies = [
- "bitflags 2.13.0",
- "cfg-if",
- "cfg_aliases",
- "libc",
 ]
 
 [[package]]
@@ -5784,7 +5791,7 @@ checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
 [[package]]
 name = "slint"
 version = "1.17.0"
-source = "git+https://github.com/npwoods/slint.git?rev=fea49e0d7ff9f09cc20d3c0a00fddd75091632b4#fea49e0d7ff9f09cc20d3c0a00fddd75091632b4"
+source = "git+https://github.com/npwoods/slint.git?rev=12b8c4cba45f34d601e0df81c70b24dd01094844#12b8c4cba45f34d601e0df81c70b24dd01094844"
 dependencies = [
  "const-field-offset",
  "i-slint-backend-selector",
@@ -5805,7 +5812,7 @@ dependencies = [
 [[package]]
 name = "slint-build"
 version = "1.17.0"
-source = "git+https://github.com/npwoods/slint.git?rev=fea49e0d7ff9f09cc20d3c0a00fddd75091632b4#fea49e0d7ff9f09cc20d3c0a00fddd75091632b4"
+source = "git+https://github.com/npwoods/slint.git?rev=12b8c4cba45f34d601e0df81c70b24dd01094844#12b8c4cba45f34d601e0df81c70b24dd01094844"
 dependencies = [
  "derive_more",
  "fontique",
@@ -5817,7 +5824,7 @@ dependencies = [
 [[package]]
 name = "slint-macros"
 version = "1.17.0"
-source = "git+https://github.com/npwoods/slint.git?rev=fea49e0d7ff9f09cc20d3c0a00fddd75091632b4#fea49e0d7ff9f09cc20d3c0a00fddd75091632b4"
+source = "git+https://github.com/npwoods/slint.git?rev=12b8c4cba45f34d601e0df81c70b24dd01094844#12b8c4cba45f34d601e0df81c70b24dd01094844"
 dependencies = [
  "i-slint-compiler",
  "proc-macro2",
@@ -5828,7 +5835,7 @@ dependencies = [
 [[package]]
 name = "slint-material-components"
 version = "1.17.0"
-source = "git+https://github.com/npwoods/slint.git?rev=fea49e0d7ff9f09cc20d3c0a00fddd75091632b4#fea49e0d7ff9f09cc20d3c0a00fddd75091632b4"
+source = "git+https://github.com/npwoods/slint.git?rev=12b8c4cba45f34d601e0df81c70b24dd01094844#12b8c4cba45f34d601e0df81c70b24dd01094844"
 
 [[package]]
 name = "slotmap"
@@ -6119,9 +6126,9 @@ dependencies = [
 
 [[package]]
 name = "taffy"
-version = "0.9.2"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41ba83ebaf2954d31d05d67340fd46cebe99da2b7133b0dd68d70c65473a437b"
+checksum = "aea22054047c16c3f34d3ac473a2170be1424b1115b2a3adcf28cfb067c88859"
 dependencies = [
  "arrayvec",
  "grid",
@@ -6753,7 +6760,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 [[package]]
 name = "vtable"
 version = "0.4.0"
-source = "git+https://github.com/npwoods/slint.git?rev=fea49e0d7ff9f09cc20d3c0a00fddd75091632b4#fea49e0d7ff9f09cc20d3c0a00fddd75091632b4"
+source = "git+https://github.com/npwoods/slint.git?rev=12b8c4cba45f34d601e0df81c70b24dd01094844#12b8c4cba45f34d601e0df81c70b24dd01094844"
 dependencies = [
  "const-field-offset",
  "portable-atomic",
@@ -6764,7 +6771,7 @@ dependencies = [
 [[package]]
 name = "vtable-macro"
 version = "0.4.0"
-source = "git+https://github.com/npwoods/slint.git?rev=fea49e0d7ff9f09cc20d3c0a00fddd75091632b4#fea49e0d7ff9f09cc20d3c0a00fddd75091632b4"
+source = "git+https://github.com/npwoods/slint.git?rev=12b8c4cba45f34d601e0df81c70b24dd01094844#12b8c4cba45f34d601e0df81c70b24dd01094844"
 dependencies = [
  "proc-macro2",
  "quote",
