@@ -1145,6 +1145,19 @@ function command_set_cheat_state(args)
 	emit_status()
 end
 
+-- CASSETTE_SEEK command
+function command_cassette_seek(args)
+	local cassette = machine().cassettes[args[2]]
+	if not cassette then
+		print("@ERROR ### Can't find cassette device with tag '" .. args[2] .. "'")
+		return
+	end
+
+	cassette:seek(tonumber(args[3]), args[4])
+	print("@OK STATUS ### Cassette '" .. args[2] .. "' seeked to position " .. tostring(cassette.position))
+	emit_status()
+end
+
 -- DEBUG_COMMAND command
 function command_debug_command(args)
 	if not machine_debugger() then
@@ -1234,6 +1247,7 @@ local commands =
 	["set_mouse_enabled"]			= command_set_mouse_enabled,
 	["show_profiler"]				= command_show_profiler,
 	["set_cheat_state"]				= command_set_cheat_state,
+	["cassette_seek"]				= command_cassette_seek,
 	["debug_command"]				= command_debug_command,
 	["dump_status"]					= command_dump_status
 }

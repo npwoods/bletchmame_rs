@@ -95,6 +95,7 @@ use crate::runtime::MameStderr;
 use crate::runtime::MameWindowing;
 use crate::runtime::args::MameArguments;
 use crate::runtime::command::MameCommand;
+use crate::runtime::command::MameSeek;
 use crate::runtime::command::MovieFormat;
 use crate::selection::SelectionManager;
 use crate::snapview::HistoryLoader;
@@ -354,16 +355,28 @@ impl AppModel {
 						images
 							.iter()
 							.find(|image| image.tag == cassette.tag)
-							.map(|image| make_ui_cassette(cassette, image))
+							.filter(|image| image.image_desc.is_some())
+							.map(|image| (cassette.tag.to_shared_string(), make_ui_cassette(cassette, image)))
 					})
 					.collect::<Vec<_>>()
 			};
-			if app_window.get_statusbar_cassettes().iter().collect::<Vec<_>>() != statusbar_cassettes {
-				// only update if changed; unnecessary updates disrupt the tooltip
-				let statusbar_cassettes = VecModel::from(statusbar_cassettes);
-				let statusbar_cassettes = ModelRc::new(statusbar_cassettes);
-				app_window.set_statusbar_cassettes(statusbar_cassettes);
+			let statusbar_cassette_tags = statusbar_cassettes
+				.iter()
+				.map(|(tag, _)| tag.clone())
+				.collect::<Vec<_>>();
+			if app_window.get_statusbar_cassette_tags().iter().collect::<Vec<_>>() != statusbar_cassette_tags {
+				// only update if changed; unnecessary changes will disrupt the tape control
+				let statusbar_cassette_tags = VecModel::from(statusbar_cassette_tags);
+				let statusbar_cassette_tags = ModelRc::new(statusbar_cassette_tags);
+				app_window.set_statusbar_cassette_tags(statusbar_cassette_tags);
 			}
+			app_window.on_get_statusbar_cassette(move |tag| {
+				let (_, cassette) = statusbar_cassettes
+					.iter()
+					.find(|(this_tag, _)| tag == this_tag)
+					.expect("unknown cassette tag");
+				cassette.clone()
+			});
 
 			// report view
 			app_window.set_report_message(
@@ -872,6 +885,18 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	let menu_entries_builtin_collections = VecModel::from(menu_entries_builtin_collections);
 	let menu_entries_builtin_collections = ModelRc::new(menu_entries_builtin_collections);
 	app_window.set_menu_entries_builtin_collections(menu_entries_builtin_collections);
+
+	// cassettes
+	let model_clone = model.clone();
+	app_window.on_set_cassette_position_absolute(move |cassette_tag, position| {
+		let command = MameCommand::cassette_seek(&cassette_tag, position, MameSeek::Start);
+		model_clone.issue_command(command);
+	});
+	let model_clone = model.clone();
+	app_window.on_set_cassette_position_relative(move |cassette_tag, position| {
+		let command = MameCommand::cassette_seek(&cassette_tag, position, MameSeek::Current);
+		model_clone.issue_command(command);
+	});
 
 	// menu commands
 	{
@@ -1960,12 +1985,6 @@ fn mame_command_line_key(prefs: &Preferences) -> impl Eq + '_ {
 }
 
 fn make_ui_cassette(cassette: &Cassette, image: &Image) -> ui::Cassette {
-	fn format_time(time: f32) -> String {
-		let minutes = (time / 60.0) as u32;
-		let seconds = (time % 60.0) as u32;
-		format!("{:02}:{:02}", minutes, seconds)
-	}
-
 	let display_name = image
 		.image_desc
 		.as_ref()
@@ -1973,14 +1992,13 @@ fn make_ui_cassette(cassette: &Cassette, image: &Image) -> ui::Cassette {
 		.unwrap_or_default();
 
 	ui::Cassette {
-		tag: cassette.tag.as_str().into(),
 		display_name,
 		is_stopped: cassette.is_stopped,
 		is_playing: cassette.is_playing,
 		is_recording: cassette.is_recording,
 		motor_state: cassette.motor_state,
 		speaker_state: cassette.speaker_state,
-		position: format_time(cassette.position).into(),
-		length: format_time(cassette.length).into(),
+		position: cassette.position,
+		length: cassette.length,
 	}
 }

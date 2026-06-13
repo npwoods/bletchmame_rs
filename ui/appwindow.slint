@@ -21,6 +21,7 @@ import {
 } from "@slint/material.slint";
 import { SimpleMenuEntry } from "common.slint";
 import { Icons } from "icons.slint";
+import { TapeControl, Cassette } from "tapecontrol.slint";
 import { HorizontalSplitter } from "splitter.slint";
 
 struct CollectionContextMenuInfo {
@@ -42,18 +43,6 @@ struct ItemContextMenuInfo {
 }
 
 struct SearchBarItem { icon: image, text: string, action: string}
-
-struct Cassette {
-    tag: string,
-    display-name: string,
-    is-stopped: bool,
-    is-playing: bool,
-    is-recording: bool,
-    motor-state: bool,
-    speaker-state: bool,
-    position: string,
-    length: string
-}
 
 struct ReportIssue { text: string, button-text: string}
 
@@ -196,6 +185,10 @@ export component AppWindow inherits Window {
     pure callback get-searchbar-items(string) -> [SearchBarItem];
     pure callback translate-searchbar-items([SearchBarItem]) -> [ListItem];
 
+    // cassettes
+    callback set-cassette-position-absolute(tag: string, position: float);
+    callback set-cassette-position-relative(tag: string, delta: float);
+
     // the items view
     in property <string> is-empty-reason;
     in-out property <int> items-view-selected-row;
@@ -243,7 +236,8 @@ export component AppWindow inherits Window {
 
     // status bar
     in property <string> statusbar-speed-text;
-    in property <[Cassette]> statusbar-cassettes;
+    in property <[string]> statusbar-cassette-tags;
+    pure callback get-statusbar-cassette(tag: string) -> Cassette;
 
     // the report view
     in property <string> report-message;
@@ -1046,7 +1040,6 @@ export component AppWindow inherits Window {
         }
 
         if menubar-visible: Rectangle {
-            height: 36px;
             vertical-stretch: 0;
             background: Palette.control-background;
             HorizontalLayout {
@@ -1069,47 +1062,13 @@ export component AppWindow inherits Window {
                     vertical-alignment: center;
                 }
 
-                for cassette in statusbar-cassettes: HorizontalLayout {
-                    if cassette.display-name != "": Rectangle {
-                        HorizontalLayout {
-                            alignment: center;
-                            padding: 0px;
-                            Image {
-                                source: Icons.cassette;
-                                width: 32px;
-                            }
-
-                            if cassette.is_playing: Text {
-                                text: "►";
-                                color: green;
-                                vertical-alignment: center;
-                            }
-
-                            if cassette.is-recording: Text {
-                                text: "●";
-                                color: red;
-                                vertical-alignment: center;
-                            }
-
-                            if cassette.is-stopped: Text {
-                                text: "■";
-                                color: black;
-                                vertical-alignment: center;
-                            }
-
-                            Text {
-                                text: cassette.position + " / " + cassette.length;
-                                vertical-alignment: center;
-                            }
-                        }
-
-                        Tooltip {
-                            HorizontalBox {
-                                Text {
-                                    text: cassette.display-name;
-                                }
-                            }
-                        }
+                for tag in statusbar-cassette-tags: TapeControl {
+                    cassette: get-statusbar-cassette(tag);
+                    set-position-absolute(position) => {
+                        root.set-cassette-position-absolute(tag, position);
+                    }
+                    set-position-relative(delta) => {
+                        root.set-cassette-position-relative(tag, delta);
                     }
                 }
             }
