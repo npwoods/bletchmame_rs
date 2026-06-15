@@ -214,9 +214,11 @@ impl AppState {
 	}
 
 	fn start_session(&self, mame_args: MameArguments) -> Session {
+		let watchdog_timeout = Duration::from_secs(30);
 		let (job, command_sender) = spawn_mame_session_thread(
 			mame_args,
 			self.fixed.mame_stderr,
+			watchdog_timeout,
 			self.fixed.interaction_monitor.clone(),
 			self.fixed.callback.clone(),
 		);

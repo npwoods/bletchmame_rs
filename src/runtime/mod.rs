@@ -1,6 +1,7 @@
 pub mod args;
 pub mod command;
 pub mod session;
+mod watchdog;
 
 use anyhow::Error;
 use serde::Deserialize;
