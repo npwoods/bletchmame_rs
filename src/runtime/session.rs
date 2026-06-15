@@ -34,6 +34,7 @@ use crate::platform::CommandExt;
 use crate::runtime::MameStderr;
 use crate::runtime::args::MameArguments;
 use crate::runtime::command::MameCommand;
+use crate::runtime::watchdog::Watchdog;
 use crate::status::Update;
 use crate::threadlocalbubble::ThreadLocalBubble;
 
@@ -62,6 +63,8 @@ enum ThisError {
 	ReadingFromMame(anyhow::Error),
 	#[error("Error writing to MAME: {0:?}")]
 	WritingToMame(anyhow::Error),
+	#[error("MAME has stopped responding to events")]
+	TimeoutFromMame,
 }
 
 #[derive(Debug)]
@@ -73,6 +76,7 @@ pub enum MameEvent {
 pub fn spawn_mame_session_thread(
 	mame_args: MameArguments,
 	mame_stderr: MameStderr,
+	watchdog_timeout: Duration,
 	interaction_monitor: Arc<Mutex<Option<InteractionMonitor>>>,
 	callback: Rc<dyn Fn(Action) + 'static>,
 ) -> (Job<Result<()>>, Sender<MameCommand>) {
@@ -94,6 +98,7 @@ pub fn spawn_mame_session_thread(
 		execute_mame(
 			&mame_args,
 			&receiver,
+			watchdog_timeout,
 			&event_callback,
 			mame_stderr,
 			interaction_monitor.as_ref(),
@@ -105,6 +110,7 @@ pub fn spawn_mame_session_thread(
 fn execute_mame(
 	mame_args: &MameArguments,
 	receiver: &Receiver<MameCommand>,
+	watchdog_timeout: Duration,
 	event_callback: &impl Fn(MameEvent),
 	mame_stderr: MameStderr,
 	interaction_monitor: &Mutex<Option<InteractionMonitor>>,
@@ -138,6 +144,7 @@ fn execute_mame(
 	let mame_result = interact_with_mame(
 		&mut child,
 		&receiver,
+		watchdog_timeout,
 		&|emit_type, s| emit_interaction_monitor(interaction_monitor, emit_type, s),
 		&event_callback,
 	);
@@ -180,6 +187,7 @@ fn execute_mame(
 pub fn interact_with_mame(
 	child: &mut Child,
 	receiver: &dyn Fn(Duration) -> MameCommand,
+	watchdog_timeout: Duration,
 	emit_interaction_monitor: &dyn for<'a> Fn(EmitType, &'a str),
 	event_callback: &dyn Fn(MameEvent),
 ) -> anyhow::Result<()> {
@@ -190,9 +198,13 @@ pub fn interact_with_mame(
 	let mut is_exiting = false;
 	let mut is_running = false;
 
+	// this is to guard against MAME messups
+	let watchdog = Watchdog::new(child.id(), watchdog_timeout);
+
 	loop {
 		info!("Calling read_response_from_mame()");
-		let (update, is_signal) = read_response_from_mame(&mut mame_stdout, &emit_interaction_monitor, &mut line)?;
+		let (update, is_signal) =
+			read_response_from_mame(&mut mame_stdout, &watchdog, &emit_interaction_monitor, &mut line)?;
 
 		if let Some(update) = update {
 			is_running = update.is_running();
@@ -211,6 +223,7 @@ pub fn interact_with_mame(
 
 fn read_response_from_mame(
 	mame_stdout: &mut impl BufRead,
+	watchdog: &Watchdog,
 	emit_interaction_monitor: &dyn for<'a> Fn(EmitType, &'a str),
 	line: &mut String,
 ) -> anyhow::Result<(Option<Update>, bool)> {
@@ -222,7 +235,7 @@ fn read_response_from_mame(
 		Cruft,
 	}
 
-	let (resp, comment) = match read_line_from_mame(mame_stdout, line) {
+	let (resp, comment) = match read_line_from_mame(mame_stdout, watchdog, line) {
 		Ok(()) => {
 			let line_without_eolns = line.trim_end_matches(&['\r', '\n'][..]);
 			if let Some(status_line) = line.strip_prefix("@") {
@@ -260,7 +273,7 @@ fn read_response_from_mame(
 		info!("update" = ?update.as_ref().map(|_| ()), "Parsed update");
 
 		// read until end of line
-		let result = read_line_from_mame(mame_stdout, line);
+		let result = read_line_from_mame(mame_stdout, watchdog, line);
 		info!(?line, ?result, "Poststatus eoln");
 		result?;
 		if !line.trim().is_empty() {
@@ -282,12 +295,14 @@ fn read_response_from_mame(
 	Ok((update, is_signal))
 }
 
-fn read_line_from_mame(mame_stdout: &mut impl BufRead, line: &mut String) -> anyhow::Result<()> {
+fn read_line_from_mame(mame_stdout: &mut impl BufRead, watchdog: &Watchdog, line: &mut String) -> anyhow::Result<()> {
 	line.clear();
-	match mame_stdout.read_line(line) {
-		Ok(0) => Err(ThisError::EofFromMame.into()),
-		Ok(_) => Ok(()),
-		Err(e) => Err(ThisError::ReadingFromMame(e.into()).into()),
+
+	match watchdog.with_timeout(|| mame_stdout.read_line(line)) {
+		(Ok(0), false) => Err(ThisError::EofFromMame.into()),
+		(Ok(_), false) => Ok(()),
+		(Err(e), false) => Err(ThisError::ReadingFromMame(e.into()).into()),
+		(_, true) => Err(ThisError::TimeoutFromMame.into()),
 	}
 }
 
