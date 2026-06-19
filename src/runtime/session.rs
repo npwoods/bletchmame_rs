@@ -5,6 +5,7 @@ use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Read;
 use std::io::Write;
+use std::ops::ControlFlow;
 use std::process::Child;
 use std::process::Command;
 use std::process::ExitStatus;
@@ -29,6 +30,7 @@ use tracing::span;
 use crate::action::Action;
 use crate::interaction_monitor::EmitType;
 use crate::interaction_monitor::InteractionMonitor;
+use crate::job::Canceller;
 use crate::job::Job;
 use crate::platform::CommandExt;
 use crate::runtime::MameStderr;
@@ -94,10 +96,11 @@ pub fn spawn_mame_session_thread(
 	};
 	let (sender, receiver) = channel();
 
-	let job = Job::new(move || {
+	let job = Job::new(move |canceller| {
 		execute_mame(
 			&mame_args,
 			&receiver,
+			canceller,
 			watchdog_timeout,
 			&event_callback,
 			mame_stderr,
@@ -110,6 +113,7 @@ pub fn spawn_mame_session_thread(
 fn execute_mame(
 	mame_args: &MameArguments,
 	receiver: &Receiver<MameCommand>,
+	canceller: Canceller,
 	watchdog_timeout: Duration,
 	event_callback: &impl Fn(MameEvent),
 	mame_stderr: MameStderr,
@@ -136,10 +140,13 @@ fn execute_mame(
 		.map_err(|e| ThisError::LaunchingMame(e.into()))?;
 
 	// interact with MAME, do our thing
-	let receiver = |timeout| match receiver.recv_timeout(timeout) {
-		Ok(command) => command,
-		Err(RecvTimeoutError::Timeout) => MameCommand::ping(),
-		Err(RecvTimeoutError::Disconnected) => MameCommand::exit(),
+	let receiver = |timeout| match canceller.status() {
+		ControlFlow::Break(()) => MameCommand::exit(),
+		ControlFlow::Continue(()) => match receiver.recv_timeout(timeout) {
+			Ok(command) => command,
+			Err(RecvTimeoutError::Timeout) => MameCommand::ping(),
+			Err(RecvTimeoutError::Disconnected) => MameCommand::exit(),
+		},
 	};
 	let mame_result = interact_with_mame(
 		&mut child,

@@ -19,9 +19,9 @@ use tracing::debug;
 use tracing::info;
 
 use crate::action::Action;
-use crate::canceller::Canceller;
 use crate::info::InfoDb;
 use crate::interaction_monitor::InteractionMonitor;
+use crate::job::Canceller;
 use crate::job::Job;
 use crate::prefs::Preferences;
 use crate::prefs::PreflightProblem;
@@ -55,7 +55,6 @@ pub struct AppState {
 /// Represents the state of an InfoDb build (-listxml) job
 struct InfoDbBuild {
 	job: Job<Result<Option<InfoDb>>>,
-	canceller: Canceller,
 	machine_description: Option<String>,
 }
 
@@ -243,10 +242,9 @@ impl AppState {
 			let mame_executable_path = mame_args.program.as_str();
 			let prefs_path = &self.fixed.prefs_path;
 			let callback = self.fixed.callback.clone();
-			let (job, canceller) = spawn_infodb_build_thread(prefs_path, mame_executable_path, callback);
+			let job = spawn_infodb_build_thread(prefs_path, mame_executable_path, callback);
 			let info_db_build = InfoDbBuild {
 				job,
-				canceller,
 				machine_description: None,
 			};
 			self.info_db_build = Some(info_db_build);
@@ -257,6 +255,7 @@ impl AppState {
 	pub fn reset(&mut self) -> bool {
 		// if a session is live, set it to stop and restart
 		if let Some(session) = self.live.as_mut().and_then(|live| live.session.as_mut()) {
+			session.job.cancel();
 			session.command_sender = None;
 			session.post_session_end = Some(PostSessionEnd::Restart { command: None });
 		}
@@ -325,18 +324,18 @@ impl AppState {
 
 	fn internal_infodb_build_complete(&mut self, cancel: bool) -> bool {
 		// we expect to be in the process of building, and to be able to "take" the job
-		let info_db_build = self.info_db_build.as_ref().unwrap();
+		let info_db_build = self.info_db_build.take().unwrap();
 
 		// if specified, cancel the build
 		if cancel {
-			info_db_build.canceller.cancel();
+			info_db_build.job.cancel();
 		}
 
 		// join the job (which we expect to complete) and digest the result
 		//
 		// take note that when we cancel, we ignore the result from the job; there
 		// can be a race condition where the job actually yields something other than `Ok(None)`
-		let result = info_db_build.job.join().unwrap();
+		let result = info_db_build.job.join();
 		let result = if cancel { Ok(None) } else { result };
 
 		// this next bit is pretty involved
@@ -456,10 +455,10 @@ impl AppState {
 	pub fn session_ended(&mut self) -> ControlFlow<()> {
 		// access the "live" and the session
 		let live = self.live.as_mut().unwrap();
-		let session = live.session.as_mut().unwrap();
+		let mut session = live.session.take().unwrap();
 
 		// join the thread and get the result
-		let result = session.job.join().unwrap();
+		let result = session.job.join();
 
 		// if we failed, we have to report the error
 		let failure = result.err().map(Failure::SessionError);
@@ -756,16 +755,11 @@ fn spawn_infodb_build_thread(
 	prefs_path: &Path,
 	mame_executable_path: &str,
 	callback: CommandCallback,
-) -> (Job<Result<Option<InfoDb>>>, Canceller) {
+) -> Job<Result<Option<InfoDb>>> {
 	let prefs_path = prefs_path.to_path_buf();
 	let mame_executable_path = mame_executable_path.to_string();
 	let callback_bubble = ThreadLocalBubble::new(callback);
-	let canceller = Canceller::default();
-	let job = {
-		let canceller = canceller.clone();
-		Job::new(move || infodb_build_thread_proc(&prefs_path, &mame_executable_path, callback_bubble, canceller))
-	};
-	(job, canceller)
+	Job::new(move |canceller| infodb_build_thread_proc(&prefs_path, &mame_executable_path, callback_bubble, canceller))
 }
 
 fn infodb_build_thread_proc(
