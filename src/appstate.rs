@@ -67,7 +67,7 @@ struct Live {
 /// Represents a session and associated communication
 struct Session {
 	job: Job<SessionResult<()>>,
-	command_sender: Option<Arc<Sender<MameCommand>>>,
+	command_sender: Option<Sender<MameCommand>>,
 	status: Option<Rc<Status>>,
 	pending_status: Option<Rc<Status>>,
 	expecting: Option<Expecting>,
@@ -221,7 +221,7 @@ impl AppState {
 			self.fixed.interaction_monitor.clone(),
 			self.fixed.callback.clone(),
 		);
-		let command_sender = Some(Arc::new(command_sender));
+		let command_sender = Some(command_sender);
 		Session {
 			job,
 			command_sender,
@@ -304,7 +304,7 @@ impl AppState {
 	/// Issues a command to MAME
 	pub fn issue_command(&self, command: MameCommand) {
 		let session = self.live.as_ref().unwrap().session.as_ref().unwrap();
-		if let Some(command_sender) = session.command_sender.as_deref() {
+		if let Some(command_sender) = session.command_sender.as_ref() {
 			command_sender.send(command).unwrap();
 		}
 	}
