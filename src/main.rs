@@ -5,7 +5,6 @@ mod appwindow;
 mod assethash;
 mod audit;
 mod backend;
-mod canceller;
 mod channel;
 mod chd;
 mod collections;

@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use default_ext::DefaultExt;
+use itertools::Either;
 use itertools::Itertools;
 use slint::SharedString;
 use smol_str::SmolStr;
@@ -154,10 +155,7 @@ impl Asset {
 		}
 	}
 
-	pub fn run_audit<P>(&self, rom_paths: &[P], sample_paths: &[P]) -> AuditResult
-	where
-		P: AsRef<Path>,
-	{
+	pub fn run_audit(&self, rom_paths: &[impl AsRef<Path>], sample_paths: &[impl AsRef<Path>]) -> AuditResult {
 		// wrap these up in a uniform signature
 		type HashFunc = fn(&mut dyn Read) -> Result<AssetHash>;
 		fn hash_func_rom(file: &mut dyn Read) -> Result<AssetHash> {
@@ -172,10 +170,15 @@ impl Asset {
 
 		// do different things based on the `AssetKind`
 		let (asset_paths, support_archives, hash_func) = match self.kind {
-			AssetKind::Rom => (rom_paths, true, hash_func_rom as HashFunc),
-			AssetKind::Sample => (sample_paths, true, hash_func_sample as HashFunc),
-			AssetKind::Disk => (rom_paths, false, hash_func_disk as HashFunc),
+			AssetKind::Rom => (Either::Left(rom_paths), true, hash_func_rom as HashFunc),
+			AssetKind::Sample => (Either::Right(sample_paths), true, hash_func_sample as HashFunc),
+			AssetKind::Disk => (Either::Left(rom_paths), false, hash_func_disk as HashFunc),
 		};
+
+		// normalize the paths iterator
+		let paths_iter = asset_paths
+			.map_left(|paths| paths.iter().map(|x| x.as_ref()))
+			.map_right(|paths| paths.iter().map(|x| x.as_ref()));
 
 		// now do the heavy lifting
 		audit_single(
@@ -185,7 +188,7 @@ impl Asset {
 			self.status,
 			self.is_optional,
 			self.machine_names.as_ref(),
-			asset_paths,
+			paths_iter,
 			support_archives,
 			hash_func,
 		)
@@ -233,14 +236,14 @@ pub enum PathType {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn audit_single(
+fn audit_single<'a>(
 	asset_name: &str,
 	expected_size: Option<u64>,
 	expected_asset_hash: &AssetHash,
 	status: AssetStatus,
 	is_optional: bool,
 	machine_names: &[impl AsRef<str>],
-	paths: &[impl AsRef<Path>],
+	paths_iter: impl Iterator<Item = &'a Path> + Clone,
 	support_archives: bool,
 	hash_func: fn(&mut dyn Read) -> Result<AssetHash>,
 ) -> AuditResult {
@@ -252,7 +255,7 @@ fn audit_single(
 
 	machine_names
 		.iter()
-		.flat_map(|machine_name| paths.iter().map(|path| (machine_name.as_ref(), path.as_ref())))
+		.flat_map(|machine_name| paths_iter.clone().map(|path| (machine_name.as_ref(), path)))
 		.flat_map(|(machine_name, path)| path_types.iter().map(move |path_type| (machine_name, path, *path_type)))
 		.filter_map(|(machine_name, path, path_type)| {
 			try_audit(

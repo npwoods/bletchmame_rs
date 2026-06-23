@@ -1,38 +1,48 @@
-use anyhow::Error;
-use anyhow::Result;
-
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::ops::ControlFlow;
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 use std::thread::JoinHandle;
 use std::thread::spawn;
 
+/// Encapsulation of a "job"; a task spawned into a separate thread with a facility for cancellation
 #[derive(Debug)]
-pub struct Job<T>(Rc<RefCell<Option<JoinHandle<T>>>>);
+pub struct Job<T> {
+	join_handle: JoinHandle<T>,
+	canceller: Canceller,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct Canceller(Arc<AtomicBool>);
 
 impl<T> Job<T>
 where
 	T: Send + 'static,
 {
-	pub fn new(f: impl FnOnce() -> T + Send + 'static) -> Self {
-		let join_handle = spawn(f);
-		Self(Rc::new(RefCell::new(Some(join_handle))))
+	pub fn new(f: impl FnOnce(Canceller) -> T + Send + 'static) -> Self {
+		let canceller = Canceller::default();
+		let canceller_clone = canceller.clone();
+		let join_handle = spawn(|| f(canceller_clone));
+		Self { join_handle, canceller }
 	}
 
-	pub fn join(&self) -> Result<T> {
-		let join_handle = self.0.borrow_mut().take().ok_or_else(|| {
-			let message = "Job::join() invoked multiple times";
-			Error::msg(message)
-		})?;
-		let result = join_handle.join().map_err(|_| {
-			let message = "JoinHandle::join() failed";
-			Error::msg(message)
-		})?;
-		Ok(result)
+	pub fn join(self) -> T {
+		// in practice we cannot meaningfully recover from JoinHandle::join() failing, so
+		// we do an expect
+		self.join_handle.join().expect("join failed")
+	}
+
+	pub fn cancel(&self) {
+		self.canceller.0.store(true, Ordering::Relaxed);
 	}
 }
 
-impl<T> Clone for Job<T> {
-	fn clone(&self) -> Self {
-		Self(Rc::clone(&self.0))
+impl Canceller {
+	pub fn status(&self) -> ControlFlow<()> {
+		if self.0.load(Ordering::Relaxed) {
+			ControlFlow::Break(())
+		} else {
+			ControlFlow::Continue(())
+		}
 	}
 }
