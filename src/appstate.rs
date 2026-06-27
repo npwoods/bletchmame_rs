@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::ops::ControlFlow;
 use std::path::Path;
 use std::path::PathBuf;
@@ -14,6 +15,7 @@ use slint::invoke_from_event_loop;
 use smol_str::SmolStr;
 use smol_str::ToSmolStr;
 use smol_str::format_smolstr;
+use strum::EnumProperty;
 use throttle::Throttle;
 use tracing::debug;
 use tracing::info;
@@ -80,12 +82,27 @@ enum PostSessionEnd {
 	Restart { command: Option<MameCommand> },
 }
 
-#[derive(Debug)]
+#[derive(Debug, EnumProperty)]
 enum Failure {
+	#[strum(props(Message = "BletchMAME requires additional configuration in order to properly interface with MAME"))]
 	Preflight(Box<[PreflightProblem]>),
+
+	#[strum(props(Message = "MAME has errored and shut down"))]
 	SessionError(SessionError),
-	StatusValidationProblem(ValidationError),
+
+	#[strum(props(Submessage = "This is a very unexpected internal error"))]
+	InfoDbStatusMismatch {
+		status_build: MameVersion,
+		infodb_build: MameVersion,
+	},
+
+	#[strum(props(Message = "Status update from MAME is incorrect"))]
+	InvalidStatusUpdate(Vec<UpdateXmlProblem>),
+
+	#[strum(props(Message = "Failure processing machine information from MAME"))]
 	InfoDbBuild(Error),
+
+	#[strum(props(Message = "Processing machine information from MAME was cancelled"))]
 	InfoDbBuildCancelled,
 }
 
@@ -366,12 +383,12 @@ impl AppState {
 						info_db,
 					);
 
-					if let Err(e) = result {
+					self.failure = if let Err(error) = result {
 						session.command_sender = None;
-						self.failure = Some(Failure::StatusValidationProblem(e));
+						Some(error.into())
 					} else {
-						self.failure = None;
-					}
+						None
+					};
 
 					session.status = status;
 					session.pending_status = pending_status;
@@ -428,7 +445,7 @@ impl AppState {
 		let (failure, rebuild_info_db) = match result {
 			Ok(()) => (None, false),
 			Err(ValidationError::VersionMismatch(_, _)) => (None, self.info_db_build.is_none()),
-			Err(e) => (Some(Failure::StatusValidationProblem(e)), false),
+			Err(e) => (Some(e.into()), false),
 		};
 
 		// and munge this into the new state
@@ -548,11 +565,7 @@ impl AppState {
 			Starting,
 			Stopping,
 			ShuttingDown,
-			PreflightFailure(&'a [PreflightProblem]),
-			SessionError(&'a SessionError),
-			InvalidStatusUpdate(&'a [UpdateXmlProblem]),
-			InfoDbBuildFailure(Option<&'a Error>),
-			InfoDbStatusMismatch(&'a MameVersion, &'a MameVersion),
+			FailureReport(&'a Failure),
 		}
 
 		// upfront logic to determine the type of report presented, if any; keep
@@ -578,22 +591,7 @@ impl AppState {
 			(None, Some(Expecting::Stop), None, _, _) => Some(ReportType::Stopping),
 			(None, _, _, _, true) => Some(ReportType::ShuttingDown),
 			(None, _, _, true, false) => Some(ReportType::Resetting),
-			(None, _, Some(Failure::Preflight(preflight_problems)), false, false) => {
-				Some(ReportType::PreflightFailure(preflight_problems.as_ref()))
-			}
-			(None, _, Some(Failure::SessionError(e)), false, false) => Some(ReportType::SessionError(e)),
-			(None, _, Some(Failure::StatusValidationProblem(ValidationError::Invalid(e))), false, false) => {
-				Some(ReportType::InvalidStatusUpdate(e.as_slice()))
-			}
-			(
-				None,
-				_,
-				Some(Failure::StatusValidationProblem(ValidationError::VersionMismatch(status_build, infodb_build))),
-				false,
-				false,
-			) => Some(ReportType::InfoDbStatusMismatch(status_build, infodb_build)),
-			(None, _, Some(Failure::InfoDbBuild(e)), false, false) => Some(ReportType::InfoDbBuildFailure(Some(e))),
-			(None, _, Some(Failure::InfoDbBuildCancelled), false, false) => Some(ReportType::InfoDbBuildFailure(None)),
+			(None, _, Some(failure), false, false) => Some(ReportType::FailureReport(failure)),
 			(None, None, None, false, false) => None,
 		};
 
@@ -622,7 +620,7 @@ impl AppState {
 				let submessage = match (is_session_stopping, is_starting_up) {
 					(true, _) => "MAME needs to be reset to run this emulation",
 					(false, true) => "MAME is reinitializing",
-					(false, false) => "Waiting for emulation startup to be complete"
+					(false, false) => "Waiting for emulation startup to be complete",
 				};
 				Report {
 					message: "Starting emulation...".into(),
@@ -630,7 +628,7 @@ impl AppState {
 					is_spinning: true,
 					..Default::default()
 				}
-			},
+			}
 			ReportType::Stopping => Report {
 				message: "Stopping emulation...".into(),
 				is_spinning: true,
@@ -641,88 +639,7 @@ impl AppState {
 				is_spinning: true,
 				..Default::default()
 			},
-			ReportType::PreflightFailure(preflight_problems) => {
-				let message = "BletchMAME requires additional configuration in order to properly interface with MAME".into();
-
-				let issues = preflight_problems
-					.iter()
-					.map(|problem| {
-						let text = problem.to_smolstr();
-						let button = problem.problem_type().map(|path_type| {
-							let text = format_smolstr!("Choose {path_type}");
-							let command = Action::SettingsPaths(Some(path_type));
-							Button { text, command }
-						});
-						Issue { text, button }
-					})
-					.collect();
-				Report {
-					message,
-					issues,
-					..Default::default()
-				}
-			}
-			ReportType::SessionError(error) => {
-				let button = Button {
-					text: "Continue".into(),
-					command: Action::ReactivateMame
-				};
-				Report {
-					message: "MAME has errored and shut down".into(),
-					submessage: Some(format!("{error}").into()),
-					mame_stderr_output: error.mame_stderr_text.clone(),
-					mame_exit_code: error.exit_code,
-					button: Some(button),
-					..Default::default()
-				}
-			}
-			ReportType::InvalidStatusUpdate(errors) => {
-				let issues = errors
-					.iter()
-					.map(|e| Issue {
-						text: format!("{e}").into(),
-						button: None,
-					})
-					.collect();
-				Report {
-					message: "Status update from MAME is incorrect".into(),
-					issues,
-					..Default::default()
-				}
-			}
-			ReportType::InfoDbBuildFailure(error) => {
-				let message = if error.is_some() {
-					"Failure processing machine information from MAME"
-				} else {
-					"Processing machine information from MAME was cancelled"
-				};
-				let message = message.into();
-				let submessage = error.map(|e| e.to_smolstr());
-				let button = Button {
-					text: "Retry".into(),
-					command: Action::HelpRefreshInfoDb,
-				};
-				Report {
-					message,
-					submessage,
-					button: Some(button),
-					..Default::default()
-				}
-			}
-			ReportType::InfoDbStatusMismatch(status_build, infodb_build) => {
-				let message = format!("The MAME Status Update is reporting version {status_build} and the MAME Machine Info output is reporting version {infodb_build}").into();
-				let submessage = Some("This is a very unexpected internal error".into());
-				let button = Button {
-					text: "Retry".into(),
-					command: Action::HelpRefreshInfoDb,
-				};
-				Report {
-					message,
-					submessage,
-					button: Some(button),
-					..Default::default()
-				}
-			}
+			ReportType::FailureReport(failure) => failure.report(),
 		})
 	}
 
@@ -752,6 +669,104 @@ impl AppState {
 			*interaction_monitor = Some(InteractionMonitor::new()?);
 		}
 		Ok(())
+	}
+}
+
+impl Failure {
+	pub fn report(&self) -> Report {
+		// primary message
+		let message = if let Self::InfoDbStatusMismatch {
+			status_build,
+			infodb_build,
+		} = self
+		{
+			format_smolstr!(
+				"The MAME Status Update is reporting version {status_build} and the MAME Machine Info output is reporting version {infodb_build}"
+			)
+		} else {
+			self.get_str("Message").unwrap().into()
+		};
+
+		// secondary message
+		let submessage: Option<&dyn Display> = match self {
+			Self::SessionError(error) => Some(error),
+			Self::InfoDbBuild(error) => Some(error),
+			_ => None,
+		};
+		let submessage = submessage
+			.map(|x| format_smolstr!("{x}"))
+			.or_else(|| self.get_str("Submessage").map(SmolStr::new_static));
+
+		// issues
+		let issues = match self {
+			Self::Preflight(preflight_problems) => preflight_problems
+				.iter()
+				.map(|problem| {
+					let text = problem.to_smolstr();
+					let button = problem.problem_type().map(|path_type| {
+						let text = format_smolstr!("Choose {path_type}");
+						let command = Action::SettingsPaths(Some(path_type));
+						Button { text, command }
+					});
+					Issue { text, button }
+				})
+				.collect(),
+
+			Self::InvalidStatusUpdate(errors) => errors
+				.iter()
+				.map(|e| Issue {
+					text: format!("{e}").into(),
+					button: None,
+				})
+				.collect(),
+			_ => Default::default(),
+		};
+
+		// MAME error output and exit code
+		let (mame_stderr_output, mame_exit_code) = if let Failure::SessionError(error) = self {
+			(error.mame_stderr_text.clone(), error.exit_code)
+		} else {
+			(None, None)
+		};
+
+		// action button
+		let button = match self {
+			Self::SessionError(_) => Some(Button {
+				text: "Continue".into(),
+				command: Action::ReactivateMame,
+			}),
+			Self::InfoDbBuild(_) => Some(Button {
+				text: "Retry".into(),
+				command: Action::HelpRefreshInfoDb,
+			}),
+			Self::InfoDbStatusMismatch { .. } => Some(Button {
+				text: "Retry".into(),
+				command: Action::ReactivateMame,
+			}),
+			_ => None,
+		};
+
+		Report {
+			message,
+			submessage,
+			issues,
+			mame_stderr_output,
+			mame_exit_code,
+			button,
+			is_spinning: false,
+		}
+	}
+}
+
+impl From<ValidationError> for Failure {
+	fn from(value: ValidationError) -> Self {
+		match value {
+			ValidationError::VersionMismatch(status_build, infodb_build) => Failure::InfoDbStatusMismatch {
+				status_build,
+				infodb_build,
+			},
+			ValidationError::Invalid(update_xml_problems) => Failure::InvalidStatusUpdate(update_xml_problems),
+		}
 	}
 }
 
