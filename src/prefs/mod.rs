@@ -13,6 +13,7 @@ use std::io::BufReader;
 use std::io::ErrorKind;
 use std::io::Read;
 use std::io::Write;
+use std::path::MAIN_SEPARATOR;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -561,55 +562,58 @@ impl Preferences {
 	}
 
 	pub fn fresh(prefs_path: Option<SmolStr>) -> Self {
-		let path_separator = '\\';
+		fresh_preferences(prefs_path, MAIN_SEPARATOR)
+	}
+}
 
-		let paths = PrefsPaths {
-			plugins: [
-				format_smolstr!("$(BLETCHMAMEPATH){path_separator}plugins"),
-				format_smolstr!("$(MAMEPATH){path_separator}plugins"),
-			]
-			.into(),
-			cfg: prefs_path.clone(),
-			diff: prefs_path.clone(),
-			inis: prefs_path.iter().cloned().collect(),
-			nvram: prefs_path.clone(),
-			..Default::default()
-		};
-		let paths = paths.into();
+/// Separate implementation to facilitate unit testing
+fn fresh_preferences(prefs_path: Option<SmolStr>, path_separator: char) -> Preferences {
+	let paths = PrefsPaths {
+		plugins: [
+			format_smolstr!("$(BLETCHMAMEPATH){path_separator}plugins"),
+			format_smolstr!("$(MAMEPATH){path_separator}plugins"),
+		]
+		.into(),
+		cfg: prefs_path.clone(),
+		diff: prefs_path.clone(),
+		inis: prefs_path.iter().cloned().collect(),
+		nvram: prefs_path.clone(),
+		..Default::default()
+	};
+	let paths = paths.into();
 
-		#[rustfmt::skip]
-		let items_columns = [
-			PrefsColumn { column_type: ColumnType::Name, sort: Some(SortOrder::Ascending), width: 100.0 },
-			PrefsColumn { column_type: ColumnType::SourceFile, sort: None, width: 155.0 },
-			PrefsColumn { column_type: ColumnType::Description, sort: None, width: 400.0 },
-			PrefsColumn { column_type: ColumnType::Year, sort: None, width: 80.0 },
-			PrefsColumn { column_type: ColumnType::Provider, sort: None, width: 180.0 },
-		].into();
+	#[rustfmt::skip]
+	let items_columns = [
+		PrefsColumn { column_type: ColumnType::Name, sort: Some(SortOrder::Ascending), width: 100.0 },
+		PrefsColumn { column_type: ColumnType::SourceFile, sort: None, width: 155.0 },
+		PrefsColumn { column_type: ColumnType::Description, sort: None, width: 400.0 },
+		PrefsColumn { column_type: ColumnType::Year, sort: None, width: 80.0 },
+		PrefsColumn { column_type: ColumnType::Provider, sort: None, width: 180.0 },
+	].into();
 
-		let collections = [
-			PrefsCollection::Builtin(BuiltinCollection::All),
-			PrefsCollection::Folder {
-				name: "Favorites".into(),
-				items: [].into(),
-			},
-		];
-		let collections = collections.into_iter().map(|x| x.into()).collect();
+	let collections = [
+		PrefsCollection::Builtin(BuiltinCollection::All),
+		PrefsCollection::Folder {
+			name: "Favorites".into(),
+			items: [].into(),
+		},
+	];
+	let collections = collections.into_iter().map(|x| x.into()).collect();
 
-		let history = [HistoryEntry {
-			collection: PrefsCollectionRef::Builtin(BuiltinCollection::All),
-			search: "".into(),
-			sort_suppressed: false,
-			selection: [].into(),
-		}]
-		.into();
+	let history = [HistoryEntry {
+		collection: PrefsCollectionRef::Builtin(BuiltinCollection::All),
+		search: "".into(),
+		sort_suppressed: false,
+		selection: [].into(),
+	}]
+	.into();
 
-		Preferences {
-			paths,
-			collections,
-			items_columns,
-			history,
-			..Default::default()
-		}
+	Preferences {
+		paths,
+		collections,
+		items_columns,
+		history,
+		..Default::default()
 	}
 }
 
@@ -824,13 +828,13 @@ mod test {
 	use tempdir::TempDir;
 	use test_case::test_case;
 
-	use super::Preferences;
 	use super::PrefsIdentifier;
+	use super::fresh_preferences;
 	use super::load_prefs_from_reader;
 
 	#[test]
 	pub fn fresh() {
-		let prefs = Preferences::fresh(None);
+		let prefs = fresh_preferences(None, '\\');
 		insta::assert_json_snapshot!(prefs);
 	}
 
