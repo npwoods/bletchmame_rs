@@ -23,6 +23,7 @@ import { SimpleMenuEntry } from "common.slint";
 import { Icons } from "icons.slint";
 import { TapeControl, Cassette } from "tapecontrol.slint";
 import { HorizontalSplitter } from "splitter.slint";
+import { AuditAsset, AuditAssetView } from "audit.slint";
 
 struct CollectionContextMenuInfo {
     move-up-action: string,
@@ -247,6 +248,7 @@ export component AppWindow inherits Window {
     in property <bool> report-spinning;
     in property <string> report-button-text;
     in property <[ReportIssue]> report-issues;
+    in property <[AuditAsset]> report-audit-assets;
     property <string> monospace-font-family: "Consolas";
     callback report-button-clicked();
     callback issue-button-clicked(int);
@@ -1032,6 +1034,16 @@ export component AppWindow inherits Window {
                             text: issue.button-text;
                             clicked => {
                                 root.issue-button-clicked(index);
+                            }
+                        }
+                    }
+
+                    // report audit assets
+                    VerticalLayout {
+                        for asset in report-audit-assets: AuditAssetView {
+                            asset: asset;
+                            menu-item-action(action) => {
+                                root.menu-item-action(action);
                             }
                         }
                     }

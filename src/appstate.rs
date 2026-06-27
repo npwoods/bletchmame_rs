@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use std::mem::replace;
 use std::ops::ControlFlow;
 use std::path::Path;
 use std::path::PathBuf;
@@ -6,6 +7,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::mpsc::Sender;
+use std::thread::sleep;
 use std::time::Duration;
 
 use anyhow::Error;
@@ -20,10 +22,14 @@ use throttle::Throttle;
 use tracing::info;
 
 use crate::action::Action;
+use crate::audit::Asset;
+use crate::audit::AuditResult;
+use crate::audit::AuditSeverity;
 use crate::info::InfoDb;
 use crate::interaction_monitor::InteractionMonitor;
 use crate::job::Canceller;
 use crate::job::Job;
+use crate::mconfig::MachineConfig;
 use crate::prefs::Preferences;
 use crate::prefs::PreflightProblem;
 use crate::prefs::PrefsVideo;
@@ -91,6 +97,11 @@ enum SessionActiveState {
 	Normal,
 	EmuStarting,
 	EmuStopping,
+	Auditing {
+		job: Job<AuditJobResult>,
+		start_args: MameStartArgs,
+		current_asset_name: Option<SmolStr>,
+	},
 }
 
 #[derive(Debug, EnumProperty)]
@@ -115,6 +126,15 @@ enum Failure {
 
 	#[strum(props(Message = "Processing machine information from MAME was cancelled"))]
 	InfoDbBuildCancelled,
+
+	#[strum(props(Message = "Audit failure before run"))]
+	AuditResults(Box<[(Asset, AuditResult)]>),
+
+	#[strum(props(Message = "Unexpected error auditing before run"))]
+	AuditError(Error),
+
+	#[strum(props(Message = "Audit was cancelled"))]
+	AuditCancelled,
 }
 
 struct Fixed {
@@ -125,10 +145,20 @@ struct Fixed {
 	callback: ActionCallback,
 }
 
+#[derive(Debug)]
+pub enum AuditJobResult {
+	Success,
+	Cancelled,
+	Failed(Box<[(Asset, AuditResult)]>),
+}
+
 type ActionCallback = Rc<dyn Fn(Action) + 'static>;
 
 // progress messages should be throttled
 const PROGRESS_THROTTLE_TIMEOUT: Duration = Duration::from_millis(100);
+
+// debugging feature to make auditing easier to debug
+const AUDIT_DELAY: Option<Duration> = None;
 
 #[derive(Default, Debug)]
 pub struct Report {
@@ -139,6 +169,7 @@ pub struct Report {
 	pub button: Option<Button>,
 	pub is_spinning: bool,
 	pub issues: Vec<Issue>,
+	pub audit_results: Box<[(Asset, AuditResult)]>,
 }
 
 #[derive(Clone, Debug)]
@@ -208,9 +239,13 @@ impl AppState {
 	pub fn activate(&mut self) -> bool {
 		info!("AppState::activate(): starting");
 
+		// clear out any failure
+		let had_failure = self.failure.is_some();
+		self.failure = None;
+
 		// if we already have a session (in any form, we're already active) or if we're shutting down, don't proceed
 		if self.live.as_ref().is_some_and(|live| live.session.is_some()) {
-			return false;
+			return had_failure;
 		}
 
 		// get or load the InfoDb
@@ -305,24 +340,34 @@ impl AppState {
 	}
 
 	pub fn start(&mut self, start_args: MameStartArgs) -> bool {
+		info!(?start_args, "AppState::start()");
+
+		// access the InfoDb now
+		let info_db = self.info_db().unwrap().clone();
+
 		// access the live session (which had better be present)
 		let session = self.live.as_mut().unwrap().session.as_mut().unwrap();
 
 		// do we have an active session that with the expected video state?
-		if let SessionState::Active {
-			command_sender,
-			active_state,
-		} = &mut session.session_state
+		if let SessionState::Active { active_state, .. } = &mut session.session_state
 			&& session.video == start_args.video
 		{
-			// there is indeed - use this session; build the command that will ultimately be issued to MAME/worker_ui
-			let command = MameCommand::start(&start_args);
-
-			// dispatch the command
-			command_sender.send(command).unwrap();
-
-			// and set the state to "starting"
-			*active_state = SessionActiveState::EmuStarting;
+			// there is indeed - start an auditing session
+			let rom_paths = self.preferences.paths.roms.clone();
+			let sample_paths = self.preferences.paths.samples.clone();
+			let callback = self.fixed.callback.clone();
+			let job = match spawn_audit(info_db, rom_paths, sample_paths, AUDIT_DELAY, &start_args, callback) {
+				Ok(job) => job,
+				Err(e) => {
+					self.failure = Some(Failure::AuditError(e));
+					return true;
+				}
+			};
+			*active_state = SessionActiveState::Auditing {
+				job,
+				start_args,
+				current_asset_name: None,
+			};
 		} else {
 			// the session is unusable either because it is shutting down and/or the video is wrong; we need to restart
 			let start_args = Some(start_args);
@@ -331,6 +376,94 @@ impl AppState {
 			// cancel the current session
 			session.job.cancel();
 		};
+		true
+	}
+
+	pub fn audit_progress(&mut self, asset_name: SmolStr) -> bool {
+		// access the live session (which had better be present)
+		let session = self.live.as_mut().unwrap().session.as_mut().unwrap();
+
+		// access the auditing session
+		let SessionState::Active {
+			active_state: SessionActiveState::Auditing { current_asset_name, .. },
+			..
+		} = &mut session.session_state
+		else {
+			// should never happen because `Action::AuditProgress` will only be invoked by an auditing job
+			panic!("audit_progress() called without session");
+		};
+
+		// record progress
+		*current_asset_name = Some(asset_name);
+		true
+	}
+
+	pub fn audit_cancel(&mut self) -> bool {
+		// access the live session (which had better be present)
+		let session = self.live.as_mut().unwrap().session.as_mut().unwrap();
+
+		// access the auditing session
+		let SessionState::Active {
+			active_state: SessionActiveState::Auditing { job, .. },
+			..
+		} = &session.session_state
+		else {
+			// should never happen because `Action::AuditProgress` will only be invoked by an auditing job
+			panic!("audit_progress() called without session");
+		};
+
+		// cancel the job
+		job.cancel();
+		true
+	}
+
+	pub fn audit_complete(&mut self) -> bool {
+		info!("AppState::audit_complete()");
+
+		// access the live session (which had better be present)
+		let session = self.live.as_mut().unwrap().session.as_mut().unwrap();
+
+		// and the session should be active
+		let SessionState::Active {
+			command_sender,
+			active_state,
+		} = &mut session.session_state
+		else {
+			// should never happen because `Action::AuditComplete` will only be invoked by an auditing job
+			panic!("audit_complete() called without session");
+		};
+
+		// ...and the active session should be auditing
+		let active_state_moved = replace(active_state, SessionActiveState::Normal);
+		let SessionActiveState::Auditing { job, start_args, .. } = active_state_moved else {
+			// should never happen because `Action::AuditComplete` will only be invoked by an auditing job
+			panic!("audit_complete() called without auditing session");
+		};
+
+		// get the results
+		let audit_result = job.join();
+
+		// how did the audit go?
+		match audit_result {
+			AuditJobResult::Success => {
+				// the audit succeeded and we're ready to go; build the command that will ultimately
+				// be issued to MAME/worker_ui
+				let command = MameCommand::start(&start_args);
+
+				// dispatch the command
+				command_sender.send(command).unwrap();
+
+				// and set the state to "starting"
+				*active_state = SessionActiveState::EmuStarting;
+			}
+			AuditJobResult::Cancelled => {
+				self.failure = Some(Failure::AuditCancelled);
+			}
+			AuditJobResult::Failed(items) => {
+				self.failure = Some(Failure::AuditResults(items));
+			}
+		}
+
 		true
 	}
 
@@ -596,6 +729,7 @@ impl AppState {
 			// messages for an emulation starting up or shutting down
 			EmuStarting,
 			EmuStopping,
+			Auditing(Option<&'a SmolStr>),
 
 			// InfoDb building
 			InfoDbBuild(Option<&'a str>),
@@ -626,6 +760,9 @@ impl AppState {
 					SessionActiveState::Normal => session.status.is_none().then_some(ReportType::SessionStarting),
 					SessionActiveState::EmuStarting => Some(ReportType::EmuStarting),
 					SessionActiveState::EmuStopping => Some(ReportType::EmuStopping),
+					SessionActiveState::Auditing { current_asset_name, .. } => {
+						Some(ReportType::Auditing(current_asset_name.as_ref()))
+					}
 				},
 			}
 		} else {
@@ -680,6 +817,19 @@ impl AppState {
 				is_spinning: true,
 				..Default::default()
 			},
+			ReportType::Auditing(current_asset_name) => {
+				let button = Button {
+					text: "Cancel".into(),
+					command: Action::AuditCancel,
+				};
+				Report {
+					message: "Auditing assets...".into(),
+					submessage: current_asset_name.cloned(),
+					is_spinning: true,
+					button: Some(button),
+					..Default::default()
+				}
+			}
 			ReportType::FailureReport(failure) => failure.report(),
 		})
 	}
@@ -731,7 +881,7 @@ impl Failure {
 		// secondary message
 		let submessage: Option<&dyn Display> = match self {
 			Self::SessionError(error) => Some(error),
-			Self::InfoDbBuild(error) => Some(error),
+			Self::InfoDbBuild(error) | Self::AuditError(error) => Some(error),
 			_ => None,
 		};
 		let submessage = submessage
@@ -772,10 +922,12 @@ impl Failure {
 
 		// action button
 		let button = match self {
-			Self::SessionError(_) => Some(Button {
-				text: "Continue".into(),
-				command: Action::ReactivateMame,
-			}),
+			Self::SessionError(_) | Self::AuditResults(_) | Self::AuditError(_) | Self::AuditCancelled => {
+				Some(Button {
+					text: "Continue".into(),
+					command: Action::ReactivateMame,
+				})
+			}
 			Self::InfoDbBuild(_) => Some(Button {
 				text: "Retry".into(),
 				command: Action::HelpRefreshInfoDb,
@@ -787,6 +939,13 @@ impl Failure {
 			_ => None,
 		};
 
+		// auditing results
+		let audit_results = if let Self::AuditResults(audit_results) = self {
+			audit_results.clone()
+		} else {
+			Default::default()
+		};
+
 		Report {
 			message,
 			submessage,
@@ -795,6 +954,7 @@ impl Failure {
 			mame_exit_code,
 			button,
 			is_spinning: false,
+			audit_results,
 		}
 	}
 }
@@ -820,6 +980,74 @@ fn spawn_infodb_build_thread(
 	let mame_executable_path = mame_executable_path.to_string();
 	let callback_bubble = ThreadLocalBubble::new(callback);
 	Job::new(move |canceller| infodb_build_thread_proc(&prefs_path, &mame_executable_path, callback_bubble, canceller))
+}
+
+fn spawn_audit(
+	info_db: Rc<InfoDb>,
+	rom_paths: Vec<impl AsRef<Path> + Send + 'static>,
+	sample_paths: Vec<impl AsRef<Path> + Send + 'static>,
+	audit_delay: Option<Duration>,
+	start_args: &MameStartArgs,
+	callback: ActionCallback,
+) -> Result<Job<AuditJobResult>> {
+	// create the MachineConfig
+	let machine_config = MachineConfig::from_mame_start_args(info_db.clone(), start_args)?;
+
+	// create the assets
+	let assets = Asset::from_machine_config(&machine_config);
+
+	// progress messages need to be throttled
+	let mut throttle = Throttle::new(PROGRESS_THROTTLE_TIMEOUT, 1);
+
+	// create the job
+	let callback_bubble = ThreadLocalBubble::new(callback);
+	let job = Job::new(move |canceller| {
+		// we need to invoke actions on the main thread
+		let invoke_action = make_invoke_action(callback_bubble, canceller.clone());
+
+		// audit each asset
+		let audit_results = assets
+			.into_iter()
+			.map(|asset| {
+				if canceller.status().is_break() {
+					Err(())
+				} else {
+					// do we need to display a progress message?
+					if throttle.accept().is_ok() {
+						let action = Action::AuditProgress(asset.name.as_str().into());
+						invoke_action(action, true);
+					}
+
+					// this is only for debugging purposes
+					if let Some(audit_delay) = audit_delay {
+						sleep(audit_delay);
+					}
+
+					// audit the asset
+					let audit_result = asset.run_audit(&rom_paths, &sample_paths);
+					Ok((asset, audit_result))
+				}
+			})
+			.collect::<std::result::Result<Vec<_>, ()>>();
+
+		// determine what the job result should be
+		let job_result = match audit_results {
+			Ok(results) => {
+				let max_severity = results.iter().map(|(_, audit_result)| audit_result.severity()).max();
+				if max_severity.is_none_or(|x| x < AuditSeverity::Fail) {
+					AuditJobResult::Success
+				} else {
+					AuditJobResult::Failed(results.into())
+				}
+			}
+			Err(()) => AuditJobResult::Cancelled,
+		};
+
+		// signal completion and return
+		invoke_action(Action::AuditComplete, false);
+		job_result
+	});
+	Ok(job)
 }
 
 fn infodb_build_thread_proc(

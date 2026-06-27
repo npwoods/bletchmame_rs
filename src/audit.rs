@@ -22,7 +22,7 @@ use crate::info::Machine;
 use crate::info::View;
 use crate::mconfig::MachineConfig;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)] // TODO - `Clone` should not be necessary
 pub struct Asset {
 	pub kind: AssetKind,
 	pub name: SharedString,
@@ -47,13 +47,13 @@ pub enum AuditSeverity {
 	Fail,
 }
 
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)] // TODO - `Clone` should not be necessary
 pub struct AuditResult {
 	pub path: Option<(PathBuf, PathType)>,
 	pub messages: Box<[AuditMessage]>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)] // TODO - `Clone` should not be necessary
 pub enum AuditMessage {
 	NotFound,
 	NotFoundNoGoodDump,

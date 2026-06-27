@@ -181,3 +181,13 @@ fn make_ui_asset(asset: &Asset, audit_result: Option<&AuditResult>, icons: &Audi
 		browse_action,
 	}
 }
+
+pub fn audit_static_model(audit_results: &[(Asset, AuditResult)], icons: Icons<'_>) -> ModelRc<crate::ui::AuditAsset> {
+	let icons = AuditIcons::new(icons);
+	let data = audit_results
+		.iter()
+		.map(|(asset, audit_result)| make_ui_asset(asset, Some(audit_result), &icons))
+		.collect::<Vec<_>>();
+	let model = VecModel::from(data);
+	ModelRc::new(model)
+}
