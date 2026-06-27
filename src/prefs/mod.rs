@@ -31,6 +31,7 @@ use slint::LogicalPosition;
 use slint::LogicalSize;
 use slint::ToSharedString;
 use smol_str::SmolStr;
+use smol_str::format_smolstr;
 use strum::EnumIter;
 use strum::EnumProperty;
 use strum::EnumString;
@@ -560,14 +561,55 @@ impl Preferences {
 	}
 
 	pub fn fresh(prefs_path: Option<SmolStr>) -> Self {
-		let json = include_str!("prefs_fresh.json");
-		let mut result = load_prefs_from_reader(json.as_bytes()).unwrap();
-		let result_paths = Rc::get_mut(&mut result.paths).unwrap();
-		result_paths.cfg = prefs_path.clone();
-		result_paths.diff = prefs_path.clone();
-		result_paths.inis = prefs_path.iter().cloned().collect();
-		result_paths.nvram = prefs_path;
-		result
+		let path_separator = '\\';
+
+		let paths = PrefsPaths {
+			plugins: [
+				format_smolstr!("$(BLETCHMAMEPATH){path_separator}plugins"),
+				format_smolstr!("$(MAMEPATH){path_separator}plugins"),
+			]
+			.into(),
+			cfg: prefs_path.clone(),
+			diff: prefs_path.clone(),
+			inis: prefs_path.iter().cloned().collect(),
+			nvram: prefs_path.clone(),
+			..Default::default()
+		};
+		let paths = paths.into();
+
+		#[rustfmt::skip]
+		let items_columns = [
+			PrefsColumn { column_type: ColumnType::Name, sort: Some(SortOrder::Ascending), width: 100.0 },
+			PrefsColumn { column_type: ColumnType::SourceFile, sort: None, width: 155.0 },
+			PrefsColumn { column_type: ColumnType::Description, sort: None, width: 400.0 },
+			PrefsColumn { column_type: ColumnType::Year, sort: None, width: 80.0 },
+			PrefsColumn { column_type: ColumnType::Provider, sort: None, width: 180.0 },
+		].into();
+
+		let collections = [
+			PrefsCollection::Builtin(BuiltinCollection::All),
+			PrefsCollection::Folder {
+				name: "Favorites".into(),
+				items: [].into(),
+			},
+		];
+		let collections = collections.into_iter().map(|x| x.into()).collect();
+
+		let history = [HistoryEntry {
+			collection: PrefsCollectionRef::Builtin(BuiltinCollection::All),
+			search: "".into(),
+			sort_suppressed: false,
+			selection: [].into(),
+		}]
+		.into();
+
+		Preferences {
+			paths,
+			collections,
+			items_columns,
+			history,
+			..Default::default()
+		}
 	}
 }
 
