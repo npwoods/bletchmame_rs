@@ -97,7 +97,7 @@ version = "0.62.2"
 version = "2.0.3"
 
 [dev-dependencies]
-assert-json-diff = "2.0.2"
+insta = { version = "1.48.0", features = ["json"] }
 tempdir = "0.3.7"
 test-case = "3.3.1"
 

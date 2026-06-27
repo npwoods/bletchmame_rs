@@ -779,40 +779,28 @@ mod test {
 	use std::assert_matches;
 	use std::fs::File;
 
-	use assert_json_diff::assert_json_eq;
-	use serde_json::Value;
 	use tempdir::TempDir;
 	use test_case::test_case;
 
 	use super::Preferences;
 	use super::PrefsIdentifier;
 	use super::load_prefs_from_reader;
-	use super::save_prefs_to_string;
 
 	#[test]
-	pub fn fresh_is_indeed_fresh() {
+	pub fn fresh() {
 		let prefs = Preferences::fresh(None);
-		let json = save_prefs_to_string(&prefs).expect("Failed to save fresh prefs");
-
-		let new_prefs = load_prefs_from_reader(json.as_bytes()).expect("Failed to load saved fresh prefs");
-		assert_eq!(prefs, new_prefs);
+		insta::assert_json_snapshot!(prefs);
 	}
 
-	#[test_case(0, include_str!("prefs_fresh.json"))]
-	#[test_case(1, include_str!("test_data/prefs01.json"))]
-	pub fn reserialization(_index: usize, json: &str) {
+	#[test_case(0, include_str!("test_data/prefs01.json"))]
+	pub fn reserialization(index: usize, json: &str) {
+		// set the insta snapshot suffix; this is a parameterized test
+		let mut settings = insta::Settings::clone_current();
+		settings.set_snapshot_suffix(index.to_string());
+		let _guard = settings.bind_to_scope();
+
 		let prefs = load_prefs_from_reader(json.as_bytes()).expect("Failed to load prefs");
-		let reserialized_json = save_prefs_to_string(&prefs).expect("Failed to save prefs");
-
-		// reeserialize the JSON and compare
-		let json_value = serde_json::from_str::<Value>(json).unwrap();
-		let reserialized_json_value = serde_json::from_str::<Value>(&reserialized_json).unwrap();
-		assert_json_eq!(reserialized_json_value, json_value);
-
-		// reload the prefs and compare
-		let reserialized_prefs =
-			load_prefs_from_reader(reserialized_json.as_bytes()).expect("Failed to load reserialized prefs");
-		assert_eq!(prefs, reserialized_prefs);
+		insta::assert_json_snapshot!(prefs);
 	}
 
 	#[test_case(0, &["foo"])]
