@@ -17,7 +17,6 @@ use smol_str::ToSmolStr;
 use smol_str::format_smolstr;
 use strum::EnumProperty;
 use throttle::Throttle;
-use tracing::debug;
 use tracing::info;
 
 use crate::action::Action;
@@ -50,7 +49,6 @@ pub struct AppState {
 	live: Option<Live>,
 	failure: Option<Failure>,
 	last_save_state: Option<Box<str>>,
-	video_override: Option<PrefsVideo>,
 	fixed: Fixed,
 }
 
@@ -69,17 +67,30 @@ struct Live {
 /// Represents a session and associated communication
 struct Session {
 	job: Job<SessionResult<()>>,
-	command_sender: Option<Sender<MameCommand>>,
+	video: Option<PrefsVideo>,
 	status: Option<Rc<Status>>,
 	pending_status: Option<Rc<Status>>,
-	expecting: Option<Expecting>,
-	post_session_end: Option<PostSessionEnd>,
+	session_state: SessionState,
 }
 
 #[derive(Debug)]
-enum PostSessionEnd {
-	Shutdown,
-	Restart { command: Option<MameCommand> },
+enum SessionState {
+	ShuttingDown,
+	Stopping,
+	Restarting {
+		start_args: Option<MameStartArgs>,
+	},
+	Active {
+		command_sender: Sender<MameCommand>,
+		active_state: SessionActiveState,
+	},
+}
+
+#[derive(Debug)]
+enum SessionActiveState {
+	Normal,
+	EmuStarting,
+	EmuStopping,
 }
 
 #[derive(Debug, EnumProperty)]
@@ -104,12 +115,6 @@ enum Failure {
 
 	#[strum(props(Message = "Processing machine information from MAME was cancelled"))]
 	InfoDbBuildCancelled,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-enum Expecting {
-	Start,
-	Stop,
 }
 
 struct Fixed {
@@ -171,7 +176,6 @@ impl AppState {
 			live: None,
 			failure: None,
 			last_save_state: None,
-			video_override: None,
 			fixed,
 		}
 	}
@@ -186,17 +190,12 @@ impl AppState {
 		)
 	}
 
-	fn make_mame_args(&mut self) -> std::result::Result<MameArguments, ()> {
+	fn make_mame_args(&mut self, video: Option<&PrefsVideo>) -> std::result::Result<MameArguments, ()> {
 		// clear out any failures
 		self.failure = None;
 
 		// create MAME arguments
-		let mame_args_result = MameArguments::new(
-			&self.preferences,
-			self.video_override.as_ref(),
-			&self.fixed.mame_windowing,
-			false,
-		);
+		let mame_args_result = MameArguments::new(&self.preferences, video, &self.fixed.mame_windowing, false);
 
 		// if we failed, report it
 		mame_args_result.map_err(|e| {
@@ -215,7 +214,7 @@ impl AppState {
 		}
 
 		// get or load the InfoDb
-		let mame_args_result = self.make_mame_args();
+		let mame_args_result = self.make_mame_args(None);
 		let info_db = self.info_db().cloned().or_else(|| {
 			let mame_executable_path = mame_args_result.as_ref().as_ref().ok()?.program.as_str();
 			let info_db = InfoDb::load(&self.fixed.prefs_path, mame_executable_path).ok()?;
@@ -223,7 +222,9 @@ impl AppState {
 		});
 
 		if let Some(info_db) = info_db {
-			let session = mame_args_result.map(|mame_args| self.start_session(mame_args)).ok();
+			let session = mame_args_result
+				.map(|mame_args| self.start_session(mame_args, None))
+				.ok();
 			self.live = Some(Live { info_db, session });
 			true
 		} else {
@@ -232,7 +233,8 @@ impl AppState {
 		}
 	}
 
-	fn start_session(&self, mame_args: MameArguments) -> Session {
+	fn start_session(&self, mame_args: MameArguments, start_args: Option<MameStartArgs>) -> Session {
+		// start the session thread
 		let watchdog_timeout = Duration::from_secs(30);
 		let (job, command_sender) = spawn_mame_session_thread(
 			mame_args,
@@ -241,14 +243,32 @@ impl AppState {
 			self.fixed.interaction_monitor.clone(),
 			self.fixed.callback.clone(),
 		);
-		let command_sender = Some(command_sender);
+
+		// if we're starting, set the active state accordingly
+		let active_state = if start_args.is_some() {
+			SessionActiveState::EmuStarting
+		} else {
+			SessionActiveState::Normal
+		};
+
+		// are we starting with a command?
+		if let Some(start_args) = start_args.as_ref() {
+			let command = MameCommand::start(start_args);
+			command_sender.send(command).unwrap();
+		}
+
+		// finally return all the state
+		let video = start_args.and_then(|x| x.video);
+		let session_state = SessionState::Active {
+			command_sender,
+			active_state,
+		};
 		Session {
 			job,
-			command_sender,
+			video,
 			status: None,
-			expecting: None,
 			pending_status: None,
-			post_session_end: None,
+			session_state,
 		}
 	}
 
@@ -258,7 +278,7 @@ impl AppState {
 		}
 
 		// access the MAME executable path (or preflight errors if we don't have them)
-		if let Ok(mame_args) = self.make_mame_args() {
+		if let Ok(mame_args) = self.make_mame_args(None) {
 			let mame_executable_path = mame_args.program.as_str();
 			let prefs_path = &self.fixed.prefs_path;
 			let callback = self.fixed.callback.clone();
@@ -276,8 +296,7 @@ impl AppState {
 		// if a session is live, set it to stop and restart
 		if let Some(session) = self.live.as_mut().and_then(|live| live.session.as_mut()) {
 			session.job.cancel();
-			session.command_sender = None;
-			session.post_session_end = Some(PostSessionEnd::Restart { command: None });
+			session.session_state = SessionState::Restarting { start_args: None };
 		}
 
 		// attempt to reactivate and return
@@ -286,28 +305,32 @@ impl AppState {
 	}
 
 	pub fn start(&mut self, start_args: MameStartArgs) -> bool {
-		// build the command that will ultimately be issued to MAME/worker_ui
-		let command = MameCommand::start(&start_args);
-
 		// access the live session (which had better be present)
 		let session = self.live.as_mut().unwrap().session.as_mut().unwrap();
 
-		// we're expecting to run
-		session.expecting = Some(Expecting::Start);
-
-		// is the session live and ready?
-		if let Some(command_sender) = &session.command_sender
-			&& self.video_override == start_args.video
+		// do we have an active session that with the expected video state?
+		if let SessionState::Active {
+			command_sender,
+			active_state,
+		} = &mut session.session_state
+			&& session.video == start_args.video
 		{
-			// if so, issue the command to start
+			// there is indeed - use this session; build the command that will ultimately be issued to MAME/worker_ui
+			let command = MameCommand::start(&start_args);
+
+			// dispatch the command
 			command_sender.send(command).unwrap();
+
+			// and set the state to "starting"
+			*active_state = SessionActiveState::EmuStarting;
 		} else {
-			// if not, set us up to restart with the new command
-			let command = Some(command);
-			self.video_override = start_args.video;
-			session.command_sender = None;
-			session.post_session_end = Some(PostSessionEnd::Restart { command });
-		}
+			// the session is unusable either because it is shutting down and/or the video is wrong; we need to restart
+			let start_args = Some(start_args);
+			session.session_state = SessionState::Restarting { start_args };
+
+			// cancel the current session
+			session.job.cancel();
+		};
 		true
 	}
 
@@ -315,16 +338,34 @@ impl AppState {
 		// access the live session (which had better be present)
 		let session = self.live.as_mut().unwrap().session.as_mut().unwrap();
 
-		let changed = session.expecting != Some(Expecting::Stop);
-		session.expecting = Some(Expecting::Stop);
-		self.issue_command(MameCommand::stop());
-		changed
+		// get the active session (if we don't have one, we're already stopping)
+		let SessionState::Active {
+			command_sender,
+			active_state,
+		} = &mut session.session_state
+		else {
+			return false;
+		};
+
+		// are we already stopping?
+		if matches!(*active_state, SessionActiveState::EmuStopping) {
+			return false;
+		}
+
+		// send the stop command
+		command_sender.send(MameCommand::stop()).unwrap();
+
+		// we're now stopping
+		*active_state = SessionActiveState::EmuStopping;
+
+		// and we're done!
+		true
 	}
 
 	/// Issues a command to MAME
 	pub fn issue_command(&self, command: MameCommand) {
 		let session = self.live.as_ref().unwrap().session.as_ref().unwrap();
-		if let Some(command_sender) = session.command_sender.as_ref() {
+		if let SessionState::Active { command_sender, .. } = &session.session_state {
 			command_sender.send(command).unwrap();
 		}
 	}
@@ -384,7 +425,7 @@ impl AppState {
 					);
 
 					self.failure = if let Err(error) = result {
-						session.command_sender = None;
+						session.session_state = SessionState::Stopping;
 						Some(error.into())
 					} else {
 						None
@@ -394,8 +435,8 @@ impl AppState {
 					session.pending_status = pending_status;
 				} else {
 					// no session; create a new one
-					if let Ok(mame_args) = self.make_mame_args() {
-						let session = self.start_session(mame_args);
+					if let Ok(mame_args) = self.make_mame_args(None) {
+						let session = self.start_session(mame_args, None);
 						self.live.as_mut().unwrap().session = Some(session);
 					}
 				};
@@ -412,7 +453,7 @@ impl AppState {
 			Err(e) => {
 				let session = self.live.as_mut().and_then(|live| live.session.as_mut());
 				if let Some(session) = session {
-					session.command_sender = None;
+					session.session_state = SessionState::Stopping;
 				}
 				self.failure = Some(Failure::InfoDbBuild(e));
 			}
@@ -428,10 +469,10 @@ impl AppState {
 		let live = self.live.as_mut().unwrap();
 		let session = live.session.as_mut().unwrap();
 
-		// ignore status updates when we're shutting down
-		if session.command_sender.is_none() {
+		// ignore status updates if the session is not active
+		let SessionState::Active { active_state, .. } = &mut session.session_state else {
 			return false;
-		}
+		};
 
 		// validate the status update
 		let (new_status, new_pending_status, result) = validate_and_update_status(
@@ -455,14 +496,15 @@ impl AppState {
 			self.failure = Some(failure);
 		}
 
-		// update expectations
-		if let Some(session) = self.live.as_mut().and_then(|l| l.session.as_mut()) {
-			let is_running = session.status.as_deref().is_some_and(|s| s.running.is_some());
-			if session.expecting == Some(Expecting::Start) && is_running
-				|| session.expecting == Some(Expecting::Stop) && !is_running
-			{
-				session.expecting = None;
-			}
+		// if we have an active session, we may need to alter the active state
+		let is_running = session.status.as_deref().is_some_and(|s| s.running.is_some());
+		let now_normal = match active_state {
+			SessionActiveState::EmuStarting => is_running,
+			SessionActiveState::EmuStopping => !is_running,
+			_ => false,
+		};
+		if now_normal {
+			*active_state = SessionActiveState::Normal
 		}
 
 		// kick off an InfoDb rebuild if appropriate
@@ -476,7 +518,7 @@ impl AppState {
 	pub fn session_ended(&mut self) -> ControlFlow<()> {
 		// access the "live" and the session
 		let live = self.live.as_mut().unwrap();
-		let mut session = live.session.take().unwrap();
+		let session = live.session.take().unwrap();
 
 		// join the thread and get the result
 		let result = session.job.join();
@@ -485,37 +527,23 @@ impl AppState {
 		let failure = result.err().map(Failure::SessionError);
 
 		// identify activities that need to happen after the session ends
-		let (reactivate, command, result) = match session.post_session_end.take() {
-			None => (false, None, ControlFlow::Continue(())),
-			Some(PostSessionEnd::Restart { command }) => (true, command, ControlFlow::Continue(())),
-			Some(PostSessionEnd::Shutdown) => (false, None, ControlFlow::Break(())),
+		let (reactivate, start_args, result) = match session.session_state {
+			SessionState::Restarting { start_args } => (true, start_args, ControlFlow::Continue(())),
+			SessionState::ShuttingDown => (false, None, ControlFlow::Break(())),
+			_ => (false, None, ControlFlow::Continue(())),
 		};
-
-		// clear out the session
-		if let Some(live) = self.live.as_mut() {
-			live.session = None;
-		}
 
 		// identify failures
 		self.failure = failure;
 
-		// do we need to reactivate?
+		// do we need to restart the session?
 		if reactivate {
-			self.activate();
-		}
-
-		// do we need to issue a command?
-		if let Some(command) = command {
-			// we do intend to issue a command, but verify that reactivation succeeded in creating one
-			let session = self.live.as_mut().and_then(|live| live.session.as_mut());
-			let has_session = session.is_some();
-			if let Some(session) = session {
-				// if we have a command, its because we're expecting an emulation to start
-				session.expecting = Some(Expecting::Start);
-			}
-			if has_session {
-				self.issue_command(command);
-			}
+			let video = start_args.as_ref().and_then(|x| x.video.as_ref());
+			let Ok(mame_args) = self.make_mame_args(video) else {
+				return ControlFlow::Continue(());
+			};
+			let session = self.start_session(mame_args, start_args);
+			self.live.as_mut().unwrap().session = Some(session);
 		}
 
 		// and we're done!
@@ -525,8 +553,7 @@ impl AppState {
 	pub fn shutdown(&mut self) -> ControlFlow<()> {
 		let session = self.live.as_mut().and_then(|live| live.session.as_mut());
 		if let Some(session) = session {
-			session.command_sender = None;
-			session.post_session_end = Some(PostSessionEnd::Shutdown);
+			session.session_state = SessionState::ShuttingDown;
 			ControlFlow::Continue(())
 		} else {
 			ControlFlow::Break(())
@@ -560,39 +587,49 @@ impl AppState {
 	pub fn report(&self) -> Option<Report> {
 		#[derive(Debug)]
 		enum ReportType<'a> {
+			// session related reports
+			SessionStarting,
+			SessionRestarting,
+			SessionRestartingForEmu,
+			SessionShuttingDown,
+
+			// messages for an emulation starting up or shutting down
+			EmuStarting,
+			EmuStopping,
+
+			// InfoDb building
 			InfoDbBuild(Option<&'a str>),
-			Resetting,
-			Starting,
-			Stopping,
-			ShuttingDown,
+
+			// failure reports
 			FailureReport(&'a Failure),
 		}
 
-		// upfront logic to determine the type of report presented, if any; keep
-		// this logic distinct from the mechanics of displaying the report
-		let session = self.live.as_ref().and_then(|live| live.session.as_ref());
-		let expecting = session.and_then(|session| session.expecting.as_ref());
-		let is_starting_up = session.is_some_and(|session| session.status.is_none());
-		let is_session_stopping = session.is_some_and(|session| session.command_sender.is_none());
-		let is_shutting_down =
-			session.is_some_and(|session| matches!(session.post_session_end, Some(PostSessionEnd::Shutdown)));
-		debug!(info_db_build=?self.info_db_build.as_ref().map(|_| "..."), ?expecting, failure=?self.failure.as_ref(), ?is_starting_up, ?is_shutting_down, "AppState::report()");
-		let report_type = match (
-			self.info_db_build.as_ref(),
-			expecting,
-			self.failure.as_ref(),
-			is_starting_up,
-			is_shutting_down,
-		) {
-			(Some(info_db_build), _, _, _, _) => {
-				Some(ReportType::InfoDbBuild(info_db_build.machine_description.as_deref()))
+		// lots of gnarly logic here
+		let report_type = if let Some(info_db_build) = self.info_db_build.as_ref() {
+			// report that we have an active InfoDb build
+			Some(ReportType::InfoDbBuild(info_db_build.machine_description.as_deref()))
+		} else if let Some(failure) = self.failure.as_ref() {
+			// report that something out there failed
+			Some(ReportType::FailureReport(failure))
+		} else if let Some(session) = self.live.as_ref().and_then(|live| live.session.as_ref()) {
+			match &session.session_state {
+				SessionState::ShuttingDown => Some(ReportType::SessionShuttingDown),
+				SessionState::Stopping => None,
+				SessionState::Restarting { start_args, .. } => {
+					if start_args.is_some() {
+						Some(ReportType::SessionRestartingForEmu)
+					} else {
+						Some(ReportType::SessionRestarting)
+					}
+				}
+				SessionState::Active { active_state, .. } => match active_state {
+					SessionActiveState::Normal => session.status.is_none().then_some(ReportType::SessionStarting),
+					SessionActiveState::EmuStarting => Some(ReportType::EmuStarting),
+					SessionActiveState::EmuStopping => Some(ReportType::EmuStopping),
+				},
 			}
-			(None, Some(Expecting::Start), None, _, _) => Some(ReportType::Starting),
-			(None, Some(Expecting::Stop), None, _, _) => Some(ReportType::Stopping),
-			(None, _, _, _, true) => Some(ReportType::ShuttingDown),
-			(None, _, _, true, false) => Some(ReportType::Resetting),
-			(None, _, Some(failure), false, false) => Some(ReportType::FailureReport(failure)),
-			(None, None, None, false, false) => None,
+		} else {
+			None
 		};
 
 		report_type.map(|report_type| match report_type {
@@ -611,31 +648,35 @@ impl AppState {
 					..Default::default()
 				}
 			}
-			ReportType::Resetting => Report {
+			ReportType::SessionRestarting => Report {
 				message: "Resetting MAME...".into(),
 				is_spinning: true,
 				..Default::default()
 			},
-			ReportType::Starting => {
-				let submessage = match (is_session_stopping, is_starting_up) {
-					(true, _) => "MAME needs to be reset to run this emulation",
-					(false, true) => "MAME is reinitializing",
-					(false, false) => "Waiting for emulation startup to be complete",
-				};
-				Report {
-					message: "Starting emulation...".into(),
-					submessage: Some(submessage.into()),
-					is_spinning: true,
-					..Default::default()
-				}
-			}
-			ReportType::Stopping => Report {
-				message: "Stopping emulation...".into(),
+			ReportType::SessionRestartingForEmu => Report {
+				message: "Starting emulation...".into(),
+				submessage: Some("MAME needs to be reset to run this emulation".into()),
 				is_spinning: true,
 				..Default::default()
 			},
-			ReportType::ShuttingDown => Report {
+			ReportType::SessionStarting => Report {
+				message: "Starting MAME...".into(),
+				submessage: Some("Waiting for emulation startup to be complete".into()),
+				is_spinning: true,
+				..Default::default()
+			},
+			ReportType::SessionShuttingDown => Report {
 				message: "MAME is shutting down...".into(),
+				is_spinning: true,
+				..Default::default()
+			},
+			ReportType::EmuStarting => Report {
+				message: "Starting emulation...".into(),
+				is_spinning: true,
+				..Default::default()
+			},
+			ReportType::EmuStopping => Report {
+				message: "Stopping emulation...".into(),
 				is_spinning: true,
 				..Default::default()
 			},
