@@ -18,17 +18,9 @@ import {
 } from "../devimageslist.slint";
 import { Icons } from "../icons.slint";
 import { VideoConfigComponent, VideoSettings } from "../videoconfig.slint";
+import { AuditAsset, AuditAssetView } from "../audit.slint";
 
 struct SoftwareMachine { machine-index: int, description: string, checked: bool}
-
-struct Asset {
-    icon: image,
-    overlay: image,
-    name: string,
-    size: string,
-    audit-messages: [string],
-    browse-command: string,
-}
 
 export component ConfigureDialog inherits Window {
     title: dialog-title;
@@ -44,7 +36,7 @@ export component ConfigureDialog inherits Window {
     in-out property <int> ram-sizes-index;
     in property <[string]> bios-selection-model;
     in-out property <int> bios-selection-index;
-    in property <[Asset]> audit-assets;
+    in property <[AuditAsset]> audit-assets;
     in property <string> audit-context-menu-browse-command;
     in property <[SoftwareMachine]> software-machines;
     in property <bool> software-machines-bulk-all-enabled;
@@ -165,54 +157,10 @@ export component ConfigureDialog inherits Window {
                     title: "Audit";
                     VerticalBox {
                         ListView {
-                            for asset in root.audit-assets: TouchArea {
-                                ContextMenuArea {
-                                    Menu {
-                                        MenuItem {
-                                            title: "Browse...";
-                                            enabled: asset.browse-command != "";
-                                            activated => {
-                                                root.menu-item-action(asset.browse-command);
-                                            }
-                                        }
-                                    }
-
-                                    HorizontalBox {
-                                        Rectangle {
-                                            width: 24px;
-                                            height: 24px;
-                                            Image {
-                                                width: 24px;
-                                                height: 24px;
-                                                source: asset.icon;
-                                            }
-
-                                            Image {
-                                                width: 24px;
-                                                height: 24px;
-                                                source: asset.overlay;
-                                            }
-                                        }
-
-                                        Text {
-                                            text: asset.name;
-                                            horizontal-stretch: 1;
-                                            vertical-alignment: center;
-                                        }
-
-                                        Text {
-                                            text: asset.size;
-                                            vertical-alignment: center;
-                                        }
-                                    }
-
-                                    if asset.audit-messages.length > 0: Tooltip {
-                                        VerticalBox {
-                                            for message in asset.audit-messages: Text {
-                                                text: asset.name + " " + message;
-                                            }
-                                        }
-                                    }
+                            for asset in root.audit-assets: AuditAssetView {
+                                asset: asset;
+                                menu-item-action(action) => {
+                                    root.menu-item-action(action);
                                 }
                             }
                         }
