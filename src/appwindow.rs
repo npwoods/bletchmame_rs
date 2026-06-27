@@ -81,6 +81,7 @@ use crate::guiutils::is_context_menu_event;
 use crate::guiutils::modal::ModalStack;
 use crate::history::History;
 use crate::history_xml::HistoryXml;
+use crate::models::audit::audit_static_model;
 use crate::models::collectionsview::CollectionsViewModel;
 use crate::models::itemstable::EmptyReason;
 use crate::models::itemstable::ItemsTableModel;
@@ -414,7 +415,8 @@ impl AppModel {
 					.unwrap_or_default(),
 			);
 			let issues = report
-				.map(|r| r.issues)
+				.as_ref()
+				.map(|r| r.issues.as_slice())
 				.unwrap_or_default()
 				.iter()
 				.map(|issue| {
@@ -430,6 +432,11 @@ impl AppModel {
 			let issues = VecModel::from(issues);
 			let issues = ModelRc::new(issues);
 			app_window.set_report_issues(issues);
+
+			let icons = Icons::get(&app_window);
+			let audit_results = report.map(|r| r.audit_results).unwrap_or_default();
+			let audit_results = audit_static_model(&audit_results, icons);
+			app_window.set_report_audit_assets(audit_results);
 		}
 
 		// menus
@@ -1651,6 +1658,15 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 		}
 		Action::ShowFile(path) => {
 			show_path_in_file_manager(&path);
+		}
+		Action::AuditProgress(asset_name) => {
+			model.update_state(|state| state.audit_progress(asset_name));
+		}
+		Action::AuditCancel => {
+			model.update_state(AppState::audit_cancel);
+		}
+		Action::AuditComplete => {
+			model.update_state(AppState::audit_complete);
 		}
 	};
 

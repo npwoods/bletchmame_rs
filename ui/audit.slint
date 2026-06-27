@@ -1,0 +1,66 @@
+import { HorizontalBox, VerticalBox } from "std-widgets.slint";
+
+export struct AuditAsset {
+    icon: image,
+    overlay: image,
+    name: string,
+    size: string,
+    audit-messages: [string],
+    browse-action: string,
+}
+
+export component AuditAssetView {
+    in property <AuditAsset> asset;
+    callback menu-item-action(action: string);
+
+    TouchArea {
+        ContextMenuArea {
+            Menu {
+                MenuItem {
+                    title: "Browse...";
+                    enabled: asset.browse-action != "";
+                    activated => {
+                        root.menu-item-action(asset.browse-action);
+                    }
+                }
+            }
+
+            HorizontalBox {
+                Rectangle {
+                    width: 24px;
+                    height: 24px;
+                    Image {
+                        width: 24px;
+                        height: 24px;
+                        source: asset.icon;
+                    }
+
+                    Image {
+                        width: 24px;
+                        height: 24px;
+                        source: asset.overlay;
+                    }
+                }
+
+                Text {
+                    text: asset.name;
+                    horizontal-stretch: 1;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: asset.size;
+                    vertical-alignment: center;
+                }
+            }
+
+            if asset.audit-messages.length > 0: Tooltip {
+                VerticalBox {
+                    for message in asset.audit-messages: Text {
+                        text: asset.name + " " + message;
+                    }
+                }
+            }
+        }
+    }
+}

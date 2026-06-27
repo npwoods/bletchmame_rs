@@ -16,6 +16,7 @@ use crate::info::Machine;
 use crate::info::Slot;
 use crate::info::View;
 use crate::info::strip_tag_prefix;
+use crate::runtime::MameStartArgs;
 
 #[derive(Clone)]
 pub struct MachineConfig {
@@ -142,6 +143,18 @@ impl MachineConfig {
 		}
 
 		Ok(result)
+	}
+
+	pub fn from_mame_start_args(info_db: Rc<InfoDb>, start_args: &MameStartArgs) -> Result<Self> {
+		let opts = start_args
+			.slots
+			.iter()
+			.filter_map(|(name, value)| {
+				let name = name.as_str().strip_prefix("&")?;
+				Some((name, (!value.is_empty()).then_some(value.as_str())))
+			})
+			.collect::<Vec<_>>();
+		Self::from_machine_name_and_slots(info_db, &start_args.machine_name, &opts)
 	}
 
 	pub fn machine(&self) -> Machine<'_> {

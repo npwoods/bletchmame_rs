@@ -138,6 +138,9 @@ pub enum Action {
 	HistoryLoadCompleted,
 	Launch(Box<OsStr>),
 	ShowFile(Box<Path>),
+	AuditProgress(SmolStr),
+	AuditCancel,
+	AuditComplete,
 }
 
 const MENU_PREFIX: &str = "MENU_";

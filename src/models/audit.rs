@@ -27,15 +27,18 @@ pub struct AuditModel {
 	rom_paths: Arc<[SmolStr]>,
 	sample_paths: Arc<[SmolStr]>,
 	audit_results: RefCell<Box<[Option<AuditResult>]>>,
-
-	icon_rom: Image,
-	icon_disk: Image,
-	icon_sample: Image,
-	icon_audit_pending: Image,
-	icon_audit_warning: Image,
-	icon_audit_failed: Image,
-
+	icons: AuditIcons,
 	notify: ModelNotify,
+}
+
+#[derive(Debug)]
+struct AuditIcons {
+	rom: Image,
+	disk: Image,
+	sample: Image,
+	audit_pending: Image,
+	audit_warning: Image,
+	audit_failed: Image,
 }
 
 impl AuditModel {
@@ -50,18 +53,14 @@ impl AuditModel {
 			.collect::<Arc<[_]>>();
 		let audit_results = (0..assets.len()).map(|_| None).collect::<Box<_>>();
 		let audit_results = RefCell::new(audit_results);
+		let icons = AuditIcons::new(icons);
 
 		Self {
 			assets,
 			rom_paths,
 			sample_paths,
 			audit_results,
-			icon_rom: icons.get_rom(),
-			icon_disk: icons.get_harddisk(),
-			icon_sample: icons.get_sample(),
-			icon_audit_pending: icons.get_audit_pending(),
-			icon_audit_warning: icons.get_audit_warning(),
-			icon_audit_failed: icons.get_audit_failed(),
+			icons,
 			notify: ModelNotify::default(),
 		}
 	}
@@ -94,13 +93,13 @@ impl AuditModel {
 		}
 	}
 
-	pub fn get_model(model: &ModelRc<crate::ui::Asset>) -> &Self {
+	pub fn get_model(model: &ModelRc<crate::ui::AuditAsset>) -> &Self {
 		model.as_any().downcast_ref::<Self>().unwrap()
 	}
 }
 
 impl Model for AuditModel {
-	type Data = crate::ui::Asset;
+	type Data = crate::ui::AuditAsset;
 
 	fn row_count(&self) -> usize {
 		self.assets.len()
@@ -108,56 +107,8 @@ impl Model for AuditModel {
 
 	fn row_data(&self, row: usize) -> Option<Self::Data> {
 		let asset = self.assets.get(row)?;
-		let (browse_command, max_severity, audit_messages) = {
-			let audit_results = self.audit_results.borrow();
-			let audit_result = &audit_results[row];
-			let max_severity = audit_result.as_ref().map(AuditResult::severity);
-			let audit_messages = audit_result
-				.as_ref()
-				.map(|r| r.messages.as_ref())
-				.unwrap_or_default()
-				.iter()
-				.map(|r| r.to_shared_string())
-				.collect::<Vec<_>>();
-			let audit_messages = VecModel::from(audit_messages);
-			let audit_messages = ModelRc::new(audit_messages);
-			let browse_command = audit_result
-				.as_ref()
-				.and_then(|r| r.path.as_ref())
-				.map(|(path, path_type)| {
-					let action = match path_type {
-						PathType::File => Action::ShowFile(path.clone().into()),
-						PathType::Zip => Action::Launch(OsString::from(path).into()),
-					};
-					action.encode_for_slint()
-				})
-				.unwrap_or_default();
-			(browse_command, max_severity, audit_messages)
-		};
-
-		let icon = match asset.kind {
-			AssetKind::Rom => self.icon_rom.clone(),
-			AssetKind::Disk => self.icon_disk.clone(),
-			AssetKind::Sample => self.icon_sample.clone(),
-		};
-		let overlay = match max_severity {
-			None => self.icon_audit_pending.clone(),
-			Some(AuditSeverity::Info) => Image::default(),
-			Some(AuditSeverity::Warning) => self.icon_audit_warning.clone(),
-			Some(AuditSeverity::Fail) => self.icon_audit_failed.clone(),
-		};
-
-		let name = asset.name.clone();
-		let size = asset.size.map(|s| s.to_shared_string()).unwrap_or_default();
-		let data = Self::Data {
-			icon,
-			overlay,
-			name,
-			size,
-			audit_messages,
-			browse_command,
-		};
-		Some(data)
+		let ui_asset = make_ui_asset(asset, self.audit_results.borrow()[row].as_ref(), &self.icons);
+		Some(ui_asset)
 	}
 
 	fn model_tracker(&self) -> &dyn ModelTracker {
@@ -167,4 +118,76 @@ impl Model for AuditModel {
 	fn as_any(&self) -> &dyn Any {
 		self
 	}
+}
+
+impl AuditIcons {
+	pub fn new(icons: Icons<'_>) -> Self {
+		Self {
+			rom: icons.get_rom(),
+			disk: icons.get_harddisk(),
+			sample: icons.get_sample(),
+			audit_pending: icons.get_audit_pending(),
+			audit_warning: icons.get_audit_warning(),
+			audit_failed: icons.get_audit_failed(),
+		}
+	}
+}
+
+fn make_ui_asset(asset: &Asset, audit_result: Option<&AuditResult>, icons: &AuditIcons) -> crate::ui::AuditAsset {
+	let (browse_action, max_severity, audit_messages) = {
+		let max_severity = audit_result.map(AuditResult::severity);
+		let audit_messages = audit_result
+			.map(|r| r.messages.as_ref())
+			.unwrap_or_default()
+			.iter()
+			.map(|r| r.to_shared_string())
+			.collect::<Vec<_>>();
+		let audit_messages = VecModel::from(audit_messages);
+		let audit_messages = ModelRc::new(audit_messages);
+		let browse_action = audit_result
+			.as_ref()
+			.and_then(|r| r.path.as_ref())
+			.map(|(path, path_type)| {
+				let action = match path_type {
+					PathType::File => Action::ShowFile(path.clone().into()),
+					PathType::Zip => Action::Launch(OsString::from(path).into()),
+				};
+				action.encode_for_slint()
+			})
+			.unwrap_or_default();
+		(browse_action, max_severity, audit_messages)
+	};
+
+	let icon = match asset.kind {
+		AssetKind::Rom => icons.rom.clone(),
+		AssetKind::Disk => icons.disk.clone(),
+		AssetKind::Sample => icons.sample.clone(),
+	};
+	let overlay = match max_severity {
+		None => icons.audit_pending.clone(),
+		Some(AuditSeverity::Info) => Image::default(),
+		Some(AuditSeverity::Warning) => icons.audit_warning.clone(),
+		Some(AuditSeverity::Fail) => icons.audit_failed.clone(),
+	};
+
+	let name = asset.name.clone();
+	let size = asset.size.map(|s| s.to_shared_string()).unwrap_or_default();
+	crate::ui::AuditAsset {
+		icon,
+		overlay,
+		name,
+		size,
+		audit_messages,
+		browse_action,
+	}
+}
+
+pub fn audit_static_model(audit_results: &[(Asset, AuditResult)], icons: Icons<'_>) -> ModelRc<crate::ui::AuditAsset> {
+	let icons = AuditIcons::new(icons);
+	let data = audit_results
+		.iter()
+		.map(|(asset, audit_result)| make_ui_asset(asset, Some(audit_result), &icons))
+		.collect::<Vec<_>>();
+	let model = VecModel::from(data);
+	ModelRc::new(model)
 }
