@@ -100,10 +100,13 @@ struct Fixed {
 	mame_stderr: MameStderr,
 	mame_windowing: MameWindowing,
 	interaction_monitor: Arc<Mutex<Option<InteractionMonitor>>>,
-	callback: CommandCallback,
+	callback: ActionCallback,
 }
 
-type CommandCallback = Rc<dyn Fn(Action) + 'static>;
+type ActionCallback = Rc<dyn Fn(Action) + 'static>;
+
+// progress messages should be throttled
+const PROGRESS_THROTTLE_TIMEOUT: Duration = Duration::from_millis(100);
 
 #[derive(Default, Debug)]
 pub struct Report {
@@ -310,33 +313,34 @@ impl AppState {
 	}
 
 	pub fn infodb_build_progress(&mut self, machine_description: String) -> bool {
-		self.info_db_build.as_mut().unwrap().machine_description = Some(machine_description);
+		self.info_db_build
+			.as_mut()
+			.expect("infodb_build_progress() invoked with no info_db_build")
+			.machine_description = Some(machine_description);
 		true
 	}
 
-	pub fn infodb_build_complete(&mut self) -> bool {
-		self.internal_infodb_build_complete(false)
-	}
-
 	pub fn infodb_build_cancel(&mut self) -> bool {
-		self.internal_infodb_build_complete(true)
+		info!("AppState::infodb_build_cancel()");
+		self.info_db_build
+			.as_ref()
+			.expect("infodb_build_cancel() invoked with no info_db_build")
+			.job
+			.cancel();
+		false
 	}
 
-	fn internal_infodb_build_complete(&mut self, cancel: bool) -> bool {
-		// we expect to be in the process of building, and to be able to "take" the job
-		let info_db_build = self.info_db_build.take().unwrap();
+	pub fn infodb_build_complete(&mut self) -> bool {
+		info!("AppState::infodb_build_complete()");
 
-		// if specified, cancel the build
-		if cancel {
-			info_db_build.job.cancel();
-		}
+		// we expect to be in the process of building, and to be able to "take" the job
+		let info_db_build = self
+			.info_db_build
+			.take()
+			.expect("infodb_build_complete() invoked with no info_db_build");
 
 		// join the job (which we expect to complete) and digest the result
-		//
-		// take note that when we cancel, we ignore the result from the job; there
-		// can be a race condition where the job actually yields something other than `Ok(None)`
 		let result = info_db_build.job.join();
-		let result = if cancel { Ok(None) } else { result };
 
 		// this next bit is pretty involved
 		match result {
@@ -754,7 +758,7 @@ impl AppState {
 fn spawn_infodb_build_thread(
 	prefs_path: &Path,
 	mame_executable_path: &str,
-	callback: CommandCallback,
+	callback: ActionCallback,
 ) -> Job<Result<Option<InfoDb>>> {
 	let prefs_path = prefs_path.to_path_buf();
 	let mame_executable_path = mame_executable_path.to_string();
@@ -765,35 +769,23 @@ fn spawn_infodb_build_thread(
 fn infodb_build_thread_proc(
 	prefs_path: &Path,
 	mame_executable_path: &str,
-	callback_bubble: ThreadLocalBubble<CommandCallback>,
+	callback_bubble: ThreadLocalBubble<ActionCallback>,
 	canceller: Canceller,
 ) -> Result<Option<InfoDb>> {
 	// progress messages need to be throttled
-	let mut throttle = Throttle::new(Duration::from_millis(100), 1);
+	let mut throttle = Throttle::new(PROGRESS_THROTTLE_TIMEOUT, 1);
 
-	// lambda to invoke a command on the main event loop; there is some nontrivial stuff here
-	// because of the need to put the callback in the "bubble" as well as to ensure that we
-	// don't invoke the command if the user cancelled
-	let cancelled_clone = canceller.clone();
-	let invoke_command = move |command| {
-		let callback_bubble = callback_bubble.clone();
-		let cancelled_clone = cancelled_clone.clone();
-		invoke_from_event_loop(move || {
-			if cancelled_clone.status().is_continue() {
-				(callback_bubble.unwrap())(command);
-			}
-		})
-		.unwrap();
-	};
+	// create a lambda to invoke an action on the main event loop
+	let invoke_action = make_invoke_action(callback_bubble, canceller.clone());
 
 	// prep a callback for progress
-	let invoke_command_clone = invoke_command.clone();
+	let invoke_action_clone = invoke_action.clone();
 	let callback = move |machine_description: &str| {
 		// do we need to update
 		if throttle.accept().is_ok() {
 			let machine_description = machine_description.to_string();
 			let command = Action::InfoDbBuildProgress { machine_description };
-			invoke_command_clone(command);
+			invoke_action_clone(command, true);
 		}
 
 		// have we cancelled?
@@ -809,10 +801,29 @@ fn infodb_build_thread_proc(
 	}
 
 	// signal that we're done
-	invoke_command(Action::InfoDbBuildComplete);
+	invoke_action(Action::InfoDbBuildComplete, false);
 
 	// and return the result
 	result
+}
+
+fn make_invoke_action(
+	callback_bubble: ThreadLocalBubble<ActionCallback>,
+	canceller: Canceller,
+) -> impl Fn(Action, bool) + Clone {
+	// lambda to invoke a command on the main event loop; there is some nontrivial stuff here
+	// because of the need to put the callback in the "bubble" as well as to ensure that we
+	// don't invoke the command if the user cancelled
+	move |action, silent_when_cancelled| {
+		let callback_bubble = callback_bubble.clone();
+		let canceller = canceller.clone();
+		invoke_from_event_loop(move || {
+			if !silent_when_cancelled || canceller.status().is_continue() {
+				(callback_bubble.unwrap())(action);
+			}
+		})
+		.unwrap();
+	}
 }
 
 #[allow(clippy::type_complexity)]
