@@ -13,6 +13,7 @@ use std::io::BufReader;
 use std::io::ErrorKind;
 use std::io::Read;
 use std::io::Write;
+use std::path::MAIN_SEPARATOR;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -31,6 +32,7 @@ use slint::LogicalPosition;
 use slint::LogicalSize;
 use slint::ToSharedString;
 use smol_str::SmolStr;
+use smol_str::format_smolstr;
 use strum::EnumIter;
 use strum::EnumProperty;
 use strum::EnumString;
@@ -560,14 +562,58 @@ impl Preferences {
 	}
 
 	pub fn fresh(prefs_path: Option<SmolStr>) -> Self {
-		let json = include_str!("prefs_fresh.json");
-		let mut result = load_prefs_from_reader(json.as_bytes()).unwrap();
-		let result_paths = Rc::get_mut(&mut result.paths).unwrap();
-		result_paths.cfg = prefs_path.clone();
-		result_paths.diff = prefs_path.clone();
-		result_paths.inis = prefs_path.iter().cloned().collect();
-		result_paths.nvram = prefs_path;
-		result
+		fresh_preferences(prefs_path, MAIN_SEPARATOR)
+	}
+}
+
+/// Separate implementation to facilitate unit testing
+fn fresh_preferences(prefs_path: Option<SmolStr>, path_separator: char) -> Preferences {
+	let paths = PrefsPaths {
+		plugins: [
+			format_smolstr!("$(BLETCHMAMEPATH){path_separator}plugins"),
+			format_smolstr!("$(MAMEPATH){path_separator}plugins"),
+		]
+		.into(),
+		cfg: prefs_path.clone(),
+		diff: prefs_path.clone(),
+		inis: prefs_path.iter().cloned().collect(),
+		nvram: prefs_path.clone(),
+		..Default::default()
+	};
+	let paths = paths.into();
+
+	#[rustfmt::skip]
+	let items_columns = [
+		PrefsColumn { column_type: ColumnType::Name, sort: Some(SortOrder::Ascending), width: 100.0 },
+		PrefsColumn { column_type: ColumnType::SourceFile, sort: None, width: 155.0 },
+		PrefsColumn { column_type: ColumnType::Description, sort: None, width: 400.0 },
+		PrefsColumn { column_type: ColumnType::Year, sort: None, width: 80.0 },
+		PrefsColumn { column_type: ColumnType::Provider, sort: None, width: 180.0 },
+	].into();
+
+	let collections = [
+		PrefsCollection::Builtin(BuiltinCollection::All),
+		PrefsCollection::Folder {
+			name: "Favorites".into(),
+			items: [].into(),
+		},
+	];
+	let collections = collections.into_iter().map(|x| x.into()).collect();
+
+	let history = [HistoryEntry {
+		collection: PrefsCollectionRef::Builtin(BuiltinCollection::All),
+		search: "".into(),
+		sort_suppressed: false,
+		selection: [].into(),
+	}]
+	.into();
+
+	Preferences {
+		paths,
+		collections,
+		items_columns,
+		history,
+		..Default::default()
 	}
 }
 
@@ -779,40 +825,28 @@ mod test {
 	use std::assert_matches;
 	use std::fs::File;
 
-	use assert_json_diff::assert_json_eq;
-	use serde_json::Value;
 	use tempdir::TempDir;
 	use test_case::test_case;
 
-	use super::Preferences;
 	use super::PrefsIdentifier;
+	use super::fresh_preferences;
 	use super::load_prefs_from_reader;
-	use super::save_prefs_to_string;
 
 	#[test]
-	pub fn fresh_is_indeed_fresh() {
-		let prefs = Preferences::fresh(None);
-		let json = save_prefs_to_string(&prefs).expect("Failed to save fresh prefs");
-
-		let new_prefs = load_prefs_from_reader(json.as_bytes()).expect("Failed to load saved fresh prefs");
-		assert_eq!(prefs, new_prefs);
+	pub fn fresh() {
+		let prefs = fresh_preferences(None, '\\');
+		insta::assert_json_snapshot!(prefs);
 	}
 
-	#[test_case(0, include_str!("prefs_fresh.json"))]
-	#[test_case(1, include_str!("test_data/prefs01.json"))]
-	pub fn reserialization(_index: usize, json: &str) {
+	#[test_case(0, include_str!("test_data/prefs01.json"))]
+	pub fn reserialization(index: usize, json: &str) {
+		// set the insta snapshot suffix; this is a parameterized test
+		let mut settings = insta::Settings::clone_current();
+		settings.set_snapshot_suffix(index.to_string());
+		let _guard = settings.bind_to_scope();
+
 		let prefs = load_prefs_from_reader(json.as_bytes()).expect("Failed to load prefs");
-		let reserialized_json = save_prefs_to_string(&prefs).expect("Failed to save prefs");
-
-		// reeserialize the JSON and compare
-		let json_value = serde_json::from_str::<Value>(json).unwrap();
-		let reserialized_json_value = serde_json::from_str::<Value>(&reserialized_json).unwrap();
-		assert_json_eq!(reserialized_json_value, json_value);
-
-		// reload the prefs and compare
-		let reserialized_prefs =
-			load_prefs_from_reader(reserialized_json.as_bytes()).expect("Failed to load reserialized prefs");
-		assert_eq!(prefs, reserialized_prefs);
+		insta::assert_json_snapshot!(prefs);
 	}
 
 	#[test_case(0, &["foo"])]
