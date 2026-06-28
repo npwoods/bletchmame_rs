@@ -2,18 +2,23 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fs::File;
 use std::io::Read;
+use std::io::Seek;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::Result;
 use default_ext::DefaultExt;
+use easy_ext::ext;
 use itertools::Either;
 use itertools::Itertools;
 use slint::SharedString;
 use smol_str::SmolStr;
 use tracing::debug;
 use zip::ZipArchive;
+use zip::read::ZipFile;
+use zip::result::ZipError;
+use zip::result::ZipResult;
 
 use crate::assethash::AssetHash;
 use crate::chd::chd_asset_hash;
@@ -311,7 +316,7 @@ fn try_audit(
 			let file_result = File::open(&path);
 			debug!(?path_type, ?path, ?file_result, "try_audit(): Invoked File::open()");
 			let mut zip_archive = ZipArchive::new(file_result?)?;
-			let mut zip_file = zip_archive.by_name(asset_name)?;
+			let mut zip_file = zip_archive.by_name_or_crc(asset_name, expected_asset_hash.crc)?;
 			let actual_size = zip_file.size();
 			let actual_hash = (!expected_asset_hash.is_default())
 				.then(|| hash_func(&mut zip_file))
@@ -351,4 +356,59 @@ fn try_audit(
 	let path = Some((path, path_type));
 	let messages = messages.into();
 	Ok(AuditResult { path, messages })
+}
+
+#[ext(ZipArchiveExt)]
+impl<R> ZipArchive<R>
+where
+	R: Read + Seek,
+{
+	/// This is an emulation of MAME's behavior by which you can load assets by CRC even if the name is wrong
+	pub fn by_name_or_crc(&mut self, name: &str, crc: Option<u32>) -> ZipResult<ZipFile<'_, R>> {
+		let file_number = match (self.index_for_name(name), crc) {
+			(Some(index), _) => Some(index),
+			(None, None) => None,
+			(None, Some(crc)) => {
+				(0..self.len()).find(|&file_number| self.by_index(file_number).is_ok_and(|file| file.crc32() == crc))
+			}
+		};
+		file_number
+			.map(|file_number| self.by_index(file_number))
+			.unwrap_or(Err(ZipError::FileNotFound))
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use std::io::Cursor;
+
+	use test_case::test_case;
+	use zip::ZipArchive;
+
+	use super::ZipArchiveExt;
+
+	#[test_case(0, include_bytes!("test_data/ziparchive01.zip"), "correct_name.bin", None, Ok(("correct_name.bin", 0x3b5b2bc1)))]
+	#[test_case(1, include_bytes!("test_data/ziparchive01.zip"), "nonexistent_name.bin", Some(0x098825db), Ok(("wrong_name.bin", 0x098825db)))]
+	#[test_case(2, include_bytes!("test_data/ziparchive01.zip"), "correct_name.bin", Some(0x098825db), Ok(("correct_name.bin", 0x3b5b2bc1)))]
+	#[test_case(3, include_bytes!("test_data/ziparchive01.zip"), "nonexistent.bin", None, Err(()))]
+	#[test_case(4, include_bytes!("test_data/ziparchive01.zip"), "nonexistent.bin", Some(0xdeadbeef), Err(()))]
+	fn by_name_or_crc(
+		_index: usize,
+		zip_bytes: &[u8],
+		name: &str,
+		crc: Option<u32>,
+		expected: Result<(&str, u32), ()>,
+	) {
+		let cursor = Cursor::new(zip_bytes);
+		let mut archive = ZipArchive::new(cursor).unwrap();
+
+		let file_result = archive.by_name_or_crc(name, crc);
+		let actual = file_result
+			.as_ref()
+			.map(|file| (file.name(), file.crc32()))
+			.map_err(|_| ());
+
+		//let expected = expected.map(|(name, crc)| (name.to_string(), crc));
+		assert_eq!(expected, actual);
+	}
 }
