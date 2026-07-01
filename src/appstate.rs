@@ -9,6 +9,7 @@ use std::sync::Mutex;
 use std::sync::mpsc::Sender;
 use std::thread::sleep;
 use std::time::Duration;
+use std::time::Instant;
 
 use anyhow::Error;
 use anyhow::Result;
@@ -19,6 +20,7 @@ use smol_str::ToSmolStr;
 use smol_str::format_smolstr;
 use strum::EnumProperty;
 use throttle::Throttle;
+use tracing::debug;
 use tracing::info;
 
 use crate::action::Action;
@@ -84,7 +86,7 @@ enum SessionState {
 	ShuttingDown,
 	Stopping,
 	Restarting {
-		start_args: Option<MameStartArgs>,
+		start_args: Option<Box<MameStartArgs>>,
 	},
 	Active {
 		command_sender: Sender<MameCommand>,
@@ -99,7 +101,7 @@ enum SessionActiveState {
 	EmuStopping,
 	Auditing {
 		job: Job<AuditJobResult>,
-		start_args: MameStartArgs,
+		start_args: Box<MameStartArgs>,
 		current_asset_name: Option<SmolStr>,
 	},
 }
@@ -268,7 +270,7 @@ impl AppState {
 		}
 	}
 
-	fn start_session(&self, mame_args: MameArguments, start_args: Option<MameStartArgs>) -> Session {
+	fn start_session(&self, mame_args: MameArguments, start_args: Option<Box<MameStartArgs>>) -> Session {
 		// start the session thread
 		let watchdog_timeout = Duration::from_secs(30);
 		let (job, command_sender) = spawn_mame_session_thread(
@@ -287,7 +289,7 @@ impl AppState {
 		};
 
 		// are we starting with a command?
-		if let Some(start_args) = start_args.as_ref() {
+		if let Some(start_args) = start_args.as_deref() {
 			let command = MameCommand::start(start_args);
 			command_sender.send(command).unwrap();
 		}
@@ -339,7 +341,8 @@ impl AppState {
 		true
 	}
 
-	pub fn start(&mut self, start_args: MameStartArgs) -> bool {
+	pub fn start(&mut self, start_args: impl Into<Box<MameStartArgs>>) -> bool {
+		let start_args = start_args.into();
 		info!(?start_args, "AppState::start()");
 
 		// access the InfoDb now
@@ -1002,6 +1005,8 @@ fn spawn_audit(
 	// create the job
 	let callback_bubble = ThreadLocalBubble::new(callback);
 	let job = Job::new(move |canceller| {
+		let start_instant = Instant::now();
+
 		// we need to invoke actions on the main thread
 		let invoke_action = make_invoke_action(callback_bubble, canceller.clone());
 
@@ -1045,6 +1050,7 @@ fn spawn_audit(
 
 		// signal completion and return
 		invoke_action(Action::AuditComplete, false);
+		debug!(duration=?start_instant.elapsed(), "spawn_audit() job");
 		job_result
 	});
 	Ok(job)
