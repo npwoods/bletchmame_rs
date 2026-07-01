@@ -150,7 +150,7 @@ fn make_ui_asset(asset: &Asset, audit_result: Option<&AuditResult>, icons: &Audi
 			.map(|(path, path_type)| {
 				let action = match path_type {
 					PathType::File => Action::ShowFile(path.clone().into()),
-					PathType::Zip => Action::Launch(OsString::from(path).into()),
+					PathType::Zip | PathType::SevenZ => Action::Launch(OsString::from(path).into()),
 				};
 				action.encode_for_slint()
 			})
