@@ -380,63 +380,63 @@ impl AppModel {
 			});
 
 			// report view
-			app_window.set_report_message(
-				report
+			let ui_report = {
+				let message = report
 					.as_ref()
 					.map(|r| r.message.to_shared_string())
-					.unwrap_or_default(),
-			);
-			app_window.set_report_submessage(
-				report
+					.unwrap_or_default();
+				let submessage = report
 					.as_ref()
 					.map(|r| r.submessage.as_deref().unwrap_or_default().to_shared_string())
-					.unwrap_or_default(),
-			);
-			app_window.set_report_mame_stderr_output(
-				report
+					.unwrap_or_default();
+				let mame_stderr_output = report
 					.as_ref()
 					.and_then(|r| r.mame_stderr_output.as_ref())
 					.map(|s| s.to_shared_string())
-					.unwrap_or_default(),
-			);
-			app_window.set_report_mame_exit_code(
-				report
+					.unwrap_or_default();
+				let mame_exit_code = report
 					.as_ref()
 					.and_then(|r| r.mame_exit_code.as_ref())
 					.map(|code| code.to_shared_string())
-					.unwrap_or_default(),
-			);
-			app_window.set_report_spinning(report.as_ref().map(|r| r.is_spinning).unwrap_or_default());
-			app_window.set_report_button_text(
-				report
+					.unwrap_or_default();
+				let spinning = report.as_ref().map(|r| r.is_spinning).unwrap_or_default();
+				let button_text = report
 					.as_ref()
 					.and_then(|r| r.button.as_ref())
 					.map(|b| b.text.to_shared_string())
-					.unwrap_or_default(),
-			);
-			let issues = report
-				.as_ref()
-				.map(|r| r.issues.as_slice())
-				.unwrap_or_default()
-				.iter()
-				.map(|issue| {
-					let text = issue.text.to_shared_string();
-					let button_text = issue
-						.button
-						.as_ref()
-						.map(|b| b.text.to_shared_string())
-						.unwrap_or_default();
-					ReportIssue { text, button_text }
-				})
-				.collect::<Vec<_>>();
-			let issues = VecModel::from(issues);
-			let issues = ModelRc::new(issues);
-			app_window.set_report_issues(issues);
-
-			let icons = Icons::get(&app_window);
-			let audit_results = report.map(|r| r.audit_results).unwrap_or_default();
-			let audit_results = audit_static_model(&audit_results, icons);
-			app_window.set_report_audit_assets(audit_results);
+					.unwrap_or_default();
+				let issues = report
+					.as_ref()
+					.map(|r| r.issues.as_slice())
+					.unwrap_or_default()
+					.iter()
+					.map(|issue| {
+						let text = issue.text.to_shared_string();
+						let button_text = issue
+							.button
+							.as_ref()
+							.map(|b| b.text.to_shared_string())
+							.unwrap_or_default();
+						ReportIssue { text, button_text }
+					})
+					.collect::<Vec<_>>();
+				let issues = VecModel::from(issues);
+				let issues = ModelRc::new(issues);
+				let icons = Icons::get(&app_window);
+				let audit_results = report.map(|r| r.audit_results).unwrap_or_default();
+				let audit_results = audit_static_model(&audit_results, icons);
+				ui::Report {
+					message,
+					submessage,
+					mame_stderr_output,
+					mame_exit_code,
+					spinning,
+					button_text,
+					issues,
+					audit_results,
+				}
+			};
+			app_window.set_report(ui_report);
 		}
 
 		// menus

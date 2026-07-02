@@ -23,7 +23,7 @@ import { SimpleMenuEntry } from "common.slint";
 import { Icons } from "icons.slint";
 import { TapeControl, Cassette } from "tapecontrol.slint";
 import { HorizontalSplitter } from "splitter.slint";
-import { AuditAsset, AuditAssetView } from "audit.slint";
+import { ReportView, Report } from "report.slint";
 
 struct CollectionContextMenuInfo {
     move-up-action: string,
@@ -43,9 +43,9 @@ struct ItemContextMenuInfo {
     remove-from-folder-desc: SimpleMenuEntry,
 }
 
-struct SearchBarItem { icon: image, text: string, action: string}
+struct SearchBarItem { icon: image, text: string, action: string }
 
-struct ReportIssue { text: string, button-text: string}
+struct ReportIssue { text: string, button-text: string }
 
 export component AppWindow inherits Window {
     // positioning and title
@@ -57,7 +57,7 @@ export component AppWindow inherits Window {
     title: (prefix-title-with-mode ? display-mode() + " " : "") + root.apptitle + (running-machine-desc != "" ? ": " + running-machine-desc : "");
 
     function display-mode() -> string {
-        return "[" + mode() + "]" + (mode() == "report" && report-spinning ? "[busy]" : "");
+        return "[" + mode() + "]" + (mode() == "report" && report.spinning ? "[busy]" : "");
     }
 
     // properties that influence the title
@@ -241,22 +241,14 @@ export component AppWindow inherits Window {
     pure callback get-statusbar-cassette(tag: string) -> Cassette;
 
     // the report view
-    in property <string> report-message;
-    in property <string> report-submessage;
-    in property <string> report-mame-stderr-output;
-    in property <string> report-mame-exit-code;
-    in property <bool> report-spinning;
-    in property <string> report-button-text;
-    in property <[ReportIssue]> report-issues;
-    in property <[AuditAsset]> report-audit-assets;
-    property <string> monospace-font-family: "Consolas";
+    in property <Report> report;
     callback report-button-clicked();
     callback issue-button-clicked(int);
 
     // mode - drives what is visible and what is not
     in property <bool> has-started;
     pure function mode() -> string {
-        if (self.report-message != "") {
+        if (self.report.message != "") {
             "report"
         } else if !has-started {
             "starting"
@@ -962,92 +954,12 @@ export component AppWindow inherits Window {
             }
 
             // report view
-            HorizontalBox {
+            ReportView {
                 visible: root.mode() == "report";
-                alignment: center;
-                if root.report-spinning: VerticalBox {
-                    // spinner
-                    alignment: center;
-                    Spinner {
-                        width: 150px;
-                        height: 150px;
-                        indeterminate: true;
-                    }
-                }
-                VerticalBox {
-                    alignment: center;
-
-                    // report message
-                    Text {
-                        text: root.report-message;
-                        horizontal-alignment: center;
-                        font-size: 24px;
-                        wrap: word-wrap;
-                    }
-
-                    // report submessage
-                    if root.report-submessage != "": Text {
-                        text: root.report-submessage;
-                        horizontal-alignment: center;
-                        font-size: 12px;
-                        wrap: word-wrap;
-                    }
-
-                    // report MAME stderr output
-                    if root.report-mame-stderr-output != "": TextEdit {
-                        width: 600px;
-                        height: 300px;
-                        text: root.report-mame-stderr-output;
-                        font-size: 10px;
-                        font-family: monospace-font-family;
-                        read-only: true;
-                    }
-
-                    // report MAME exit code
-                    if root.report-mame-exit-code != "": Text {
-                        text: "(exit code " + root.report-mame-exit-code + "}";
-                        horizontal-alignment: right;
-                        font-size: 12px;
-                    }
-
-                    // report button
-                    if root.report-button-text != "": HorizontalBox {
-                        alignment: center;
-                        Button {
-                            text: root.report-button-text;
-                            width: 50px;
-                            clicked => {
-                                root.report-button-clicked();
-                            }
-                        }
-                    }
-
-                    // report issues
-                    for issue[index] in report-issues: HorizontalBox {
-                        Text {
-                            horizontal-alignment: left;
-                            text: issue.text;
-                        }
-
-                        Button {
-                            visible: issue.button-text != "";
-                            text: issue.button-text;
-                            clicked => {
-                                root.issue-button-clicked(index);
-                            }
-                        }
-                    }
-
-                    // report audit assets
-                    VerticalLayout {
-                        for asset in report-audit-assets: AuditAssetView {
-                            asset: asset;
-                            menu-item-action(action) => {
-                                root.menu-item-action(action);
-                            }
-                        }
-                    }
-                }
+                report: root.report;
+                report-button-clicked => root.report-button-clicked();
+                issue-button-clicked(index) => root.issue-button-clicked(index);
+                menu-item-action(action) => root.menu-item-action(action);
             }
         }
 

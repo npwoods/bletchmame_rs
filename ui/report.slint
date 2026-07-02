@@ -1,0 +1,119 @@
+import {
+    HorizontalBox,
+    VerticalBox,
+    Button,
+    Spinner,
+    TextEdit,
+} from "std-widgets.slint";
+import { AuditAsset, AuditAssetView } from "audit.slint";
+
+struct ReportIssue { text: string, button-text: string }
+
+export struct Report {
+    message: string,
+    submessage: string,
+    mame-stderr-output: string,
+    mame-exit-code: string,
+    spinning: bool,
+    button-text: string,
+    issues: [ReportIssue],
+    audit-results: [AuditAsset],
+}
+
+export component ReportView {
+    in property <Report> report;
+    callback report-button-clicked();
+    callback issue-button-clicked(int);
+    callback menu-item-action(string);
+
+    property <string> monospace-font-family: "Consolas";
+
+    HorizontalBox {
+        alignment: center;
+        visible: report.message != "";
+
+        if report.spinning: VerticalBox {
+            alignment: center;
+            Spinner {
+                width: 150px;
+                height: 150px;
+                indeterminate: true;
+            }
+        }
+
+        VerticalBox {
+            alignment: center;
+
+            // report message
+            Text {
+                text: report.message;
+                horizontal-alignment: center;
+                font-size: 24px;
+                wrap: word-wrap;
+            }
+
+            // report submessage
+            if report.submessage != "": Text {
+                text: report.submessage;
+                horizontal-alignment: center;
+                font-size: 12px;
+                wrap: word-wrap;
+            }
+
+            // report MAME stderr output
+            if report.mame-stderr-output != "": TextEdit {
+                width: 600px;
+                height: 300px;
+                text: report.mame-stderr-output;
+                font-size: 10px;
+                font-family: monospace-font-family;
+                read-only: true;
+            }
+
+            // report MAME exit code
+            if report.mame-exit-code != "": Text {
+                text: "(exit code " + report.mame-exit-code + "}";
+                horizontal-alignment: right;
+                font-size: 12px;
+            }
+
+            // report button
+            if report.button-text != "": HorizontalBox {
+                alignment: center;
+                Button {
+                    text: report.button-text;
+                    width: 50px;
+                    clicked => {
+                        report-button-clicked();
+                    }
+                }
+            }
+
+            // report issues
+            for issue[index] in report.issues: HorizontalBox {
+                Text {
+                    horizontal-alignment: left;
+                    text: issue.text;
+                }
+
+                Button {
+                    visible: issue.button-text != "";
+                    text: issue.button-text;
+                    clicked => {
+                        issue-button-clicked(index);
+                    }
+                }
+            }
+
+            // report audit assets
+            VerticalLayout {
+                for asset in report.audit-results: AuditAssetView {
+                    asset: asset;
+                    menu-item-action(action) => {
+                        menu-item-action(action);
+                    }
+                }
+            }
+        }
+    }
+}
