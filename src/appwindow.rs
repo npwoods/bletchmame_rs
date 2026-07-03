@@ -1659,8 +1659,8 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 		Action::ShowFile(path) => {
 			show_path_in_file_manager(&path);
 		}
-		Action::AuditProgress(asset_name) => {
-			model.update_state(|state| state.audit_progress(asset_name));
+		Action::AuditProgress(asset_name, progress) => {
+			model.update_state(|state| state.audit_progress(asset_name, progress));
 		}
 		Action::AuditCancel => {
 			model.update_state(AppState::audit_cancel);
