@@ -83,8 +83,6 @@ enum MachineType<'a> {
 
 impl Asset {
 	pub fn from_machine_config(machine_config: &MachineConfig) -> Vec<Self> {
-		debug!(?machine_config, "Asset::from_machine_config()");
-
 		let mut results = Vec::new();
 		Self::from_machine_internal(&mut results, machine_config.machine(), None, MachineType::Root);
 		machine_config.visit_slots(|_, _, _, _, slot_data| {
@@ -94,10 +92,13 @@ impl Asset {
 		});
 
 		// remove duplicates and return
-		results
+		let results = results
 			.into_iter()
 			.unique_by(|x| (x.kind, x.name.clone(), x.machine_names.clone()))
-			.collect()
+			.collect();
+
+		debug!(?machine_config, ?results, "Asset::from_machine_config()");
+		results
 	}
 
 	fn from_machine_internal(
@@ -264,7 +265,7 @@ fn audit_single<'a>(
 		[PathType::File].as_slice()
 	};
 
-	machine_names
+	let result = machine_names
 		.iter()
 		.flat_map(|machine_name| paths_iter.clone().map(|path| (machine_name.as_ref(), path)))
 		.flat_map(|(machine_name, path)| path_types.iter().map(move |path_type| (machine_name, path, *path_type)))
@@ -290,7 +291,18 @@ fn audit_single<'a>(
 			};
 			let messages = [message].into();
 			AuditResult { path: None, messages }
-		})
+		});
+	debug!(
+		?asset_name,
+		?expected_size,
+		?expected_asset_hash,
+		?status,
+		?is_optional,
+		machine_names = ?machine_names.iter().map(|x| x.as_ref()).collect::<Vec<_>>(),
+		?result,
+		"audit_single()"
+	);
+	result
 }
 
 #[allow(clippy::too_many_arguments)]
