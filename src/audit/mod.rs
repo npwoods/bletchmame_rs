@@ -150,7 +150,7 @@ impl Asset {
 			machine_names: machine_names.clone(),
 			asset_hash: AssetHash::default(),
 			status: AssetStatus::Good,
-			is_optional: false,
+			is_optional: true, // samples are always optional; MAME just doesn't play the same if they are missing
 		});
 		results.extend(roms.chain(disks).chain(samples));
 

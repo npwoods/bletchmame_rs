@@ -53,6 +53,6 @@ expression: assets
         ],
         asset_hash: <<NONE>>,
         status: Good,
-        is_optional: false,
+        is_optional: true,
     },
 ]
