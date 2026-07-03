@@ -115,7 +115,7 @@ impl Asset {
 
 		debug!(machine=?machine.name(), ?bios, ?machine_type, "Asset::from_machine_internal()");
 
-		let machine_names = [Some(machine.name()), machine.clone_of().map(|x| x.name())]
+		let machine_names = [Some(machine.name()), machine.rom_of().map(|x| x.name())]
 			.iter()
 			.flatten()
 			.copied()
