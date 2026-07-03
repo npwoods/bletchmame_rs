@@ -29,10 +29,16 @@ use crate::history_xml::HistoryXml;
 use crate::prefs::PrefsCollection;
 use crate::prefs::PrefsItemRef;
 
-#[derive(Debug)]
 pub enum MultiPath {
-	Zip(RefCell<ZipArchive<File>>),
 	Dir(PathBuf),
+	Zip(RefCell<ZipArchive<File>>),
+	SevenZ(RefCell<Box<sevenz_rust2::ArchiveReader<File>>>),
+}
+
+#[derive(Debug, thiserror::Error)]
+enum ThisError {
+	#[error("Unknown archive file extension: {0}")]
+	UnknownArchiveFileExtension(String),
 }
 
 pub struct HistoryLoader(CancelableWorker<PathBuf, Result<HistoryXml>>);
@@ -93,8 +99,19 @@ impl MultiPath {
 			Self::Dir(path.to_path_buf())
 		} else {
 			let file = File::open(path)?;
-			let zip = ZipArchive::new(file)?;
-			Self::Zip(RefCell::new(zip))
+			let extension = path.extension().and_then(|x| x.to_str()).map(|x| x.to_lowercase());
+			match extension.as_deref() {
+				Some("zip") => {
+					let zip = ZipArchive::new(file)?;
+					Ok(Self::Zip(RefCell::new(zip)))
+				}
+				Some("7z") => {
+					let file = File::open(path)?;
+					let archive = sevenz_rust2::ArchiveReader::new(file, Default::default())?;
+					Ok(Self::SevenZ(RefCell::new(archive.into())))
+				}
+				_ => Err(ThisError::UnknownArchiveFileExtension(extension.unwrap_or_default())),
+			}?
 		};
 		Ok(result)
 	}
@@ -110,6 +127,11 @@ impl MultiPath {
 				Err(ZipError::FileNotFound) => Ok(None),
 				Err(e) => Err(e.into()),
 			},
+			Self::SevenZ(archive_reader) => archive_reader
+				.borrow_mut()
+				.read_file(name)
+				.map(Some)
+				.map_err(Into::into),
 			Self::Dir(path) => {
 				let path = path.join(name);
 				let file_result = File::open(&path);
