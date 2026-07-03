@@ -429,13 +429,47 @@ where
 mod tests {
 	use std::io::Cursor;
 	use std::io::Read;
+	use std::ops::ControlFlow;
 
 	use sevenz_rust2::ArchiveReader as SevenZArchiveReader;
 	use test_case::test_case;
 	use zip::ZipArchive;
 
+	use crate::info::InfoDb;
+	use crate::mconfig::MachineConfig;
+
+	use super::Asset;
 	use super::SevenZArchiveReaderExt as _;
 	use super::ZipArchiveExt as _;
+
+	#[test_case(0, include_str!("../info/test_data/listxml_alienar.xml"), "alienar")]
+	#[test_case(1, include_str!("../info/test_data/listxml_coco.xml"), "coco2b")]
+	#[test_case(2, include_str!("../info/test_data/listxml_c64.xml"), "c64")]
+	#[test_case(3, include_str!("../info/test_data/listxml_fake.xml"), "fake")]
+	#[test_case(4, include_str!("../info/test_data/listxml_fake.xml"), "blah")]
+	#[test_case(5, include_str!("../info/test_data/listxml_fake.xml"), "fakefake")]
+	fn assets_from_machine_config(_index: usize, xml: &str, machine_name: &str) {
+		// set the insta snapshot suffix; this is a parameterized test
+		let mut settings = insta::Settings::clone_current();
+		settings.set_snapshot_suffix(machine_name);
+		let _guard = settings.bind_to_scope();
+
+		// load the InfoDb
+		let info_db = InfoDb::from_listxml_output(xml.as_bytes(), |_| ControlFlow::Continue(()))
+			.unwrap()
+			.unwrap()
+			.into();
+
+		// create a MachineConifg
+		let opts: &[(&str, Option<&str>)] = &[];
+		let machine_config = MachineConfig::from_machine_name_and_slots(info_db, machine_name, opts).unwrap();
+
+		// identify audit assets
+		let assets = Asset::from_machine_config(&machine_config);
+
+		// and validate
+		insta::assert_debug_snapshot!(assets);
+	}
 
 	#[test_case(0, "correct_name.bin", None, Ok(("correct_name.bin", 0x3b5b2bc1)))]
 	#[test_case(1, "nonexistent_name.bin", Some(0x098825db), Ok(("wrong_name.bin", 0x098825db)))]

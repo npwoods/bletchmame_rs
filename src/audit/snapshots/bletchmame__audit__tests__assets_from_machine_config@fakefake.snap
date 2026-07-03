@@ -1,0 +1,58 @@
+---
+source: src/audit/mod.rs
+expression: assets
+---
+[
+    Asset {
+        kind: Rom,
+        name: "garbage.bin",
+        size: Some(
+            32768,
+        ),
+        machine_names: [
+            "fakefake",
+            "fake",
+        ],
+        asset_hash: CRC(0faf9fdb) SHA1(c27909184ee9170707c1be9a4cfbe83b359672e1),
+        status: Good,
+        is_optional: false,
+    },
+    Asset {
+        kind: Rom,
+        name: "nodump.bin",
+        size: Some(
+            32768,
+        ),
+        machine_names: [
+            "fakefake",
+            "fake",
+        ],
+        asset_hash: <<NONE>>,
+        status: NoDump,
+        is_optional: false,
+    },
+    Asset {
+        kind: Disk,
+        name: "samplechd.chd",
+        size: None,
+        machine_names: [
+            "fakefake",
+            "fake",
+        ],
+        asset_hash: SHA1(bfec48ae2439308ac3a547231a13f122ef303c76),
+        status: Good,
+        is_optional: false,
+    },
+    Asset {
+        kind: Sample,
+        name: "fakesample.wav",
+        size: None,
+        machine_names: [
+            "fakefake",
+            "fake",
+        ],
+        asset_hash: <<NONE>>,
+        status: Good,
+        is_optional: false,
+    },
+]

@@ -1,0 +1,184 @@
+---
+source: src/audit/mod.rs
+expression: assets
+---
+[
+    Asset {
+        kind: Rom,
+        name: "aarom10",
+        size: Some(
+            4096,
+        ),
+        machine_names: [
+            "alienar",
+        ],
+        asset_hash: CRC(6feb0314) SHA1(5cf30f097bc695cbd388cb408e78394926362a7b),
+        status: Good,
+        is_optional: false,
+    },
+    Asset {
+        kind: Rom,
+        name: "aarom11",
+        size: Some(
+            4096,
+        ),
+        machine_names: [
+            "alienar",
+        ],
+        asset_hash: CRC(ae3a270e) SHA1(867fff32062bc876390e8ca6bd7cedae47cd92c9),
+        status: Good,
+        is_optional: false,
+    },
+    Asset {
+        kind: Rom,
+        name: "aarom12",
+        size: Some(
+            4096,
+        ),
+        machine_names: [
+            "alienar",
+        ],
+        asset_hash: CRC(6be9f09e) SHA1(98821c9b94301c5fd6e7f5d9e4bc9c1bdbab53ec),
+        status: Good,
+        is_optional: false,
+    },
+    Asset {
+        kind: Rom,
+        name: "aarom01",
+        size: Some(
+            4096,
+        ),
+        machine_names: [
+            "alienar",
+        ],
+        asset_hash: CRC(bb0c21be) SHA1(dbf122870adaa49cd99e2c1e9fa4b78fb74ef2c1),
+        status: Good,
+        is_optional: false,
+    },
+    Asset {
+        kind: Rom,
+        name: "aarom02",
+        size: Some(
+            4096,
+        ),
+        machine_names: [
+            "alienar",
+        ],
+        asset_hash: CRC(165acd37) SHA1(12466c94bcf5a98f154a639ecc2e95d5193cbab2),
+        status: Good,
+        is_optional: false,
+    },
+    Asset {
+        kind: Rom,
+        name: "aarom03",
+        size: Some(
+            4096,
+        ),
+        machine_names: [
+            "alienar",
+        ],
+        asset_hash: CRC(e5d51d92) SHA1(598c928499e977a30906319c97ffa1ef2b9395d1),
+        status: Good,
+        is_optional: false,
+    },
+    Asset {
+        kind: Rom,
+        name: "aarom04",
+        size: Some(
+            4096,
+        ),
+        machine_names: [
+            "alienar",
+        ],
+        asset_hash: CRC(24f6feb8) SHA1(c1b7d764785b4edfe80a90ffdc52a67c8dbbfea5),
+        status: Good,
+        is_optional: false,
+    },
+    Asset {
+        kind: Rom,
+        name: "aarom05",
+        size: Some(
+            4096,
+        ),
+        machine_names: [
+            "alienar",
+        ],
+        asset_hash: CRC(5b1ac59b) SHA1(9b312eb419e994a006fda2ae61c58c31f048bace),
+        status: Good,
+        is_optional: false,
+    },
+    Asset {
+        kind: Rom,
+        name: "aarom06",
+        size: Some(
+            4096,
+        ),
+        machine_names: [
+            "alienar",
+        ],
+        asset_hash: CRC(da7195a2) SHA1(ef2c2750c504176fd6a11e8463278d97cac9a5c5),
+        status: Good,
+        is_optional: false,
+    },
+    Asset {
+        kind: Rom,
+        name: "aarom07",
+        size: Some(
+            4096,
+        ),
+        machine_names: [
+            "alienar",
+        ],
+        asset_hash: CRC(f9812be4) SHA1(5f116345f09cd79790612672aa48ede63fc91f56),
+        status: Good,
+        is_optional: false,
+    },
+    Asset {
+        kind: Rom,
+        name: "aarom08",
+        size: Some(
+            4096,
+        ),
+        machine_names: [
+            "alienar",
+        ],
+        asset_hash: CRC(cd7f3a87) SHA1(59577059308931139ecc036d06953660a148d91c),
+        status: Good,
+        is_optional: false,
+    },
+    Asset {
+        kind: Rom,
+        name: "aarom09",
+        size: Some(
+            4096,
+        ),
+        machine_names: [
+            "alienar",
+        ],
+        asset_hash: CRC(e6ce77b4) SHA1(bd4354100067654d0ad2e590591582dbdfb845b6),
+        status: Good,
+        is_optional: false,
+    },
+    Asset {
+        kind: Disk,
+        name: "fakedisk.chd",
+        size: None,
+        machine_names: [
+            "alienar",
+        ],
+        asset_hash: SHA1(0123456789abcdef0123456789abcdef01234567),
+        status: Good,
+        is_optional: false,
+    },
+    Asset {
+        kind: Sample,
+        name: "fakesample.wav",
+        size: None,
+        machine_names: [
+            "alienar",
+        ],
+        asset_hash: <<NONE>>,
+        status: Good,
+        is_optional: false,
+    },
+]
