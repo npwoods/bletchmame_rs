@@ -381,32 +381,31 @@ impl AppModel {
 
 			// report view
 			let ui_report = {
-				let message = report
-					.as_ref()
-					.map(|r| r.message.to_shared_string())
-					.unwrap_or_default();
+				let report = report.as_ref();
+				let message = report.map(|r| r.message.to_shared_string()).unwrap_or_default();
 				let submessage = report
-					.as_ref()
 					.map(|r| r.submessage.as_deref().unwrap_or_default().to_shared_string())
 					.unwrap_or_default();
 				let mame_stderr_output = report
-					.as_ref()
 					.and_then(|r| r.mame_stderr_output.as_ref())
 					.map(|s| s.to_shared_string())
 					.unwrap_or_default();
 				let mame_exit_code = report
-					.as_ref()
 					.and_then(|r| r.mame_exit_code.as_ref())
 					.map(|code| code.to_shared_string())
 					.unwrap_or_default();
-				let spinning = report.as_ref().map(|r| r.is_spinning).unwrap_or_default();
+				let spinning = report.map(|r| r.spinner_progress.is_some()).unwrap_or_default();
+				let spinning_progress = report.and_then(|r| r.spinner_progress).unwrap_or_default();
+				let spinning_progress = if spinning_progress.is_nan() {
+					-1.0
+				} else {
+					spinning_progress
+				};
 				let button_text = report
-					.as_ref()
 					.and_then(|r| r.button.as_ref())
 					.map(|b| b.text.to_shared_string())
 					.unwrap_or_default();
 				let issues = report
-					.as_ref()
 					.map(|r| r.issues.as_slice())
 					.unwrap_or_default()
 					.iter()
@@ -423,14 +422,15 @@ impl AppModel {
 				let issues = VecModel::from(issues);
 				let issues = ModelRc::new(issues);
 				let icons = Icons::get(&app_window);
-				let audit_results = report.map(|r| r.audit_results).unwrap_or_default();
-				let audit_results = audit_static_model(&audit_results, icons);
+				let audit_results = report.map(|r| r.audit_results.as_ref()).unwrap_or_default();
+				let audit_results = audit_static_model(audit_results, icons);
 				ui::Report {
 					message,
 					submessage,
 					mame_stderr_output,
 					mame_exit_code,
 					spinning,
+					spinning_progress,
 					button_text,
 					issues,
 					audit_results,

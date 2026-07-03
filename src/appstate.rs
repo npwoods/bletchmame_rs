@@ -169,7 +169,7 @@ pub struct Report {
 	pub mame_stderr_output: Option<SmolStr>,
 	pub mame_exit_code: Option<i32>,
 	pub button: Option<Button>,
-	pub is_spinning: bool,
+	pub spinner_progress: Option<f32>,
 	pub issues: Vec<Issue>,
 	pub audit_results: Box<[(Asset, AuditResult)]>,
 }
@@ -784,40 +784,40 @@ impl AppState {
 					message,
 					submessage: Some(submessage),
 					button: Some(button),
-					is_spinning: true,
+					spinner_progress: Some(f32::NAN),
 					..Default::default()
 				}
 			}
 			ReportType::SessionRestarting => Report {
 				message: "Resetting MAME...".into(),
-				is_spinning: true,
+				spinner_progress: Some(f32::NAN),
 				..Default::default()
 			},
 			ReportType::SessionRestartingForEmu => Report {
 				message: "Starting emulation...".into(),
 				submessage: Some("MAME needs to be reset to run this emulation".into()),
-				is_spinning: true,
+				spinner_progress: Some(f32::NAN),
 				..Default::default()
 			},
 			ReportType::SessionStarting => Report {
 				message: "Starting MAME...".into(),
 				submessage: Some("Waiting for emulation startup to be complete".into()),
-				is_spinning: true,
+				spinner_progress: Some(f32::NAN),
 				..Default::default()
 			},
 			ReportType::SessionShuttingDown => Report {
 				message: "MAME is shutting down...".into(),
-				is_spinning: true,
+				spinner_progress: Some(f32::NAN),
 				..Default::default()
 			},
 			ReportType::EmuStarting => Report {
 				message: "Starting emulation...".into(),
-				is_spinning: true,
+				spinner_progress: Some(f32::NAN),
 				..Default::default()
 			},
 			ReportType::EmuStopping => Report {
 				message: "Stopping emulation...".into(),
-				is_spinning: true,
+				spinner_progress: Some(f32::NAN),
 				..Default::default()
 			},
 			ReportType::Auditing(current_asset_name) => {
@@ -828,7 +828,7 @@ impl AppState {
 				Report {
 					message: "Auditing assets...".into(),
 					submessage: current_asset_name.cloned(),
-					is_spinning: true,
+					spinner_progress: Some(f32::NAN),
 					button: Some(button),
 					..Default::default()
 				}
@@ -956,7 +956,7 @@ impl Failure {
 			mame_stderr_output,
 			mame_exit_code,
 			button,
-			is_spinning: false,
+			spinner_progress: None,
 			audit_results,
 		}
 	}

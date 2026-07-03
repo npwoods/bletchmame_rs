@@ -16,6 +16,7 @@ export struct Report {
     mame-stderr-output: string,
     mame-exit-code: string,
     spinning: bool,
+    spinning-progress: float,
     button-text: string,
     issues: [ReportIssue],
     audit-results: [AuditAsset],
@@ -40,7 +41,8 @@ export component ReportView {
             Spinner {
                 width: 150px;
                 height: 150px;
-                indeterminate: true;
+                indeterminate: report.spinning-progress < 0.0;
+                progress: report.spinning-progress;
             }
         }
 
