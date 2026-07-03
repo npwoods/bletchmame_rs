@@ -196,7 +196,7 @@
 		<device_ref name="<<INVALID>>"/>
 		<softwarelist tag=":cart_list" name="coco_cart" status="original"/>
 	</machine>
-	<machine name="blah" sourcefile="fake_machine.cpp" cloneof="fake">
+	<machine name="blah" sourcefile="fake_machine.cpp" cloneof="fake" romof="fake">
 		<description>Fake Machine</description>
 		<year>2021</year>
 		<manufacturer>&lt;Bletch&gt;</manufacturer>
