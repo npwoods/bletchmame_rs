@@ -2,6 +2,7 @@ import {
     HorizontalBox,
     VerticalBox,
     Button,
+    ScrollView,
     Spinner,
     TextEdit,
 } from "std-widgets.slint";
@@ -28,6 +29,8 @@ export component ReportView {
 
     property <string> monospace-font-family: "Consolas";
 
+    height: 100%;
+
     HorizontalBox {
         alignment: center;
         visible: report.message != "";
@@ -43,6 +46,8 @@ export component ReportView {
 
         VerticalBox {
             alignment: center;
+            height: 100%;
+            width: 100%;
 
             // report message
             Text {
@@ -106,11 +111,16 @@ export component ReportView {
             }
 
             // report audit assets
-            VerticalLayout {
-                for asset in report.audit-results: AuditAssetView {
-                    asset: asset;
-                    menu-item-action(action) => {
-                        menu-item-action(action);
+            if report.audit-results.length > 0: ScrollView {
+                height: 100%;
+                width: 450px;
+                vertical-scrollbar-policy: always-on;
+                VerticalLayout {
+                    for asset in report.audit-results: AuditAssetView {
+                        asset: asset;
+                        menu-item-action(action) => {
+                            menu-item-action(action);
+                        }
                     }
                 }
             }
