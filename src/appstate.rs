@@ -103,6 +103,7 @@ enum SessionActiveState {
 		job: Job<AuditJobResult>,
 		start_args: Box<MameStartArgs>,
 		current_asset_name: Option<SmolStr>,
+		current_progress: f32,
 	},
 }
 
@@ -169,7 +170,7 @@ pub struct Report {
 	pub mame_stderr_output: Option<SmolStr>,
 	pub mame_exit_code: Option<i32>,
 	pub button: Option<Button>,
-	pub is_spinning: bool,
+	pub spinner_progress: Option<f32>,
 	pub issues: Vec<Issue>,
 	pub audit_results: Box<[(Asset, AuditResult)]>,
 }
@@ -370,6 +371,7 @@ impl AppState {
 				job,
 				start_args,
 				current_asset_name: None,
+				current_progress: 0.0,
 			};
 		} else {
 			// the session is unusable either because it is shutting down and/or the video is wrong; we need to restart
@@ -382,13 +384,17 @@ impl AppState {
 		true
 	}
 
-	pub fn audit_progress(&mut self, asset_name: SmolStr) -> bool {
+	pub fn audit_progress(&mut self, asset_name: SmolStr, progress: f32) -> bool {
 		// access the live session (which had better be present)
 		let session = self.live.as_mut().unwrap().session.as_mut().unwrap();
 
 		// access the auditing session
 		let SessionState::Active {
-			active_state: SessionActiveState::Auditing { current_asset_name, .. },
+			active_state: SessionActiveState::Auditing {
+				current_asset_name,
+				current_progress,
+				..
+			},
 			..
 		} = &mut session.session_state
 		else {
@@ -398,6 +404,7 @@ impl AppState {
 
 		// record progress
 		*current_asset_name = Some(asset_name);
+		*current_progress = progress;
 		true
 	}
 
@@ -732,7 +739,7 @@ impl AppState {
 			// messages for an emulation starting up or shutting down
 			EmuStarting,
 			EmuStopping,
-			Auditing(Option<&'a SmolStr>),
+			Auditing(Option<&'a SmolStr>, f32),
 
 			// InfoDb building
 			InfoDbBuild(Option<&'a str>),
@@ -763,9 +770,11 @@ impl AppState {
 					SessionActiveState::Normal => session.status.is_none().then_some(ReportType::SessionStarting),
 					SessionActiveState::EmuStarting => Some(ReportType::EmuStarting),
 					SessionActiveState::EmuStopping => Some(ReportType::EmuStopping),
-					SessionActiveState::Auditing { current_asset_name, .. } => {
-						Some(ReportType::Auditing(current_asset_name.as_ref()))
-					}
+					SessionActiveState::Auditing {
+						current_asset_name,
+						current_progress,
+						..
+					} => Some(ReportType::Auditing(current_asset_name.as_ref(), *current_progress)),
 				},
 			}
 		} else {
@@ -784,43 +793,43 @@ impl AppState {
 					message,
 					submessage: Some(submessage),
 					button: Some(button),
-					is_spinning: true,
+					spinner_progress: Some(f32::NAN),
 					..Default::default()
 				}
 			}
 			ReportType::SessionRestarting => Report {
 				message: "Resetting MAME...".into(),
-				is_spinning: true,
+				spinner_progress: Some(f32::NAN),
 				..Default::default()
 			},
 			ReportType::SessionRestartingForEmu => Report {
 				message: "Starting emulation...".into(),
 				submessage: Some("MAME needs to be reset to run this emulation".into()),
-				is_spinning: true,
+				spinner_progress: Some(f32::NAN),
 				..Default::default()
 			},
 			ReportType::SessionStarting => Report {
 				message: "Starting MAME...".into(),
 				submessage: Some("Waiting for emulation startup to be complete".into()),
-				is_spinning: true,
+				spinner_progress: Some(f32::NAN),
 				..Default::default()
 			},
 			ReportType::SessionShuttingDown => Report {
 				message: "MAME is shutting down...".into(),
-				is_spinning: true,
+				spinner_progress: Some(f32::NAN),
 				..Default::default()
 			},
 			ReportType::EmuStarting => Report {
 				message: "Starting emulation...".into(),
-				is_spinning: true,
+				spinner_progress: Some(f32::NAN),
 				..Default::default()
 			},
 			ReportType::EmuStopping => Report {
 				message: "Stopping emulation...".into(),
-				is_spinning: true,
+				spinner_progress: Some(f32::NAN),
 				..Default::default()
 			},
-			ReportType::Auditing(current_asset_name) => {
+			ReportType::Auditing(current_asset_name, current_progress) => {
 				let button = Button {
 					text: "Cancel".into(),
 					command: Action::AuditCancel,
@@ -828,7 +837,7 @@ impl AppState {
 				Report {
 					message: "Auditing assets...".into(),
 					submessage: current_asset_name.cloned(),
-					is_spinning: true,
+					spinner_progress: Some(current_progress),
 					button: Some(button),
 					..Default::default()
 				}
@@ -956,7 +965,7 @@ impl Failure {
 			mame_stderr_output,
 			mame_exit_code,
 			button,
-			is_spinning: false,
+			spinner_progress: None,
 			audit_results,
 		}
 	}
@@ -1011,15 +1020,18 @@ fn spawn_audit(
 		let invoke_action = make_invoke_action(callback_bubble, canceller.clone());
 
 		// audit each asset
+		let assets_len = assets.len();
 		let audit_results = assets
 			.into_iter()
-			.map(|asset| {
+			.enumerate()
+			.map(|(index, asset)| {
 				if canceller.status().is_break() {
 					Err(())
 				} else {
 					// do we need to display a progress message?
 					if throttle.accept().is_ok() {
-						let action = Action::AuditProgress(asset.name.as_str().into());
+						let progress = (index as f32) / (assets_len as f32);
+						let action = Action::AuditProgress(asset.name.as_str().into(), progress);
 						invoke_action(action, true);
 					}
 

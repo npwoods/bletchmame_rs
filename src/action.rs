@@ -138,7 +138,7 @@ pub enum Action {
 	HistoryLoadCompleted,
 	Launch(Box<OsStr>),
 	ShowFile(Box<Path>),
-	AuditProgress(SmolStr),
+	AuditProgress(SmolStr, f32),
 	AuditCancel,
 	AuditComplete,
 }
