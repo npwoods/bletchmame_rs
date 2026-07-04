@@ -352,34 +352,29 @@ impl AppState {
 		// access the live session (which had better be present)
 		let session = self.live.as_mut().unwrap().session.as_mut().unwrap();
 
-		// do we have an active session that with the expected video state?
-		if let SessionState::Active { active_state, .. } = &mut session.session_state
-			&& session.video == start_args.video
-		{
-			// there is indeed - start an auditing session
-			let rom_paths = self.preferences.paths.roms.clone();
-			let sample_paths = self.preferences.paths.samples.clone();
-			let callback = self.fixed.callback.clone();
-			let job = match spawn_audit(info_db, rom_paths, sample_paths, AUDIT_DELAY, &start_args, callback) {
-				Ok(job) => job,
-				Err(e) => {
-					self.failure = Some(Failure::AuditError(e));
-					return true;
-				}
-			};
-			*active_state = SessionActiveState::Auditing {
-				job,
-				start_args,
-				current_asset_name: None,
-				current_progress: 0.0,
-			};
-		} else {
-			// the session is unusable either because it is shutting down and/or the video is wrong; we need to restart
-			let start_args = Some(start_args);
-			session.session_state = SessionState::Restarting { start_args };
+		// we expect to have an active session
+		let SessionState::Active { active_state, .. } = &mut session.session_state else {
+			panic!("AppState::start() called without active session");
+		};
 
-			// cancel the current session
-			session.job.cancel();
+		// start an auditing session
+		let rom_paths = self.preferences.paths.roms.clone();
+		let sample_paths = self.preferences.paths.samples.clone();
+		let callback = self.fixed.callback.clone();
+		let job = match spawn_audit(info_db, rom_paths, sample_paths, AUDIT_DELAY, &start_args, callback) {
+			Ok(job) => job,
+			Err(e) => {
+				self.failure = Some(Failure::AuditError(e));
+				return true;
+			}
+		};
+
+		// and set up the state
+		*active_state = SessionActiveState::Auditing {
+			job,
+			start_args,
+			current_asset_name: None,
+			current_progress: 0.0,
 		};
 		true
 	}
@@ -456,15 +451,22 @@ impl AppState {
 		// how did the audit go?
 		match audit_result {
 			AuditJobResult::Success => {
-				// the audit succeeded and we're ready to go; build the command that will ultimately
-				// be issued to MAME/worker_ui
-				let command = MameCommand::start(&start_args);
+				// the audit succeeded; not check to seee if the video matchesdoes the video match?
+				if start_args.video == session.video {
+					// it does, lets go!
+					let command = MameCommand::start(&start_args);
 
-				// dispatch the command
-				command_sender.send(command).unwrap();
+					// dispatch the command
+					command_sender.send(command).unwrap();
 
-				// and set the state to "starting"
-				*active_state = SessionActiveState::EmuStarting;
+					// and set the state to "starting"
+					*active_state = SessionActiveState::EmuStarting;
+				} else {
+					// it doesn't; we need to restart
+					session.session_state = SessionState::Restarting {
+						start_args: Some(start_args),
+					};
+				}
 			}
 			AuditJobResult::Cancelled => {
 				self.failure = Some(Failure::AuditCancelled);
