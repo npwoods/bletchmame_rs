@@ -1,0 +1,21 @@
+---
+source: src/audit/mod.rs
+expression: assets
+---
+[
+    Asset {
+        kind: Rom,
+        name: "bravo.bin",
+        size: Some(
+            32768,
+        ),
+        machine_names: [
+            "phony_withbios_bravo",
+            "phony_withbios_alpha",
+            "phony_withbios",
+        ],
+        asset_hash: CRC(2faf9fdb) SHA1(e27909184ee9170707c1be9a4cfbe83b359672e1),
+        status: Good,
+        is_optional: false,
+    },
+]

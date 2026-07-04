@@ -1,0 +1,32 @@
+---
+source: src/audit/mod.rs
+expression: assets
+---
+[
+    Asset {
+        kind: Rom,
+        name: "garbage.bin",
+        size: Some(
+            32768,
+        ),
+        machine_names: [
+            "phony_withbios",
+        ],
+        asset_hash: CRC(0faf9fdb) SHA1(c27909184ee9170707c1be9a4cfbe83b359672e1),
+        status: Good,
+        is_optional: false,
+    },
+    Asset {
+        kind: Rom,
+        name: "nodump.bin",
+        size: Some(
+            32768,
+        ),
+        machine_names: [
+            "phony_withbios",
+        ],
+        asset_hash: <<NONE>>,
+        status: NoDump,
+        is_optional: false,
+    },
+]

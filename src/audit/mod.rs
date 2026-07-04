@@ -4,6 +4,7 @@ use std::fs::File;
 use std::io::Cursor;
 use std::io::Read;
 use std::io::Seek;
+use std::iter::successors;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -116,11 +117,8 @@ impl Asset {
 
 		debug!(machine=?machine.name(), ?bios, ?machine_type, "Asset::from_machine_internal()");
 
-		let machine_names = [Some(machine.name()), machine.rom_of().map(|x| x.name())]
-			.iter()
-			.flatten()
-			.copied()
-			.map(SmolStr::from)
+		let machine_names = successors(Some(machine), |machine| machine.rom_of())
+			.map(|machine| machine.name().into())
 			.collect::<Arc<[_]>>();
 		let roms = machine
 			.roms()
@@ -460,6 +458,9 @@ mod tests {
 	#[test_case(3, include_str!("../info/test_data/listxml_fake.xml"), "fake")]
 	#[test_case(4, include_str!("../info/test_data/listxml_fake.xml"), "blah")]
 	#[test_case(5, include_str!("../info/test_data/listxml_fake.xml"), "fakefake")]
+	#[test_case(6, include_str!("../info/test_data/listxml_fake.xml"), "phony_withbios")]
+	#[test_case(7, include_str!("../info/test_data/listxml_fake.xml"), "phony_withbios_alpha")]
+	#[test_case(8, include_str!("../info/test_data/listxml_fake.xml"), "phony_withbios_bravo")]
 	fn assets_from_machine_config(_index: usize, xml: &str, machine_name: &str) {
 		// set the insta snapshot suffix; this is a parameterized test
 		let mut settings = insta::Settings::clone_current();
