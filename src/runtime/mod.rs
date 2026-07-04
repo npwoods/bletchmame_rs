@@ -3,7 +3,6 @@ pub mod command;
 pub mod session;
 mod watchdog;
 
-use anyhow::Error;
 use serde::Deserialize;
 use serde::Serialize;
 use smol_str::SmolStr;
@@ -37,17 +36,4 @@ pub struct MameStartArgs {
 	pub slots: Vec<(SmolStr, SmolStr)>,
 	pub images: Vec<(SmolStr, ImageDesc)>,
 	pub video: Option<PrefsVideo>,
-}
-
-impl MameStartArgs {
-	pub fn preflight(&self) -> Result<(), Vec<Error>> {
-		let errors = self
-			.images
-			.iter()
-			.map(|(_, image_desc)| image_desc.validate())
-			.filter_map(|x| x.err())
-			.collect::<Vec<_>>();
-
-		if errors.is_empty() { Ok(()) } else { Err(errors) }
-	}
 }
