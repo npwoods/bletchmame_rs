@@ -4,6 +4,7 @@ use std::fs::File;
 use std::io::Cursor;
 use std::io::Read;
 use std::io::Seek;
+use std::iter::successors;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -116,11 +117,8 @@ impl Asset {
 
 		debug!(machine=?machine.name(), ?bios, ?machine_type, "Asset::from_machine_internal()");
 
-		let machine_names = [Some(machine.name()), machine.rom_of().map(|x| x.name())]
-			.iter()
-			.flatten()
-			.copied()
-			.map(SmolStr::from)
+		let machine_names = successors(Some(machine), |machine| machine.rom_of())
+			.map(|machine| machine.name().into())
 			.collect::<Arc<[_]>>();
 		let roms = machine
 			.roms()
