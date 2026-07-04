@@ -9,9 +9,11 @@ expression: assets
         size: Some(
             32768,
         ),
-        machine_names: [
-            "phony_withbios",
-        ],
+        location: MachinePaths(
+            [
+                "phony_withbios",
+            ],
+        ),
         asset_hash: CRC(0faf9fdb) SHA1(c27909184ee9170707c1be9a4cfbe83b359672e1),
         status: Good,
         is_optional: false,
@@ -22,9 +24,11 @@ expression: assets
         size: Some(
             32768,
         ),
-        machine_names: [
-            "phony_withbios",
-        ],
+        location: MachinePaths(
+            [
+                "phony_withbios",
+            ],
+        ),
         asset_hash: <<NONE>>,
         status: NoDump,
         is_optional: false,

@@ -20,6 +20,7 @@ use smol_str::SmolStr;
 use tokio::sync::mpsc;
 
 use crate::action::Action;
+use crate::audit::Asset;
 use crate::devimageconfig::DevicesImagesConfig;
 use crate::devimageconfig::EntryDetails;
 use crate::devimageconfig::ListSlots;
@@ -515,10 +516,20 @@ impl State {
 
 		let dialog = self.dialog_weak.unwrap();
 		let audit_model = dimodel_state.with_machine_config(|machine_config| {
+			let images = if let DiModelState::Ok { images, .. } = dimodel_state {
+				images
+					.borrow()
+					.iter()
+					.map(|(tag, image_desc)| (tag.into(), image_desc.clone()))
+					.collect::<Vec<_>>()
+			} else {
+				[].into()
+			};
+			let assets = Asset::from_machine_config_and_images(machine_config, &images);
 			let rom_paths = self.rom_paths.clone();
 			let sample_paths = self.sample_paths.clone();
 			let icons = Icons::get(&dialog);
-			AuditModel::new(machine_config, rom_paths, sample_paths, icons)
+			AuditModel::new(assets, rom_paths, sample_paths, icons)
 		});
 		let audit_model = audit_model.map(ModelRc::new).unwrap_or_default();
 		dialog.set_audit_assets(audit_model);
