@@ -732,7 +732,7 @@ mod test {
 
 	#[test_case(0, include_str!("test_data/listxml_alienar.xml"), "0.229 (mame0229)", 13, 1, &["alienar", "ipt_merge_any_hi", "ls157"])]
 	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "0.284 (mame0284)", 211, 10, &["93c06_16", "acia6850", "adaptator_multitap"])]
-	#[test_case(2, include_str!("test_data/listxml_fake.xml"), "<<fake build>>", 6, 3, &["blah", "fake", "fakefake", "floppy_525_dd", "floppy_connector", "mc6809e"])]
+	#[test_case(2, include_str!("test_data/listxml_fake.xml"), "<<fake build>>", 9, 6, &["blah", "fake", "fakefake", "floppy_525_dd", "floppy_connector", "mc6809e"])]
 	pub fn test(
 		_index: usize,
 		xml: &str,

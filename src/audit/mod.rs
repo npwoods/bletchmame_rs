@@ -460,6 +460,9 @@ mod tests {
 	#[test_case(3, include_str!("../info/test_data/listxml_fake.xml"), "fake")]
 	#[test_case(4, include_str!("../info/test_data/listxml_fake.xml"), "blah")]
 	#[test_case(5, include_str!("../info/test_data/listxml_fake.xml"), "fakefake")]
+	#[test_case(6, include_str!("../info/test_data/listxml_fake.xml"), "phony_withbios")]
+	#[test_case(7, include_str!("../info/test_data/listxml_fake.xml"), "phony_withbios_alpha")]
+	#[test_case(8, include_str!("../info/test_data/listxml_fake.xml"), "phony_withbios_bravo")]
 	fn assets_from_machine_config(_index: usize, xml: &str, machine_name: &str) {
 		// set the insta snapshot suffix; this is a parameterized test
 		let mut settings = insta::Settings::clone_current();

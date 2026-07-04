@@ -248,4 +248,23 @@
 		<sound channels="1"/>
 		<softwarelist tag=":cart_list" name="coco_cart" status="original"/>
 	</machine>
+	<machine name="phony_withbios"  sourcefile="phony_machine_with_bios.cpp" isbios="yes">
+		<description>Phony Machine With Bios</description>
+		<year>2021</year>
+		<manufacturer>&lt;Bletch&gt;</manufacturer>
+		<rom name="garbage.bin" size="32768" crc="0faf9fdb" sha1="c27909184ee9170707c1be9a4cfbe83b359672e1" region="maincpu" offset="0000"/>
+		<rom name="nodump.bin" size="32768" status="nodump" region="maincpu" offset="8000"/>
+	</machine>
+	<machine name="phony_withbios_alpha"  sourcefile="phony_machine_with_bios.cpp" romof="phony_withbios">
+		<description>Phony Machine With Bios Alpha</description>
+		<year>2021</year>
+		<manufacturer>&lt;Bletch&gt;</manufacturer>
+		<rom name="alpha.bin" size="32768" crc="1faf9fdb" sha1="d27909184ee9170707c1be9a4cfbe83b359672e1" region="maincpu" offset="0000"/>
+	</machine>
+	<machine name="phony_withbios_bravo"  sourcefile="phony_machine_with_bios.cpp" cloneof="phony_withbios_alpha" romof="phony_withbios_alpha">
+		<description>Phony Machine With Bios Bravo</description>
+		<year>2021</year>
+		<manufacturer>&lt;Bletch&gt;</manufacturer>
+		<rom name="bravo.bin" size="32768" crc="2faf9fdb" sha1="e27909184ee9170707c1be9a4cfbe83b359672e1" region="maincpu" offset="0000"/>
+	</machine>
 </mame>
