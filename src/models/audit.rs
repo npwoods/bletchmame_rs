@@ -19,7 +19,7 @@ use crate::audit::AssetKind;
 use crate::audit::AuditResult;
 use crate::audit::AuditSeverity;
 use crate::audit::PathType;
-use crate::mconfig::MachineConfig;
+use crate::info::DeviceType;
 use crate::ui::Icons;
 
 pub struct AuditModel {
@@ -39,18 +39,18 @@ struct AuditIcons {
 	audit_pending: Image,
 	audit_warning: Image,
 	audit_failed: Image,
+	cassette: Image,
+	image_unknown: Image,
 }
 
 impl AuditModel {
 	pub fn new(
-		machine_config: &MachineConfig,
+		assets: impl IntoIterator<Item = Asset>,
 		rom_paths: Arc<[SmolStr]>,
 		sample_paths: Arc<[SmolStr]>,
 		icons: Icons<'_>,
 	) -> Self {
-		let assets = Asset::from_machine_config(machine_config)
-			.into_iter()
-			.collect::<Arc<[_]>>();
+		let assets = assets.into_iter().collect::<Arc<[_]>>();
 		let audit_results = (0..assets.len()).map(|_| None).collect::<Box<_>>();
 		let audit_results = RefCell::new(audit_results);
 		let icons = AuditIcons::new(icons);
@@ -129,6 +129,8 @@ impl AuditIcons {
 			audit_pending: icons.get_audit_pending(),
 			audit_warning: icons.get_audit_warning(),
 			audit_failed: icons.get_audit_failed(),
+			cassette: icons.get_cassette(),
+			image_unknown: icons.get_image_unknown(),
 		}
 	}
 }
@@ -162,6 +164,10 @@ fn make_ui_asset(asset: &Asset, audit_result: Option<&AuditResult>, icons: &Audi
 		AssetKind::Rom => icons.rom.clone(),
 		AssetKind::Disk => icons.disk.clone(),
 		AssetKind::Sample => icons.sample.clone(),
+		AssetKind::ImageFile(DeviceType::Cassette) => icons.cassette.clone(),
+		AssetKind::ImageFile(DeviceType::HardDisk) => icons.disk.clone(),
+		AssetKind::ImageFile(DeviceType::RomImage) => icons.rom.clone(),
+		AssetKind::ImageFile(_) => icons.image_unknown.clone(),
 	};
 	let overlay = match max_severity {
 		None => icons.audit_pending.clone(),

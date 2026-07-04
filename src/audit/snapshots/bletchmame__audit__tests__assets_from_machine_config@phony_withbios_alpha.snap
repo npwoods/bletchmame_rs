@@ -9,10 +9,12 @@ expression: assets
         size: Some(
             32768,
         ),
-        machine_names: [
-            "phony_withbios_alpha",
-            "phony_withbios",
-        ],
+        location: MachinePaths(
+            [
+                "phony_withbios_alpha",
+                "phony_withbios",
+            ],
+        ),
         asset_hash: CRC(1faf9fdb) SHA1(d27909184ee9170707c1be9a4cfbe83b359672e1),
         status: Good,
         is_optional: false,

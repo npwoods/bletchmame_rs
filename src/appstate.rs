@@ -1008,7 +1008,7 @@ fn spawn_audit(
 	let machine_config = MachineConfig::from_mame_start_args(info_db.clone(), start_args)?;
 
 	// create the assets
-	let assets = Asset::from_machine_config(&machine_config);
+	let assets = Asset::from_machine_config_and_images(&machine_config, &start_args.images);
 
 	// progress messages need to be throttled
 	let mut throttle = Throttle::new(PROGRESS_THROTTLE_TIMEOUT, 1);

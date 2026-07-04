@@ -29,8 +29,6 @@ enum ThisError {
 	InvalidHostName(SmolStr),
 	#[error("cannot parse portnumber")]
 	CannotParsePortNumber,
-	#[error("file not found: {0}")]
-	FileNotFound(String),
 	#[error("invalid software name: {0}")]
 	InvalidSoftwareName(SmolStr),
 }
@@ -53,17 +51,6 @@ impl ImageDesc {
 			Self::Software(software) => Cow::Borrowed(software.as_ref()),
 			Self::Socket { hostname, port } => format!("socket.{}:{}", hostname, *port).into(),
 		}
-	}
-
-	pub fn validate(&self) -> Result<()> {
-		if let Self::File(filename) = self
-			&& !Path::new(filename).is_file()
-			&& available_ports().iter().all(|p| p.port_name != *filename)
-		{
-			let error = ThisError::FileNotFound(filename.to_string());
-			return Err(error.into());
-		}
-		Ok(())
 	}
 
 	pub fn display_name(&self) -> Cow<'_, str> {

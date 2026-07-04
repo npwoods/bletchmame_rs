@@ -9,10 +9,12 @@ expression: assets
         size: Some(
             8192,
         ),
-        machine_names: [
-            "coco2b",
-            "coco",
-        ],
+        location: MachinePaths(
+            [
+                "coco2b",
+                "coco",
+            ],
+        ),
         asset_hash: CRC(d8f4d15e) SHA1(28b92bebe35fa4f026a084416d6ea3b1552b63d3),
         status: Good,
         is_optional: false,
@@ -23,10 +25,12 @@ expression: assets
         size: Some(
             8192,
         ),
-        machine_names: [
-            "coco2b",
-            "coco",
-        ],
+        location: MachinePaths(
+            [
+                "coco2b",
+                "coco",
+            ],
+        ),
         asset_hash: CRC(a82a6254) SHA1(ad927fb4f30746d820cb8b860ebb585e7f095dea),
         status: Good,
         is_optional: false,
@@ -37,9 +41,11 @@ expression: assets
         size: Some(
             8192,
         ),
-        machine_names: [
-            "coco_fdc",
-        ],
+        location: MachinePaths(
+            [
+                "coco_fdc",
+            ],
+        ),
         asset_hash: CRC(0b9c5415) SHA1(10bdc5aa2d7d7f205f67b47b19003a4bd89defd1),
         status: Good,
         is_optional: false,
