@@ -18,6 +18,7 @@ use itertools::Itertools;
 use more_asserts::assert_le;
 use more_asserts::assert_lt;
 use primal::is_prime;
+use strum::EnumCount;
 use tracing::debug;
 use zerocopy::Immutable;
 use zerocopy::IntoBytes;
@@ -36,6 +37,7 @@ use crate::info::binary::ASSET_FLAG_HAS_SHA1;
 use crate::info::binary::ASSET_FLAG_NODUMP;
 use crate::info::binary::ASSET_FLAG_OPTIONAL;
 use crate::info::binary::ASSET_FLAG_WRITABLE;
+use crate::info::binary::DeviceType;
 use crate::info::binary::Fixup;
 use crate::info::entities::AssetStatus;
 use crate::info::strings::StringTableBuilder;
@@ -453,15 +455,17 @@ impl State {
 			(Phase::Machine, b"device") => {
 				let [device_type, tag, mandatory, interface] =
 					evt.find_attributes([b"type", b"tag", b"mandatory", b"interface"])?;
+				let device_type = device_type
+					.and_then(|x| x.parse::<DeviceType>().ok())
+					.unwrap_or(DeviceType::Unknown);
 				let tag = tag.mandatory("tag")?;
 				let tag = normalize_tag(tag);
-				let type_strindex = self.strings.lookup(&device_type.unwrap_or_default());
 				let tag_strindex = self.strings.lookup(&tag);
 				let mandatory = mandatory.map(parse_mame_bool).transpose()?.unwrap_or(false);
 				let interfaces = interface.unwrap_or_default().split(',').sorted().join("\0");
 				let interfaces_strindex = self.strings.lookup(&interfaces);
 				let device = binary::Device {
-					type_strindex,
+					device_type,
 					tag_strindex,
 					mandatory,
 					interfaces_strindex,
@@ -1064,6 +1068,7 @@ pub fn calculate_sizes_hash() -> U64 {
 		size_of::<binary::SoftwareList>(),
 		size_of::<binary::MachineSoftwareList>(),
 		size_of::<binary::RamOption>(),
+		binary::DeviceType::COUNT,
 	]
 	.into_iter()
 	.fold(0, |value, item| {

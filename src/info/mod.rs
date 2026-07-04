@@ -47,6 +47,7 @@ use crate::version::MameVersion;
 
 pub use self::binary::ChipType;
 pub use self::binary::ConditionRelation;
+pub use self::binary::DeviceType;
 pub use self::binary::SoftwareListStatus;
 pub use self::entities::AssetStatus;
 pub use self::entities::BiosSet;
@@ -727,6 +728,7 @@ mod test {
 	use crate::info::entities::AssetStatus;
 
 	use super::ChipType;
+	use super::DeviceType;
 	use super::InfoDb;
 	use super::View;
 
@@ -934,16 +936,16 @@ mod test {
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", "ext:fdc:wd17xx:0:525dd", "floppydisk", &["floppy_5_25"],
+	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", "ext:fdc:wd17xx:0:525dd", crate::info::DeviceType::FloppyDisk, &["floppy_5_25"],
 		&["1dd", "86f", "cqi", "cqm", "d77", "d88", "dfi", "dmk", "dsk", "imd", "jvc", "mfi", "mfm", "os9", "sdf", "td0", "vdk"])]
-	#[test_case(1, include_str!("test_data/listxml_c64.xml"), "c64", "exp", "cartridge", &["c64_cart" ,"vic10_cart"],
+	#[test_case(1, include_str!("test_data/listxml_c64.xml"), "c64", "exp", crate::info::DeviceType::Cartridge, &["c64_cart" ,"vic10_cart"],
 		&["80", "a0", "crt", "e0"])]
 	pub fn devices(
 		_index: usize,
 		xml: &str,
 		machine: &str,
 		device_tag: &str,
-		expected_type: &str,
+		expected_type: DeviceType,
 		expected_interfaces: &[&str],
 		expected_extensions: &[&str],
 	) {
@@ -961,13 +963,13 @@ mod test {
 			.map_err(|e| e.to_string())
 			.unwrap();
 		let actual = (
-			device.device_type().to_string(),
+			device.device_type(),
 			device.interfaces().map(|x| x.to_string()).collect::<Vec<_>>(),
 			device.extensions().map(|x| x.to_string()).collect::<Vec<_>>(),
 		);
 
 		let expected = (
-			expected_type.to_string(),
+			expected_type,
 			expected_interfaces.iter().map(|x| x.to_string()).collect::<Vec<_>>(),
 			expected_extensions.iter().map(|x| x.to_string()).collect::<Vec<_>>(),
 		);

@@ -8,6 +8,7 @@ use strum::EnumString;
 use crate::assethash::AssetHash;
 use crate::info::ChipType;
 use crate::info::ConditionRelation;
+use crate::info::DeviceType;
 use crate::info::IndirectView;
 use crate::info::Object;
 use crate::info::SimpleView;
@@ -349,8 +350,8 @@ impl<'a> ConfigurationSettingCondition<'a> {
 }
 
 impl<'a> Device<'a> {
-	pub fn device_type(&self) -> &'a str {
-		self.string(|x| x.type_strindex)
+	pub fn device_type(&self) -> DeviceType {
+		self.obj().device_type
 	}
 
 	pub fn tag(&self) -> &'a str {

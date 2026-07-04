@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use strum::EnumCount;
 use strum::EnumString;
 use zerocopy::Immutable;
 use zerocopy::IntoBytes;
@@ -207,11 +208,103 @@ pub enum ConditionRelation {
 #[repr(C, packed)]
 #[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq, Eq, Hash)]
 pub struct Device {
-	pub type_strindex: UsizeDb,
+	pub device_type: DeviceType,
 	pub tag_strindex: UsizeDb,
 	pub mandatory: bool,
 	pub interfaces_strindex: UsizeDb,
 	pub extensions_strindex: UsizeDb,
+}
+
+#[repr(u8)]
+#[derive(
+	Clone,
+	Copy,
+	Debug,
+	Deserialize,
+	TryFromBytes,
+	IntoBytes,
+	Immutable,
+	KnownLayout,
+	EnumCount,
+	EnumString,
+	PartialEq,
+	Eq,
+	Hash,
+)]
+pub enum DeviceType {
+	Unknown,
+	#[strum(serialize = "bitbanger")]
+	Bitbanger,
+	#[strum(serialize = "bubble")]
+	Bubble,
+	#[strum(serialize = "card")]
+	Card,
+	#[strum(serialize = "cartridge")]
+	Cartridge,
+	#[strum(serialize = "cartridge60pin")]
+	Cartridge60Pin,
+	#[strum(serialize = "cassette")]
+	Cassette,
+	#[strum(serialize = "cdrom")]
+	Cdrom,
+	#[strum(serialize = "connect")]
+	Connect,
+	#[strum(serialize = "ctape")]
+	Ctape,
+	#[strum(serialize = "cylinder")]
+	Cylinder,
+	#[strum(serialize = "datapack")]
+	Datapack,
+	#[strum(serialize = "disk")]
+	Disk,
+	#[strum(serialize = "floppydisk")]
+	FloppyDisk,
+	#[strum(serialize = "harddisk")]
+	HardDisk,
+	#[strum(serialize = "magtape")]
+	MagTape,
+	#[strum(serialize = "memcard")]
+	MemCard,
+	#[strum(serialize = "microtape")]
+	Microtape,
+	#[strum(serialize = "midiin")]
+	MidiIn,
+	#[strum(serialize = "midiout")]
+	MidiOut,
+	#[strum(serialize = "node_id")]
+	NodeId,
+	#[strum(serialize = "parallel")]
+	Parallel,
+	#[strum(serialize = "picture")]
+	Picture,
+	#[strum(serialize = "port")]
+	Port,
+	#[strum(serialize = "printout")]
+	PrintOut,
+	#[strum(serialize = "promimage")]
+	PromImage,
+	#[strum(serialize = "punchtape")]
+	PunchTape,
+	#[strum(serialize = "quickload")]
+	QuickLoad,
+	#[strum(serialize = "romimage")]
+	RomImage,
+	#[strum(serialize = "sasihd")]
+	SasiHd,
+	#[strum(serialize = "serial")]
+	Serial,
+	#[strum(serialize = "snapshot")]
+	Snapshot,
+	#[strum(serialize = "ssd")]
+	Ssd,
+	#[strum(serialize = "tape")]
+	Tape,
+	#[strum(serialize = "vidfile")]
+	VidFile,
+	#[strum(serialize = "winchester")]
+	Winchester,
+	#[strum(serialize = "yamahaminicart")]
+	YamahaMiniCart,
 }
 
 #[repr(C, packed)]
