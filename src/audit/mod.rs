@@ -93,6 +93,10 @@ enum MachineType<'a> {
 }
 
 impl Asset {
+	pub fn from_machine_config(machine_config: &MachineConfig) -> Vec<Self> {
+		Self::from_machine_config_and_images(machine_config, &[])
+	}
+
 	pub fn from_machine_config_and_images<'a>(
 		machine_config: &MachineConfig,
 		images: impl IntoIterator<Item = &'a (SmolStr, ImageDesc)> + 'a,
@@ -503,7 +507,7 @@ mod tests {
 		let machine_config = MachineConfig::from_machine_name_and_slots(info_db, machine_name, opts).unwrap();
 
 		// identify audit assets
-		let assets = Asset::from_machine_config_and_images(&machine_config, &[]);
+		let assets = Asset::from_machine_config(&machine_config);
 
 		// and validate
 		insta::assert_debug_snapshot!(assets);

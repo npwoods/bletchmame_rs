@@ -20,7 +20,7 @@ import { Icons } from "../icons.slint";
 import { VideoConfigComponent, VideoSettings } from "../videoconfig.slint";
 import { AuditAsset, AuditAssetView } from "../audit.slint";
 
-struct SoftwareMachine { machine-index: int, description: string, checked: bool}
+struct SoftwareMachine { machine-index: int, description: string, checked: bool }
 
 export component ConfigureDialog inherits Window {
     title: dialog-title;
@@ -37,6 +37,7 @@ export component ConfigureDialog inherits Window {
     in property <[string]> bios-selection-model;
     in-out property <int> bios-selection-index;
     in property <[AuditAsset]> audit-assets;
+    in property <string> audit-error-message;
     in property <string> audit-context-menu-browse-command;
     in property <[SoftwareMachine]> software-machines;
     in property <bool> software-machines-bulk-all-enabled;
@@ -156,7 +157,7 @@ export component ConfigureDialog inherits Window {
                 Tab {
                     title: "Audit";
                     VerticalBox {
-                        ListView {
+                        if root.audit-error-message == "": ListView {
                             for asset in root.audit-assets: AuditAssetView {
                                 asset: asset;
                                 menu-item-action(action) => {
@@ -165,11 +166,15 @@ export component ConfigureDialog inherits Window {
                             }
                         }
 
-                        Button {
+                        if root.audit-error-message == "": Button {
                             text: "Run Audit";
                             clicked => {
                                 root.run-audit-clicked();
                             }
+                        }
+
+                        if root.audit-error-message != "": Text {
+                            text: root.audit-error-message;
                         }
                     }
                 }
@@ -212,6 +217,31 @@ export component ConfigureDialog inherits Window {
                             Text {
                                 text: data.description;
                             }
+                        }
+                    }
+                }
+
+                Tab {
+                    title: "Audit";
+                    VerticalBox {
+                        if root.audit-error-message == "": ListView {
+                            for asset in root.audit-assets: AuditAssetView {
+                                asset: asset;
+                                menu-item-action(action) => {
+                                    root.menu-item-action(action);
+                                }
+                            }
+                        }
+
+                        if root.audit-error-message == "": Button {
+                            text: "Run Audit";
+                            clicked => {
+                                root.run-audit-clicked();
+                            }
+                        }
+
+                        if root.audit-error-message != "": Text {
+                            text: root.audit-error-message;
                         }
                     }
                 }
