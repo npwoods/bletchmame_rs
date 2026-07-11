@@ -5,6 +5,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use anyhow::Error;
+use anyhow::Result;
 use itertools::Itertools;
 use showfile::show_path_in_file_manager;
 use slint::CloseRequestResponse;
@@ -13,6 +14,7 @@ use slint::Global;
 use slint::Model;
 use slint::ModelRc;
 use slint::SharedString;
+use slint::ToSharedString;
 use slint::VecModel;
 use slint::Weak;
 use slint::spawn_local;
@@ -82,6 +84,12 @@ enum DiModelState {
 		info_db: Rc<InfoDb>,
 		machine_index: usize,
 	},
+}
+
+#[derive(thiserror::Error, Debug)]
+enum ThisError {
+	#[error("Can only audit a single machine")]
+	CanOnlyAuditSingleMachine,
 }
 
 pub async fn dialog_configure(
@@ -374,8 +382,8 @@ impl State {
 		};
 		if matches!(&state.core, CoreState::Machine { .. }) {
 			state.update_images();
-			state.update_audit();
 		}
+		state.update_audit();
 		state
 	}
 
@@ -510,32 +518,64 @@ impl State {
 	}
 
 	pub fn update_audit(&self) {
-		let CoreState::Machine { dimodel_state, .. } = &self.core else {
-			unreachable!()
-		};
+		let assets_result = self.audit_assets();
 
 		let dialog = self.dialog_weak.unwrap();
-		let audit_model = dimodel_state.with_machine_config(|machine_config| {
-			let images = if let DiModelState::Ok { images, .. } = dimodel_state {
-				images
-					.borrow()
-					.iter()
-					.map(|(tag, image_desc)| (tag.into(), image_desc.clone()))
-					.collect::<Vec<_>>()
-			} else {
-				[].into()
-			};
-			let assets = Asset::from_machine_config_and_images(machine_config, &images);
-			let rom_paths = self.rom_paths.clone();
-			let sample_paths = self.sample_paths.clone();
-			let icons = Icons::get(&dialog);
-			AuditModel::new(assets, rom_paths, sample_paths, icons)
-		});
-		let audit_model = audit_model.map(ModelRc::new).unwrap_or_default();
+		dialog.set_audit_error_message(
+			assets_result
+				.as_ref()
+				.err()
+				.map(|e| e.to_shared_string())
+				.unwrap_or_default(),
+		);
+		let assets = assets_result.unwrap_or_default();
+		let rom_paths = self.rom_paths.clone();
+		let sample_paths = self.sample_paths.clone();
+		let icons = Icons::get(&dialog);
+		let audit_model = AuditModel::new(assets, rom_paths, sample_paths, icons);
+		let audit_model = ModelRc::new(audit_model);
 		dialog.set_audit_assets(audit_model);
 
 		// start running the audit!
 		self.start_run_audit();
+	}
+
+	fn audit_assets(&self) -> Result<Vec<Asset>> {
+		let assets = match &self.core {
+			CoreState::Machine { dimodel_state, .. } => {
+				let images = if let DiModelState::Ok { images, .. } = dimodel_state {
+					images
+						.borrow()
+						.iter()
+						.map(|(tag, image_desc)| (tag.into(), image_desc.clone()))
+						.collect::<Vec<_>>()
+				} else {
+					[].into()
+				};
+				let assets = dimodel_state.with_machine_config(|machine_config| {
+					Asset::from_machine_config_and_images(machine_config, &images)
+				});
+				assets.unwrap_or_default()
+			}
+			CoreState::Software {
+				info_db,
+				software_machines,
+				..
+			} => {
+				let machine_index = software_machines
+					.iter()
+					.filter(|x| x.checked)
+					.exactly_one()
+					.map_err(|_| ThisError::CanOnlyAuditSingleMachine)?
+					.machine_index
+					.try_into()
+					.unwrap();
+				let info_db = info_db.clone();
+				let machine_config = MachineConfig::new(info_db, machine_index);
+				Asset::from_machine_config(&machine_config)
+			}
+		};
+		Ok(assets)
 	}
 
 	pub fn start_run_audit(&self) {
