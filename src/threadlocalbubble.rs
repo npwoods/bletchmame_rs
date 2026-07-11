@@ -121,7 +121,7 @@ mod test {
 
 		// push the bubble into a different thread and touch it
 		let thread = spawn(move || {
-			let _ = format!("{:?}", &bubble);
+			let _ = format!("{:?}", bubble);
 			bubble.clone()
 		});
 
