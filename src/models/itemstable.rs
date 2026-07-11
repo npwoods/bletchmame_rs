@@ -1111,7 +1111,7 @@ fn column_text<'a>(_info_db: &'a InfoDb, item: &'a Item, column: ColumnType) -> 
 			..
 		} => match column {
 			ColumnType::Name => software.name.as_str().into(),
-			ColumnType::SourceFile => format!("{}.xml", &software_list.name).into(),
+			ColumnType::SourceFile => format!("{}.xml", software_list.name).into(),
 			ColumnType::Description => software.description.as_str().into(),
 			ColumnType::Year => software.year.as_str().into(),
 			ColumnType::Provider => software.publisher.as_str().into(),

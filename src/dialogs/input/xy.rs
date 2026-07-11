@@ -257,7 +257,7 @@ fn build_input_dialog_entry(
 	if let Some(input) = input {
 		let input_seqs = [(input, Some(axis), SeqType::Standard), (input, Some(axis), seq_type)];
 		let suffix = seq_type.suffix();
-		let name = format!("{}{}", &input.name, suffix).to_shared_string();
+		let name = format!("{}{}", input.name, suffix).to_shared_string();
 		let text = build_code_text(input_seqs, codes).to_shared_string();
 		let primary_action = Action::SeqPollDialog {
 			port_tag: input.port_tag.clone(),
