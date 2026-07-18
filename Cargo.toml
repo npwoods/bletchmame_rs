@@ -30,7 +30,7 @@ levenshtein = "1.0.5"
 more-asserts = "0.3.1"
 nu-utils = "0.113.1"
 num = "0.4.3"
-open = "5.3.6"
+open = "5.4.0"
 parallel_worker = "1.0.2"
 path-absolutize = "3.1.1"
 primal = "0.3.3"
@@ -49,10 +49,10 @@ smol_str = { version = "0.3.6", features = ["serde"] }
 splitty = "1.0.2"
 strum = { version = "0.28.0", features = ["derive"] }
 strum_macros = "0.28.0"
-sysinfo = "0.39.5"
+sysinfo = "0.39.6"
 thiserror = "2.0.18"
 throttle = "0.1.0"
-tokio = { version = "1.52.3", features = [
+tokio = { version = "1.53.0", features = [
     "rt",
     "rt-multi-thread",
     "time",
@@ -64,9 +64,9 @@ tracing = { version = "0.1.44", features = [
 ] }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 unicase = "2.9.0"
-uuid = { version = "1.23.4", features = ["v4"] }
+uuid = { version = "1.24.0", features = ["v4"] }
 winit = "0.30.13"
-zerocopy = { version = "0.8.52", features = ["derive"] }
+zerocopy = { version = "0.8.54", features = ["derive"] }
 zip = "8.6.0"
 
 # Slint dependencies
