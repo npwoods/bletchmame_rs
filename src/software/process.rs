@@ -2,6 +2,7 @@ use std::io::BufRead;
 
 use anyhow::Error;
 use anyhow::Result;
+use smol_str::SmolStr;
 use tracing::error;
 
 use crate::software::Software;
@@ -31,7 +32,16 @@ const TEXT_CAPTURE_PHASES: &[Phase] = &[
 struct State {
 	phase_stack: Vec<Phase>,
 	software_list: SoftwareList,
-	current_software: Option<Software>,
+	current_software: Option<CurrentSoftware>,
+}
+
+#[derive(Debug, Default)]
+struct CurrentSoftware {
+	pub name: SmolStr,
+	pub description: SmolStr,
+	pub year: SmolStr,
+	pub publisher: SmolStr,
+	pub parts: Vec<SoftwarePart>,
 }
 
 impl State {
@@ -67,13 +77,9 @@ impl State {
 					return Ok(None);
 				}
 
-				let name = name.into();
-				let software = Software {
-					name,
-					description: Default::default(),
-					year: Default::default(),
-					publisher: Default::default(),
-					parts: Vec::new(),
+				let software = CurrentSoftware {
+					name: name.into(),
+					..Default::default()
 				};
 				self.current_software = Some(software);
 				Some(Phase::Software)
@@ -98,8 +104,8 @@ impl State {
 	pub fn handle_end(&mut self, text: Option<String>) -> Result<()> {
 		match self.phase_stack.last().unwrap_or(&Phase::Root) {
 			Phase::Software => {
-				let software = self.current_software.take().unwrap().into();
-				self.software_list.software.push(software);
+				let software = Software::from(self.current_software.take().unwrap());
+				self.software_list.software.push(software.into());
 			}
 
 			Phase::SoftwareDescription => {
@@ -117,6 +123,18 @@ impl State {
 			_ => {}
 		};
 		Ok(())
+	}
+}
+
+impl From<CurrentSoftware> for Software {
+	fn from(value: CurrentSoftware) -> Self {
+		Self {
+			name: value.name,
+			description: value.description,
+			year: value.year,
+			publisher: value.publisher,
+			parts: value.parts.into(),
+		}
 	}
 }
 

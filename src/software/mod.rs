@@ -32,7 +32,7 @@ pub struct Software {
 	pub description: SmolStr,
 	pub year: SmolStr,
 	pub publisher: SmolStr,
-	pub parts: Vec<SoftwarePart>,
+	pub parts: Box<[SoftwarePart]>,
 }
 
 #[derive(Debug)]
