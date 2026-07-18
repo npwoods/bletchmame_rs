@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cell::OnceCell;
 use std::fmt::Display;
 use std::fmt::Formatter;
@@ -8,7 +9,6 @@ use std::io::Seek;
 use std::iter::successors;
 use std::path::Path;
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use anyhow::Result;
 use default_ext::DefaultExt;
@@ -17,6 +17,7 @@ use itertools::Either;
 use itertools::Itertools;
 use sevenz_rust2::ArchiveReader as SevenZArchiveReader;
 use slint::SharedString;
+use smallvec::SmallVec;
 use smol_str::SmolStr;
 use strum::EnumProperty;
 use tracing::debug;
@@ -62,7 +63,10 @@ pub enum AuditSeverity {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AssetLocation {
-	MachinePaths(Arc<[SmolStr]>),
+	Paths {
+		software_list_name: Option<SmolStr>,
+		targets: SmallVec<[SmolStr; 3]>,
+	},
 	Absolute(SmolStr),
 }
 
@@ -167,10 +171,13 @@ impl Asset {
 
 		debug!(machine=?machine.name(), ?bios, ?machine_type, "Asset::from_machine_internal()");
 
-		let machine_names = successors(Some(machine), |machine| machine.rom_of())
+		let targets = successors(Some(machine), |machine| machine.rom_of())
 			.map(|machine| machine.name().into())
-			.collect::<Arc<[_]>>();
-		let location = AssetLocation::MachinePaths(machine_names);
+			.collect();
+		let location = AssetLocation::Paths {
+			software_list_name: None,
+			targets,
+		};
 		let roms = machine
 			.roms()
 			.iter()
@@ -241,21 +248,27 @@ impl Asset {
 
 		// iterate through everything that can identify an asset
 		let iter = match &self.location {
-			AssetLocation::MachinePaths(machine_names) => {
+			AssetLocation::Paths {
+				software_list_name,
+				targets,
+			} => {
 				let path_types = if support_archives {
 					[PathType::File, PathType::Zip, PathType::SevenZ].as_slice()
 				} else {
 					[PathType::File].as_slice()
 				};
-				let iter = machine_names
+				let iter = targets
 					.as_ref()
 					.iter()
-					.flat_map(|machine_name| asset_paths_iter.clone().map(|path| (path, machine_name.as_str())))
-					.flat_map(|(path, machine_name)| {
-						path_types.iter().map(move |path_type| (path, machine_name, *path_type))
-					})
-					.map(|(path, machine_name, path_type)| {
-						let mut path = path.join(machine_name);
+					.flat_map(|target| asset_paths_iter.clone().map(|path| (path, target.as_str())))
+					.flat_map(|(path, target)| path_types.iter().map(move |path_type| (path, target, *path_type)))
+					.map(|(path, target, path_type)| {
+						let path = if let Some(software_list_name) = software_list_name.as_deref() {
+							Cow::Owned(path.join(software_list_name))
+						} else {
+							Cow::Borrowed(path)
+						};
+						let mut path = path.join(target);
 						if let Some(archive_extension) = path_type.get_str("ArchiveExtension") {
 							path.set_extension(archive_extension);
 						} else {

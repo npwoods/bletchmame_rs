@@ -9,11 +9,12 @@ expression: assets
         size: Some(
             8192,
         ),
-        location: MachinePaths(
-            [
+        location: Paths {
+            software_list_name: None,
+            targets: [
                 "c64",
             ],
-        ),
+        },
         asset_hash: CRC(dbe3e7c7) SHA1(1d503e56df85a62fee696e7618dc5b4e781df1bb),
         status: Good,
         is_optional: false,
@@ -24,11 +25,12 @@ expression: assets
         size: Some(
             8192,
         ),
-        location: MachinePaths(
-            [
+        location: Paths {
+            software_list_name: None,
+            targets: [
                 "c64",
             ],
-        ),
+        },
         asset_hash: CRC(f833d117) SHA1(79015323128650c742a3694c9429aa91f355905e),
         status: Good,
         is_optional: false,
@@ -39,11 +41,12 @@ expression: assets
         size: Some(
             4096,
         ),
-        location: MachinePaths(
-            [
+        location: Paths {
+            software_list_name: None,
+            targets: [
                 "c64",
             ],
-        ),
+        },
         asset_hash: CRC(ec4272ee) SHA1(adc7c31e18c7c7413d54802ef2f4193da14711aa),
         status: Good,
         is_optional: false,
@@ -54,11 +57,12 @@ expression: assets
         size: Some(
             245,
         ),
-        location: MachinePaths(
-            [
+        location: Paths {
+            software_list_name: None,
+            targets: [
                 "c64",
             ],
-        ),
+        },
         asset_hash: CRC(54c89351) SHA1(efb315f560b6f72444b8f0b2ca4b0ccbcd144a1b),
         status: Good,
         is_optional: false,
@@ -69,11 +73,12 @@ expression: assets
         size: Some(
             8192,
         ),
-        location: MachinePaths(
-            [
+        location: Paths {
+            software_list_name: None,
+            targets: [
                 "c1541",
             ],
-        ),
+        },
         asset_hash: CRC(3a235039) SHA1(c7f94f4f51d6de4cdc21ecbb7e57bb209f0530c0),
         status: Good,
         is_optional: false,
@@ -84,11 +89,12 @@ expression: assets
         size: Some(
             8192,
         ),
-        location: MachinePaths(
-            [
+        location: Paths {
+            software_list_name: None,
+            targets: [
                 "c1541",
             ],
-        ),
+        },
         asset_hash: CRC(29ae9752) SHA1(8e0547430135ba462525c224e76356bd3d430f11),
         status: Good,
         is_optional: false,
