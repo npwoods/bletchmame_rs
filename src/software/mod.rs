@@ -165,22 +165,27 @@ fn load_software_list(paths: &[impl AsRef<str>], name: &str) -> Result<Arc<Softw
 pub fn is_valid_software_list_name(s: &str) -> bool {
 	!s.is_empty()
 		&& s.chars()
-			.all(|c| c.is_ascii_digit() || c.is_ascii_lowercase() || c == '_')
+			.all(|c| c.is_ascii_digit() || c.is_ascii_lowercase() || c == '_' || c == ':')
+		&& s.chars().filter(|&c| c == ':').count() <= 2
 }
 
 #[cfg(test)]
 mod test {
 	use test_case::test_case;
 
-	#[test_case(0, "", false)]
-	#[test_case(1, "abcde", true)]
-	#[test_case(2, "Abcde", false)]
-	#[test_case(3, "ABCDE", false)]
-	#[test_case(4, "abcde_fghij", true)]
-	#[test_case(5, "abcde fghij", false)]
-	#[test_case(6, "foo.img", false)]
-	#[test_case(7, "/foo/bar.img", false)]
-	#[test_case(8, "C:\\foo\\bar.img", false)]
+	#[allow(clippy::zero_prefixed_literal)]
+	#[test_case(00, "", false)]
+	#[test_case(01, "abcde", true)]
+	#[test_case(02, "abc:def", true)]
+	#[test_case(03, "abc:def:ghi", true)]
+	#[test_case(04, "abc:def:ghi:jkl", false)]
+	#[test_case(05, "Abcde", false)]
+	#[test_case(06, "ABCDE", false)]
+	#[test_case(07, "abcde_fghij", true)]
+	#[test_case(08, "abcde fghij", false)]
+	#[test_case(09, "foo.img", false)]
+	#[test_case(10, "/foo/bar.img", false)]
+	#[test_case(11, "C:\\foo\\bar.img", false)]
 	fn is_valid_software_list_name(_index: usize, s: &str, expected: bool) {
 		let actual = super::is_valid_software_list_name(s);
 		assert_eq!(expected, actual);

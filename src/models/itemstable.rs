@@ -351,7 +351,16 @@ impl ItemsTableModel {
 									.devices()
 									.iter()
 									.find(|dev| dev.interfaces().any(|x| x == part.interface))
-									.map(|dev| (dev.tag().into(), ImageDesc::Software(software.name.clone())))
+									.map(|dev| {
+										(
+											dev.tag().into(),
+											ImageDesc::Software {
+												list: Some(software_list.name.clone()),
+												name: software.name.clone(),
+												part: Some(part.name.clone()),
+											},
+										)
+									})
 									.ok_or(())
 							})
 							.collect::<std::result::Result<Vec<_>, ()>>();
@@ -574,7 +583,16 @@ impl ItemsTableModel {
 									.devices()
 									.iter()
 									.find(|dev| dev.interfaces().any(|x| x == part.interface))
-									.map(|dev| (dev.tag().into(), ImageDesc::Software(software.name.clone())))
+									.map(|dev| {
+										(
+											dev.tag().into(),
+											ImageDesc::Software {
+												list: Some(software_list.name.clone()),
+												name: software.name.clone(),
+												part: Some(part.name.clone()),
+											},
+										)
+									})
 									.ok_or(())
 							})
 							.collect::<std::result::Result<Vec<_>, ()>>();
