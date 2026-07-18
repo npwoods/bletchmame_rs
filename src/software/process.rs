@@ -2,10 +2,14 @@ use std::io::BufRead;
 
 use anyhow::Error;
 use anyhow::Result;
+use parse_int::parse;
 use smol_str::SmolStr;
 use tracing::error;
 
+use crate::assethash::AssetHash;
 use crate::software::Software;
+use crate::software::SoftwareAsset;
+use crate::software::SoftwareDataArea;
 use crate::software::SoftwareList;
 use crate::software::SoftwarePart;
 use crate::software::is_valid_software_list_name;
@@ -21,6 +25,8 @@ enum Phase {
 	SoftwareDescription,
 	SoftwareYear,
 	SoftwarePublisher,
+	SoftwarePart,
+	SoftwarePartDataArea,
 }
 
 const TEXT_CAPTURE_PHASES: &[Phase] = &[
@@ -33,6 +39,8 @@ struct State {
 	phase_stack: Vec<Phase>,
 	software_list: SoftwareList,
 	current_software: Option<CurrentSoftware>,
+	current_data_areas: Option<Vec<SoftwareDataArea>>,
+	current_assets: Option<Vec<SoftwareAsset>>,
 }
 
 #[derive(Debug, Default)]
@@ -54,6 +62,8 @@ impl State {
 				software: Vec::new(),
 			},
 			current_software: None,
+			current_data_areas: None,
+			current_assets: None,
 		}
 	}
 
@@ -91,9 +101,36 @@ impl State {
 				let [name, interface] = evt.find_attributes([b"name", b"interface"])?;
 				if let Some((name, interface)) = Option::zip(name, interface) {
 					let (name, interface) = (name.into(), interface.into());
-					let part = SoftwarePart { name, interface };
+					let part = SoftwarePart {
+						name,
+						interface,
+						data_areas: Default::default(),
+					};
 					self.current_software.as_mut().unwrap().parts.push(part);
 				}
+				self.current_data_areas = Some(Vec::new());
+				Some(Phase::SoftwarePart)
+			}
+			(Phase::SoftwarePart, b"dataarea") => {
+				let [name, size] = evt.find_attributes([b"name", b"size"])?;
+				let name = name.unwrap_or_default().into();
+				let size = parse(&size.unwrap_or_default())?;
+				let data_area = SoftwareDataArea {
+					name,
+					size,
+					assets: Default::default(),
+				};
+				self.current_data_areas.as_mut().unwrap().push(data_area);
+				self.current_assets = Some(Vec::new());
+				Some(Phase::SoftwarePartDataArea)
+			}
+			(Phase::SoftwarePartDataArea, b"rom") => {
+				let [name, size, crc, sha1] = evt.find_attributes([b"name", b"size", b"crc", b"sha1"])?;
+				let name = name.unwrap_or_default().into();
+				let size = parse(&size.unwrap_or_default())?;
+				let hash = AssetHash::from_hex_strings(crc.as_deref(), sha1.as_deref())?;
+				let asset = SoftwareAsset { name, size, hash };
+				self.current_assets.as_mut().unwrap().push(asset);
 				None
 			}
 			_ => None,
@@ -119,6 +156,20 @@ impl State {
 			Phase::SoftwarePublisher => {
 				let publisher = text.unwrap().into();
 				self.current_software.as_mut().unwrap().publisher = publisher;
+			}
+			Phase::SoftwarePart => {
+				let data_areas = self.current_data_areas.take().unwrap().into();
+				self.current_software
+					.as_mut()
+					.unwrap()
+					.parts
+					.last_mut()
+					.unwrap()
+					.data_areas = data_areas;
+			}
+			Phase::SoftwarePartDataArea => {
+				let assets = self.current_assets.take().unwrap().into();
+				self.current_data_areas.as_mut().unwrap().last_mut().unwrap().assets = assets;
 			}
 			_ => {}
 		};

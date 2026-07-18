@@ -77,6 +77,7 @@ i-slint-core = { git = "https://github.com/npwoods/slint.git", rev = "6d9c369794
 slint = { git = "https://github.com/npwoods/slint.git", rev = "6d9c369794c9540e191b8bb5da611f0c003bbd6c", features = [
     "raw-window-handle-06",
 ] }
+parse_int = "0.9.0"
 
 [target.'cfg(target_os = "windows")'.dependencies.windows]
 features = [

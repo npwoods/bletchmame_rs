@@ -13,6 +13,7 @@ use anyhow::Error;
 use anyhow::Result;
 use smol_str::SmolStr;
 
+use crate::assethash::AssetHash;
 use crate::info;
 use crate::info::InfoDb;
 use crate::info::View;
@@ -41,6 +42,24 @@ pub struct SoftwarePart {
 	pub name: SmolStr,
 
 	pub interface: SmolStr,
+
+	pub data_areas: Box<[SoftwareDataArea]>,
+}
+
+#[derive(Debug)]
+#[allow(dead_code)]
+pub struct SoftwareDataArea {
+	pub name: SmolStr,
+	pub size: u64,
+	pub assets: Box<[SoftwareAsset]>,
+}
+
+#[derive(Debug)]
+#[allow(dead_code)]
+pub struct SoftwareAsset {
+	pub name: SmolStr,
+	pub size: u64,
+	pub hash: AssetHash,
 }
 
 impl SoftwareList {
