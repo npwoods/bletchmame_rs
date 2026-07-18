@@ -362,7 +362,7 @@ impl<'a> Device<'a> {
 		self.obj().mandatory
 	}
 
-	pub fn interfaces(&self) -> impl Iterator<Item = &'a str> + use<'a> {
+	pub fn interfaces(&self) -> impl Iterator<Item = &'a str> + Clone + use<'a> {
 		self.string(|x| x.interfaces_strindex).split('\0')
 	}
 

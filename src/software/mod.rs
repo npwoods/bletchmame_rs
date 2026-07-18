@@ -38,16 +38,12 @@ pub struct Software {
 
 #[derive(Debug)]
 pub struct SoftwarePart {
-	#[allow(dead_code)]
 	pub name: SmolStr,
-
 	pub interface: SmolStr,
-
 	pub data_areas: Box<[SoftwareDataArea]>,
 }
 
 #[derive(Debug)]
-#[allow(dead_code)]
 pub struct SoftwareDataArea {
 	pub name: SmolStr,
 	pub size: u64,
@@ -55,7 +51,6 @@ pub struct SoftwareDataArea {
 }
 
 #[derive(Debug)]
-#[allow(dead_code)]
 pub struct SoftwareAsset {
 	pub name: SmolStr,
 	pub size: u64,

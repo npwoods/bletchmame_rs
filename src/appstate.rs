@@ -360,8 +360,17 @@ impl AppState {
 		// start an auditing session
 		let rom_paths = self.preferences.paths.roms.clone();
 		let sample_paths = self.preferences.paths.samples.clone();
+		let software_list_paths = &self.preferences.paths.software_lists;
 		let callback = self.fixed.callback.clone();
-		let job = match spawn_audit(info_db, rom_paths, sample_paths, AUDIT_DELAY, &start_args, callback) {
+		let job = match spawn_audit(
+			info_db,
+			rom_paths,
+			sample_paths,
+			software_list_paths,
+			AUDIT_DELAY,
+			&start_args,
+			callback,
+		) {
 			Ok(job) => job,
 			Err(e) => {
 				self.failure = Some(Failure::AuditError(e));
@@ -1000,6 +1009,7 @@ fn spawn_audit(
 	info_db: Rc<InfoDb>,
 	rom_paths: Vec<impl AsRef<Path> + Send + 'static>,
 	sample_paths: Vec<impl AsRef<Path> + Send + 'static>,
+	software_list_paths: &[SmolStr],
 	audit_delay: Option<Duration>,
 	start_args: &MameStartArgs,
 	callback: ActionCallback,
@@ -1008,7 +1018,7 @@ fn spawn_audit(
 	let machine_config = MachineConfig::from_mame_start_args(info_db.clone(), start_args)?;
 
 	// create the assets
-	let assets = Asset::from_machine_config_and_images(&machine_config, &start_args.images);
+	let assets = Asset::from_machine_config_and_images(&machine_config, software_list_paths, &start_args.images);
 
 	// progress messages need to be throttled
 	let mut throttle = Throttle::new(PROGRESS_THROTTLE_TIMEOUT, 1);

@@ -57,6 +57,7 @@ struct State {
 	modal_stack: ModalStack,
 	rom_paths: Arc<[SmolStr]>,
 	sample_paths: Arc<[SmolStr]>,
+	software_list_paths: Arc<[SmolStr]>,
 	core: CoreState,
 }
 
@@ -378,6 +379,7 @@ impl State {
 			modal_stack,
 			rom_paths: paths.roms.clone().into(),
 			sample_paths: paths.samples.clone().into(),
+			software_list_paths: paths.software_lists.clone().into(),
 			core,
 		};
 		if matches!(&state.core, CoreState::Machine { .. }) {
@@ -553,14 +555,15 @@ impl State {
 					[].into()
 				};
 				let assets = dimodel_state.with_machine_config(|machine_config| {
-					Asset::from_machine_config_and_images(machine_config, &images)
+					Asset::from_machine_config_and_images(machine_config, &self.software_list_paths, &images)
 				});
 				assets.unwrap_or_default()
 			}
 			CoreState::Software {
 				info_db,
 				software_machines,
-				..
+				software_list,
+				software,
 			} => {
 				let machine_index = software_machines
 					.iter()
@@ -572,7 +575,12 @@ impl State {
 					.unwrap();
 				let info_db = info_db.clone();
 				let machine_config = MachineConfig::new(info_db, machine_index);
-				Asset::from_machine_config(&machine_config)
+				Asset::from_machine_config_and_software(
+					&machine_config,
+					&self.software_list_paths,
+					software_list,
+					software,
+				)?
 			}
 		};
 		Ok(assets)
