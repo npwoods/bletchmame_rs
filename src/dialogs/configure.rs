@@ -114,6 +114,14 @@ pub async fn dialog_configure(
 	// set the title
 	modal.dialog().set_dialog_title(state.title(paths).into());
 
+	// set up the context menu action handler
+	let state_clone = state.clone();
+	modal.dialog().on_menu_item_action(move |action_string| {
+		if let Some(action) = Action::decode_from_slint(action_string) {
+			context_menu_command(&state_clone, action);
+		}
+	});
+
 	// do we have a devices and images model?
 	if let Some(dimodel) = state.dimodel() {
 		// if so we have lots to set up
@@ -149,14 +157,6 @@ pub async fn dialog_configure(
 			entry_popup_menu(model, entry_index, point, |entries, point| {
 				dialog.invoke_show_context_menu(entries, point)
 			})
-		});
-
-		// set up the context menu command handler
-		let state_clone = state.clone();
-		modal.dialog().on_menu_item_action(move |command_string| {
-			if let Some(command) = Action::decode_from_slint(command_string) {
-				context_menu_command(&state_clone, command);
-			}
 		});
 	}
 
