@@ -9,12 +9,13 @@ expression: assets
         size: Some(
             32768,
         ),
-        location: MachinePaths(
-            [
+        location: Paths {
+            software_list_name: None,
+            targets: [
                 "blah",
                 "fake",
             ],
-        ),
+        },
         asset_hash: CRC(0faf9fdb) SHA1(c27909184ee9170707c1be9a4cfbe83b359672e1),
         status: Good,
         is_optional: true,
@@ -25,12 +26,13 @@ expression: assets
         size: Some(
             32768,
         ),
-        location: MachinePaths(
-            [
+        location: Paths {
+            software_list_name: None,
+            targets: [
                 "blah",
                 "fake",
             ],
-        ),
+        },
         asset_hash: <<NONE>>,
         status: NoDump,
         is_optional: false,
@@ -41,12 +43,13 @@ expression: assets
         size: Some(
             32768,
         ),
-        location: MachinePaths(
-            [
+        location: Paths {
+            software_list_name: None,
+            targets: [
                 "blah",
                 "fake",
             ],
-        ),
+        },
         asset_hash: <<NONE>>,
         status: BadDump,
         is_optional: false,
@@ -55,12 +58,13 @@ expression: assets
         kind: Disk,
         name: "samplechd.chd",
         size: None,
-        location: MachinePaths(
-            [
+        location: Paths {
+            software_list_name: None,
+            targets: [
                 "blah",
                 "fake",
             ],
-        ),
+        },
         asset_hash: SHA1(bfec48ae2439308ac3a547231a13f122ef303c76),
         status: Good,
         is_optional: false,
@@ -69,12 +73,13 @@ expression: assets
         kind: Sample,
         name: "fakesample.wav",
         size: None,
-        location: MachinePaths(
-            [
+        location: Paths {
+            software_list_name: None,
+            targets: [
                 "blah",
                 "fake",
             ],
-        ),
+        },
         asset_hash: <<NONE>>,
         status: Good,
         is_optional: true,

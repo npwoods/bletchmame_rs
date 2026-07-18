@@ -161,14 +161,17 @@ fn make_ui_asset(asset: &Asset, audit_result: Option<&AuditResult>, icons: &Audi
 	};
 
 	let icon = match asset.kind {
-		AssetKind::Rom => icons.rom.clone(),
-		AssetKind::Disk => icons.disk.clone(),
-		AssetKind::Sample => icons.sample.clone(),
-		AssetKind::ImageFile(DeviceType::Cassette) => icons.cassette.clone(),
-		AssetKind::ImageFile(DeviceType::HardDisk) => icons.disk.clone(),
-		AssetKind::ImageFile(DeviceType::RomImage) => icons.rom.clone(),
-		AssetKind::ImageFile(_) => icons.image_unknown.clone(),
+		AssetKind::Rom => &icons.rom,
+		AssetKind::Disk => &icons.disk,
+		AssetKind::Sample => &icons.sample,
+		AssetKind::ImageFile { device_type, .. } => match device_type {
+			DeviceType::Cassette => &icons.cassette,
+			DeviceType::HardDisk => &icons.disk,
+			DeviceType::RomImage => &icons.rom,
+			_ => &icons.image_unknown,
+		},
 	};
+	let icon = icon.clone();
 	let overlay = match max_severity {
 		None => icons.audit_pending.clone(),
 		Some(AuditSeverity::Info) => Image::default(),

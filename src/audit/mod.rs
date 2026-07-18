@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cell::OnceCell;
 use std::fmt::Display;
 use std::fmt::Formatter;
@@ -8,7 +9,6 @@ use std::io::Seek;
 use std::iter::successors;
 use std::path::Path;
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use anyhow::Result;
 use default_ext::DefaultExt;
@@ -17,6 +17,7 @@ use itertools::Either;
 use itertools::Itertools;
 use sevenz_rust2::ArchiveReader as SevenZArchiveReader;
 use slint::SharedString;
+use smallvec::SmallVec;
 use smol_str::SmolStr;
 use strum::EnumProperty;
 use tracing::debug;
@@ -33,6 +34,7 @@ use crate::info::DeviceType;
 use crate::info::Machine;
 use crate::info::View;
 use crate::mconfig::MachineConfig;
+use crate::software::SoftwareListDispenser;
 
 #[derive(Clone, Debug)] // TODO - `Clone` should not be necessary
 pub struct Asset {
@@ -50,7 +52,10 @@ pub enum AssetKind {
 	Rom,
 	Disk,
 	Sample,
-	ImageFile(DeviceType),
+	ImageFile {
+		device_type: DeviceType,
+		use_absolute_path: bool,
+	},
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -62,7 +67,10 @@ pub enum AuditSeverity {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AssetLocation {
-	MachinePaths(Arc<[SmolStr]>),
+	Paths {
+		software_list_name: Option<SmolStr>,
+		targets: SmallVec<[SmolStr; 3]>,
+	},
 	Absolute(SmolStr),
 }
 
@@ -92,13 +100,44 @@ enum MachineType<'a> {
 	DeviceRef(Option<&'a str>),
 }
 
-impl Asset {
-	pub fn from_machine_config(machine_config: &MachineConfig) -> Vec<Self> {
-		Self::from_machine_config_and_images(machine_config, &[])
-	}
+#[derive(thiserror::Error, Debug)]
+enum ThisError {
+	#[error("unknown software '{0}'")]
+	UnknownSoftware(SmolStr),
+}
 
+impl Asset {
 	pub fn from_machine_config_and_images<'a>(
 		machine_config: &MachineConfig,
+		software_list_paths: &[SmolStr],
+		images: impl IntoIterator<Item = &'a (SmolStr, ImageDesc)> + 'a,
+	) -> Vec<Self> {
+		let software_list_dispenser = SoftwareListDispenser::new(&machine_config.info_db, software_list_paths);
+		Self::internal_from_machine_config_and_images(machine_config, software_list_dispenser, images)
+	}
+
+	pub fn from_machine_config_and_software(
+		machine_config: &MachineConfig,
+		software_list_paths: &[SmolStr],
+		software_list_name: &str,
+		software: &str,
+	) -> Result<Vec<Self>> {
+		let mut software_list_dispenser = SoftwareListDispenser::new(&machine_config.info_db, software_list_paths);
+
+		let (_, software_list) = software_list_dispenser.get(software_list_name)?;
+		let software = software_list
+			.software
+			.iter()
+			.find(|x| x.name == software)
+			.ok_or_else(|| ThisError::UnknownSoftware(software.into()))?;
+		let images = ImageDesc::from_software(&machine_config.machine(), Some(software_list_name), software)?;
+		let results = Self::internal_from_machine_config_and_images(machine_config, software_list_dispenser, &images);
+		Ok(results)
+	}
+
+	fn internal_from_machine_config_and_images<'a>(
+		machine_config: &MachineConfig,
+		mut software_list_dispenser: SoftwareListDispenser<'_>,
 		images: impl IntoIterator<Item = &'a (SmolStr, ImageDesc)> + 'a,
 	) -> Vec<Self> {
 		let mut results = Vec::new();
@@ -115,30 +154,84 @@ impl Asset {
 
 		// add images
 		for (tag, image_desc) in images {
-			if let ImageDesc::File(filename) = image_desc
-				&& available_ports().iter().all(|p| p.port_name != *filename)
-			{
-				let name = Path::new(&filename)
-					.file_name()
-					.unwrap_or_default()
-					.to_string_lossy()
-					.as_ref()
-					.into();
-				let device_type = machine_config
-					.lookup_device_tag(tag)
-					.ok()
-					.map(|(_, device)| device.device_type())
-					.unwrap_or(DeviceType::Unknown);
-				let asset = Asset {
-					kind: AssetKind::ImageFile(device_type),
-					name,
-					size: None,
-					location: AssetLocation::Absolute(filename.clone()),
-					asset_hash: AssetHash::default(),
-					status: AssetStatus::Good,
-					is_optional: false,
-				};
-				results.push(asset);
+			let device = machine_config.lookup_device_tag(tag).ok().map(|(_, device)| device);
+			let device_type = device.map(|d| d.device_type()).unwrap_or(DeviceType::Unknown);
+
+			match image_desc {
+				ImageDesc::File(filename) => {
+					if available_ports().iter().all(|p| p.port_name != *filename) {
+						let name = Path::new(&filename)
+							.file_name()
+							.unwrap_or_default()
+							.to_string_lossy()
+							.as_ref()
+							.into();
+						let asset = Asset {
+							kind: AssetKind::ImageFile {
+								device_type,
+								use_absolute_path: true,
+							},
+							name,
+							size: None,
+							location: AssetLocation::Absolute(filename.clone()),
+							asset_hash: AssetHash::default(),
+							status: AssetStatus::Good,
+							is_optional: false,
+						};
+						results.push(asset);
+					}
+				}
+				ImageDesc::Software { list, name, part } => {
+					let list = list.as_deref();
+					let part = part.as_deref();
+					let target_interfaces_iter = device.iter().flat_map(|x| x.interfaces());
+
+					let software_list_iter = machine_config
+						.machine()
+						.machine_software_lists()
+						.iter()
+						.map(|info_msl| info_msl.software_list())
+						.filter(|info_sl| list.is_none_or(|x| x == info_sl.name()))
+						.filter_map(|info_sl| software_list_dispenser.get(info_sl.name()).ok())
+						.map(|(_, sl)| sl);
+					for software_list in software_list_iter {
+						let asset_iter = software_list
+							.software
+							.iter()
+							.filter(|s| s.name.as_str() == name)
+							.flat_map(|s| &s.parts)
+							.filter(|sp| {
+								part.is_none_or(|x| sp.name == x)
+									&& target_interfaces_iter.clone().any(|i| i == sp.interface.as_str())
+							})
+							.flat_map(|sp| sp.data_areas.iter())
+							.flat_map(|sda| sda.assets.iter())
+							.map(|sa| {
+								let software_list_name = Some(software_list.name.clone());
+								let targets = [name.clone()].into_iter().collect();
+								let location = AssetLocation::Paths {
+									software_list_name,
+									targets,
+								};
+								Asset {
+									kind: AssetKind::ImageFile {
+										device_type,
+										use_absolute_path: false,
+									},
+									name: sa.name.as_str().into(),
+									size: Some(sa.size),
+									location,
+									asset_hash: sa.hash,
+									status: AssetStatus::Good,
+									is_optional: false,
+								}
+							});
+						results.extend(asset_iter)
+					}
+				}
+				ImageDesc::Socket { .. } => {
+					// nothing to audit
+				}
 			}
 		}
 
@@ -167,10 +260,13 @@ impl Asset {
 
 		debug!(machine=?machine.name(), ?bios, ?machine_type, "Asset::from_machine_internal()");
 
-		let machine_names = successors(Some(machine), |machine| machine.rom_of())
+		let targets = successors(Some(machine), |machine| machine.rom_of())
 			.map(|machine| machine.name().into())
-			.collect::<Arc<[_]>>();
-		let location = AssetLocation::MachinePaths(machine_names);
+			.collect();
+		let location = AssetLocation::Paths {
+			software_list_name: None,
+			targets,
+		};
 		let roms = machine
 			.roms()
 			.iter()
@@ -231,7 +327,14 @@ impl Asset {
 			AssetKind::Rom => (Either::Left(rom_paths), true, hash_func_rom as HashFunc),
 			AssetKind::Sample => (Either::Right(sample_paths), true, hash_func_bogus as HashFunc),
 			AssetKind::Disk => (Either::Left(rom_paths), false, hash_func_disk as HashFunc),
-			AssetKind::ImageFile(_) => (Either::Left([].as_slice()), false, hash_func_bogus as HashFunc),
+			AssetKind::ImageFile {
+				use_absolute_path: false,
+				..
+			} => (Either::Left(rom_paths), true, hash_func_rom as HashFunc), // software part
+			AssetKind::ImageFile {
+				use_absolute_path: true,
+				..
+			} => (Either::Left([].as_slice()), false, hash_func_bogus as HashFunc), // loaded image
 		};
 
 		// normalize the iterator for asset paths
@@ -241,21 +344,27 @@ impl Asset {
 
 		// iterate through everything that can identify an asset
 		let iter = match &self.location {
-			AssetLocation::MachinePaths(machine_names) => {
+			AssetLocation::Paths {
+				software_list_name,
+				targets,
+			} => {
 				let path_types = if support_archives {
 					[PathType::File, PathType::Zip, PathType::SevenZ].as_slice()
 				} else {
 					[PathType::File].as_slice()
 				};
-				let iter = machine_names
+				let iter = targets
 					.as_ref()
 					.iter()
-					.flat_map(|machine_name| asset_paths_iter.clone().map(|path| (path, machine_name.as_str())))
-					.flat_map(|(path, machine_name)| {
-						path_types.iter().map(move |path_type| (path, machine_name, *path_type))
-					})
-					.map(|(path, machine_name, path_type)| {
-						let mut path = path.join(machine_name);
+					.flat_map(|target| asset_paths_iter.clone().map(|path| (path, target.as_str())))
+					.flat_map(|(path, target)| path_types.iter().map(move |path_type| (path, target, *path_type)))
+					.map(|(path, target, path_type)| {
+						let path = if let Some(software_list_name) = software_list_name.as_deref() {
+							Cow::Owned(path.join(software_list_name))
+						} else {
+							Cow::Borrowed(path)
+						};
+						let mut path = path.join(target);
 						if let Some(archive_extension) = path_type.get_str("ArchiveExtension") {
 							path.set_extension(archive_extension);
 						} else {
@@ -507,7 +616,7 @@ mod tests {
 		let machine_config = MachineConfig::from_machine_name_and_slots(info_db, machine_name, opts).unwrap();
 
 		// identify audit assets
-		let assets = Asset::from_machine_config(&machine_config);
+		let assets = Asset::from_machine_config_and_images(&machine_config, &[], []);
 
 		// and validate
 		insta::assert_debug_snapshot!(assets);

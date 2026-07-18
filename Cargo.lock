@@ -715,6 +715,7 @@ dependencies = [
  "num",
  "open",
  "parallel_worker",
+ "parse_int",
  "path-absolutize",
  "primal",
  "qttypes",
@@ -4466,6 +4467,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a649e01a1acc917247ee147b56b8a1fa91824acf7117bd003b4204306d601255"
 dependencies = [
  "icu_properties",
+]
+
+[[package]]
+name = "parse_int"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c464266693329dd5a8715098c7f86e6c5fd5d985018b8318f53d9c6c2b21a31"
+dependencies = [
+ "num-traits",
 ]
 
 [[package]]
