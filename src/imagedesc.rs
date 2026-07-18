@@ -59,7 +59,11 @@ impl ImageDesc {
 		Ok(from_mame_image_desc(desc, loaded_through_softlist)?)
 	}
 
-	pub fn from_software(machine: &Machine, software: &Software) -> Result<Vec<(SmolStr, Self)>> {
+	pub fn from_software(
+		machine: &Machine,
+		software_list: Option<&str>,
+		software: &Software,
+	) -> Result<Vec<(SmolStr, Self)>> {
 		software
 			.parts
 			.iter()
@@ -70,9 +74,9 @@ impl ImageDesc {
 					.find(|dev| dev.interfaces().any(|x| x == part.interface))
 					.map(|dev| {
 						let desc = ImageDesc::Software {
-							list: None,
+							list: software_list.map(|x| x.into()),
 							name: software.name.clone(),
-							part: None,
+							part: Some(part.name.clone()),
 						};
 						(dev.tag().into(), desc)
 					})

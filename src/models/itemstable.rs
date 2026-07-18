@@ -343,41 +343,21 @@ impl ItemsTableModel {
 						);
 
 						// identify all parts of the software
-						let parts_with_devices = software
-							.parts
-							.iter()
-							.map(|part| {
-								machine
-									.devices()
-									.iter()
-									.find(|dev| dev.interfaces().any(|x| x == part.interface))
-									.map(|dev| {
-										(
-											dev.tag().into(),
-											ImageDesc::Software {
-												list: Some(software_list.name.clone()),
-												name: software.name.clone(),
-												part: Some(part.name.clone()),
-											},
-										)
-									})
-									.ok_or(())
+						ImageDesc::from_software(&machine, Some(&software_list.name), software)
+							.ok()
+							.map(|images| {
+								let start_args = MameStartArgs {
+									machine_name: machine.name().into(),
+									ram_size: None,
+									bios: None,
+									slots: [].into(),
+									images,
+									video: video.clone(),
+								};
+								let action = Some(Action::Start(start_args));
+								let title = machine.description().into();
+								MenuDesc { action, title }
 							})
-							.collect::<std::result::Result<Vec<_>, ()>>();
-
-						parts_with_devices.ok().map(|images| {
-							let start_args = MameStartArgs {
-								machine_name: machine.name().into(),
-								ram_size: None,
-								bios: None,
-								slots: [].into(),
-								images,
-								video: video.clone(),
-							};
-							let action = Some(Action::Start(start_args));
-							let title = machine.description().into();
-							MenuDesc { action, title }
-						})
 					})
 					.collect::<Vec<_>>();
 				let run_title = run_item_text(&software.description).into();
@@ -575,41 +555,21 @@ impl ItemsTableModel {
 						);
 
 						// identify all parts of the software
-						let parts_with_devices = software
-							.parts
-							.iter()
-							.map(|part| {
-								machine
-									.devices()
-									.iter()
-									.find(|dev| dev.interfaces().any(|x| x == part.interface))
-									.map(|dev| {
-										(
-											dev.tag().into(),
-											ImageDesc::Software {
-												list: Some(software_list.name.clone()),
-												name: software.name.clone(),
-												part: Some(part.name.clone()),
-											},
-										)
-									})
-									.ok_or(())
+						ImageDesc::from_software(&machine, Some(&software_list.name), software)
+							.ok()
+							.map(|images| {
+								let start_args = MameStartArgs {
+									machine_name: machine.name().into(),
+									ram_size: None,
+									bios: None,
+									slots: [].into(),
+									images,
+									video: video.clone(),
+								};
+								let action = Some(Action::Start(start_args));
+								let title = machine.description().into();
+								MenuDesc { action, title }
 							})
-							.collect::<std::result::Result<Vec<_>, ()>>();
-
-						parts_with_devices.ok().map(|images| {
-							let start_args = MameStartArgs {
-								machine_name: machine.name().into(),
-								ram_size: None,
-								bios: None,
-								slots: [].into(),
-								images,
-								video: video.clone(),
-							};
-							let action = Some(Action::Start(start_args));
-							let title = machine.description().into();
-							MenuDesc { action, title }
-						})
 					})
 					.collect::<Vec<_>>();
 				let run_title = run_item_text(&software.description).into();
