@@ -15,6 +15,7 @@ use smol_str::SmolStr;
 
 use crate::assethash::AssetHash;
 use crate::info;
+use crate::info::AssetStatus;
 use crate::info::InfoDb;
 use crate::info::View;
 use crate::software::process::process_xml;
@@ -55,6 +56,7 @@ pub struct SoftwareAsset {
 	pub name: SmolStr,
 	pub size: u64,
 	pub hash: AssetHash,
+	pub status: AssetStatus,
 }
 
 impl SoftwareList {

@@ -7,6 +7,7 @@ use smol_str::SmolStr;
 use tracing::error;
 
 use crate::assethash::AssetHash;
+use crate::software::AssetStatus;
 use crate::software::Software;
 use crate::software::SoftwareAsset;
 use crate::software::SoftwareDataArea;
@@ -125,11 +126,21 @@ impl State {
 				Some(Phase::SoftwarePartDataArea)
 			}
 			(Phase::SoftwarePartDataArea, b"rom") => {
-				let [name, size, crc, sha1] = evt.find_attributes([b"name", b"size", b"crc", b"sha1"])?;
+				let [name, size, crc, sha1, status] =
+					evt.find_attributes([b"name", b"size", b"crc", b"sha1", b"status"])?;
 				let name = name.unwrap_or_default().into();
 				let size = parse(&size.unwrap_or_default())?;
 				let hash = AssetHash::from_hex_strings(crc.as_deref(), sha1.as_deref())?;
-				let asset = SoftwareAsset { name, size, hash };
+				let status = status
+					.map(|x| x.parse::<AssetStatus>())
+					.transpose()?
+					.unwrap_or(AssetStatus::Good);
+				let asset = SoftwareAsset {
+					name,
+					size,
+					hash,
+					status,
+				};
 				self.current_assets.as_mut().unwrap().push(asset);
 				None
 			}
@@ -237,6 +248,9 @@ mod test {
 
 	use test_case::test_case;
 
+	use crate::assethash::AssetHash;
+	use crate::info::AssetStatus;
+
 	use super::process_xml;
 
 	#[test_case(0, include_str!("test_data/softlist_coco_cart.xml"), ("coco_cart", "Tandy Radio Shack Color Computer cartridges", 112))]
@@ -262,5 +276,41 @@ mod test {
 			software.publisher.as_ref(),
 		);
 		assert_eq!(expected, actual);
+	}
+
+	#[allow(clippy::too_many_arguments)]
+	#[test_case(0, include_str!("test_data/softlist_msx1_cart.xml"), "fsfd1", "fs_fd1.rom", 0x4000, Some("4c9b8214"), Some("8e3f6f08309f082a82be8298a66c9b90f2d34ad4"), AssetStatus::Good)]
+	#[test_case(1, include_str!("test_data/softlist_msx1_cart.xml"), "vy0010", "27128q25-8.ic2", 0x4000, Some("164f5a6d"), Some("8924e3e11eb1c8c1edcb7efa63c26d2bdc142473"), AssetStatus::BadDump)]
+	pub fn asset(
+		_index: usize,
+		xml: &str,
+		software_name: &str,
+		asset_name: &str,
+		expected_size: u64,
+		expected_crc: Option<&str>,
+		expected_sha1: Option<&str>,
+		expected_status: AssetStatus,
+	) {
+		let expected_hash = AssetHash::from_hex_strings(expected_crc, expected_sha1).unwrap();
+
+		let reader = BufReader::new(xml.as_bytes());
+		let software_list = process_xml(reader).unwrap();
+		let asset = software_list
+			.software
+			.iter()
+			.find(|x| x.name == software_name)
+			.unwrap()
+			.as_ref()
+			.parts
+			.iter()
+			.flat_map(|p| &p.data_areas)
+			.flat_map(|da| &da.assets)
+			.find(|a| a.name == asset_name)
+			.unwrap();
+
+		assert_eq!(
+			(expected_size, expected_hash, expected_status),
+			(asset.size, asset.hash, asset.status)
+		);
 	}
 }
