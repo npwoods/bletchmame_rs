@@ -222,7 +222,7 @@ impl Asset {
 									size: Some(sa.size),
 									location,
 									asset_hash: sa.hash,
-									status: AssetStatus::Good,
+									status: sa.status,
 									is_optional: false,
 								}
 							});
