@@ -17,26 +17,6 @@ export struct Cassette {
     length: float
 }
 
-component TimeText {
-    in property <float> time;
-    in property <bool> editable;
-    in property <bool> read-only;
-
-    // functions
-    function format-time(time: float) -> string {
-        let minutes = floor(time / 60.0);
-        let seconds = floor(time - (minutes * 60.0));
-        return minutes + ":" + (seconds < 10.0 ? "0" : "") + seconds;
-    }
-
-    HorizontalLayout {
-        width: 48px;
-        Text {
-            text: format-time(time);
-        }
-    }
-}
-
 export component TapeControl {
     // general properties
     in property <Cassette> cassette;
@@ -52,6 +32,13 @@ export component TapeControl {
     callback set-position-absolute(position: float);
     callback set-position-relative(delta: float);
 
+    // functions
+    function format-time(time: float) -> string {
+        let minutes = floor(time / 60.0);
+        let seconds = floor(time - (minutes * 60.0));
+        return minutes + ":" + (seconds < 10.0 ? "0" : "") + seconds;
+    }
+
     VerticalLayout {
         vertical-stretch: 0;
         if editable: HorizontalLayout {
@@ -60,7 +47,7 @@ export component TapeControl {
             Button {
                 width: button-length;
                 height: button-length;
-                text: "|<<";  // should be ⏮
+                text: "⏮";
                 enabled: root.cassette.position > 0.0;
                 clicked => {
                     root.set-position-absolute(0.0);
@@ -70,7 +57,7 @@ export component TapeControl {
             Button {
                 width: button-length;
                 height: button-length;
-                text: "<<";  // should be ⏪︎
+                text: "⏪︎";
                 enabled: root.cassette.position > 0.0;
                 changed pressed => {
                     root.timer-adjustment = self.pressed ? -1.0 : 0.0;
@@ -98,7 +85,7 @@ export component TapeControl {
             Button {
                 width: button-length;
                 height: button-length;
-                text: ">>"; // should be ⏩︎
+                text: "⏩︎";
                 enabled: root.cassette.position < root.cassette.length;
                 changed pressed => {
                     root.timer-adjustment = self.pressed ? 1.0 : 0.0;
@@ -108,7 +95,7 @@ export component TapeControl {
             Button {
                 width: button-length;
                 height: button-length;
-                text: ">>|";  // should be ⏭
+                text: "⏭";
                 enabled: root.cassette.position < root.cassette.length;
                 clicked => {
                     root.set-position-absolute(root.cassette.length);
@@ -151,21 +138,19 @@ export component TapeControl {
                     vertical-alignment: center;
                 }
 
-                TimeText {
-                    editable: root.editable;
-                    read-only: false;
-                    time: root.cassette.position;
-                }
-
                 Text {
-                    text: "/";
+                    text: format-time(root.cassette.position);
                     vertical-alignment: center;
                 }
 
-                TimeText {
-                    editable: root.editable;
-                    read-only: true;
-                    time: root.cassette.length;
+                Text {
+                    text: " / ";
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: format-time(root.cassette.length);
+                    vertical-alignment: center;
                 }
             }
 
