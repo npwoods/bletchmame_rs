@@ -259,6 +259,15 @@ export component AppWindow inherits Window {
         }
     }
 
+    // shadowing because the automatic checkboxing beheavior of Slint's menu bar is problematic
+    property <bool> is-sound-enabled-shadow;
+    changed is-sound-enabled => {
+        is-sound-enabled-shadow = is-sound-enabled;
+    }
+    changed is-sound-enabled-shadow => {
+        is-sound-enabled-shadow = is-sound-enabled;
+    }
+
     // Slint's menu bar
     MenuBar {
         visible: menubar-visible;
@@ -488,7 +497,7 @@ export component AppWindow inherits Window {
                 title: @tr("MenuBar" => "&Sound");
                 enabled: mode() == "running";
                 checkable: true;
-                checked: is-sound-enabled;
+                checked <=> is-sound-enabled-shadow;
                 activated => {
                     menu-item-action(root.menu-action-options-toggle-sound);
                 }
