@@ -20,7 +20,7 @@ export struct Cassette {
 export component TapeControl {
     // general properties
     in property <Cassette> cassette;
-    property <bool> editable: false;
+    property <bool> buttons-panel: false;
     property <float> timer-adjustment: 0.0;
 
     // const parameters
@@ -39,9 +39,16 @@ export component TapeControl {
         return minutes + ":" + (seconds < 10.0 ? "0" : "") + seconds;
     }
 
+    // this is necessary because using the slider will blow away a one way binding, but we don't
+    // want a two way binding with root.cassette.position because root.cassette is set by the host
+    property <float> cassette-position-shadow: 0.0;
+    changed cassette => {
+        cassette-position-shadow = root.cassette.position;
+    }
+
     VerticalLayout {
         vertical-stretch: 0;
-        if editable: HorizontalLayout {
+        if buttons-panel: HorizontalLayout {
             alignment: center;
 
             Button {
@@ -106,7 +113,10 @@ export component TapeControl {
                 width: slider-width;
                 minimum: 0.0;
                 maximum: root.cassette.length;
-                value: root.cassette.position;
+                value <=> cassette-position-shadow;
+                changed(value) => {
+                    root.set-position-absolute(value);
+                }
             }
         }
 
@@ -138,9 +148,11 @@ export component TapeControl {
                     vertical-alignment: center;
                 }
 
-                Text {
-                    text: format-time(root.cassette.position);
-                    vertical-alignment: center;
+                position-text := TouchArea {
+                    Text {
+                        text: format-time(root.cassette.position);
+                        vertical-alignment: center;
+                    }
                 }
 
                 Text {
@@ -163,7 +175,7 @@ export component TapeControl {
             }
 
             clicked => {
-                root.editable = !root.editable;
+                root.buttons-panel = !root.buttons-panel;
             }
         }
     }
