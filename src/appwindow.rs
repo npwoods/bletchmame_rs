@@ -371,13 +371,16 @@ impl AppModel {
 				let statusbar_cassette_tags = ModelRc::new(statusbar_cassette_tags);
 				app_window.set_statusbar_cassette_tags(statusbar_cassette_tags);
 			}
-			app_window.on_get_statusbar_cassette(move |tag| {
-				let (_, cassette) = statusbar_cassettes
-					.iter()
-					.find(|(this_tag, _)| tag == this_tag)
-					.expect("unknown cassette tag");
-				cassette.clone()
-			});
+			if !statusbar_cassettes.is_empty() {
+				app_window.on_get_statusbar_cassette(move |tag, _| {
+					let (_, cassette) = statusbar_cassettes
+						.iter()
+						.find(|(this_tag, _)| tag == this_tag)
+						.expect("unknown cassette tag");
+					cassette.clone()
+				});
+				app_window.set_statusbar_cassette_salt(app_window.get_statusbar_cassette_salt() + 1);
+			}
 
 			// report view
 			let ui_report = {
