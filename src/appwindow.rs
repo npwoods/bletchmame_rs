@@ -352,6 +352,7 @@ impl AppModel {
 				let images = running.as_ref().map(|r| r.images.as_ref()).unwrap_or_default();
 				cassettes
 					.iter()
+					.filter(|_| report.is_none())
 					.filter_map(|cassette| {
 						images
 							.iter()
