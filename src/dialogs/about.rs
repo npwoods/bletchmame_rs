@@ -5,9 +5,14 @@ use crate::dialogs::SenderExt;
 use crate::guiutils::modal::ModalStack;
 use crate::ui::AboutDialog;
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 pub async fn dialog_about(modal_stack: ModalStack) {
 	let modal = modal_stack.modal(|| AboutDialog::new().unwrap());
 	let (tx, mut rx) = mpsc::channel(1);
+
+	// set the version
+	modal.dialog().set_version(VERSION.into());
 
 	// set up the close handler
 	let tx_clone = tx.clone();

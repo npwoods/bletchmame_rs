@@ -9,6 +9,8 @@ import { Icons } from "../icons.slint";
 export component AboutDialog inherits Window {
     title: "About BletchMAME";
     icon: Icons.bletchmame;
+    in property <string> version;
+
     HorizontalBox {
         Image {
             width: 192px;
@@ -18,7 +20,7 @@ export component AboutDialog inherits Window {
 
         VerticalBox {
             Text {
-                text: "BletchMAME";
+                text: "BletchMAME " + version;
                 font-size: 24px;
                 horizontal-alignment: center;
             }
