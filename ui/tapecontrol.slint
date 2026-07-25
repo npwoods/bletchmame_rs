@@ -20,7 +20,7 @@ export struct Cassette {
 export component TapeControl {
     // general properties
     in property <Cassette> cassette;
-    property <bool> editable: false;
+    property <bool> buttons-panel: false;
     property <float> timer-adjustment: 0.0;
 
     // const parameters
@@ -41,7 +41,7 @@ export component TapeControl {
 
     VerticalLayout {
         vertical-stretch: 0;
-        if editable: HorizontalLayout {
+        if buttons-panel: HorizontalLayout {
             alignment: center;
 
             Button {
@@ -163,7 +163,7 @@ export component TapeControl {
             }
 
             clicked => {
-                root.editable = !root.editable;
+                root.buttons-panel = !root.buttons-panel;
             }
         }
     }
