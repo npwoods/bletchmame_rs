@@ -238,8 +238,7 @@ export component AppWindow inherits Window {
     // status bar
     in property <string> statusbar-speed-text;
     in property <[string]> statusbar-cassette-tags;
-    in property <int> statusbar-cassette-salt;
-    pure callback get-statusbar-cassette(tag: string, salt: int) -> Cassette;
+    pure callback get-statusbar-cassette(tag: string) -> Cassette;
 
     // the report view
     in property <Report> report;
@@ -997,7 +996,7 @@ export component AppWindow inherits Window {
                 }
 
                 for tag in statusbar-cassette-tags: TapeControl {
-                    cassette: get-statusbar-cassette(tag, root.statusbar-cassette-salt);
+                    cassette: get-statusbar-cassette(tag);
                     set-position-absolute(position) => {
                         root.set-cassette-position-absolute(tag, position);
                     }
