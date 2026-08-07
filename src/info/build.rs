@@ -114,23 +114,25 @@ enum ThisError {
 	TooManyRecords,
 }
 
-// capacity defaults based on MAME 0.280
-//          48893 machines
-//         360116 roms
-//           1240 disks
+// capacity defaults based on MAME 0.289
+//          50368 machines
+//         366758 roms
+//           1263 disks
 //            472 samples
-//           4221 BIOS sets
-//          24594 chips
-//          78106 configurations
-//          47581 configuration settings
-//            280 configuration setting configurations
-//           2890 devices
-//          99687 device refs
-//           7183 slots
-//           3113 slot options
-//           7038 links
-//           1128 RAM options
-//        4997834 string bytes
+//           4471 BIOS sets
+//          26405 chips
+//          82264 configurations
+//          49712 configuration settings
+//            290 configuration setting conditions
+//           3147 devices
+//          95973 device refs
+//           8241 slots
+//           3376 slot options
+//           7924 links
+//           1152 RAM options
+//        5337643 string bytes
+//
+// of course, the actual CAPACITY_* values are padded for future MAME versions
 const CAPACITY_MACHINES: usize = 55000;
 const CAPACITY_ROMS: usize = 400000;
 const CAPACITY_DISKS: usize = 1600;
@@ -142,11 +144,11 @@ const CAPACITY_CONFIG_SETTINGS: usize = 52000;
 const CAPACITY_CONFIG_SETTING_CONDITIONS: usize = 400;
 const CAPACITY_DEVICES: usize = 3500;
 const CAPACITY_DEVICE_REFS: usize = 120000;
-const CAPACITY_SLOTS: usize = 8500;
-const CAPACITY_SLOT_OPTIONS: usize = 3500;
-const CAPACITY_MACHINE_SOFTWARE_LISTS: usize = 7500;
+const CAPACITY_SLOTS: usize = 9000;
+const CAPACITY_SLOT_OPTIONS: usize = 4000;
+const CAPACITY_MACHINE_SOFTWARE_LISTS: usize = 9000;
 const CAPACITY_RAM_OPTIONS: usize = 1500;
-const CAPACITY_STRING_TABLE: usize = 5500000;
+const CAPACITY_STRING_TABLE: usize = 6000000;
 
 impl State {
 	pub fn new() -> Self {
