@@ -69,6 +69,7 @@ export component AppWindow inherits Window {
     in property <bool> menubar-visible: true;
     in property <bool> is-paused;
     in property <bool> is-recording;
+    in property <bool> is-debugging-present;
     in property <bool> is-throttled;
     in property <bool> is-fullscreen;
     in property <bool> is-sound-enabled;
@@ -362,7 +363,7 @@ export component AppWindow inherits Window {
 
             MenuItem {
                 title: @tr("MenuBar" => "Debugger...");
-                enabled: mode() == "running";
+                enabled: root.is-debugging-present;
                 activated => {
                     menu-item-action(root.menu-action-file-debugger);
                 }

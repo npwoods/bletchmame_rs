@@ -51,6 +51,7 @@ impl Status {
 			let has_input_using_mouse = running
 				.has_input_using_mouse
 				.unwrap_or(status_running.has_input_using_mouse);
+			let debugger_present = running.debugger_present.unwrap_or(status_running.debugger_present);
 
 			let images = running.images.map(|images| {
 				images
@@ -93,6 +94,7 @@ impl Status {
 				is_recording,
 				polling_input_seq,
 				has_input_using_mouse,
+				debugger_present,
 				cheats,
 				images,
 				cassettes,
@@ -135,6 +137,7 @@ pub struct Running {
 	pub is_recording: bool,
 	pub polling_input_seq: bool,
 	pub has_input_using_mouse: bool,
+	pub debugger_present: bool,
 	pub cheats: Arc<[Cheat]>,
 	pub images: Arc<[Image]>,
 	pub cassettes: Arc<[Cassette]>,
@@ -249,6 +252,7 @@ struct RunningUpdate {
 	pub is_recording: Option<bool>,
 	pub polling_input_seq: Option<bool>,
 	pub has_input_using_mouse: Option<bool>,
+	pub debugger_present: Option<bool>,
 	pub cheats: Option<Vec<Cheat>>,
 	pub images: Option<Vec<ImageUpdate>>,
 	pub cassettes: Option<Vec<Cassette>>,
