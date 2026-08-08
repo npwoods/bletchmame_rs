@@ -48,6 +48,7 @@ use crate::version::MameVersion;
 pub use self::binary::ChipType;
 pub use self::binary::ConditionRelation;
 pub use self::binary::DeviceType;
+pub use self::binary::DriverQuality;
 pub use self::binary::SoftwareListStatus;
 pub use self::entities::AssetStatus;
 pub use self::entities::BiosSet;

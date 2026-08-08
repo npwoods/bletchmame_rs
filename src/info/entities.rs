@@ -9,6 +9,7 @@ use crate::assethash::AssetHash;
 use crate::info::ChipType;
 use crate::info::ConditionRelation;
 use crate::info::DeviceType;
+use crate::info::DriverQuality;
 use crate::info::IndirectView;
 use crate::info::Object;
 use crate::info::SimpleView;
@@ -147,6 +148,10 @@ impl<'a> Machine<'a> {
 
 	pub fn default_ram_option_index(&self) -> Option<usize> {
 		self.ram_options().iter().position(|x| x.is_default())
+	}
+
+	pub fn driver_status(&self) -> DriverQuality {
+		self.obj().driver_status
 	}
 }
 

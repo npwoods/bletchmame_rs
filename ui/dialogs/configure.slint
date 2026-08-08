@@ -19,6 +19,7 @@ import {
 import { Icons } from "../icons.slint";
 import { VideoConfigComponent, VideoSettings } from "../videoconfig.slint";
 import { AuditAsset, AuditAssetView } from "../audit.slint";
+import { Info, InfoComponent } from "../info.slint";
 
 struct SoftwareMachine { machine-index: int, description: string, checked: bool }
 
@@ -30,6 +31,7 @@ export component ConfigureDialog inherits Window {
 
     // properties
     in property <string> dialog-title;
+    in property <Info> info;
     in property <DevicesAndImagesState> dev-images-state;
     in property <string> dev-images-error;
     in property <[string]> ram-sizes-model;
@@ -91,6 +93,19 @@ export component ConfigureDialog inherits Window {
                 row: 0;
                 col: 0;
                 visible: root.software-machines.length == 0;
+                Tab {
+                    title: "Info";
+                    HorizontalBox {
+                        alignment: start;
+                        VerticalBox {
+                            alignment: start;
+                            InfoComponent {
+                                info: root.info;
+                            }
+                        }
+                    }
+                }
+
                 Tab {
                     title: "Devices";
                     GridBox {
@@ -200,6 +215,19 @@ export component ConfigureDialog inherits Window {
                 row: 0;
                 col: 0;
                 visible: root.software-machines.length > 0;
+                Tab {
+                    title: "Info";
+                    HorizontalBox {
+                        alignment: start;
+                        VerticalBox {
+                            alignment: start;
+                            InfoComponent {
+                                info: root.info;
+                            }
+                        }
+                    }
+                }
+
                 Tab {
                     title: "Preferred Machines";
                     ListView {

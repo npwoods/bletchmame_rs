@@ -51,6 +51,7 @@ use crate::ui::ConfigureDialog;
 use crate::ui::DeviceAndImageEntry;
 use crate::ui::DevicesAndImagesState;
 use crate::ui::Icons;
+use crate::ui::Info;
 use crate::ui::SoftwareMachine;
 
 struct State {
@@ -161,6 +162,9 @@ pub async fn dialog_configure(
 			})
 		});
 	}
+
+	// info
+	modal.dialog().set_info(state.info());
 
 	// RAM options
 	if let Some((ram_option_texts, current_index)) = state.ram_options() {
@@ -805,6 +809,37 @@ impl State {
 				} else {
 					configure_dialog_title(software_name.as_str(), None)
 				}
+			}
+		}
+	}
+
+	pub fn info(&self) -> Info {
+		match &self.core {
+			CoreState::Machine { dimodel_state, .. } => dimodel_state.with_machine(|machine| {
+				let machine = machine.unwrap();
+				Info {
+					name: machine.name().into(),
+					source_file: machine.source_file().into(),
+					description: machine.description().into(),
+					provider: machine.manufacturer().into(),
+					year: machine.year().into(),
+					status: machine.driver_status().to_string().into(),
+				}
+			}),
+			CoreState::Software {
+				software_list_name,
+				software,
+				..
+			} => {
+				let info = software.as_deref().map(|software| Info {
+					name: software.name.as_str().into(),
+					source_file: software_list_name.as_str().into(),
+					description: software.description.as_str().into(),
+					provider: software.publisher.as_str().into(),
+					year: software.year.as_str().into(),
+					status: "".into(),
+				});
+				info.unwrap_or_default()
 			}
 		}
 	}

@@ -121,14 +121,15 @@ impl Fixup for Machine {
 	PartialEq,
 	Eq,
 	Hash,
+	strum::Display,
 )]
 pub enum DriverQuality {
 	#[default]
-	#[strum(serialize = "good")]
+	#[strum(serialize = "good", to_string = "Good")]
 	Good,
-	#[strum(serialize = "imperfect")]
+	#[strum(serialize = "imperfect", to_string = "Imperfect")]
 	Imperfect,
-	#[strum(serialize = "preliminary")]
+	#[strum(serialize = "preliminary", to_string = "Preliminary")]
 	Preliminary,
 }
 
