@@ -58,6 +58,7 @@ pub use self::entities::ConfigurationSettingCondition;
 pub use self::entities::Device;
 pub use self::entities::DeviceRef;
 pub use self::entities::Disk;
+pub use self::entities::Feature;
 pub use self::entities::Machine;
 pub use self::entities::MachineSoftwareList;
 pub use self::entities::MachinesView;
@@ -87,6 +88,7 @@ enum ThisError {
 pub struct InfoDb {
 	data: Box<[u8]>,
 	machines: RootView<binary::Machine>,
+	features: RootView<binary::Feature>,
 	roms: RootView<binary::Rom>,
 	disks: RootView<binary::Disk>,
 	samples: RootView<binary::Sample>,
@@ -119,6 +121,7 @@ impl InfoDb {
 		// now walk the views
 		let mut cursor = size_of::<binary::Header>()..data.len();
 		let machines = next_root_view(&mut cursor, hdr.machine_count)?;
+		let features = next_root_view(&mut cursor, hdr.feature_count)?;
 		let roms = next_root_view(&mut cursor, hdr.rom_count)?;
 		let disks = next_root_view(&mut cursor, hdr.disk_count)?;
 		let samples = next_root_view(&mut cursor, hdr.sample_count)?;
@@ -144,6 +147,7 @@ impl InfoDb {
 		let result = Self {
 			data,
 			machines,
+			features,
 			roms,
 			disks,
 			samples,
@@ -277,6 +281,10 @@ impl InfoDb {
 
 	pub fn machines(&self) -> MachinesView<'_> {
 		self.make_view(&self.machines)
+	}
+
+	pub fn features(&self) -> impl View<'_, Feature<'_>> {
+		self.make_view(&self.features)
 	}
 
 	pub fn roms(&self) -> impl View<'_, Rom<'_>> {

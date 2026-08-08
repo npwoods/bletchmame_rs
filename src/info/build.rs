@@ -73,6 +73,7 @@ const TEXT_CAPTURE_PHASES: &[Phase] = &[
 struct State {
 	phase_stack: Vec<Phase>,
 	machines: TableBuilder<binary::Machine>,
+	features: TableBuilder<binary::Feature>,
 	roms: TableBuilder<binary::Rom>,
 	disks: TableBuilder<binary::Disk>,
 	samples: TableBuilder<binary::Sample>,
@@ -116,6 +117,7 @@ enum ThisError {
 
 // capacity defaults based on MAME 0.289
 //          50368 machines
+//            281 features
 //         366758 roms
 //           1263 disks
 //            472 samples
@@ -134,6 +136,7 @@ enum ThisError {
 //
 // of course, the actual CAPACITY_* values are padded for future MAME versions
 const CAPACITY_MACHINES: usize = 55000;
+const CAPACITY_FEATURES: usize = 1000;
 const CAPACITY_ROMS: usize = 400000;
 const CAPACITY_DISKS: usize = 1600;
 const CAPACITY_SAMPLES: usize = 1000;
@@ -162,6 +165,7 @@ impl State {
 		Self {
 			phase_stack: Vec::with_capacity(32),
 			machines: TableBuilder::with_capacity(CAPACITY_MACHINES),
+			features: TableBuilder::with_capacity(CAPACITY_FEATURES),
 			roms: TableBuilder::with_capacity(CAPACITY_ROMS),
 			disks: TableBuilder::with_capacity(CAPACITY_DISKS),
 			samples: TableBuilder::with_capacity(CAPACITY_SAMPLES),
@@ -214,6 +218,8 @@ impl State {
 					source_file_strindex,
 					clone_of_machine_index,
 					rom_of_machine_index,
+					features_start: self.features.len_db(),
+					features_end: self.features.len_db(),
 					roms_start: self.roms.len_db(),
 					roms_end: self.roms.len_db(),
 					disks_start: self.disks.len_db(),
@@ -233,6 +239,8 @@ impl State {
 					device_refs_end: self.device_refs.len_db(),
 					slots_start: self.slots.len_db(),
 					slots_end: self.slots.len_db(),
+					slot_options_start: self.slot_options.len_db(),
+					slot_options_end: self.slot_options.len_db(),
 					machine_software_lists_start: self.machine_software_lists.len_db(),
 					machine_software_lists_end: self.machine_software_lists.len_db(),
 					ram_options_start: self.ram_options.len_db(),
@@ -552,6 +560,34 @@ impl State {
 				self.phase_specific = Some(PhaseSpecificState::RamOption(is_default));
 				Some(Phase::MachineRamOption)
 			}
+			(Phase::Machine, b"feature") => {
+				let [feature_type, status, overall] = evt.find_attributes([b"type", b"status", b"overall"])?;
+				let feature_type_attr = feature_type.mandatory("type")?;
+				let Ok(feature_type) = (*feature_type_attr).parse::<binary::FeatureType>() else {
+					// unknown feature type; ignore
+					return Ok(None);
+				};
+				let status = status
+					.as_deref()
+					.map(|s| s.parse::<binary::FeatureStatus>())
+					.transpose()?
+					.unwrap_or_default();
+				let overall = overall
+					.as_deref()
+					.map(|s| s.parse::<binary::FeatureStatus>())
+					.transpose()?
+					.unwrap_or_default();
+				let feature = binary::Feature {
+					feature_type,
+					status,
+					overall,
+				};
+				self.features.push_db(feature)?;
+				self.machines.modify_last(|machine| {
+					machine.features_end += 1;
+				});
+				None
+			}
 			(Phase::MachineDevice, b"extension") => {
 				let [name] = evt.find_attributes([b"name"])?;
 				if let Some(name) = name {
@@ -664,6 +700,11 @@ impl State {
 						&mut machine.ram_options_start,
 						&mut machine.ram_options_end,
 						&mut self.ram_options,
+					);
+					try_reuse_existing_collection(
+						&mut machine.features_start,
+						&mut machine.features_end,
+						&mut self.features,
 					);
 				});
 			}
@@ -873,6 +914,7 @@ impl State {
 			sizes_hash: calculate_sizes_hash(),
 			build_strindex: self.build_strindex,
 			machine_count: machines.len_db(),
+			feature_count: self.features.len_db(),
 			rom_count: self.roms.len_db(),
 			disk_count: self.disks.len_db(),
 			sample_count: self.samples.len_db(),
@@ -896,6 +938,7 @@ impl State {
 			.as_bytes()
 			.iter()
 			.chain(machines.iter().flat_map(IntoBytes::as_bytes))
+			.chain(self.features.into_vec().iter().flat_map(IntoBytes::as_bytes))
 			.chain(self.roms.into_vec().iter().flat_map(IntoBytes::as_bytes))
 			.chain(self.disks.into_vec().iter().flat_map(IntoBytes::as_bytes))
 			.chain(self.samples.into_vec().iter().flat_map(IntoBytes::as_bytes))
@@ -1055,6 +1098,7 @@ pub fn calculate_sizes_hash() -> U64 {
 	[
 		size_of::<binary::Header>(),
 		size_of::<binary::Machine>(),
+		size_of::<binary::Feature>(),
 		size_of::<binary::Rom>(),
 		size_of::<binary::Disk>(),
 		size_of::<binary::Sample>(),
@@ -1070,6 +1114,7 @@ pub fn calculate_sizes_hash() -> U64 {
 		size_of::<binary::SoftwareList>(),
 		size_of::<binary::MachineSoftwareList>(),
 		size_of::<binary::RamOption>(),
+		binary::FeatureType::COUNT,
 		binary::DeviceType::COUNT,
 	]
 	.into_iter()

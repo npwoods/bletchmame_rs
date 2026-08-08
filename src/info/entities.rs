@@ -21,6 +21,7 @@ use crate::info::binary::ASSET_FLAG_HAS_SHA1;
 
 pub type Machine<'a> = Object<'a, binary::Machine>;
 pub type MachinesView<'a> = SimpleView<'a, binary::Machine>;
+pub type Feature<'a> = Object<'a, binary::Feature>;
 pub type Rom<'a> = Object<'a, binary::Rom>;
 pub type Disk<'a> = Object<'a, binary::Disk>;
 pub type Sample<'a> = Object<'a, binary::Sample>;
@@ -71,6 +72,11 @@ impl<'a> Machine<'a> {
 
 	pub fn runnable(&self) -> bool {
 		self.obj().runnable
+	}
+
+	pub fn features(&self) -> impl View<'a, Feature<'a>> + use<'a> {
+		let range = self.obj().features_start.into()..self.obj().features_end.into();
+		self.db.features().sub_view(range)
 	}
 
 	pub fn roms(&self) -> impl View<'a, Rom<'a>> + use<'a> {
