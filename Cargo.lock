@@ -732,7 +732,7 @@ dependencies = [
  "image",
  "insta",
  "is_executable",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "levenshtein",
  "more-asserts",
  "nu-utils",
