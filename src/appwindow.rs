@@ -1714,6 +1714,7 @@ fn update_menus(model: &AppModel) {
 	let can_refresh_info_db = has_mame_executable && !state.is_building_infodb();
 	let is_fullscreen = model.app_window().window().is_fullscreen();
 	let is_recording = running.as_ref().map(|r| r.is_recording).unwrap_or_default();
+	let is_debugging_present = running.as_ref().map(|r| r.debugger_present).unwrap_or_default();
 	let has_last_save_state = is_running && state.last_save_state().is_some();
 	let input_classes = running
 		.map(|x| x.inputs.as_ref())
@@ -1728,6 +1729,7 @@ fn update_menus(model: &AppModel) {
 	let app_window = model.app_window();
 	app_window.set_is_paused(is_paused);
 	app_window.set_is_recording(is_recording);
+	app_window.set_is_debugging_present(is_debugging_present);
 	app_window.set_is_throttled(is_throttled);
 	app_window.set_is_fullscreen(is_fullscreen);
 	app_window.set_is_sound_enabled(is_sound_enabled);

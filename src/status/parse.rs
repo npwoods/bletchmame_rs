@@ -90,6 +90,7 @@ impl State {
 					app_version,
 					polling_input_seq,
 					has_input_using_mouse,
+					debugger_present,
 				] = evt.find_attributes([
 					b"romname",
 					b"paused",
@@ -97,16 +98,14 @@ impl State {
 					b"app_version",
 					b"polling_input_seq",
 					b"has_input_using_mouse",
+					b"debugger_present",
 				])?;
 				let machine_name = romname.unwrap_or_default().into();
 				let is_paused = is_paused.map(parse_mame_bool).transpose()?;
 				let polling_input_seq = polling_input_seq.map(parse_mame_bool).transpose()?;
 				let has_input_using_mouse = has_input_using_mouse.map(parse_mame_bool).transpose()?;
-				debug!(
-					machine_name=?machine_name,
-					is_paused=?is_paused,
-					"status State::handle_start()"
-				);
+				let debugger_present = debugger_present.map(parse_mame_bool).transpose()?;
+				debug!(?machine_name, ?is_paused, "status State::handle_start()");
 
 				let app_build = app_build.map(MameVersion::from);
 				let app_version = app_version.and_then(MameVersion::parse_simple);
@@ -116,6 +115,7 @@ impl State {
 				self.running.is_paused = is_paused;
 				self.running.polling_input_seq = polling_input_seq;
 				self.running.has_input_using_mouse = has_input_using_mouse;
+				self.running.debugger_present = debugger_present;
 				Some(Phase::Status)
 			}
 			(Phase::Status, b"video") => {
