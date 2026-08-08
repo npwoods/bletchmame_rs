@@ -790,6 +790,7 @@ export component AppWindow inherits Window {
                     NavigationDrawer {
                         vertical-stretch: 0;
                         preferred-height: 100%;
+                        width: 100%;
                         groups: [{ title: 0, items: collections-model }];
                         current-index <=> collections-view-selected-index;
                         selected(group-index, index) => {
