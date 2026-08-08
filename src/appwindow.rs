@@ -834,6 +834,13 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	});
 	model.history_loader.replace(Some(history_loader));
 
+	// hyperlinks
+	app_window.on_link_clicked(|url| {
+		if let Err(e) = open::that(url.as_str()) {
+			warn!(error=?e, ?url, "open::that() failed");
+		}
+	});
+
 	// report button
 	let model_clone = model.clone();
 	app_window.on_report_button_clicked(move || {

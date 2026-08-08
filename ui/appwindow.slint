@@ -234,6 +234,7 @@ export component AppWindow inherits Window {
     function get-history-styled-text-func() -> styled-text {
         return get-history-styled-text(current-snap-view);
     }
+    callback link-clicked(url: string);
 
     // status bar
     in property <string> statusbar-speed-text;
@@ -950,6 +951,9 @@ export component AppWindow inherits Window {
                                 StyledText {
                                     text: get-history-styled-text-func();
                                     visible: self.text != @markdown("");
+                                    link-clicked(url) => {
+                                        root.link-clicked(url);
+                                    }
                                 }
                             }
                         }
