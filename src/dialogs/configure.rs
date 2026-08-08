@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use anyhow::Error;
 use anyhow::Result;
+use itertools::AllEqualValueError;
 use itertools::Itertools;
 use showfile::show_path_in_file_manager;
 use slint::CloseRequestResponse;
@@ -736,8 +737,7 @@ impl State {
 		let (bulk_all_enabled, bulk_none_enabled) = match all_equal_value {
 			Ok(false) => (true, false),
 			Ok(true) => (false, true),
-			Err(None) => (false, false),
-			Err(Some(_)) => (true, true),
+			Err(AllEqualValueError(x)) => (x.is_some(), x.is_some()),
 		};
 		let dialog = self.dialog_weak.unwrap();
 		dialog.set_software_machines_bulk_all_enabled(bulk_all_enabled);

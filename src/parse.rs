@@ -4,7 +4,6 @@ use std::borrow::Cow;
 use anyhow::Error;
 use anyhow::Result;
 use itertools::Itertools;
-use itertools::Position;
 
 /// General parsing function for bool string values outputted by MAME
 pub fn parse_mame_bool(text: impl AsRef<str>) -> Result<bool> {
@@ -36,7 +35,7 @@ fn internal_normalize_tag(tag: &str) -> Option<String> {
 			.chain([None])
 			.tuple_windows()
 			.with_position()
-			.map(|(pos, (ch, next))| match (pos != Position::Middle, ch, next) {
+			.map(|(pos, (ch, next))| match (!pos.is_middle(), ch, next) {
 				(_, Some(':'), Some(':')) => None,
 				(true, Some(':'), _) => None,
 				_ => ch,
