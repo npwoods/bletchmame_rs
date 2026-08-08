@@ -1,0 +1,85 @@
+export struct Info {
+    name: string,
+    source-file: string,
+    description: string,
+    year: string,
+    provider: string,
+    status: string,
+}
+
+export component InfoComponent {
+    in property <Info> info;
+    GridLayout {
+        Text {
+            row: 0;
+            col: 0;
+            text: "Name: ";
+        }
+
+        Text {
+            row: 0;
+            col: 1;
+            text: info.name;
+        }
+
+        Text {
+            row: 1;
+            col: 0;
+            text: "Source File: ";
+        }
+
+        Text {
+            row: 1;
+            col: 1;
+            text: info.source-file;
+        }
+
+        Text {
+            row: 2;
+            col: 0;
+            text: "Description: ";
+        }
+
+        Text {
+            row: 2;
+            col: 1;
+            text: info.description;
+        }
+
+        Text {
+            row: 3;
+            col: 0;
+            text: "Year: ";
+        }
+
+        Text {
+            row: 3;
+            col: 1;
+            text: info.year;
+        }
+
+        Text {
+            row: 4;
+            col: 0;
+            text: "Provider: ";
+        }
+
+        Text {
+            row: 4;
+            col: 1;
+            text: info.provider;
+        }
+
+        Text {
+            row: 5;
+            col: 0;
+            text: "Status: ";
+        }
+
+        Text {
+            row: 5;
+            col: 1;
+            text: info.status;
+        }
+    }
+}

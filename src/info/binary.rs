@@ -31,6 +31,7 @@ pub struct Header {
 	pub sizes_hash: U64,
 	pub build_strindex: UsizeDb,
 	pub machine_count: UsizeDb,
+	pub feature_count: UsizeDb,
 	pub rom_count: UsizeDb,
 	pub disk_count: UsizeDb,
 	pub sample_count: UsizeDb,
@@ -59,6 +60,9 @@ pub struct Machine {
 	pub description_strindex: UsizeDb,
 	pub year_strindex: UsizeDb,
 	pub manufacturer_strindex: UsizeDb,
+
+	pub features_start: UsizeDb,
+	pub features_end: UsizeDb,
 	pub roms_start: UsizeDb,
 	pub roms_end: UsizeDb,
 	pub disks_start: UsizeDb,
@@ -84,6 +88,15 @@ pub struct Machine {
 	pub machine_software_lists_end: UsizeDb,
 	pub ram_options_start: UsizeDb,
 	pub ram_options_end: UsizeDb,
+
+	pub driver_status: DriverQuality,
+	pub driver_emulation: DriverQuality,
+	pub driver_cocktail: DriverQuality,
+	pub driver_savestate: DriverSavestate,
+	pub driver_requiresartwork: bool,
+	pub driver_unofficial: bool,
+	pub driver_nosoundhardware: bool,
+	pub driver_incomplete: bool,
 	pub runnable: bool,
 }
 
@@ -91,6 +104,147 @@ impl Fixup for Machine {
 	fn identify_machine_indexes(&mut self) -> impl IntoIterator<Item = &mut UsizeDb> {
 		[&mut self.clone_of_machine_index, &mut self.rom_of_machine_index]
 	}
+}
+
+#[repr(u8)]
+#[derive(
+	Clone,
+	Copy,
+	Debug,
+	Deserialize,
+	TryFromBytes,
+	IntoBytes,
+	Immutable,
+	KnownLayout,
+	EnumString,
+	Default,
+	PartialEq,
+	Eq,
+	Hash,
+	strum::Display,
+)]
+pub enum DriverQuality {
+	#[default]
+	#[strum(serialize = "good", to_string = "Good")]
+	Good,
+	#[strum(serialize = "imperfect", to_string = "Imperfect")]
+	Imperfect,
+	#[strum(serialize = "preliminary", to_string = "Preliminary")]
+	Preliminary,
+}
+
+#[repr(u8)]
+#[derive(
+	Clone,
+	Copy,
+	Debug,
+	Deserialize,
+	TryFromBytes,
+	IntoBytes,
+	Immutable,
+	KnownLayout,
+	EnumString,
+	Default,
+	PartialEq,
+	Eq,
+	Hash,
+)]
+pub enum DriverSavestate {
+	#[default]
+	#[strum(serialize = "supported")]
+	Supported,
+	#[strum(serialize = "unsupported")]
+	Unsupported,
+}
+
+#[repr(u8)]
+#[derive(
+	Clone,
+	Copy,
+	Debug,
+	Deserialize,
+	TryFromBytes,
+	IntoBytes,
+	Immutable,
+	KnownLayout,
+	EnumCount,
+	EnumString,
+	PartialEq,
+	Eq,
+	Hash,
+)]
+pub enum FeatureType {
+	#[strum(serialize = "camera")]
+	Camera,
+	#[strum(serialize = "capture")]
+	Capture,
+	#[strum(serialize = "comms")]
+	Comms,
+	#[strum(serialize = "controls")]
+	Controls,
+	#[strum(serialize = "disk")]
+	Disk,
+	#[strum(serialize = "graphics")]
+	Graphics,
+	#[strum(serialize = "keyboard")]
+	Keyboard,
+	#[strum(serialize = "lan")]
+	Lan,
+	#[strum(serialize = "media")]
+	Media,
+	#[strum(serialize = "microphone")]
+	Microphone,
+	#[strum(serialize = "mouse")]
+	Mouse,
+	#[strum(serialize = "palette")]
+	Palette,
+	#[strum(serialize = "printer")]
+	Printer,
+	#[strum(serialize = "protection")]
+	Protection,
+	#[strum(serialize = "rom")]
+	Rom,
+	#[strum(serialize = "sound")]
+	Sound,
+	#[strum(serialize = "tape")]
+	Tape,
+	#[strum(serialize = "timing")]
+	Timing,
+	#[strum(serialize = "wan")]
+	Wan,
+}
+
+#[repr(u8)]
+#[derive(
+	Clone,
+	Copy,
+	Debug,
+	Default,
+	Deserialize,
+	TryFromBytes,
+	IntoBytes,
+	Immutable,
+	KnownLayout,
+	EnumString,
+	PartialEq,
+	Eq,
+	Hash,
+)]
+pub enum FeatureStatus {
+	#[default]
+	Unspecified,
+	#[strum(serialize = "unemulated")]
+	Unemulated,
+	#[strum(serialize = "imperfect")]
+	Imperfect,
+}
+
+#[repr(C, packed)]
+#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq, Eq, Hash)]
+pub struct Feature {
+	pub feature_type: FeatureType,
+	pub status: FeatureStatus,
+	pub overall: FeatureStatus,
 }
 
 #[repr(C, packed)]
