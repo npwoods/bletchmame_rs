@@ -51,9 +51,10 @@ impl ImportMameIni {
 		let absolutize_path = |path: &str| {
 			Path::new(path)
 				.absolutize_from(parent)
-				.ok()
-				.and_then(|p| p.into_owned().into_os_string().into_string().ok())
-				.unwrap_or_else(|| path.to_string())
+				.into_owned()
+				.into_os_string()
+				.into_string()
+				.unwrap_or_else(|_| path.to_string())
 				.into()
 		};
 
