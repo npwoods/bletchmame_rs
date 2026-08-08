@@ -45,6 +45,7 @@ use crate::prefs::PrefsMachineItem;
 use crate::prefs::PrefsPaths;
 use crate::prefs::PrefsSoftwareItem;
 use crate::prefs::PrefsVideo;
+use crate::software::Software;
 use crate::software::SoftwareListDispenser;
 use crate::ui::ConfigureDialog;
 use crate::ui::DeviceAndImageEntry;
@@ -69,8 +70,9 @@ enum CoreState {
 	},
 	Software {
 		info_db: Rc<InfoDb>,
-		software_list: String,
-		software: String,
+		software_list_name: SmolStr,
+		software_name: SmolStr,
+		software: Option<Arc<Software>>,
 		software_machines: ModelRc<SoftwareMachine>,
 	},
 }
@@ -112,7 +114,7 @@ pub async fn dialog_configure(
 	let state = Rc::new(state);
 
 	// set the title
-	modal.dialog().set_dialog_title(state.title(paths).into());
+	modal.dialog().set_dialog_title(state.title().into());
 
 	// set up the context menu action handler
 	let state_clone = state.clone();
@@ -366,11 +368,25 @@ impl State {
 				let software_machines = VecModel::from(software_machines);
 				let software_machines = ModelRc::new(software_machines);
 
+				// look up in the software list
+				let software_list_name = SmolStr::from(item.software_list);
+				let software_name = SmolStr::from(item.software);
+				let software = {
+					let mut dispenser = SoftwareListDispenser::new(info_db, &paths.software_lists);
+					dispenser.get(software_list_name.as_str()).ok().and_then(|(_, x)| {
+						x.software
+							.iter()
+							.flat_map(|x| (*x.name == *software_name).then(|| x.clone()))
+							.next()
+					})
+				};
+
 				CoreState::Software {
 					info_db: info_db.clone(),
-					software_list: item.software_list,
-					software: item.software,
+					software_list_name,
+					software_name,
 					software_machines,
+					software,
 				}
 			}
 		};
@@ -562,8 +578,9 @@ impl State {
 			CoreState::Software {
 				info_db,
 				software_machines,
-				software_list,
-				software,
+				software_list_name: software_list,
+				software_name: software,
+				..
 			} => {
 				let machine_index = software_machines
 					.iter()
@@ -631,9 +648,10 @@ impl State {
 
 			CoreState::Software {
 				info_db,
-				software_list,
-				software,
+				software_list_name,
+				software_name,
 				software_machines,
+				..
 			} => {
 				let software_machines = software_machines
 					.as_any()
@@ -655,8 +673,8 @@ impl State {
 				});
 
 				let item = PrefsSoftwareItem {
-					software_list: software_list.clone(),
-					software: software.clone(),
+					software_list: software_list_name.as_str().into(),
+					software: software_name.as_str().into(),
 					preferred_machines,
 				};
 				PrefsItemDetails::Software(item)
@@ -770,7 +788,7 @@ impl State {
 		}
 	}
 
-	pub fn title(&self, paths: &PrefsPaths) -> String {
+	pub fn title(&self) -> String {
 		match &self.core {
 			CoreState::Machine { dimodel_state, .. } => dimodel_state.with_machine(|machine| {
 				let machine = machine.unwrap();
@@ -778,23 +796,14 @@ impl State {
 			}),
 
 			CoreState::Software {
-				info_db,
-				software_list,
+				software_name,
 				software,
 				..
 			} => {
-				let mut dispenser = SoftwareListDispenser::new(info_db, &paths.software_lists);
-
-				let software_entry = dispenser.get(software_list).ok().and_then(|(_, x)| {
-					x.software
-						.iter()
-						.flat_map(|x| (x.name == software).then(|| x.clone()))
-						.next()
-				});
-				if let Some(software_entry) = software_entry.as_deref() {
-					configure_dialog_title(software_entry.description.as_ref(), Some(software_entry.name.as_ref()))
+				if let Some(software) = software.as_deref() {
+					configure_dialog_title(software.description.as_ref(), Some(software.name.as_ref()))
 				} else {
-					configure_dialog_title(software.as_str(), None)
+					configure_dialog_title(software_name.as_str(), None)
 				}
 			}
 		}
