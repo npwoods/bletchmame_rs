@@ -929,7 +929,8 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		app_window.set_menu_action_file_save_state(FileSaveState.encode_for_slint());
 		app_window.set_menu_action_file_save_screenshot(FileSaveScreenshot.encode_for_slint());
 		app_window.set_menu_action_file_record_movie(FileRecordMovie.encode_for_slint());
-		app_window.set_menu_action_file_debugger(FileDebugger.encode_for_slint());
+		app_window.set_menu_action_file_debugging_toggle(FileDebuggingToggle.encode_for_slint());
+		app_window.set_menu_action_file_debugging_launch(FileDebuggingLaunch.encode_for_slint());
 		app_window.set_menu_action_file_reset_soft(FileResetSoft.encode_for_slint());
 		app_window.set_menu_action_file_reset_hard(FileResetHard.encode_for_slint());
 		app_window.set_menu_action_file_exit(FileExit.encode_for_slint());
@@ -1131,7 +1132,10 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 				model.clone().spawn_maybe_pause(fut);
 			}
 		}
-		Action::FileDebugger => {
+		Action::FileDebuggingToggle => {
+			model.modify_prefs(|prefs| prefs.debugging_enabled = !prefs.debugging_enabled);
+		}
+		Action::FileDebuggingLaunch => {
 			model.issue_command(MameCommand::debugger());
 		}
 		Action::FileResetSoft => {
@@ -1714,6 +1718,7 @@ fn update_menus(model: &AppModel) {
 	let can_refresh_info_db = has_mame_executable && !state.is_building_infodb();
 	let is_fullscreen = model.app_window().window().is_fullscreen();
 	let is_recording = running.as_ref().map(|r| r.is_recording).unwrap_or_default();
+	let is_debugging_enabled = model.state.borrow().preferences.debugging_enabled;
 	let is_debugging_present = running.as_ref().map(|r| r.debugger_present).unwrap_or_default();
 	let has_last_save_state = is_running && state.last_save_state().is_some();
 	let input_classes = running
@@ -1729,6 +1734,7 @@ fn update_menus(model: &AppModel) {
 	let app_window = model.app_window();
 	app_window.set_is_paused(is_paused);
 	app_window.set_is_recording(is_recording);
+	app_window.set_is_debugging_enabled(is_debugging_enabled);
 	app_window.set_is_debugging_present(is_debugging_present);
 	app_window.set_is_throttled(is_throttled);
 	app_window.set_is_fullscreen(is_fullscreen);

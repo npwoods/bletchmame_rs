@@ -49,7 +49,9 @@ impl MameArguments {
 
 		// figure out windowing
 		let windowing_args = match windowing {
-			MameWindowing::Attached(window) => vec!["-attach_window".into(), Cow::Owned(window.to_string())],
+			MameWindowing::Attached(window) => {
+				vec!["-w".into(), "-attach_window".into(), Cow::Owned(window.to_string())]
+			}
 			MameWindowing::Windowed => vec!["-w".into(), "-nomax".into()],
 			MameWindowing::WindowedMaximized => vec!["-w".into(), "-max".into()],
 			MameWindowing::Fullscreen => vec!["-now".into()],
@@ -58,6 +60,13 @@ impl MameArguments {
 		// video arguments
 		let video = video_override.unwrap_or(&prefs.video);
 		let video_args = ["-prescale".into(), Cow::Owned(video.prescale.to_string())].into_iter();
+
+		// debugger arguments
+		let debug_args = prefs
+			.debugging_enabled
+			.then_some(Cow::Borrowed("-debug"))
+			.into_iter()
+			.collect::<Vec<_>>();
 
 		// platform specific arguments
 		let platform_args = platform_specific_args().into_iter().map(Cow::Borrowed);
@@ -69,12 +78,13 @@ impl MameArguments {
 
 		// assemble all arguments
 		let program = prefs.paths.mame_executable.clone().unwrap();
-		let args = ["-plugin", "worker_ui", "-skip_gameinfo", "-nomouse", "-debug"]
+		let args = ["-plugin", "worker_ui", "-skip_gameinfo", "-nomouse"]
 			.into_iter()
 			.map(Cow::Borrowed)
 			.chain(windowing_args)
 			.chain(platform_args)
 			.chain(video_args)
+			.chain(debug_args)
 			.map(|x| match x {
 				Cow::Borrowed(x) => Cow::Borrowed(OsStr::new(x)),
 				Cow::Owned(x) => Cow::Owned(OsString::from(x)),
