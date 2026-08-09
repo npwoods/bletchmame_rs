@@ -1,4 +1,4 @@
-export struct Info {
+export struct InfoDisplay {
     name: string,
     source-file: string,
     description: string,
@@ -7,76 +7,76 @@ export struct Info {
     status: string,
 }
 
-export component InfoComponent {
-    in property <Info> info;
+export component InfoDisplayComponent {
+    in property <InfoDisplay> info;
     GridLayout {
-        Text {
+        if info.name != "": Text {
             row: 0;
             col: 0;
             text: "Name: ";
         }
 
-        Text {
+        if info.name != "": Text {
             row: 0;
             col: 1;
             text: info.name;
         }
 
-        Text {
+        if info.source-file != "": Text {
             row: 1;
             col: 0;
             text: "Source File: ";
         }
 
-        Text {
+        if info.source-file != "": Text {
             row: 1;
             col: 1;
             text: info.source-file;
         }
 
-        Text {
+        if info.description != "": Text {
             row: 2;
             col: 0;
             text: "Description: ";
         }
 
-        Text {
+        if info.description != "": Text {
             row: 2;
             col: 1;
             text: info.description;
         }
 
-        Text {
+        if info.year != "": Text {
             row: 3;
             col: 0;
             text: "Year: ";
         }
 
-        Text {
+        if info.year != "": Text {
             row: 3;
             col: 1;
             text: info.year;
         }
 
-        Text {
+        if info.provider != "": Text {
             row: 4;
             col: 0;
             text: "Provider: ";
         }
 
-        Text {
+        if info.provider != "": Text {
             row: 4;
             col: 1;
             text: info.provider;
         }
 
-        Text {
+        if info.status != "": Text {
             row: 5;
             col: 0;
             text: "Status: ";
         }
 
-        Text {
+        if info.status != "": Text {
             row: 5;
             col: 1;
             text: info.status;

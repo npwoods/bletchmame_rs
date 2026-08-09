@@ -18,6 +18,7 @@ mod icon;
 mod imagedesc;
 mod importmameini;
 mod info;
+mod infodisplay;
 mod interaction_monitor;
 mod job;
 mod mconfig;

@@ -1786,6 +1786,12 @@ fn update_ui_for_current_history_item(model: &AppModel) {
 	let current_snap_view = snap_view_string(&collection, prefs.current_history_entry().selection.first());
 	app_window.set_current_snap_view(current_snap_view);
 
+	// update the info display
+	let info_display = model
+		.with_items_table_model(ItemsTableModel::current_selected_info_display)
+		.unwrap_or_default();
+	app_window.set_current_info_display(info_display);
+
 	// and finish tracing
 	debug!(duration=?start_instant.elapsed(), "update_ui_for_current_history_item() completed");
 }
