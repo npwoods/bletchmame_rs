@@ -52,7 +52,7 @@ use crate::ui::ConfigureDialog;
 use crate::ui::DeviceAndImageEntry;
 use crate::ui::DevicesAndImagesState;
 use crate::ui::Icons;
-use crate::ui::Info;
+use crate::ui::InfoDisplay;
 use crate::ui::SoftwareMachine;
 
 struct State {
@@ -813,11 +813,11 @@ impl State {
 		}
 	}
 
-	pub fn info(&self) -> Info {
+	pub fn info(&self) -> InfoDisplay {
 		match &self.core {
 			CoreState::Machine { dimodel_state, .. } => dimodel_state.with_machine(|machine| {
 				let machine = machine.unwrap();
-				Info {
+				InfoDisplay {
 					name: machine.name().into(),
 					source_file: machine.source_file().into(),
 					description: machine.description().into(),
@@ -831,7 +831,7 @@ impl State {
 				software,
 				..
 			} => {
-				let info = software.as_deref().map(|software| Info {
+				let info = software.as_deref().map(|software| InfoDisplay {
 					name: software.name.as_str().into(),
 					source_file: software_list_name.as_str().into(),
 					description: software.description.as_str().into(),

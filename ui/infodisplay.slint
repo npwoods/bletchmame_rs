@@ -1,4 +1,4 @@
-export struct Info {
+export struct InfoDisplay {
     name: string,
     source-file: string,
     description: string,
@@ -7,8 +7,8 @@ export struct Info {
     status: string,
 }
 
-export component InfoComponent {
-    in property <Info> info;
+export component InfoDisplayComponent {
+    in property <InfoDisplay> info;
     GridLayout {
         Text {
             row: 0;
