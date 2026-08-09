@@ -24,6 +24,7 @@ import { Icons } from "icons.slint";
 import { TapeControl, Cassette } from "tapecontrol.slint";
 import { HorizontalSplitter } from "splitter.slint";
 import { ReportView, Report } from "report.slint";
+import { InfoDisplay, InfoDisplayComponent } from "infodisplay.slint";
 
 struct CollectionContextMenuInfo {
     move-up-action: string,
@@ -225,6 +226,7 @@ export component AppWindow inherits Window {
 
     // snapshot and history
     in property <string> current-snap-view;
+    in property <InfoDisplay> current-info-display;
     in property <bool> history-xml-is-loading;
     in-out property <bool> is-picture-area-visible: true;
     pure callback get-snap-image(string) -> image;
@@ -940,7 +942,7 @@ export component AppWindow inherits Window {
                         preferred-height: 300px;
                     }
 
-                    if get-history-styled-text-func() != @markdown("") || root.history-xml-is-loading: Rectangle {
+                    if get-history-styled-text-func() != @markdown("") || root.history-xml-is-loading || root.current-info-display != { }: Rectangle {
                         vertical-stretch: 1;
                         min-height: 0px;
                         preferred-height: 300px;
@@ -950,6 +952,11 @@ export component AppWindow inherits Window {
                             content-width: self.width;
                             VerticalLayout {
                                 alignment: start;
+                                spacing: 10px;
+                                InfoDisplayComponent {
+                                    info: root.current-info-display;
+                                }
+
                                 StyledText {
                                     text: get-history-styled-text-func();
                                     visible: self.text != @markdown("");

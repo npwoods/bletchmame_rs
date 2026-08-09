@@ -27,4 +27,13 @@ pub impl InfoDisplay {
 			status: "".into(),
 		}
 	}
+
+	fn brief(self) -> Self {
+		Self {
+			description: self.description,
+			provider: self.provider,
+			status: self.status,
+			..Default::default()
+		}
+	}
 }

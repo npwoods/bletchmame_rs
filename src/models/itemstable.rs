@@ -34,6 +34,7 @@ use crate::action::Action;
 use crate::imagedesc::ImageDesc;
 use crate::info::InfoDb;
 use crate::info::View;
+use crate::infodisplay::InfoDisplayExt as _;
 use crate::mconfig::MachineConfig;
 use crate::prefs::BuiltinCollection;
 use crate::prefs::ColumnType;
@@ -49,6 +50,7 @@ use crate::selection::SelectionManager;
 use crate::software::Software;
 use crate::software::SoftwareList;
 use crate::software::SoftwareListDispenser;
+use crate::ui::InfoDisplay;
 use crate::ui::ItemContextMenuInfo;
 use crate::ui::SimpleMenuEntry;
 
@@ -671,6 +673,13 @@ impl ItemsTableModel {
 		Some(text.to_shared_string())
 	}
 
+	pub fn current_selected_info_display(&self) -> Option<InfoDisplay> {
+		let selected_index = self.current_selected_index()?;
+		let items = self.items.borrow();
+		let item = items.get(usize::try_from(selected_index).unwrap())?;
+		item_info_display(item)
+	}
+
 	fn current_selected_index(&self) -> Option<u32> {
 		self.selection
 			.selected_index()
@@ -1114,6 +1123,19 @@ fn is_item_match(prefs_item_ref: &PrefsItemRef, item: &Item) -> bool {
 
 fn run_item_text(text: &str) -> String {
 	format!("Run {text}")
+}
+
+fn item_info_display(item: &Item) -> Option<InfoDisplay> {
+	let result = match &item.details {
+		ItemDetails::Machine { machine_config, .. } => Some(InfoDisplay::from_machine(&machine_config.machine())),
+		ItemDetails::Software {
+			software_list,
+			software,
+			..
+		} => Some(InfoDisplay::from_software(&software_list.name, software)),
+		ItemDetails::Unrecognized { .. } => None,
+	}?;
+	Some(result.brief())
 }
 
 /// Rust friendly equivalent of ItemContextMenuInfo
