@@ -93,6 +93,9 @@ pub struct Preferences {
 	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub history_position: usize,
 
+	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub debugging_enabled: bool,
+
 	pub show_stop_warning: bool,
 }
 
@@ -113,6 +116,7 @@ impl Default for Preferences {
 			collections: [].into(),
 			history: [].into(),
 			history_position: 0,
+			debugging_enabled: false,
 			show_stop_warning: true,
 		}
 	}
