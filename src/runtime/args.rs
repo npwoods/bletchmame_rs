@@ -96,14 +96,7 @@ pub struct MameArgumentsError {
 fn platform_specific_args() -> Vec<&'static str> {
 	if cfg!(target_family = "windows") {
 		// Windows MAME
-		vec![
-			"-keyboardprovider",
-			"dinput",
-			"-mouseprovider",
-			"dinput",
-			"-lightgunprovider",
-			"dinput",
-		]
+		vec!["-keyboardprovider", "dinput", "-mouseprovider", "dinput"]
 	} else if cfg!(target_family = "unix") {
 		// SDL MAME
 		vec!["-video", "soft"]
