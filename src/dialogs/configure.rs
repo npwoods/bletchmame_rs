@@ -37,6 +37,7 @@ use crate::imagedesc::ImageDesc;
 use crate::info::InfoDb;
 use crate::info::Machine;
 use crate::info::View;
+use crate::infodisplay::InfoDisplayExt as _;
 use crate::mconfig::MachineConfig;
 use crate::models::audit::AuditModel;
 use crate::models::devimages::DevicesAndImagesModel;
@@ -815,32 +816,17 @@ impl State {
 
 	pub fn info(&self) -> InfoDisplay {
 		match &self.core {
-			CoreState::Machine { dimodel_state, .. } => dimodel_state.with_machine(|machine| {
-				let machine = machine.unwrap();
-				InfoDisplay {
-					name: machine.name().into(),
-					source_file: machine.source_file().into(),
-					description: machine.description().into(),
-					provider: machine.manufacturer().into(),
-					year: machine.year().into(),
-					status: machine.driver_status().to_string().into(),
-				}
-			}),
+			CoreState::Machine { dimodel_state, .. } => {
+				dimodel_state.with_machine(|machine| InfoDisplay::from_machine(&machine.unwrap()))
+			}
 			CoreState::Software {
 				software_list_name,
 				software,
 				..
-			} => {
-				let info = software.as_deref().map(|software| InfoDisplay {
-					name: software.name.as_str().into(),
-					source_file: software_list_name.as_str().into(),
-					description: software.description.as_str().into(),
-					provider: software.publisher.as_str().into(),
-					year: software.year.as_str().into(),
-					status: "".into(),
-				});
-				info.unwrap_or_default()
-			}
+			} => software
+				.as_deref()
+				.map(|software| InfoDisplay::from_software(software_list_name, software))
+				.unwrap_or_default(),
 		}
 	}
 }
