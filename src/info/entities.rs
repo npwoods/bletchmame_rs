@@ -10,6 +10,7 @@ use crate::info::ChipType;
 use crate::info::ConditionRelation;
 use crate::info::DeviceType;
 use crate::info::DriverQuality;
+use crate::info::DriverSavestate;
 use crate::info::IndirectView;
 use crate::info::Object;
 use crate::info::SimpleView;
@@ -152,6 +153,14 @@ impl<'a> Machine<'a> {
 
 	pub fn driver_status(&self) -> DriverQuality {
 		self.obj().driver_status
+	}
+
+	pub fn driver_emulation(&self) -> DriverQuality {
+		self.obj().driver_emulation
+	}
+
+	pub fn driver_savestate(&self) -> DriverSavestate {
+		self.obj().driver_savestate
 	}
 }
 

@@ -560,6 +560,18 @@ impl State {
 				self.phase_specific = Some(PhaseSpecificState::RamOption(is_default));
 				Some(Phase::MachineRamOption)
 			}
+			(Phase::Machine, b"driver") => {
+				let [status, emulation, savestate] = evt.find_attributes([b"status", b"emulation", b"savestate"])?;
+				let status = status.as_deref().map(|s| s.parse()).transpose()?;
+				let emulation = emulation.as_deref().map(|s| s.parse()).transpose()?;
+				let savestate = savestate.as_deref().map(|s| s.parse()).transpose()?;
+				self.machines.modify_last(|machine| {
+					machine.driver_status = status.unwrap_or(machine.driver_status);
+					machine.driver_emulation = emulation.unwrap_or(machine.driver_emulation);
+					machine.driver_savestate = savestate.unwrap_or(machine.driver_savestate);
+				});
+				None
+			}
 			(Phase::Machine, b"feature") => {
 				let [feature_type, status, overall] = evt.find_attributes([b"type", b"status", b"overall"])?;
 				let feature_type_attr = feature_type.mandatory("type")?;
