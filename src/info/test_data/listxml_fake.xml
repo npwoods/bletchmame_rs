@@ -178,7 +178,7 @@
 			<control type="joy" player="1" buttons="2" ways="8"/>
 			<control type="joy" player="2" buttons="2" ways="8"/>
 		</input>
-		<driver status="good" emulation="good" savestate="supported"/>
+		<driver status="preliminary" emulation="preliminary" savestate="unsupported"/>
 		<slot name=":ext:">
 			<slotoption name="fdcv11" devname="coco_fdc_v11" default="yes"/>
 		</slot>

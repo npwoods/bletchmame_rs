@@ -49,6 +49,7 @@ pub use self::binary::ChipType;
 pub use self::binary::ConditionRelation;
 pub use self::binary::DeviceType;
 pub use self::binary::DriverQuality;
+pub use self::binary::DriverSavestate;
 pub use self::binary::SoftwareListStatus;
 pub use self::entities::AssetStatus;
 pub use self::entities::BiosSet;
@@ -734,6 +735,8 @@ mod test {
 	use test_case::test_case;
 
 	use crate::assethash::AssetHash;
+	use crate::info::DriverQuality;
+	use crate::info::DriverSavestate;
 	use crate::info::entities::AssetStatus;
 
 	use super::ChipType;
@@ -866,6 +869,28 @@ mod test {
 			let other_machine = db.machines().find(machine.name()).unwrap();
 			assert_eq!(other_machine.name(), machine.name());
 		}
+	}
+
+	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", DriverQuality::Good, DriverQuality::Good, DriverSavestate::Supported)]
+	#[test_case(1, include_str!("test_data/listxml_fake.xml"), "fake", DriverQuality::Preliminary, DriverQuality::Preliminary, DriverSavestate::Unsupported)]
+	pub fn driver(
+		_index: usize,
+		xml: &str,
+		machine: &str,
+		expected_status: DriverQuality,
+		expected_emulation: DriverQuality,
+		expected_savestate: DriverSavestate,
+	) {
+		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| ControlFlow::Continue(()))
+			.unwrap()
+			.unwrap();
+		let machine = db.machines().find(machine).unwrap();
+		let actual = (
+			machine.driver_status(),
+			machine.driver_emulation(),
+			machine.driver_savestate(),
+		);
+		assert_eq!((expected_status, expected_emulation, expected_savestate), actual);
 	}
 
 	#[allow(clippy::too_many_arguments)]
