@@ -677,7 +677,9 @@ impl ItemsTableModel {
 		let selected_index = self.current_selected_index()?;
 		let items = self.items.borrow();
 		let item = items.get(usize::try_from(selected_index).unwrap())?;
-		item_info_display(item)
+		let result = item_info_display(item);
+		debug!(?result, "ItemsTableModel::current_selected_info_display()");
+		result
 	}
 
 	fn current_selected_index(&self) -> Option<u32> {
