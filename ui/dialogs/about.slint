@@ -3,6 +3,7 @@ import {
     Button,
     VerticalBox,
     HorizontalBox,
+    StandardButton,
 } from "std-widgets.slint";
 import { Icons } from "../icons.slint";
 
@@ -10,6 +11,8 @@ export component AboutDialog inherits Window {
     title: "About BletchMAME";
     icon: Icons.bletchmame;
     in property <string> version;
+
+    property <image> logo-image: @image_url("../bletchmame_logo.svg");
 
     HorizontalBox {
         Image {
@@ -19,14 +22,39 @@ export component AboutDialog inherits Window {
         }
 
         VerticalBox {
+            alignment: stretch;
+            Image {
+                width: 500px;
+                height: self.width / root.logo-image.width * root.logo-image.height;
+                source: root.logo-image;
+                vertical-stretch: 0;
+            }
+
             Text {
-                text: "BletchMAME " + version;
-                font-size: 24px;
-                horizontal-alignment: center;
+                text: "version " + version;
+                font-size: 20px;
+                horizontal-alignment: right;
+                vertical-alignment: top;
+                vertical-stretch: 0;
             }
 
             AboutSlint {
-                height: 100px;
+                horizontal-stretch: 0;
+                vertical-stretch: 0;
+            }
+
+            Rectangle {
+                vertical-stretch: 1;
+            }
+
+            HorizontalBox {
+                alignment: end;
+                vertical-stretch: 0;
+
+                StandardButton {
+                    kind: ok;
+                    clicked => root.close();
+                }
             }
         }
     }
