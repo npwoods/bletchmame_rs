@@ -422,8 +422,8 @@ impl AuditMessage {
 	pub fn severity(&self) -> AuditSeverity {
 		match self {
 			Self::NotFoundButOptional | Self::NeedsRedump | Self::NoGoodDump => AuditSeverity::Info,
-			Self::WrongLength { .. } | Self::WrongChecksums { .. } => AuditSeverity::Warning,
-			Self::NotFound | Self::NotFoundNoGoodDump => AuditSeverity::Fail,
+			Self::WrongLength { .. } | Self::WrongChecksums { .. } | Self::NotFoundNoGoodDump => AuditSeverity::Warning,
+			Self::NotFound => AuditSeverity::Fail,
 		}
 	}
 }
