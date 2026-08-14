@@ -821,7 +821,7 @@ impl AppState {
 			},
 			ReportType::SessionStarting => Report {
 				message: "Starting MAME...".into(),
-				submessage: Some("Waiting for emulation startup to be complete".into()),
+				submessage: Some("Waiting for MAME startup to be complete".into()),
 				spinner_progress: Some(f32::NAN),
 				..Default::default()
 			},
