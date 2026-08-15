@@ -733,7 +733,13 @@ impl AppState {
 					.as_ref()
 					.and_then(|session| session.status.as_deref())
 					.and_then(|status| status.running.as_ref())
-					.map(|running| live.info_db.machines().find(&running.machine_name).unwrap().name())
+					.map(|running| {
+						live.info_db
+							.machines()
+							.find(&running.machine_name)
+							.unwrap()
+							.description()
+					})
 			})
 			.unwrap_or_default()
 	}
