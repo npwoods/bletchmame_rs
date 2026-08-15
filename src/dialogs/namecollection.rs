@@ -31,12 +31,6 @@ async fn dialog_name_collection(
 		tx_clone.signal(Some(text));
 	});
 
-	// set up the "cancel" button
-	let tx_clone = tx.clone();
-	modal.dialog().on_cancel_clicked(move || {
-		tx_clone.signal(None);
-	});
-
 	// set up the close handler
 	let tx_clone = tx.clone();
 	modal.window().on_close_requested(move || {

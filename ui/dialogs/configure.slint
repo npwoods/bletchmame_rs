@@ -50,7 +50,6 @@ export component ConfigureDialog inherits Window {
 
     // callbacks
     callback ok-clicked();
-    callback cancel-clicked();
     callback reset-clicked();
     callback entry-option-changed(int, string);
     callback entry-button-clicked(int, Point);
@@ -303,7 +302,7 @@ export component ConfigureDialog inherits Window {
                 max-height: 30px;
                 kind: cancel;
                 clicked => {
-                    root.cancel-clicked();
+                    root.close();
                 }
             }
 

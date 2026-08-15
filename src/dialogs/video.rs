@@ -34,12 +34,6 @@ pub async fn dialog_video(modal_stack: ModalStack, video: PrefsVideo) -> Option<
 		tx_clone.signal(Some(results));
 	});
 
-	// set up the "cancel" button
-	let tx_clone = tx.clone();
-	modal.dialog().on_cancel_clicked(move || {
-		tx_clone.signal(None);
-	});
-
 	// show the dialog
 	modal.run(async { rx.recv().await.unwrap() }).await
 }

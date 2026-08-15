@@ -65,12 +65,6 @@ pub async fn dialog_paths(
 		tx_clone.signal(true);
 	});
 
-	// set up the "cancel" button
-	let tx_clone = tx.clone();
-	modal.dialog().on_cancel_clicked(move || {
-		tx_clone.signal(false);
-	});
-
 	// set up the "browse" button
 	let state_clone = state.clone();
 	modal.dialog().on_browse_clicked(move || {

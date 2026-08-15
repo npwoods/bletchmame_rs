@@ -14,7 +14,6 @@ export component NameCollectionDialog inherits Window {
     width: 400px;
     height: 100px;
     callback ok-clicked();
-    callback cancel-clicked();
     callback text-edited(string);
     out property <string> text;
     in property <string> title-text;
@@ -43,7 +42,7 @@ export component NameCollectionDialog inherits Window {
             StandardButton {
                 kind: cancel;
                 clicked => {
-                    root.cancel-clicked();
+                    root.close();
                 }
                 width: 80px;
                 height: 30px;
