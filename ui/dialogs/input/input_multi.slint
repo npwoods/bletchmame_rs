@@ -13,7 +13,6 @@ export component InputSelectMultipleDialog inherits Window {
     
     // callbacks
     callback ok-clicked();
-    callback cancel-clicked();
     callback checkbox-toggled(int, bool);
 
     // control hierarchy
@@ -38,7 +37,7 @@ export component InputSelectMultipleDialog inherits Window {
             StandardButton {
                 kind: cancel;
                 clicked => {
-                    root.cancel-clicked();
+                    root.close();
                 }
             }
         }

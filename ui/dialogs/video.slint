@@ -13,7 +13,6 @@ import { VideoConfigComponent, VideoSettings } from "../videoconfig.slint";
 export component VideoDialog inherits Window {
     // callbacks
     callback ok-clicked();
-    callback cancel-clicked();
 
     // properties
     in-out property <VideoSettings> settings: default-settings;
@@ -52,7 +51,7 @@ export component VideoDialog inherits Window {
             StandardButton {
                 kind: cancel;
                 clicked => {
-                    root.cancel-clicked();
+                    root.close();
                 }
             }
         }

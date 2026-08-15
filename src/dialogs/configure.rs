@@ -241,12 +241,6 @@ pub async fn dialog_configure(
 		tx_clone.signal(Some(result));
 	});
 
-	// set up the "cancel" button
-	let tx_clone = tx.clone();
-	modal.dialog().on_cancel_clicked(move || {
-		tx_clone.signal(None);
-	});
-
 	// set up the "reset" button
 	let state_clone = state.clone();
 	modal.dialog().on_reset_clicked(move || {

@@ -32,7 +32,6 @@ export component ImportMameIniDialog inherits Dialog {
 
     // callbacks
     callback ok-clicked();
-    callback cancel-clicked();
 
     // widgets
     VerticalBox {
@@ -96,7 +95,7 @@ export component ImportMameIniDialog inherits Dialog {
                 kind: cancel;
                 horizontal-stretch: 0;
                 clicked => {
-                    root.cancel-clicked();
+                    root.close();
                 }
             }
         }

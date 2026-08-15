@@ -68,12 +68,6 @@ pub async fn dialog_import_mame_ini(
 		tx_clone.signal(true);
 	});
 
-	// set up the "cancel" button
-	let tx_clone = tx.clone();
-	modal.dialog().on_cancel_clicked(move || {
-		tx_clone.signal(false);
-	});
-
 	// set up the close handler
 	let tx_clone = tx.clone();
 	modal.window().on_close_requested(move || {

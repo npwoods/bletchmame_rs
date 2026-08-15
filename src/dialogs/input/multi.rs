@@ -57,12 +57,6 @@ pub async fn dialog_input_select_multiple(
 		CloseRequestResponse::KeepWindowShown
 	});
 
-	// set up the "cancel" button
-	let tx_clone = tx.clone();
-	modal.dialog().on_cancel_clicked(move || {
-		tx_clone.signal(None);
-	});
-
 	// set up the "ok" button
 	let tx_clone = tx.clone();
 	modal.dialog().on_ok_clicked(move || {
