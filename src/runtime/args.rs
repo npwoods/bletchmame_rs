@@ -62,8 +62,11 @@ impl MameArguments {
 		let video_args = ["-prescale".into(), Cow::Owned(video.prescale.to_string())].into_iter();
 
 		// debugger arguments
-		let debug_args = prefs
-			.debugging_enabled
+		//
+		// NOTE - we tried conditional debugging, but unless the debugger is enabled MAME can in some
+		// circumstances warnings that we cannot either present nor suppress, so we're forcing it on for now
+		let debugging_enabled = true;
+		let debug_args = debugging_enabled
 			.then_some(Cow::Borrowed("-debug"))
 			.into_iter()
 			.collect::<Vec<_>>();

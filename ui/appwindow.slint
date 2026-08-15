@@ -70,7 +70,6 @@ export component AppWindow inherits Window {
     in property <bool> menubar-visible: true;
     in property <bool> is-paused;
     in property <bool> is-recording;
-    in property <bool> is-debugging-enabled;
     in property <bool> is-debugging-present;
     in property <bool> is-throttled;
     in property <bool> is-fullscreen;
@@ -104,8 +103,7 @@ export component AppWindow inherits Window {
     in property <string> menu-action-file-save-state;
     in property <string> menu-action-file-save-screenshot;
     in property <string> menu-action-file-record-movie;
-    in property <string> menu-action-file-debugging-toggle;
-    in property <string> menu-action-file-debugging-launch;
+    in property <string> menu-action-file-debugger;
     in property <string> menu-action-file-reset-soft;
     in property <string> menu-action-file-reset-hard;
     in property <string> menu-action-file-exit;
@@ -273,13 +271,6 @@ export component AppWindow inherits Window {
     changed is-sound-enabled-shadow => {
         is-sound-enabled-shadow = is-sound-enabled;
     }
-    property <bool> is-debugging-enabled-shadow;
-    changed is-debugging-enabled => {
-        is-debugging-enabled-shadow = is-debugging-enabled;
-    }
-    changed is-debugging-enabled-shadow => {
-        is-debugging-enabled_shadow = is-debugging-enabled;
-    }
 
     // Slint's menu bar
     MenuBar {
@@ -372,26 +363,11 @@ export component AppWindow inherits Window {
 
             MenuSeparator { }
 
-            Menu {
-                title: @tr("MenuBar" => "Debugging");
-
-                MenuItem {
-                    title: @tr("MenuBar" => "Enable");
-                    enabled: mode() == "ready" || mode() == "report";
-                    checkable: true;
-                    checked <=> is-debugging-enabled-shadow;
-
-                    activated => {
-                        menu-item-action(root.menu-action-file-debugging-toggle);
-                    }
-                }
-
-                MenuItem {
-                    title: @tr("MenuBar" => "Launch...");
-                    enabled: is-debugging-present;
-                    activated => {
-                        menu-item-action(root.menu-action-file-debugging-launch);
-                    }
+            MenuItem {
+                title: @tr("MenuBar" => "Debugger...");
+                enabled: root.is-debugging-present;
+                activated => {
+                    menu-item-action(root.menu-action-file-debugger);
                 }
             }
 
