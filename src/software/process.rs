@@ -128,7 +128,12 @@ impl State {
 			(Phase::SoftwarePartDataArea, b"rom") => {
 				let [name, size, crc, sha1, status] =
 					evt.find_attributes([b"name", b"size", b"crc", b"sha1", b"status"])?;
-				let name = name.unwrap_or_default().into();
+				let Some(name) = name else {
+					// the software list tag is <rom> but this is likely not a ROM (e.g. -
+					// NVRAM); software lists are weird
+					return Ok(None);
+				};
+				let name = name.into();
 				let size = parse(&size.unwrap_or_default())?;
 				let hash = AssetHash::from_hex_strings(crc.as_deref(), sha1.as_deref())?;
 				let status = status
