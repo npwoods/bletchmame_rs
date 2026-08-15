@@ -89,12 +89,6 @@ pub async fn dialog_input(
 		CloseRequestResponse::KeepWindowShown
 	});
 
-	// set up the "ok" button
-	let tx_clone = tx.clone();
-	modal.dialog().on_ok_clicked(move || {
-		tx_clone.signal(());
-	});
-
 	// set up the context menu command handler
 	modal.dialog().on_menu_item_action(move |command_string| {
 		if let Some(command) = Action::decode_from_slint(command_string) {

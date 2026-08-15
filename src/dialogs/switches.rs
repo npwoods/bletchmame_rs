@@ -79,12 +79,6 @@ pub async fn dialog_switches(
 		CloseRequestResponse::KeepWindowShown
 	});
 
-	// set up the "ok" button
-	let tx_clone = tx.clone();
-	modal.dialog().on_ok_clicked(move || {
-		tx_clone.signal(());
-	});
-
 	// set up the invoke command callback
 	let invoke_command_clone = invoke_command.clone();
 	modal.dialog().on_menu_item_action(move |command_string| {

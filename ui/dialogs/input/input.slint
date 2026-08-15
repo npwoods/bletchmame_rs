@@ -9,10 +9,7 @@ import {
 import { SimpleMenuEntry } from "../../common.slint";
 import { Icons } from "../../icons.slint";
 
-export struct InputDialogEntry {
-    name: string,
-    text: string,
-    primary-action: string}
+export struct InputDialogEntry { name: string, text: string, primary-action: string }
 
 export component InputDialog inherits Window {
     title: dialog-title;
@@ -26,7 +23,6 @@ export component InputDialog inherits Window {
     in property <string> restore-defaults-action;
 
     // callbacks
-    callback ok-clicked();
     callback context-button-clicked(int, Point);
     callback menu-item-action(string);
 
@@ -113,7 +109,7 @@ export component InputDialog inherits Window {
                 kind: ok;
                 horizontal-stretch: 0;
                 clicked => {
-                    root.ok-clicked();
+                    root.close();
                 }
             }
         }
