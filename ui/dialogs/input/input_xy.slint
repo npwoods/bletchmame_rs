@@ -55,7 +55,6 @@ export component InputXyDialog inherits Window {
     in property <string> restore-defaults-action;
 
     // callbacks
-    callback ok-clicked();
     callback menu-item-action(string);
     callback left-context-button-clicked(Point);
     callback right-context-button-clicked(Point);
@@ -166,7 +165,7 @@ export component InputXyDialog inherits Window {
             StandardButton {
                 kind: ok;
                 clicked => {
-                    root.ok-clicked();
+                    root.close();
                 }
             }
         }

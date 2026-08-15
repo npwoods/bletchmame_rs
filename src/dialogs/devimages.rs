@@ -43,12 +43,6 @@ pub async fn dialog_devices_and_images(
 	};
 	modal.dialog().set_state(state);
 
-	// set up the "ok" button
-	let tx_clone = tx.clone();
-	modal.dialog().on_ok_clicked(move || {
-		tx_clone.signal(());
-	});
-
 	// set up the "apply changes" button
 	let model_clone = model.clone();
 	let invoke_command_clone = invoke_command.clone();

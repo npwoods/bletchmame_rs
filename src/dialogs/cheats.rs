@@ -62,12 +62,6 @@ pub async fn dialog_cheats(
 		CloseRequestResponse::KeepWindowShown
 	});
 
-	// set up the "ok" button
-	let tx_clone = tx.clone();
-	modal.dialog().on_ok_clicked(move || {
-		tx_clone.signal(());
-	});
-
 	// set up the model
 	let model = CheatDialogModel::new(cheats);
 	let model = ModelRc::new(model);

@@ -35,7 +35,6 @@ export component CheatsDialog inherits Window {
     in property <length> splitter-position: 200px;
 
     // callbacks
-    callback ok-clicked();
     callback set-cheat-state(index: int, enabled: bool);
     callback set-cheat-state-parameter(index: int, enabled: bool, parameter-index: int);
 
@@ -128,7 +127,7 @@ export component CheatsDialog inherits Window {
                 kind: ok;
                 horizontal-stretch: 0;
                 clicked => {
-                    root.ok-clicked();
+                    root.close();
                 }
             }
         }

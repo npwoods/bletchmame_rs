@@ -18,7 +18,6 @@ import { Icons } from "../icons.slint";
 export component DevicesAndImagesDialog inherits Window {
     title: "Devices And Images";
     icon: Icons.bletchmame;
-    callback ok-clicked();
     callback apply-changes-clicked();
     preferred-width: 600px;
     preferred-height: 500px;
@@ -70,7 +69,7 @@ export component DevicesAndImagesDialog inherits Window {
                 max-height: 30px;
                 kind: ok;
                 clicked => {
-                    root.ok-clicked();
+                    root.close();
                 }
             }
         }

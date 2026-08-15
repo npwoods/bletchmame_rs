@@ -9,10 +9,7 @@ import {
 } from "std-widgets.slint";
 import { Icons } from "../icons.slint";
 
-export struct SwitchesDialogEntry {
-    name: string,
-    options: [string],
-    current-option-index: int}
+export struct SwitchesDialogEntry { name: string, options: [string], current-option-index: int }
 
 export component SwitchesDialog inherits Window {
     title: dialog-title;
@@ -26,7 +23,6 @@ export component SwitchesDialog inherits Window {
     in property <string> restore-defaults-action;
 
     // callbacks
-    callback ok-clicked();
     callback menu-item-action(string);
     callback entry-option-changed(int, int);
 
@@ -73,7 +69,7 @@ export component SwitchesDialog inherits Window {
                 kind: ok;
                 horizontal-stretch: 0;
                 clicked => {
-                    root.ok-clicked();
+                    root.close();
                 }
             }
         }
