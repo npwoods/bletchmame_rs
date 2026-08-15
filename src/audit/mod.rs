@@ -9,6 +9,7 @@ use std::io::Seek;
 use std::iter::successors;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use anyhow::Result;
 use default_ext::DefaultExt;
@@ -34,6 +35,7 @@ use crate::info::DeviceType;
 use crate::info::Machine;
 use crate::info::View;
 use crate::mconfig::MachineConfig;
+use crate::software::SoftwareList;
 use crate::software::SoftwareListDispenser;
 
 #[derive(Clone, Debug)] // TODO - `Clone` should not be necessary
@@ -112,8 +114,9 @@ impl Asset {
 		software_list_paths: &[SmolStr],
 		images: impl IntoIterator<Item = &'a (SmolStr, ImageDesc)> + 'a,
 	) -> Vec<Self> {
-		let software_list_dispenser = SoftwareListDispenser::new(&machine_config.info_db, software_list_paths);
-		Self::internal_from_machine_config_and_images(machine_config, software_list_dispenser, images)
+		let mut software_list_dispenser = SoftwareListDispenser::new(&machine_config.info_db, software_list_paths);
+		let dispense_software_list = |name: &str| software_list_dispenser.get(name).ok().map(|(_, sl)| sl);
+		assets_from_machine_config_and_images(machine_config, dispense_software_list, images)
 	}
 
 	pub fn from_machine_config_and_software(
@@ -131,182 +134,9 @@ impl Asset {
 			.find(|x| x.name == software)
 			.ok_or_else(|| ThisError::UnknownSoftware(software.into()))?;
 		let images = ImageDesc::from_software(&machine_config.machine(), Some(software_list_name), software)?;
-		let results = Self::internal_from_machine_config_and_images(machine_config, software_list_dispenser, &images);
+		let dispense_software_list = |name: &str| software_list_dispenser.get(name).ok().map(|(_, sl)| sl);
+		let results = assets_from_machine_config_and_images(machine_config, dispense_software_list, &images);
 		Ok(results)
-	}
-
-	fn internal_from_machine_config_and_images<'a>(
-		machine_config: &MachineConfig,
-		mut software_list_dispenser: SoftwareListDispenser<'_>,
-		images: impl IntoIterator<Item = &'a (SmolStr, ImageDesc)> + 'a,
-	) -> Vec<Self> {
-		let mut results = Vec::new();
-		Self::from_machine_internal(&mut results, machine_config.machine(), None, MachineType::Root);
-		machine_config.visit_slots(|_, _, _, _, slot_data| {
-			if let Some(machine) = slot_data.map(|(_, machine_config)| machine_config.machine()) {
-				Self::from_machine_internal(&mut results, machine, None, MachineType::Slot);
-			}
-		});
-
-		// available ports should only be evaluated once
-		let available_ports = OnceCell::new();
-		let available_ports = || available_ports.get_or_init(crate::imagedesc::available_ports);
-
-		// add images
-		for (tag, image_desc) in images {
-			let device = machine_config.lookup_device_tag(tag).ok().map(|(_, device)| device);
-			let device_type = device.map(|d| d.device_type()).unwrap_or(DeviceType::Unknown);
-
-			match image_desc {
-				ImageDesc::File(filename) => {
-					if available_ports().iter().all(|p| p.port_name != *filename) {
-						let name = Path::new(&filename)
-							.file_name()
-							.unwrap_or_default()
-							.to_string_lossy()
-							.as_ref()
-							.into();
-						let asset = Asset {
-							kind: AssetKind::ImageFile {
-								device_type,
-								use_absolute_path: true,
-							},
-							name,
-							size: None,
-							location: AssetLocation::Absolute(filename.clone()),
-							asset_hash: AssetHash::default(),
-							status: AssetStatus::Good,
-							is_optional: false,
-						};
-						results.push(asset);
-					}
-				}
-				ImageDesc::Software { list, name, part } => {
-					let list = list.as_deref();
-					let part = part.as_deref();
-					let target_interfaces_iter = device.iter().flat_map(|x| x.interfaces());
-
-					let software_list_iter = machine_config
-						.machine()
-						.machine_software_lists()
-						.iter()
-						.map(|info_msl| info_msl.software_list())
-						.filter(|info_sl| list.is_none_or(|x| x == info_sl.name()))
-						.filter_map(|info_sl| software_list_dispenser.get(info_sl.name()).ok())
-						.map(|(_, sl)| sl);
-					for software_list in software_list_iter {
-						let asset_iter = software_list
-							.software
-							.iter()
-							.filter(|s| s.name.as_str() == name)
-							.flat_map(|s| &s.parts)
-							.filter(|sp| {
-								part.is_none_or(|x| sp.name == x)
-									&& target_interfaces_iter.clone().any(|i| i == sp.interface.as_str())
-							})
-							.flat_map(|sp| sp.data_areas.iter())
-							.flat_map(|sda| sda.assets.iter())
-							.map(|sa| {
-								let software_list_name = Some(software_list.name.clone());
-								let targets = [name.clone()].into_iter().collect();
-								let location = AssetLocation::Paths {
-									software_list_name,
-									targets,
-								};
-								Asset {
-									kind: AssetKind::ImageFile {
-										device_type,
-										use_absolute_path: false,
-									},
-									name: sa.name.as_str().into(),
-									size: Some(sa.size),
-									location,
-									asset_hash: sa.hash,
-									status: sa.status,
-									is_optional: false,
-								}
-							});
-						results.extend(asset_iter)
-					}
-				}
-				ImageDesc::Socket { .. } => {
-					// nothing to audit
-				}
-			}
-		}
-
-		// remove duplicates and return
-		let results = results
-			.into_iter()
-			.unique_by(|x| (x.kind, x.name.clone(), x.location.clone()))
-			.collect();
-
-		debug!(?machine_config, ?results, "Asset::from_machine_config()");
-		results
-	}
-
-	fn from_machine_internal(
-		results: &mut Vec<Self>,
-		machine: Machine<'_>,
-		bios: Option<&str>,
-		machine_type: MachineType<'_>,
-	) {
-		// we were passed a BIOS; if `None` was specified use the machine's default BIOS
-		let bios = bios.or_else(|| {
-			machine
-				.default_biosset_index()
-				.map(|index| machine.biossets().get(index).unwrap().name())
-		});
-
-		debug!(machine=?machine.name(), ?bios, ?machine_type, "Asset::from_machine_internal()");
-
-		let targets = successors(Some(machine), |machine| machine.rom_of())
-			.map(|machine| machine.name().into())
-			.collect();
-		let location = AssetLocation::Paths {
-			software_list_name: None,
-			targets,
-		};
-		let roms = machine
-			.roms()
-			.iter()
-			.filter(|r| r.bios().is_none_or(|b| bios == Some(b)))
-			.map(|rom| Asset {
-				kind: AssetKind::Rom,
-				name: rom.name().into(),
-				size: rom.size().into(),
-				location: location.clone(),
-				asset_hash: rom.asset_hash(),
-				status: rom.status(),
-				is_optional: rom.is_optional(),
-			});
-		let disks = machine.disks().iter().map(|disk| Asset {
-			kind: AssetKind::Disk,
-			name: format!("{}.chd", disk.name()).into(),
-			size: None,
-			location: location.clone(),
-			asset_hash: disk.asset_hash(),
-			status: disk.status(),
-			is_optional: disk.is_optional(),
-		});
-		let samples = machine.samples().iter().map(|sample| Asset {
-			kind: AssetKind::Sample,
-			name: format!("{}.wav", sample.name()).into(),
-			size: None,
-			location: location.clone(),
-			asset_hash: AssetHash::default(),
-			status: AssetStatus::Good,
-			is_optional: true, // samples are always optional; MAME just doesn't play the same if they are missing
-		});
-		results.extend(roms.chain(disks).chain(samples));
-
-		// add devices references
-		for device_ref in machine.device_refs().iter() {
-			if let Some(machine) = device_ref.machine() {
-				let machine_type = MachineType::DeviceRef(device_ref.tag());
-				Self::from_machine_internal(results, machine, None, machine_type);
-			}
-		}
 	}
 
 	pub fn run_audit(&self, rom_paths: &[impl AsRef<Path>], sample_paths: &[impl AsRef<Path>]) -> AuditResult {
@@ -451,6 +281,179 @@ pub enum PathType {
 	SevenZ,
 }
 
+fn assets_from_machine_config_and_images<'a>(
+	machine_config: &MachineConfig,
+	mut dispense_software_list: impl FnMut(&str) -> Option<Arc<SoftwareList>>,
+	images: impl IntoIterator<Item = &'a (SmolStr, ImageDesc)> + 'a,
+) -> Vec<Asset> {
+	let mut results = Vec::new();
+	assets_from_machine_internal(&mut results, machine_config.machine(), None, MachineType::Root);
+	machine_config.visit_slots(|_, _, _, _, slot_data| {
+		if let Some(machine) = slot_data.map(|(_, machine_config)| machine_config.machine()) {
+			assets_from_machine_internal(&mut results, machine, None, MachineType::Slot);
+		}
+	});
+
+	// available ports should only be evaluated once
+	let available_ports = OnceCell::new();
+	let available_ports = || available_ports.get_or_init(crate::imagedesc::available_ports);
+
+	// add images
+	for (tag, image_desc) in images {
+		let device = machine_config.lookup_device_tag(tag).ok().map(|(_, device)| device);
+		let device_type = device.map(|d| d.device_type()).unwrap_or(DeviceType::Unknown);
+
+		match image_desc {
+			ImageDesc::File(filename) => {
+				if available_ports().iter().all(|p| p.port_name != *filename) {
+					let name = Path::new(&filename)
+						.file_name()
+						.unwrap_or_default()
+						.to_string_lossy()
+						.as_ref()
+						.into();
+					let asset = Asset {
+						kind: AssetKind::ImageFile {
+							device_type,
+							use_absolute_path: true,
+						},
+						name,
+						size: None,
+						location: AssetLocation::Absolute(filename.clone()),
+						asset_hash: AssetHash::default(),
+						status: AssetStatus::Good,
+						is_optional: false,
+					};
+					results.push(asset);
+				}
+			}
+			ImageDesc::Software { list, name, part } => {
+				let list = list.as_deref();
+				let part = part.as_deref();
+				let target_interfaces_iter = device.iter().flat_map(|x| x.interfaces());
+
+				let software_list_iter = machine_config
+					.machine()
+					.machine_software_lists()
+					.iter()
+					.map(|info_msl| info_msl.software_list())
+					.filter(|info_sl| list.is_none_or(|x| x == info_sl.name()))
+					.filter_map(|info_sl| dispense_software_list(info_sl.name()));
+				for software_list in software_list_iter {
+					let asset_iter = software_list
+						.software
+						.iter()
+						.filter(|s| s.name.as_str() == name)
+						.flat_map(|s| &s.parts)
+						.filter(|sp| {
+							part.is_none_or(|x| sp.name == x)
+								&& target_interfaces_iter.clone().any(|i| i == sp.interface.as_str())
+						})
+						.flat_map(|sp| sp.data_areas.iter())
+						.flat_map(|sda| sda.assets.iter())
+						.map(|sa| {
+							let software_list_name = Some(software_list.name.clone());
+							let targets = [name.clone()].into_iter().collect();
+							let location = AssetLocation::Paths {
+								software_list_name,
+								targets,
+							};
+							Asset {
+								kind: AssetKind::ImageFile {
+									device_type,
+									use_absolute_path: false,
+								},
+								name: sa.name.as_str().into(),
+								size: Some(sa.size),
+								location,
+								asset_hash: sa.hash,
+								status: sa.status,
+								is_optional: false,
+							}
+						});
+					results.extend(asset_iter)
+				}
+			}
+			ImageDesc::Socket { .. } => {
+				// nothing to audit
+			}
+		}
+	}
+
+	// remove duplicates and return
+	let results = results
+		.into_iter()
+		.unique_by(|x| (x.kind, x.name.clone(), x.location.clone()))
+		.collect();
+
+	debug!(?machine_config, ?results, "assets_from_machine_config()");
+	results
+}
+
+fn assets_from_machine_internal(
+	results: &mut Vec<Asset>,
+	machine: Machine<'_>,
+	bios: Option<&str>,
+	machine_type: MachineType<'_>,
+) {
+	// we were passed a BIOS; if `None` was specified use the machine's default BIOS
+	let bios = bios.or_else(|| {
+		machine
+			.default_biosset_index()
+			.map(|index| machine.biossets().get(index).unwrap().name())
+	});
+
+	debug!(machine=?machine.name(), ?bios, ?machine_type, "assets_from_machine_internal()");
+
+	let targets = successors(Some(machine), |machine| machine.rom_of())
+		.map(|machine| machine.name().into())
+		.collect();
+	let location = AssetLocation::Paths {
+		software_list_name: None,
+		targets,
+	};
+	let roms = machine
+		.roms()
+		.iter()
+		.filter(|r| r.bios().is_none_or(|b| bios == Some(b)))
+		.map(|rom| Asset {
+			kind: AssetKind::Rom,
+			name: rom.name().into(),
+			size: rom.size().into(),
+			location: location.clone(),
+			asset_hash: rom.asset_hash(),
+			status: rom.status(),
+			is_optional: rom.is_optional(),
+		});
+	let disks = machine.disks().iter().map(|disk| Asset {
+		kind: AssetKind::Disk,
+		name: format!("{}.chd", disk.name()).into(),
+		size: None,
+		location: location.clone(),
+		asset_hash: disk.asset_hash(),
+		status: disk.status(),
+		is_optional: disk.is_optional(),
+	});
+	let samples = machine.samples().iter().map(|sample| Asset {
+		kind: AssetKind::Sample,
+		name: format!("{}.wav", sample.name()).into(),
+		size: None,
+		location: location.clone(),
+		asset_hash: AssetHash::default(),
+		status: AssetStatus::Good,
+		is_optional: true, // samples are always optional; MAME just doesn't play the same if they are missing
+	});
+	results.extend(roms.chain(disks).chain(samples));
+
+	// add devices references
+	for device_ref in machine.device_refs().iter() {
+		if let Some(machine) = device_ref.machine() {
+			let machine_type = MachineType::DeviceRef(device_ref.tag());
+			assets_from_machine_internal(results, machine, None, machine_type);
+		}
+	}
+}
+
 #[allow(clippy::too_many_arguments)]
 fn try_audit(
 	asset_name: &str,
@@ -578,17 +581,21 @@ mod tests {
 	use std::io::Cursor;
 	use std::io::Read;
 	use std::ops::ControlFlow;
+	use std::sync::Arc;
 
 	use sevenz_rust2::ArchiveReader as SevenZArchiveReader;
 	use test_case::test_case;
 	use zip::ZipArchive;
 
+	use crate::imagedesc::ImageDesc;
 	use crate::info::InfoDb;
 	use crate::mconfig::MachineConfig;
+	use crate::software::SoftwareList;
 
 	use super::Asset;
 	use super::SevenZArchiveReaderExt as _;
 	use super::ZipArchiveExt as _;
+	use super::assets_from_machine_config_and_images;
 
 	#[test_case(0, include_str!("../info/test_data/listxml_alienar.xml"), "alienar")]
 	#[test_case(1, include_str!("../info/test_data/listxml_coco.xml"), "coco2b")]
@@ -617,6 +624,50 @@ mod tests {
 
 		// identify audit assets
 		let assets = Asset::from_machine_config_and_images(&machine_config, &[], []);
+
+		// and validate
+		insta::assert_debug_snapshot!(assets);
+	}
+
+	#[test_case(0, include_str!("../info/test_data/listxml_coco.xml"), include_str!("../software/test_data/softlist_coco_cart.xml"), "coco2b", "dagorath")]
+	fn assets_from_machine_config_and_software(
+		_index: usize,
+		info_xml: &str,
+		softlist_xml: &str,
+		machine_name: &str,
+		software_name: &str,
+	) {
+		// set the insta snapshot suffix; this is a parameterized test
+		let mut settings = insta::Settings::clone_current();
+		settings.set_snapshot_suffix(format!("{machine_name}_{software_name}"));
+		let _guard = settings.bind_to_scope();
+
+		// load the InfoDb
+		let info_db = InfoDb::from_listxml_output(info_xml.as_bytes(), |_| ControlFlow::Continue(()))
+			.unwrap()
+			.unwrap()
+			.into();
+
+		// create a MachineConifg
+		let opts: &[(&str, Option<&str>)] = &[];
+		let machine_config = MachineConfig::from_machine_name_and_slots(info_db, machine_name, opts).unwrap();
+
+		// load the software list
+		let software_list = SoftwareList::from_reader(softlist_xml.as_bytes()).unwrap();
+		let software_list = Arc::new(software_list);
+
+		// identify image descs
+		let software = software_list
+			.software
+			.iter()
+			.find(|x| x.name == software_name)
+			.unwrap()
+			.as_ref();
+		let images = ImageDesc::from_software(&machine_config.machine(), Some(&software_list.name), software).unwrap();
+
+		// identify audit assets
+		let dispense_software_list = |name: &str| (name == software_list.name).then_some(&software_list).cloned();
+		let assets = assets_from_machine_config_and_images(&machine_config, &dispense_software_list, &images);
 
 		// and validate
 		insta::assert_debug_snapshot!(assets);
