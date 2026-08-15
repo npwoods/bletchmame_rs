@@ -73,6 +73,7 @@ expression: assets
             software_list_name: None,
             targets: [
                 "saa5050",
+                "bbcm",
             ],
         },
         asset_hash: CRC(201490f3) SHA1(6c8daba70374e5aa3a6402f24cdc5f8677d58a0f),

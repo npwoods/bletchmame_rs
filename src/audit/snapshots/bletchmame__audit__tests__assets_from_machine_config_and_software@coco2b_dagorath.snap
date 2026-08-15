@@ -47,6 +47,7 @@ expression: assets
             software_list_name: None,
             targets: [
                 "coco_fdc",
+                "coco2b",
             ],
         },
         asset_hash: CRC(0b9c5415) SHA1(10bdc5aa2d7d7f205f67b47b19003a4bd89defd1),
