@@ -630,6 +630,7 @@ mod tests {
 	}
 
 	#[test_case(0, include_str!("../info/test_data/listxml_coco.xml"), include_str!("../software/test_data/softlist_coco_cart.xml"), "coco2b", "dagorath")]
+	#[test_case(1, include_str!("../info/test_data/listxml_bbcm.xml"), include_str!("../software/test_data/softlist_bbcm_cart.xml"), "bbcm", "click100")]
 	fn assets_from_machine_config_and_software(
 		_index: usize,
 		info_xml: &str,
