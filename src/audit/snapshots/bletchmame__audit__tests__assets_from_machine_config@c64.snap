@@ -77,6 +77,7 @@ expression: assets
             software_list_name: None,
             targets: [
                 "c1541",
+                "c64",
             ],
         },
         asset_hash: CRC(3a235039) SHA1(c7f94f4f51d6de4cdc21ecbb7e57bb209f0530c0),
@@ -93,6 +94,7 @@ expression: assets
             software_list_name: None,
             targets: [
                 "c1541",
+                "c64",
             ],
         },
         asset_hash: CRC(29ae9752) SHA1(8e0547430135ba462525c224e76356bd3d430f11),

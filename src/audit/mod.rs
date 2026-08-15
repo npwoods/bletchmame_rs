@@ -287,10 +287,11 @@ fn assets_from_machine_config_and_images<'a>(
 	images: impl IntoIterator<Item = &'a (SmolStr, ImageDesc)> + 'a,
 ) -> Vec<Asset> {
 	let mut results = Vec::new();
-	assets_from_machine_internal(&mut results, machine_config.machine(), None, MachineType::Root);
+	let root_machine = machine_config.machine();
+	assets_from_machine_internal(&mut results, root_machine, root_machine, None, MachineType::Root);
 	machine_config.visit_slots(|_, _, _, _, slot_data| {
 		if let Some(machine) = slot_data.map(|(_, machine_config)| machine_config.machine()) {
-			assets_from_machine_internal(&mut results, machine, None, MachineType::Slot);
+			assets_from_machine_internal(&mut results, root_machine, machine, None, MachineType::Slot);
 		}
 	});
 
@@ -392,27 +393,29 @@ fn assets_from_machine_config_and_images<'a>(
 
 fn assets_from_machine_internal(
 	results: &mut Vec<Asset>,
-	machine: Machine<'_>,
+	root_machine: Machine<'_>,
+	device_machine: Machine<'_>,
 	bios: Option<&str>,
 	machine_type: MachineType<'_>,
 ) {
 	// we were passed a BIOS; if `None` was specified use the machine's default BIOS
 	let bios = bios.or_else(|| {
-		machine
+		device_machine
 			.default_biosset_index()
-			.map(|index| machine.biossets().get(index).unwrap().name())
+			.map(|index| device_machine.biossets().get(index).unwrap().name())
 	});
 
-	debug!(machine=?machine.name(), ?bios, ?machine_type, "assets_from_machine_internal()");
+	debug!(root_machine=?root_machine.name(), device_machine=?device_machine.name(), ?bios, ?machine_type, "assets_from_machine_internal()");
 
-	let targets = successors(Some(machine), |machine| machine.rom_of())
+	let targets = successors(Some(device_machine), |machine| machine.rom_of())
 		.map(|machine| machine.name().into())
+		.chain((root_machine.name() != device_machine.name()).then_some(root_machine.name().into()))
 		.collect();
 	let location = AssetLocation::Paths {
 		software_list_name: None,
 		targets,
 	};
-	let roms = machine
+	let roms = device_machine
 		.roms()
 		.iter()
 		.filter(|r| r.bios().is_none_or(|b| bios == Some(b)))
@@ -425,7 +428,7 @@ fn assets_from_machine_internal(
 			status: rom.status(),
 			is_optional: rom.is_optional(),
 		});
-	let disks = machine.disks().iter().map(|disk| Asset {
+	let disks = device_machine.disks().iter().map(|disk| Asset {
 		kind: AssetKind::Disk,
 		name: format!("{}.chd", disk.name()).into(),
 		size: None,
@@ -434,7 +437,7 @@ fn assets_from_machine_internal(
 		status: disk.status(),
 		is_optional: disk.is_optional(),
 	});
-	let samples = machine.samples().iter().map(|sample| Asset {
+	let samples = device_machine.samples().iter().map(|sample| Asset {
 		kind: AssetKind::Sample,
 		name: format!("{}.wav", sample.name()).into(),
 		size: None,
@@ -446,10 +449,10 @@ fn assets_from_machine_internal(
 	results.extend(roms.chain(disks).chain(samples));
 
 	// add devices references
-	for device_ref in machine.device_refs().iter() {
+	for device_ref in device_machine.device_refs().iter() {
 		if let Some(machine) = device_ref.machine() {
 			let machine_type = MachineType::DeviceRef(device_ref.tag());
-			assets_from_machine_internal(results, machine, None, machine_type);
+			assets_from_machine_internal(results, root_machine, machine, None, machine_type);
 		}
 	}
 }
