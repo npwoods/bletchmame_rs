@@ -1,0 +1,78 @@
+---
+source: src/audit/mod.rs
+expression: assets
+---
+[
+    Asset {
+        kind: Rom,
+        name: "bas13.rom",
+        size: Some(
+            8192,
+        ),
+        location: Paths {
+            software_list_name: None,
+            targets: [
+                "coco2b",
+                "coco",
+            ],
+        },
+        asset_hash: CRC(d8f4d15e) SHA1(28b92bebe35fa4f026a084416d6ea3b1552b63d3),
+        status: Good,
+        is_optional: false,
+    },
+    Asset {
+        kind: Rom,
+        name: "extbas11.rom",
+        size: Some(
+            8192,
+        ),
+        location: Paths {
+            software_list_name: None,
+            targets: [
+                "coco2b",
+                "coco",
+            ],
+        },
+        asset_hash: CRC(a82a6254) SHA1(ad927fb4f30746d820cb8b860ebb585e7f095dea),
+        status: Good,
+        is_optional: false,
+    },
+    Asset {
+        kind: Rom,
+        name: "disk11.rom",
+        size: Some(
+            8192,
+        ),
+        location: Paths {
+            software_list_name: None,
+            targets: [
+                "coco_fdc",
+                "coco2b",
+            ],
+        },
+        asset_hash: CRC(0b9c5415) SHA1(10bdc5aa2d7d7f205f67b47b19003a4bd89defd1),
+        status: Good,
+        is_optional: false,
+    },
+    Asset {
+        kind: ImageFile {
+            device_type: FloppyDisk,
+            use_absolute_path: false,
+        },
+        name: "ZONX.DSK",
+        size: Some(
+            161280,
+        ),
+        location: Paths {
+            software_list_name: Some(
+                "coco_flop",
+            ),
+            targets: [
+                "zonx",
+            ],
+        },
+        asset_hash: CRC(da6a8b6c) SHA1(fdd3ef04a6e2fcc854a467ae735f2af43c838af2),
+        status: Good,
+        is_optional: false,
+    },
+]

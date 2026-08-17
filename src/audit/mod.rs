@@ -303,7 +303,17 @@ fn assets_from_machine_config_and_images<'a>(
 
 	// add images
 	for (tag, image_desc) in images {
-		let device = machine_config.lookup_device_tag(tag).ok().map(|(_, device)| device);
+		let device = machine_config
+			.lookup_device_tag(tag)
+			.ok()
+			.map(|(_, device)| device)
+			.or_else(|| {
+				// can't find the device? as a backup plan lets try to see if we can find it in the default configuration
+				//
+				// this was discussed on the MAME Bannister forums ("Inconsistencies in MAME -listxml output")
+				// https://forums.bannister.org/ubbthreads.php?ubb=showflat&Number=124299#Post124299
+				machine_config.machine().devices().iter().find(|d| d.tag() == tag)
+			});
 		let device_type = device.map(|d| d.device_type()).unwrap_or(DeviceType::Unknown);
 
 		match image_desc {
@@ -652,8 +662,10 @@ mod tests {
 		insta::assert_debug_snapshot!(assets);
 	}
 
-	#[test_case(0, include_str!("../info/test_data/listxml_coco.xml"), include_str!("../software/test_data/softlist_coco_cart.xml"), "coco2b", "dagorath")]
-	#[test_case(1, include_str!("../info/test_data/listxml_bbcm.xml"), include_str!("../software/test_data/softlist_bbcm_cart.xml"), "bbcm", "click100")]
+	#[allow(clippy::zero_prefixed_literal)]
+	#[test_case(00, include_str!("../info/test_data/listxml_coco.xml"), include_str!("../software/test_data/softlist_coco_cart.xml"), "coco2b", "dagorath")]
+	#[test_case(01, include_str!("../info/test_data/listxml_coco.xml"), include_str!("../software/test_data/softlist_coco_flop.xml"), "coco2b", "zonx")]
+	#[test_case(02, include_str!("../info/test_data/listxml_bbcm.xml"), include_str!("../software/test_data/softlist_bbcm_cart.xml"), "bbcm", "click100")]
 	fn assets_from_machine_config_and_software(
 		_index: usize,
 		info_xml: &str,
