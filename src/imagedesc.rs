@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::collections::HashSet;
 use std::path::Path;
 use std::str::FromStr;
 
@@ -61,9 +62,10 @@ impl ImageDesc {
 
 	pub fn from_software(
 		machine: &Machine,
-		software_list: Option<&str>,
+		software_list_name: Option<&str>,
 		software: &Software,
 	) -> Result<Vec<(SmolStr, Self)>> {
+		let mut used_device_tags = HashSet::new();
 		software
 			.parts
 			.iter()
@@ -71,10 +73,14 @@ impl ImageDesc {
 				machine
 					.devices()
 					.iter()
-					.find(|dev| dev.interfaces().any(|x| x == part.interface))
+					.find(|dev| dev.interfaces().any(|x| x == part.interface) && !used_device_tags.contains(dev.tag()))
 					.map(|dev| {
+						// can't use this device again; record it
+						used_device_tags.insert(dev.tag());
+
+						// and return the device tag and ImageDesc
 						let desc = ImageDesc::Software {
-							list: software_list.map(|x| x.into()),
+							list: software_list_name.map(|x| x.into()),
 							name: software.name.clone(),
 							part: Some(part.name.clone()),
 						};
@@ -289,7 +295,12 @@ impl<'de> Deserialize<'de> for ImageDesc {
 
 #[cfg(test)]
 mod test {
+	use std::ops::ControlFlow;
+
 	use test_case::test_case;
+
+	use crate::info::InfoDb;
+	use crate::software::SoftwareList;
 
 	use super::ImageDesc;
 	use super::ImageDescStringType;
@@ -350,5 +361,50 @@ mod test {
 	fn deserialize(_index: usize, json: &str, expected: ImageDesc) {
 		let actual = serde_json::from_str(json).unwrap();
 		assert_eq!(&expected, &actual);
+	}
+
+	#[allow(clippy::zero_prefixed_literal)]
+	#[test_case(00, include_str!("./info/test_data/listxml_coco.xml"), include_str!("./software/test_data/softlist_coco_flop.xml"), "coco2b", "zonx", &[("ext:fdc:wd17xx:0:525dd", "coco_flop:zonx:flop0")])]
+	#[test_case(01, include_str!("./info/test_data/listxml_coco.xml"), include_str!("./software/test_data/softlist_coco_flop.xml"), "coco2b", "rbwd1086", &[("ext:fdc:wd17xx:0:525dd", "coco_flop:rbwd1086:flop0"), ("ext:fdc:wd17xx:1:525dd", "coco_flop:rbwd1086:flop1")])]
+	fn from_software(
+		_index: usize,
+		info_xml: &str,
+		software_list_xml: &str,
+		machine_name: &str,
+		software_name: &str,
+		expected: &[(&str, &str)],
+	) {
+		// load the InfoDb
+		let info_db = InfoDb::from_listxml_output(info_xml.as_bytes(), |_| ControlFlow::Continue(()))
+			.unwrap()
+			.unwrap();
+
+		// find the machine
+		let machine = info_db.machines().find(machine_name).unwrap();
+
+		// find the software
+		let software_list = SoftwareList::from_reader(software_list_xml.as_bytes()).unwrap();
+		let software = software_list
+			.software
+			.iter()
+			.find(|x| x.name == software_name)
+			.unwrap()
+			.as_ref();
+
+		// and invoke the star of the show
+		let actual = ImageDesc::from_software(&machine, Some(software_list.name.as_ref()), software).unwrap();
+
+		// normalize the actual data
+		let actual = actual
+			.iter()
+			.map(|(tag, desc)| (tag, desc.as_mame_image_desc().into_owned()))
+			.collect::<Vec<_>>();
+		let actual = actual
+			.iter()
+			.map(|(tag, desc)| (tag.as_ref(), desc.as_ref()))
+			.collect::<Vec<_>>();
+
+		// and validate!
+		assert_eq!(expected, actual);
 	}
 }
