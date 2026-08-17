@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::collections::HashSet;
 use std::path::Path;
 use std::str::FromStr;
 
@@ -64,6 +65,7 @@ impl ImageDesc {
 		software_list_name: Option<&str>,
 		software: &Software,
 	) -> Result<Vec<(SmolStr, Self)>> {
+		let mut used_device_tags = HashSet::new();
 		software
 			.parts
 			.iter()
@@ -71,8 +73,12 @@ impl ImageDesc {
 				machine
 					.devices()
 					.iter()
-					.find(|dev| dev.interfaces().any(|x| x == part.interface))
+					.find(|dev| dev.interfaces().any(|x| x == part.interface) && !used_device_tags.contains(dev.tag()))
 					.map(|dev| {
+						// can't use this device again; record it
+						used_device_tags.insert(dev.tag());
+
+						// and return the device tag and ImageDesc
 						let desc = ImageDesc::Software {
 							list: software_list_name.map(|x| x.into()),
 							name: software.name.clone(),
@@ -359,6 +365,7 @@ mod test {
 
 	#[allow(clippy::zero_prefixed_literal)]
 	#[test_case(00, include_str!("./info/test_data/listxml_coco.xml"), include_str!("./software/test_data/softlist_coco_flop.xml"), "coco2b", "zonx", &[("ext:fdc:wd17xx:0:525dd", "coco_flop:zonx:flop0")])]
+	#[test_case(01, include_str!("./info/test_data/listxml_coco.xml"), include_str!("./software/test_data/softlist_coco_flop.xml"), "coco2b", "rbwd1086", &[("ext:fdc:wd17xx:0:525dd", "coco_flop:rbwd1086:flop0"), ("ext:fdc:wd17xx:1:525dd", "coco_flop:rbwd1086:flop1")])]
 	fn from_software(
 		_index: usize,
 		info_xml: &str,
