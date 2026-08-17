@@ -1334,7 +1334,11 @@ function startplugin()
 					local v = table.remove(start_load_args, 1)
 					local image = find_image_by_tag(k)
 					if image then
-						image:load(v)
+						if v:sub(1, 1) == "?" then
+							image:load_software(v:sub(2))
+						else
+							image:load(v)
+						end
 						if image.is_reset_on_load then
 							will_reset = true
 						end
