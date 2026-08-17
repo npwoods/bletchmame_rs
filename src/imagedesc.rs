@@ -86,27 +86,43 @@ impl ImageDesc {
 	}
 
 	pub fn as_mame_image_desc(&self) -> Cow<'_, str> {
-		match self {
-			Self::File(filename) => Cow::Borrowed(filename.as_ref()),
-			Self::Software {
-				list,
-				name: software,
-				part,
-			} => match (list.as_deref(), part.as_deref()) {
-				(None, None) => Cow::Borrowed(software.as_ref()),
-				(Some(list), None) => format!("{}:{}", list, software).into(),
-				(list, Some(part)) => format!("{}:{}:{}", list.unwrap_or_default(), software, part).into(),
-			},
-			Self::Socket { hostname, port } => format!("socket.{}:{}", hostname, *port).into(),
-		}
+		image_desc_to_string(self, ImageDescStringType::ImageDesc)
+	}
+
+	pub fn as_mame_start_argument(&self) -> Cow<'_, str> {
+		image_desc_to_string(self, ImageDescStringType::StartArgument)
 	}
 
 	pub fn display_name(&self) -> Cow<'_, str> {
-		if let Self::File(filename) = self {
+		image_desc_to_string(self, ImageDescStringType::Display)
+	}
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum ImageDescStringType {
+	ImageDesc,
+	StartArgument,
+	Display,
+}
+
+fn image_desc_to_string(desc: &ImageDesc, string_type: ImageDescStringType) -> Cow<'_, str> {
+	let prefix = if string_type == ImageDescStringType::StartArgument {
+		"?"
+	} else {
+		""
+	};
+
+	match (desc, string_type) {
+		(ImageDesc::File(filename), ImageDescStringType::Display) => {
 			Path::new(filename).file_name().unwrap_or_default().to_string_lossy()
-		} else {
-			self.as_mame_image_desc()
 		}
+		(ImageDesc::File(filename), _) => Cow::Borrowed(filename.as_ref()),
+		(ImageDesc::Software { list, name, part }, _) => match (list.as_deref(), part.as_deref()) {
+			(None, None) => Cow::Borrowed(name.as_ref()),
+			(Some(list), None) => format!("{}:{}", list, name).into(),
+			(list, Some(part)) => format!("{}{}:{}:{}", prefix, list.unwrap_or_default(), name, part).into(),
+		},
+		(ImageDesc::Socket { hostname, port }, _) => format!("socket.{}:{}", hostname, *port).into(),
 	}
 }
 
@@ -276,16 +292,19 @@ mod test {
 	use test_case::test_case;
 
 	use super::ImageDesc;
+	use super::ImageDescStringType;
 	use super::ThisError;
 
 	#[allow(clippy::zero_prefixed_literal)]
-	#[test_case(00, ImageDesc::File("/foo/bar.img".into()), "/foo/bar.img")]
-	#[test_case(01, ImageDesc::Software{ list: None, name: "abcde".into(), part: None }, "abcde")]
-	#[test_case(02, ImageDesc::Software{ list: Some("abc".into()), name: "def".into(), part: None }, "abc:def")]
-	#[test_case(03, ImageDesc::Software{ list: Some("abc".into()), name: "def".into(), part: Some("ghi".into()) }, "abc:def:ghi")]
-	#[test_case(04, ImageDesc::socket("contoso.com", 8888).unwrap(), "socket.contoso.com:8888")]
-	fn as_mame_image_desc(_index: usize, image_desc: ImageDesc, expected: &str) {
-		let actual = image_desc.as_mame_image_desc();
+	#[test_case(00, ImageDesc::File("/foo/bar.img".into()), ImageDescStringType::ImageDesc, "/foo/bar.img")]
+	#[test_case(01, ImageDesc::File("/foo/bar.img".into()), ImageDescStringType::StartArgument, "/foo/bar.img")]
+	#[test_case(02, ImageDesc::Software{ list: None, name: "abcde".into(), part: None }, ImageDescStringType::ImageDesc, "abcde")]
+	#[test_case(03, ImageDesc::Software{ list: Some("abc".into()), name: "def".into(), part: None }, ImageDescStringType::ImageDesc, "abc:def")]
+	#[test_case(04, ImageDesc::Software{ list: Some("abc".into()), name: "def".into(), part: Some("ghi".into()) }, ImageDescStringType::ImageDesc, "abc:def:ghi")]
+	#[test_case(05, ImageDesc::Software{ list: Some("abc".into()), name: "def".into(), part: Some("ghi".into()) }, ImageDescStringType::StartArgument, "?abc:def:ghi")]
+	#[test_case(06, ImageDesc::socket("contoso.com", 8888).unwrap(), ImageDescStringType::ImageDesc, "socket.contoso.com:8888")]
+	fn image_desc_to_string(_index: usize, desc: ImageDesc, string_type: ImageDescStringType, expected: &str) {
+		let actual = super::image_desc_to_string(&desc, string_type);
 		assert_eq!(expected, &*actual);
 	}
 

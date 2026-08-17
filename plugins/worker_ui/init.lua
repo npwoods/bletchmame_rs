@@ -1334,7 +1334,11 @@ function startplugin()
 					local v = table.remove(start_load_args, 1)
 					local image = find_image_by_tag(k)
 					if image then
-						image:load(v)
+						if v:sub(1, 1) == "?" then
+							image:load_software(v:sub(2))
+						else
+							image:load(v)
+						end
 						if image.is_reset_on_load then
 							will_reset = true
 						end
@@ -1363,21 +1367,6 @@ function startplugin()
 	emu.register_prestart(function() 
 		protected_call(callback_prestart, "callback_prestart")
 	end)
-
-	function callback_stop()
-		-- the emulation session has stopped; tidy things up
-		stop_polling_input_seq()
-		print("@INFO ### Session is stopping")
-	end
-	if emu.add_machine_stop_notifier ~= nil then
-		emu.add_machine_stop_notifier(function()
-			protected_call(callback_stop, "callback_stop")
-		end)
-	else
-		emu.register_stop(function()
-			protected_call(callback_stop, "callback_stop")
-		end)
-	end
 
 	-- register another handler to handle commands after prestart
 	function callback_periodic()

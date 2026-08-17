@@ -56,7 +56,7 @@ impl MameCommand {
 		let image_args_iter = start_args
 			.images
 			.iter()
-			.flat_map(|(tag, image_desc)| [Cow::Borrowed(tag.as_ref()), image_desc.as_mame_image_desc()]);
+			.flat_map(|(tag, image_desc)| [Cow::Borrowed(tag.as_ref()), image_desc.as_mame_start_argument()]);
 
 		// and assemble everything
 		let args = once(Cow::Borrowed(start_args.machine_name.as_str()))
