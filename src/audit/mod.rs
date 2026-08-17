@@ -22,6 +22,8 @@ use smallvec::SmallVec;
 use smol_str::SmolStr;
 use strum::EnumProperty;
 use tracing::debug;
+use tracing::trace;
+use tracing::warn;
 use zip::ZipArchive;
 use zip::read::ZipFile;
 use zip::result::ZipError;
@@ -331,21 +333,33 @@ fn assets_from_machine_config_and_images<'a>(
 			ImageDesc::Software { list, name, part } => {
 				let list = list.as_deref();
 				let part = part.as_deref();
-				let target_interfaces_iter = device.iter().flat_map(|x| x.interfaces());
 
-				let software_list_iter = machine_config
+				// try to find the software in question
+				let software_lookup_result = machine_config
 					.machine()
 					.machine_software_lists()
 					.iter()
 					.map(|info_msl| info_msl.software_list())
 					.filter(|info_sl| list.is_none_or(|x| x == info_sl.name()))
-					.filter_map(|info_sl| dispense_software_list(info_sl.name()));
-				for software_list in software_list_iter {
-					let asset_iter = software_list
-						.software
+					.filter_map(|info_sl| dispense_software_list(info_sl.name()))
+					.filter_map(|software_list| {
+						software_list
+							.software
+							.iter()
+							.find(|s| s.name.as_str() == name)
+							.map(|software| {
+								let software_list_name = software_list.name.clone();
+								(software_list_name, software.clone())
+							})
+					})
+					.next();
+
+				// at this point we should have found the software (if we didn't something went wrong)
+				if let Some((software_list_name, software)) = software_lookup_result {
+					let target_interfaces_iter = device.iter().flat_map(|x| x.interfaces());
+					let asset_iter = software
+						.parts
 						.iter()
-						.filter(|s| s.name.as_str() == name)
-						.flat_map(|s| &s.parts)
 						.filter(|sp| {
 							part.is_none_or(|x| sp.name == x)
 								&& target_interfaces_iter.clone().any(|i| i == sp.interface.as_str())
@@ -353,7 +367,7 @@ fn assets_from_machine_config_and_images<'a>(
 						.flat_map(|sp| sp.data_areas.iter())
 						.flat_map(|sda| sda.assets.iter())
 						.map(|sa| {
-							let software_list_name = Some(software_list.name.clone());
+							let software_list_name = Some(software_list_name.clone());
 							let targets = [name.clone()].into_iter().collect();
 							let location = AssetLocation::Paths {
 								software_list_name,
@@ -373,6 +387,12 @@ fn assets_from_machine_config_and_images<'a>(
 							}
 						});
 					results.extend(asset_iter)
+				} else {
+					// this is really an error condition that should really be reported
+					warn!(
+						?image_desc,
+						"assets_from_machine_config_and_images(): failed to find software image"
+					)
 				}
 			}
 			ImageDesc::Socket { .. } => {
@@ -387,7 +407,7 @@ fn assets_from_machine_config_and_images<'a>(
 		.unique_by(|x| (x.kind, x.name.clone(), x.location.clone()))
 		.collect();
 
-	debug!(?machine_config, ?results, "assets_from_machine_config()");
+	debug!(?machine_config, ?results, "assets_from_machine_config_and_images()");
 	results
 }
 
@@ -405,7 +425,7 @@ fn assets_from_machine_internal(
 			.map(|index| device_machine.biossets().get(index).unwrap().name())
 	});
 
-	debug!(root_machine=?root_machine.name(), device_machine=?device_machine.name(), ?bios, ?machine_type, "assets_from_machine_internal()");
+	trace!(root_machine=?root_machine.name(), device_machine=?device_machine.name(), ?bios, ?machine_type, "assets_from_machine_internal()");
 
 	let targets = successors(Some(device_machine), |machine| machine.rom_of())
 		.map(|machine| machine.name().into())
