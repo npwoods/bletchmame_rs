@@ -86,7 +86,7 @@ enum SessionState {
 	ShuttingDown,
 	Stopping,
 	Restarting {
-		start_args: Option<Box<MameStartArgs>>,
+		start_args: Option<Arc<MameStartArgs>>,
 	},
 	Active {
 		command_sender: Sender<MameCommand>,
@@ -101,7 +101,7 @@ enum SessionActiveState {
 	EmuStopping,
 	Auditing {
 		job: Job<AuditJobResult>,
-		start_args: Box<MameStartArgs>,
+		start_args: Arc<MameStartArgs>,
 		current_asset_name: Option<SmolStr>,
 		current_progress: f32,
 	},
@@ -131,7 +131,10 @@ enum Failure {
 	InfoDbBuildCancelled,
 
 	#[strum(props(Message = "Audit failure before run"))]
-	AuditResults(Box<[(Asset, AuditResult)]>),
+	AuditResults {
+		items: Box<[(Asset, AuditResult)]>,
+		proceed_action: Action,
+	},
 
 	#[strum(props(Message = "Unexpected error auditing before run"))]
 	AuditError(Error),
@@ -169,7 +172,8 @@ pub struct Report {
 	pub submessage: Option<SmolStr>,
 	pub mame_stderr_output: Option<SmolStr>,
 	pub mame_exit_code: Option<i32>,
-	pub button: Option<Button>,
+	pub button1: Option<Button>,
+	pub button2: Option<Button>,
 	pub spinner_progress: Option<f32>,
 	pub issues: Vec<Issue>,
 	pub audit_results: Box<[(Asset, AuditResult)]>,
@@ -178,7 +182,7 @@ pub struct Report {
 #[derive(Clone, Debug)]
 pub struct Button {
 	pub text: SmolStr,
-	pub command: Action,
+	pub action: Action,
 }
 
 #[derive(Clone, Debug)]
@@ -271,7 +275,7 @@ impl AppState {
 		}
 	}
 
-	fn start_session(&self, mame_args: MameArguments, start_args: Option<Box<MameStartArgs>>) -> Session {
+	fn start_session(&self, mame_args: MameArguments, start_args: Option<Arc<MameStartArgs>>) -> Session {
 		// start the session thread
 		let watchdog_timeout = Duration::from_secs(30);
 		let (job, command_sender) = spawn_mame_session_thread(
@@ -296,7 +300,7 @@ impl AppState {
 		}
 
 		// finally return all the state
-		let video = start_args.and_then(|x| x.video);
+		let video = start_args.and_then(|x| Arc::unwrap_or_clone(x).video);
 		let session_state = SessionState::Active {
 			command_sender,
 			active_state,
@@ -342,7 +346,7 @@ impl AppState {
 		true
 	}
 
-	pub fn start(&mut self, start_args: impl Into<Box<MameStartArgs>>) -> bool {
+	pub fn start(&mut self, start_args: impl Into<Arc<MameStartArgs>>, skip_audit: bool) -> bool {
 		let start_args = start_args.into();
 		info!(?start_args, "AppState::start()");
 
@@ -353,38 +357,60 @@ impl AppState {
 		let session = self.live.as_mut().unwrap().session.as_mut().unwrap();
 
 		// we expect to have an active session
-		let SessionState::Active { active_state, .. } = &mut session.session_state else {
+		let SessionState::Active {
+			active_state,
+			command_sender,
+			..
+		} = &mut session.session_state
+		else {
 			panic!("AppState::start() called without active session");
 		};
 
-		// start an auditing session
-		let rom_paths = self.preferences.paths.roms.clone();
-		let sample_paths = self.preferences.paths.samples.clone();
-		let software_list_paths = &self.preferences.paths.software_lists;
-		let callback = self.fixed.callback.clone();
-		let job = match spawn_audit(
-			info_db,
-			rom_paths,
-			sample_paths,
-			software_list_paths,
-			AUDIT_DELAY,
-			&start_args,
-			callback,
-		) {
-			Ok(job) => job,
-			Err(e) => {
-				self.failure = Some(Failure::AuditError(e));
-				return true;
-			}
-		};
+		if !skip_audit {
+			// start an auditing session
+			let rom_paths = self.preferences.paths.roms.clone();
+			let sample_paths = self.preferences.paths.samples.clone();
+			let software_list_paths = &self.preferences.paths.software_lists;
+			let callback = self.fixed.callback.clone();
+			let job = match spawn_audit(
+				info_db,
+				rom_paths,
+				sample_paths,
+				software_list_paths,
+				AUDIT_DELAY,
+				&start_args,
+				callback,
+			) {
+				Ok(job) => job,
+				Err(e) => {
+					self.failure = Some(Failure::AuditError(e));
+					return true;
+				}
+			};
 
-		// and set up the state
-		*active_state = SessionActiveState::Auditing {
-			job,
-			start_args,
-			current_asset_name: None,
-			current_progress: 0.0,
-		};
+			// and set up the state
+			*active_state = SessionActiveState::Auditing {
+				job,
+				start_args,
+				current_asset_name: None,
+				current_progress: 0.0,
+			};
+		} else if start_args.video == session.video {
+			// it does, lets go!
+			let command = MameCommand::start(&start_args);
+
+			// dispatch the command
+			command_sender.send(command).unwrap();
+
+			// and set the state to "starting"
+			*active_state = SessionActiveState::EmuStarting;
+		} else {
+			// it doesn't; we need to restart
+			session.session_state = SessionState::Restarting {
+				start_args: Some(start_args),
+			};
+		}
+		self.failure = None;
 		true
 	}
 
@@ -481,7 +507,9 @@ impl AppState {
 				self.failure = Some(Failure::AuditCancelled);
 			}
 			AuditJobResult::Failed(items) => {
-				self.failure = Some(Failure::AuditResults(items));
+				let proceed_action = Action::StartSkipAudit(start_args);
+				let failure = Failure::AuditResults { items, proceed_action };
+				self.failure = Some(failure);
 			}
 		}
 
@@ -804,12 +832,12 @@ impl AppState {
 				let submessage = machine_description.map(|x| x.into()).unwrap_or_default();
 				let button = Button {
 					text: "Cancel".into(),
-					command: Action::InfoDbBuildCancel,
+					action: Action::InfoDbBuildCancel,
 				};
 				Report {
 					message,
 					submessage: Some(submessage),
-					button: Some(button),
+					button1: Some(button),
 					spinner_progress: Some(f32::NAN),
 					..Default::default()
 				}
@@ -849,13 +877,13 @@ impl AppState {
 			ReportType::Auditing(current_asset_name, current_progress) => {
 				let button = Button {
 					text: "Cancel".into(),
-					command: Action::AuditCancel,
+					action: Action::AuditCancel,
 				};
 				Report {
 					message: "Auditing assets...".into(),
 					submessage: current_asset_name.cloned(),
 					spinner_progress: Some(current_progress),
-					button: Some(button),
+					button1: Some(button),
 					..Default::default()
 				}
 			}
@@ -925,8 +953,8 @@ impl Failure {
 					let text = problem.to_smolstr();
 					let button = problem.problem_type().map(|path_type| {
 						let text = format_smolstr!("Choose {path_type}");
-						let command = Action::SettingsPaths(Some(path_type));
-						Button { text, command }
+						let action = Action::SettingsPaths(Some(path_type));
+						Button { text, action }
 					});
 					Issue { text, button }
 				})
@@ -949,28 +977,46 @@ impl Failure {
 			(None, None)
 		};
 
-		// action button
-		let button = match self {
-			Self::SessionError(_) | Self::AuditResults(_) | Self::AuditError(_) | Self::AuditCancelled => {
-				Some(Button {
+		// action buttons
+		let (button1, button2) = match self {
+			Self::SessionError(_) | Self::AuditError(_) | Self::AuditCancelled => {
+				let button1 = Button {
 					text: "Continue".into(),
-					command: Action::ReactivateMame,
-				})
+					action: Action::ReactivateMame,
+				};
+				(Some(button1), None)
 			}
-			Self::InfoDbBuild(_) => Some(Button {
-				text: "Retry".into(),
-				command: Action::HelpRefreshInfoDb,
-			}),
-			Self::InfoDbStatusMismatch { .. } => Some(Button {
-				text: "Retry".into(),
-				command: Action::ReactivateMame,
-			}),
-			_ => None,
+			Self::AuditResults { proceed_action, .. } => {
+				let button1 = Button {
+					text: "Cancel".into(),
+					action: Action::ReactivateMame,
+				};
+				let button2 = Button {
+					text: "Proceed (not recommended)".into(),
+					action: proceed_action.clone(),
+				};
+				(Some(button1), Some(button2))
+			}
+			Self::InfoDbBuild(_) => {
+				let button1 = Button {
+					text: "Retry".into(),
+					action: Action::HelpRefreshInfoDb,
+				};
+				(Some(button1), None)
+			}
+			Self::InfoDbStatusMismatch { .. } => {
+				let button1 = Button {
+					text: "Retry".into(),
+					action: Action::ReactivateMame,
+				};
+				(Some(button1), None)
+			}
+			_ => (None, None),
 		};
 
 		// auditing results
-		let audit_results = if let Self::AuditResults(audit_results) = self {
-			audit_results.clone()
+		let audit_results = if let Self::AuditResults { items, .. } = self {
+			items.clone()
 		} else {
 			Default::default()
 		};
@@ -981,7 +1027,8 @@ impl Failure {
 			issues,
 			mame_stderr_output,
 			mame_exit_code,
-			button,
+			button1,
+			button2,
 			spinner_progress: None,
 			audit_results,
 		}

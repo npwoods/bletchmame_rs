@@ -17,14 +17,16 @@ export struct Report {
     mame-exit-code: string,
     spinning: bool,
     spinning-progress: float,
-    button-text: string,
+    button1-text: string,
+    button1-action: string,
+    button2-text: string,
+    button2-action: string,
     issues: [ReportIssue],
     audit-results: [AuditAsset],
 }
 
 export component ReportView {
     in property <Report> report;
-    callback report-button-clicked();
     callback issue-button-clicked(int);
     callback menu-item-action(string);
 
@@ -84,14 +86,21 @@ export component ReportView {
                 font-size: 12px;
             }
 
-            // report button
-            if report.button-text != "": HorizontalBox {
+            if report.button1-text != "" || report.button2-text != "": HorizontalBox {
                 alignment: center;
-                Button {
-                    text: report.button-text;
-                    width: 50px;
+                // report button 1
+                if report.button1-text != "": Button {
+                    text: report.button1-text;
                     clicked => {
-                        report-button-clicked();
+                        menu-item-action(report.button1-action);
+                    }
+                }
+
+                // report button 2
+                if report.button2-text != "": Button {
+                    text: report.button2-text;
+                    clicked => {
+                        menu-item-action(report.button2-action);
                     }
                 }
             }

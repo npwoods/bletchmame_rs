@@ -73,7 +73,8 @@ pub enum Action {
 	ErrorMessageBox(String),
 
 	// Other
-	Start(MameStartArgs),
+	Start(Arc<MameStartArgs>),
+	StartSkipAudit(Arc<MameStartArgs>),
 	IssueMameCommand(MameCommand),
 	Browse(PrefsCollection),
 	HistoryAdvance(isize),

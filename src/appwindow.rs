@@ -405,9 +405,13 @@ impl AppModel {
 				} else {
 					spinning_progress
 				};
-				let button_text = report
-					.and_then(|r| r.button.as_ref())
-					.map(|b| b.text.to_shared_string())
+				let (button1_text, button1_action) = report
+					.and_then(|r| r.button1.as_ref())
+					.map(|b| (b.text.to_shared_string(), b.action.encode_for_slint()))
+					.unwrap_or_default();
+				let (button2_text, button2_action) = report
+					.and_then(|r| r.button2.as_ref())
+					.map(|b| (b.text.to_shared_string(), b.action.encode_for_slint()))
 					.unwrap_or_default();
 				let issues = report
 					.map(|r| r.issues.as_slice())
@@ -435,7 +439,10 @@ impl AppModel {
 					mame_exit_code,
 					spinning,
 					spinning_progress,
-					button_text,
+					button1_text,
+					button1_action,
+					button2_text,
+					button2_action,
 					issues,
 					audit_results,
 				}
@@ -841,16 +848,6 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		}
 	});
 
-	// report button
-	let model_clone = model.clone();
-	app_window.on_report_button_clicked(move || {
-		let action = {
-			let state = model_clone.state.borrow();
-			state.report().unwrap().button.unwrap().command
-		};
-		handle_action(&model_clone, action);
-	});
-
 	// issue button
 	let model_clone = model.clone();
 	app_window.on_issue_button_clicked(move |index| {
@@ -858,7 +855,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		let action = {
 			let state = model_clone.state.borrow();
 			let issue = state.report().unwrap().issues.into_iter().nth(index).unwrap();
-			issue.button.unwrap().command
+			issue.button.unwrap().action
 		};
 		handle_action(&model_clone, action);
 	});
@@ -1364,7 +1361,10 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 			spawn_local(fut).unwrap();
 		}
 		Action::Start(start_args) => {
-			model.update_state(|state| state.start(start_args));
+			model.update_state(|state| state.start(start_args, false));
+		}
+		Action::StartSkipAudit(start_args) => {
+			model.update_state(|state| state.start(start_args, true));
 		}
 		Action::IssueMameCommand(command) => {
 			model.issue_command(command);

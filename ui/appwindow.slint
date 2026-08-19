@@ -246,7 +246,6 @@ export component AppWindow inherits Window {
 
     // the report view
     in property <Report> report;
-    callback report-button-clicked();
     callback issue-button-clicked(int);
 
     // mode - drives what is visible and what is not
@@ -979,7 +978,6 @@ export component AppWindow inherits Window {
             ReportView {
                 visible: root.mode() == "report";
                 report: root.report;
-                report-button-clicked => root.report-button-clicked();
                 issue-button-clicked(index) => root.issue-button-clicked(index);
                 menu-item-action(action) => root.menu-item-action(action);
             }
