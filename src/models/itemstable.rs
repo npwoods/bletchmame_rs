@@ -312,7 +312,7 @@ impl ItemsTableModel {
 					images,
 					video,
 				};
-				let action = Action::Start(start_args);
+				let action = Action::Start(start_args.into());
 				let run_title = run_item_text(machine.description()).into();
 				let run_descs = vec![MenuDesc {
 					title: "".into(),
@@ -356,7 +356,7 @@ impl ItemsTableModel {
 									images,
 									video: video.clone(),
 								};
-								let action = Some(Action::Start(start_args));
+								let action = Some(Action::Start(start_args.into()));
 								let title = machine.description().into();
 								MenuDesc { action, title }
 							})
@@ -524,7 +524,7 @@ impl ItemsTableModel {
 					images,
 					video,
 				};
-				let action = Action::Start(start_args);
+				let action = Action::Start(start_args.into());
 				let run_title = run_item_text(machine.description()).into();
 				let run_descs = vec![MenuDesc {
 					title: "".into(),
@@ -568,7 +568,7 @@ impl ItemsTableModel {
 									images,
 									video: video.clone(),
 								};
-								let action = Some(Action::Start(start_args));
+								let action = Some(Action::Start(start_args.into()));
 								let title = machine.description().into();
 								MenuDesc { action, title }
 							})

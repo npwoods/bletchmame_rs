@@ -86,7 +86,7 @@ enum SessionState {
 	ShuttingDown,
 	Stopping,
 	Restarting {
-		start_args: Option<Box<MameStartArgs>>,
+		start_args: Option<Arc<MameStartArgs>>,
 	},
 	Active {
 		command_sender: Sender<MameCommand>,
@@ -101,7 +101,7 @@ enum SessionActiveState {
 	EmuStopping,
 	Auditing {
 		job: Job<AuditJobResult>,
-		start_args: Box<MameStartArgs>,
+		start_args: Arc<MameStartArgs>,
 		current_asset_name: Option<SmolStr>,
 		current_progress: f32,
 	},
@@ -271,7 +271,7 @@ impl AppState {
 		}
 	}
 
-	fn start_session(&self, mame_args: MameArguments, start_args: Option<Box<MameStartArgs>>) -> Session {
+	fn start_session(&self, mame_args: MameArguments, start_args: Option<Arc<MameStartArgs>>) -> Session {
 		// start the session thread
 		let watchdog_timeout = Duration::from_secs(30);
 		let (job, command_sender) = spawn_mame_session_thread(
@@ -296,7 +296,7 @@ impl AppState {
 		}
 
 		// finally return all the state
-		let video = start_args.and_then(|x| x.video);
+		let video = start_args.and_then(|x| Arc::unwrap_or_clone(x).video);
 		let session_state = SessionState::Active {
 			command_sender,
 			active_state,
@@ -342,7 +342,7 @@ impl AppState {
 		true
 	}
 
-	pub fn start(&mut self, start_args: impl Into<Box<MameStartArgs>>) -> bool {
+	pub fn start(&mut self, start_args: impl Into<Arc<MameStartArgs>>) -> bool {
 		let start_args = start_args.into();
 		info!(?start_args, "AppState::start()");
 
