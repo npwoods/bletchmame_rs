@@ -169,7 +169,8 @@ pub struct Report {
 	pub submessage: Option<SmolStr>,
 	pub mame_stderr_output: Option<SmolStr>,
 	pub mame_exit_code: Option<i32>,
-	pub button: Option<Button>,
+	pub button1: Option<Button>,
+	pub button2: Option<Button>,
 	pub spinner_progress: Option<f32>,
 	pub issues: Vec<Issue>,
 	pub audit_results: Box<[(Asset, AuditResult)]>,
@@ -178,7 +179,7 @@ pub struct Report {
 #[derive(Clone, Debug)]
 pub struct Button {
 	pub text: SmolStr,
-	pub command: Action,
+	pub action: Action,
 }
 
 #[derive(Clone, Debug)]
@@ -804,12 +805,12 @@ impl AppState {
 				let submessage = machine_description.map(|x| x.into()).unwrap_or_default();
 				let button = Button {
 					text: "Cancel".into(),
-					command: Action::InfoDbBuildCancel,
+					action: Action::InfoDbBuildCancel,
 				};
 				Report {
 					message,
 					submessage: Some(submessage),
-					button: Some(button),
+					button1: Some(button),
 					spinner_progress: Some(f32::NAN),
 					..Default::default()
 				}
@@ -849,13 +850,13 @@ impl AppState {
 			ReportType::Auditing(current_asset_name, current_progress) => {
 				let button = Button {
 					text: "Cancel".into(),
-					command: Action::AuditCancel,
+					action: Action::AuditCancel,
 				};
 				Report {
 					message: "Auditing assets...".into(),
 					submessage: current_asset_name.cloned(),
 					spinner_progress: Some(current_progress),
-					button: Some(button),
+					button1: Some(button),
 					..Default::default()
 				}
 			}
@@ -925,8 +926,8 @@ impl Failure {
 					let text = problem.to_smolstr();
 					let button = problem.problem_type().map(|path_type| {
 						let text = format_smolstr!("Choose {path_type}");
-						let command = Action::SettingsPaths(Some(path_type));
-						Button { text, command }
+						let action = Action::SettingsPaths(Some(path_type));
+						Button { text, action }
 					});
 					Issue { text, button }
 				})
@@ -949,23 +950,30 @@ impl Failure {
 			(None, None)
 		};
 
-		// action button
-		let button = match self {
+		// action buttons
+		let (button1, button2) = match self {
 			Self::SessionError(_) | Self::AuditResults(_) | Self::AuditError(_) | Self::AuditCancelled => {
-				Some(Button {
+				let button1 = Button {
 					text: "Continue".into(),
-					command: Action::ReactivateMame,
-				})
+					action: Action::ReactivateMame,
+				};
+				(Some(button1), None)
 			}
-			Self::InfoDbBuild(_) => Some(Button {
-				text: "Retry".into(),
-				command: Action::HelpRefreshInfoDb,
-			}),
-			Self::InfoDbStatusMismatch { .. } => Some(Button {
-				text: "Retry".into(),
-				command: Action::ReactivateMame,
-			}),
-			_ => None,
+			Self::InfoDbBuild(_) => {
+				let button1 = Button {
+					text: "Retry".into(),
+					action: Action::HelpRefreshInfoDb,
+				};
+				(Some(button1), None)
+			}
+			Self::InfoDbStatusMismatch { .. } => {
+				let button1 = Button {
+					text: "Retry".into(),
+					action: Action::ReactivateMame,
+				};
+				(Some(button1), None)
+			}
+			_ => (None, None),
 		};
 
 		// auditing results
@@ -981,7 +989,8 @@ impl Failure {
 			issues,
 			mame_stderr_output,
 			mame_exit_code,
-			button,
+			button1,
+			button2,
 			spinner_progress: None,
 			audit_results,
 		}
