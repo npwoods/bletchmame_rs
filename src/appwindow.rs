@@ -1361,7 +1361,10 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 			spawn_local(fut).unwrap();
 		}
 		Action::Start(start_args) => {
-			model.update_state(|state| state.start(start_args));
+			model.update_state(|state| state.start(start_args, false));
+		}
+		Action::StartSkipAudit(start_args) => {
+			model.update_state(|state| state.start(start_args, true));
 		}
 		Action::IssueMameCommand(command) => {
 			model.issue_command(command);

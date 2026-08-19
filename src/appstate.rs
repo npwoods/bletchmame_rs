@@ -131,7 +131,10 @@ enum Failure {
 	InfoDbBuildCancelled,
 
 	#[strum(props(Message = "Audit failure before run"))]
-	AuditResults(Box<[(Asset, AuditResult)]>),
+	AuditResults {
+		items: Box<[(Asset, AuditResult)]>,
+		proceed_action: Action,
+	},
 
 	#[strum(props(Message = "Unexpected error auditing before run"))]
 	AuditError(Error),
@@ -343,7 +346,7 @@ impl AppState {
 		true
 	}
 
-	pub fn start(&mut self, start_args: impl Into<Arc<MameStartArgs>>) -> bool {
+	pub fn start(&mut self, start_args: impl Into<Arc<MameStartArgs>>, skip_audit: bool) -> bool {
 		let start_args = start_args.into();
 		info!(?start_args, "AppState::start()");
 
@@ -354,38 +357,60 @@ impl AppState {
 		let session = self.live.as_mut().unwrap().session.as_mut().unwrap();
 
 		// we expect to have an active session
-		let SessionState::Active { active_state, .. } = &mut session.session_state else {
+		let SessionState::Active {
+			active_state,
+			command_sender,
+			..
+		} = &mut session.session_state
+		else {
 			panic!("AppState::start() called without active session");
 		};
 
-		// start an auditing session
-		let rom_paths = self.preferences.paths.roms.clone();
-		let sample_paths = self.preferences.paths.samples.clone();
-		let software_list_paths = &self.preferences.paths.software_lists;
-		let callback = self.fixed.callback.clone();
-		let job = match spawn_audit(
-			info_db,
-			rom_paths,
-			sample_paths,
-			software_list_paths,
-			AUDIT_DELAY,
-			&start_args,
-			callback,
-		) {
-			Ok(job) => job,
-			Err(e) => {
-				self.failure = Some(Failure::AuditError(e));
-				return true;
-			}
-		};
+		if !skip_audit {
+			// start an auditing session
+			let rom_paths = self.preferences.paths.roms.clone();
+			let sample_paths = self.preferences.paths.samples.clone();
+			let software_list_paths = &self.preferences.paths.software_lists;
+			let callback = self.fixed.callback.clone();
+			let job = match spawn_audit(
+				info_db,
+				rom_paths,
+				sample_paths,
+				software_list_paths,
+				AUDIT_DELAY,
+				&start_args,
+				callback,
+			) {
+				Ok(job) => job,
+				Err(e) => {
+					self.failure = Some(Failure::AuditError(e));
+					return true;
+				}
+			};
 
-		// and set up the state
-		*active_state = SessionActiveState::Auditing {
-			job,
-			start_args,
-			current_asset_name: None,
-			current_progress: 0.0,
-		};
+			// and set up the state
+			*active_state = SessionActiveState::Auditing {
+				job,
+				start_args,
+				current_asset_name: None,
+				current_progress: 0.0,
+			};
+		} else if start_args.video == session.video {
+			// it does, lets go!
+			let command = MameCommand::start(&start_args);
+
+			// dispatch the command
+			command_sender.send(command).unwrap();
+
+			// and set the state to "starting"
+			*active_state = SessionActiveState::EmuStarting;
+		} else {
+			// it doesn't; we need to restart
+			session.session_state = SessionState::Restarting {
+				start_args: Some(start_args),
+			};
+		}
+		self.failure = None;
 		true
 	}
 
@@ -482,7 +507,9 @@ impl AppState {
 				self.failure = Some(Failure::AuditCancelled);
 			}
 			AuditJobResult::Failed(items) => {
-				self.failure = Some(Failure::AuditResults(items));
+				let proceed_action = Action::StartSkipAudit(start_args);
+				let failure = Failure::AuditResults { items, proceed_action };
+				self.failure = Some(failure);
 			}
 		}
 
@@ -952,12 +979,23 @@ impl Failure {
 
 		// action buttons
 		let (button1, button2) = match self {
-			Self::SessionError(_) | Self::AuditResults(_) | Self::AuditError(_) | Self::AuditCancelled => {
+			Self::SessionError(_) | Self::AuditError(_) | Self::AuditCancelled => {
 				let button1 = Button {
 					text: "Continue".into(),
 					action: Action::ReactivateMame,
 				};
 				(Some(button1), None)
+			}
+			Self::AuditResults { proceed_action, .. } => {
+				let button1 = Button {
+					text: "Cancel".into(),
+					action: Action::ReactivateMame,
+				};
+				let button2 = Button {
+					text: "Proceed (not recommended)".into(),
+					action: proceed_action.clone(),
+				};
+				(Some(button1), Some(button2))
 			}
 			Self::InfoDbBuild(_) => {
 				let button1 = Button {
@@ -977,8 +1015,8 @@ impl Failure {
 		};
 
 		// auditing results
-		let audit_results = if let Self::AuditResults(audit_results) = self {
-			audit_results.clone()
+		let audit_results = if let Self::AuditResults { items, .. } = self {
+			items.clone()
 		} else {
 			Default::default()
 		};

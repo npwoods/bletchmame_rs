@@ -74,6 +74,7 @@ pub enum Action {
 
 	// Other
 	Start(Arc<MameStartArgs>),
+	StartSkipAudit(Arc<MameStartArgs>),
 	IssueMameCommand(MameCommand),
 	Browse(PrefsCollection),
 	HistoryAdvance(isize),
