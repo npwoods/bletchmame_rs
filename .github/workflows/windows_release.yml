@@ -19,6 +19,8 @@ jobs:
     steps:
       # Checks out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
 
       # Install Rust toolchain
       - uses: actions-rs/toolchain@v1
@@ -31,6 +33,22 @@ jobs:
       - name: Caching
         uses: Swatinem/rust-cache@v2
         
+      # Install cargo-edit
+      - name: Install cargo-edit
+        shell: bash
+        run: |
+          cargo install cargo-edit
+
+      # Determine version and set crate version
+      - name: Determine version and set crate version
+        shell: bash
+        run: |
+          VERSION=$(git describe --tags | perl scripts/process_version.pl)
+          cargo set-version "$VERSION"
+          VERSION_UNDERSCORES=${VERSION//./_}
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "VERSION_UNDERSCORES=$VERSION_UNDERSCORES" >> $GITHUB_ENV
+
       # Build
       - name: Build
         uses: actions-rs/cargo@v1
@@ -68,39 +86,37 @@ jobs:
           echo $wixBin >> $env:GITHUB_PATH
           Write-Host "Using WiX from $wixBin"
     
-      # Build MSI - Candle (replace 'echo' with 'git describe --tags' when we have actual tags)
+      # Build MSI - Candle
       - name: Build MSI - Candle
         shell: bash
-        run: candle -v bletchmame.wxs -dVERSION=`echo v3.0 | perl scripts/process_version.pl` -out bletchmame.wixobj
+        run: candle -v bletchmame.wxs -dVERSION="$VERSION" -out bletchmame.wixobj
             
       # Build MSI - Light
       - name: Build MSI - Light
         run: light -v -ext WixUIExtension -ext WixUtilExtension bletchmame.wixobj -out BletchMAME.msi
 
-      # Prepare Artifacts (replace 'echo' with 'git describe --tags' when we have actual tags)
+      # Prepare Artifacts
       - name: Prepare Artifacts
         shell: bash
         run: |
-          mkdir rel
-          echo v3.0 | perl scripts/process_version.pl > rel/version_latest.txt
-          mv BletchMAME.msi rel/BletchMAME_latest.msi
-          7z a rel/BletchMAME_latest.zip ./target/release/BletchMAME.exe
-          7z a rel/BletchMAME_latest.zip readme.html
-          7z a rel/BletchMAME_latest.zip plugins
+          mkdir -p rel
+          mv BletchMAME.msi rel/BletchMAME_${VERSION_UNDERSCORES}.msi
+          7z a rel/BletchMAME_${VERSION_UNDERSCORES}.zip ./target/release/BletchMAME.exe
+          7z a rel/BletchMAME_${VERSION_UNDERSCORES}.zip readme.html
+          7z a rel/BletchMAME_${VERSION_UNDERSCORES}.zip plugins
 
-      # Set date as env variable (PowerShell)
-      - name: Set date as env variable (PowerShell)
-        id: set_date
-        shell: pwsh
-        if: success() && github.ref == 'refs/heads/master'
-        run: |
-          $d = Get-Date -Format "yyyyMMddHHmm"
-          echo "ARTIFACT_DATE=$d" >> $env:GITHUB_ENV
-
-      # Upload build output
-      - name: Upload build output
+      # Upload build output MSI
+      - name: Upload build output MSI
         uses: actions/upload-artifact@v4
         if: success() && github.ref == 'refs/heads/master'
         with:
-          name: BletchMAME_latest_${{ env.ARTIFACT_DATE }}
-          path: rel
+          name: BletchMAME_${{ env.VERSION_UNDERSCORES }}.msi
+          path: rel/*.msi
+
+      # Upload build output ZIP
+      - name: Upload build output ZIP
+        uses: actions/upload-artifact@v4
+        if: success() && github.ref == 'refs/heads/master'
+        with:
+          name: BletchMAME_${{ env.VERSION_UNDERSCORES }}.zip
+          path: rel/*.zip
