@@ -9,9 +9,9 @@ use i_slint_backend_winit::WinitWindowAccessor;
 use raw_window_handle::HasWindowHandle;
 use raw_window_handle::RawWindowHandle;
 use tokio::sync::oneshot;
-use tracing::debug;
 use tracing::info;
 use tracing::info_span;
+use tracing::trace;
 use winit::event::WindowEvent;
 use winit::event_loop::ActiveEventLoop;
 use winit::monitor::MonitorHandle;
@@ -119,7 +119,7 @@ impl WinitBackendRuntime {
 		let child_window = receiver.await??;
 
 		// set inactive
-		child_window.do_set_active(false);
+		child_window.set_active(false);
 
 		// wrap it up in an Rc and add it to "live"
 		let result = Rc::new(child_window);
@@ -175,7 +175,7 @@ impl CustomApplicationHandler for WinitBackendRuntime {
 		// tracing
 		let span = info_span!("window_event");
 		let _guard = span.enter();
-		debug!(?event, ?window_id, "window_event");
+		trace!(?event, ?window_id, "window_event");
 
 		match event {
 			WindowEvent::Focused(true) => {
@@ -234,12 +234,6 @@ impl WinitChildWindow {
 	}
 
 	pub fn set_active(&self, active: bool) {
-		if active != self.is_active() {
-			self.do_set_active(active);
-		}
-	}
-
-	fn do_set_active(&self, active: bool) {
 		self.window.set_visible(active);
 
 		#[cfg(target_family = "windows")]
@@ -281,7 +275,14 @@ impl WinitChildWindow {
 				(focus_hwnd == child_hwnd).then_some(parent_hwnd.clone().ok()).flatten()
 			};
 
-			debug!(parent_hwnd=?parent_hwnd, child_hwnd=?child_hwnd, focus_hwnd=?focus_hwnd, active=?active, set_focus_hwnd=?set_focus_hwnd, "WinitChildWindow::fix_focus()");
+			debug!(
+				?parent_hwnd,
+				?child_hwnd,
+				?focus_hwnd,
+				?active,
+				?set_focus_hwnd,
+				"WinitChildWindow::fix_focus()"
+			);
 
 			if let Some(set_focus_hwnd) = set_focus_hwnd {
 				let _ = unsafe { SetFocus(Some(set_focus_hwnd)) };

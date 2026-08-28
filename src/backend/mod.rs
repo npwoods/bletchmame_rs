@@ -110,11 +110,22 @@ impl BackendRuntime {
 
 impl ChildWindow {
 	pub fn set_active(&self, active: bool) {
+		if active != self.is_active() {
+			match self {
+				Self::Winit(child_window) => child_window.set_active(active),
+
+				#[cfg(feature = "slint-qt-backend")]
+				Self::Qt(child_window) => child_window.set_active(active),
+			}
+		}
+	}
+
+	fn is_active(&self) -> bool {
 		match self {
-			Self::Winit(child_window) => child_window.set_active(active),
+			Self::Winit(child_window) => child_window.is_active(),
 
 			#[cfg(feature = "slint-qt-backend")]
-			Self::Qt(child_window) => child_window.set_active(active),
+			Self::Qt(child_window) => child_window.is_active(),
 		}
 	}
 

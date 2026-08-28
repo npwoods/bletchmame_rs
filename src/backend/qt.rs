@@ -41,9 +41,11 @@ impl QtBackendRuntime {
 
 impl QtChildWindow {
 	pub fn set_active(&self, active: bool) {
-		if active != self.qt_widget.is_visible() {
-			self.internal_update(Some(active));
-		}
+		self.internal_update(Some(active));
+	}
+
+	pub fn is_active(&self) -> bool {
+		self.qt_widget.is_visible()
 	}
 
 	pub fn set_position_and_size(&self, position: dpi::PhysicalPosition<u32>, size: dpi::PhysicalSize<u32>) {
