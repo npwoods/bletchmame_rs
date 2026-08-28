@@ -688,6 +688,9 @@ impl AppState {
 		if now_normal {
 			*active_state = SessionActiveState::Normal
 		}
+		if !is_running {
+			self.last_save_state = None;
+		}
 
 		// kick off an InfoDb rebuild if appropriate
 		if rebuild_info_db {
