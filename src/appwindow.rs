@@ -614,8 +614,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 	// create the child window
 	let (child_window, mame_windowing) = match args.mame_windowing {
 		AppWindowing::Integrated => {
-			let parent = app_window.window();
-			let child_window = args.backend_runtime.create_child_window(parent).await.unwrap();
+			let child_window = args.backend_runtime.create_child_window(app_window).await.unwrap();
 			let child_window_text = child_window.text();
 			(Some(child_window), MameWindowing::Attached(child_window_text.into()))
 		}
