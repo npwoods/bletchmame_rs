@@ -8,6 +8,7 @@ use std::rc::Rc;
 use anyhow::Result;
 use easy_ext::ext;
 use i_slint_backend_winit::WinitWindowAccessor;
+use slint::ComponentHandle;
 use slint::LogicalPosition;
 use slint::LogicalSize;
 use slint::Window;
@@ -88,12 +89,15 @@ impl BackendRuntime {
 		}
 	}
 
-	pub async fn create_child_window(&self, parent: &Window) -> Result<ChildWindow> {
+	pub async fn create_child_window<C>(&self, parent: &C) -> Result<ChildWindow>
+	where
+		C: ComponentHandle + 'static,
+	{
 		let child_window = match self {
 			Self::Winit(backend) => ChildWindow::Winit(backend.create_child_window(parent).await?),
 
 			#[cfg(feature = "slint-qt-backend")]
-			Self::Qt(backend) => ChildWindow::Qt(backend.create_child_window(parent)?),
+			Self::Qt(backend) => ChildWindow::Qt(backend.create_child_window(parent.window())?),
 		};
 		Ok(child_window)
 	}

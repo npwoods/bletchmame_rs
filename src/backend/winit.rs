@@ -8,6 +8,7 @@ use i_slint_backend_winit::EventResult;
 use i_slint_backend_winit::WinitWindowAccessor;
 use raw_window_handle::HasWindowHandle;
 use raw_window_handle::RawWindowHandle;
+use slint::ComponentHandle;
 use tokio::sync::oneshot;
 use tracing::info;
 use tracing::info_span;
@@ -36,10 +37,12 @@ struct WinitBackendRuntimeInner {
 	invoke_with_event_loop: Option<InvokeWithActiveEventLoopFunc>,
 }
 
-#[derive(Debug)]
+type DispatchWinitWindowEventToParentFn = Box<dyn Fn(&ActiveEventLoop, &WindowEvent) + Send>;
+
 pub struct WinitChildWindow {
 	window: Window,
 	parent_window_id: WindowId,
+	dispatch_winit_window_event_to_parent: DispatchWinitWindowEventToParentFn,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -88,10 +91,13 @@ impl WinitBackendRuntime {
 		Ok(())
 	}
 
-	pub async fn create_child_window(&self, parent: &slint::Window) -> Result<Rc<WinitChildWindow>> {
+	pub async fn create_child_window<C>(&self, parent: &C) -> Result<Rc<WinitChildWindow>>
+	where
+		C: ComponentHandle + 'static,
+	{
 		// prepare the window attributes
-		let raw_window_handle = parent.window_handle().window_handle()?.as_raw();
-		let size = parent.with_winit_window(|parent| parent.inner_size()).unwrap();
+		let raw_window_handle = parent.window().window_handle().window_handle()?.as_raw();
+		let size = parent.window().with_winit_window(|parent| parent.inner_size()).unwrap();
 		let window_attributes = unsafe {
 			WindowAttributes::default()
 				.with_title("MAME Child Window")
@@ -105,12 +111,27 @@ impl WinitBackendRuntime {
 		// an `ActiveEventLoop`; prepare to receive it
 		let (sender, receiver) = oneshot::channel();
 
-		// get the parent window's ID
-		let parent_window_id = parent.with_winit_window(|window| window.id()).unwrap();
+		// get the parent window ID
+		let parent_window_id = parent.window().with_winit_window(|w| w.id()).unwrap();
+
+		// create a callback to invoke a winit window event
+		let parent_window_weak = parent.as_weak();
+		let dispatch_winit_window_event_to_parent = move |event_loop: &ActiveEventLoop, event: &WindowEvent| {
+			if let Some(parent_window) = parent_window_weak.upgrade() {
+				let parent_window = parent_window.window();
+				parent_window.dispatch_winit_window_event(event_loop, event);
+			}
+		};
+		let dispatch_winit_window_event_to_parent = Box::<_>::from(dispatch_winit_window_event_to_parent);
 
 		// send an event to create the pending window with the active event loop
 		let callback: Box<dyn FnOnce(&ActiveEventLoop) + Send> = Box::new(move |event_loop| {
-			let result = WinitChildWindow::new(parent_window_id, window_attributes, event_loop);
+			let result = WinitChildWindow::new(
+				parent_window_id,
+				dispatch_winit_window_event_to_parent,
+				window_attributes,
+				event_loop,
+			);
 			let _ = sender.send(result);
 		});
 		let _ = (self.0.borrow().invoke_with_event_loop.as_ref().unwrap())(callback);
@@ -166,7 +187,7 @@ impl WinitBackendRuntime {
 impl CustomApplicationHandler for WinitBackendRuntime {
 	fn window_event(
 		&mut self,
-		_event_loop: &ActiveEventLoop,
+		event_loop: &ActiveEventLoop,
 		window_id: WindowId,
 		_winit_window: Option<&Window>,
 		_slint_window: Option<&slint::Window>,
@@ -193,8 +214,10 @@ impl CustomApplicationHandler for WinitBackendRuntime {
 
 			WindowEvent::KeyboardInput { .. } => self
 				.with_child_window(&window_id, |child_window, find_result_type| {
-					(find_result_type == FindResultType::Child)
-						.then_some(EventResult::Retarget(child_window.parent_window_id))
+					(find_result_type == FindResultType::Child).then(|| {
+						(child_window.dispatch_winit_window_event_to_parent)(event_loop, event);
+						EventResult::PreventDefault
+					})
 				})
 				.flatten()
 				.unwrap_or(EventResult::Propagate),
@@ -214,6 +237,7 @@ impl CustomApplicationHandler for WinitBackendRuntime {
 impl WinitChildWindow {
 	pub fn new(
 		parent_window_id: WindowId,
+		dispatch_winit_window_event_to_parent: DispatchWinitWindowEventToParentFn,
 		window_attributes: WindowAttributes,
 		event_loop: &ActiveEventLoop,
 	) -> Result<Self> {
@@ -224,6 +248,7 @@ impl WinitChildWindow {
 		let result = Self {
 			parent_window_id,
 			window,
+			dispatch_winit_window_event_to_parent,
 		};
 
 		// sanity check it
