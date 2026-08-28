@@ -56,6 +56,7 @@ export component AppWindow inherits Window {
     max-height: 10000px;
     icon: Icons.bletchmame;
     title: (prefix-title-with-mode ? display-mode() + " " : "") + root.apptitle + (running-machine-desc != "" ? ": " + running-machine-desc : "");
+    forward-focus: items-table-view;
 
     function display-mode() -> string {
         return "[" + mode() + "]" + (mode() == "report" && report.spinning ? "[busy]" : "");
@@ -782,6 +783,12 @@ export component AppWindow inherits Window {
             HorizontalBox {
                 alignment: stretch;
                 visible: root.mode() == "ready";
+                forward-focus: items-table-view;
+                changed visible => {
+                    if (self.visible) {
+                        items-table-view.focus();
+                    }
+                }
 
                 // collections list view on the left
                 if root.is-collections-list-visible: VerticalLayout {
