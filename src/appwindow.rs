@@ -384,38 +384,38 @@ impl AppModel {
 			});
 
 			// report view
-			let ui_report = {
-				let report = report.as_ref();
-				let message = report.map(|r| r.message.to_shared_string()).unwrap_or_default();
-				let submessage = report
-					.map(|r| r.submessage.as_deref().unwrap_or_default().to_shared_string())
-					.unwrap_or_default();
+			let ui_report = report.as_ref().map(|report| {
+				let message = report.message.to_shared_string();
+				let submessage = report.submessage.as_deref().unwrap_or_default().to_shared_string();
 				let mame_stderr_output = report
-					.and_then(|r| r.mame_stderr_output.as_ref())
+					.mame_stderr_output
+					.as_ref()
 					.map(|s| s.to_shared_string())
 					.unwrap_or_default();
 				let mame_exit_code = report
-					.and_then(|r| r.mame_exit_code.as_ref())
+					.mame_exit_code
+					.as_ref()
 					.map(|code| code.to_shared_string())
 					.unwrap_or_default();
-				let spinning = report.map(|r| r.spinner_progress.is_some()).unwrap_or_default();
-				let spinning_progress = report.and_then(|r| r.spinner_progress).unwrap_or_default();
+				let spinning = report.spinner_progress.is_some();
+				let spinning_progress = report.spinner_progress.unwrap_or_default();
 				let spinning_progress = if spinning_progress.is_nan() {
 					-1.0
 				} else {
 					spinning_progress
 				};
 				let (button1_text, button1_action) = report
-					.and_then(|r| r.button1.as_ref())
+					.button1
+					.as_ref()
 					.map(|b| (b.text.to_shared_string(), b.action.encode_for_slint()))
 					.unwrap_or_default();
 				let (button2_text, button2_action) = report
-					.and_then(|r| r.button2.as_ref())
+					.button2
+					.as_ref()
 					.map(|b| (b.text.to_shared_string(), b.action.encode_for_slint()))
 					.unwrap_or_default();
 				let issues = report
-					.map(|r| r.issues.as_slice())
-					.unwrap_or_default()
+					.issues
 					.iter()
 					.map(|issue| {
 						let text = issue.text.to_shared_string();
@@ -430,7 +430,7 @@ impl AppModel {
 				let issues = VecModel::from(issues);
 				let issues = ModelRc::new(issues);
 				let icons = Icons::get(&app_window);
-				let audit_results = report.map(|r| r.audit_results.as_ref()).unwrap_or_default();
+				let audit_results = report.audit_results.as_ref();
 				let audit_results = audit_static_model(audit_results, icons);
 				ui::Report {
 					message,
@@ -446,8 +446,18 @@ impl AppModel {
 					issues,
 					audit_results,
 				}
-			};
-			app_window.set_report(ui_report);
+			});
+
+			// Slint can be aggressive at rebuilding the menubar on Windows; this can cause
+			// the Windows taskbar to flicker when BletchMAME is full screen (see
+			// https://github.com/slint-ui/slint/issues/13113), and the `report` variable
+			// drives the mode
+			//
+			// avoiding unnecessarily setting the report is an imperfect mitigation, but it
+			// avoids flickering during a live emulation
+			if ui_report.is_some() || !app_window.get_report().message.is_empty() {
+				app_window.set_report(ui_report.unwrap_or_default());
+			}
 		}
 
 		// menus
