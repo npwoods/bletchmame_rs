@@ -82,7 +82,7 @@ impl State {
 	pub fn handle_start(&mut self, evt: XmlElement<'_>) -> Result<Option<Phase>> {
 		let phase = self.phase_stack.last().unwrap_or(&Phase::Root);
 		let new_phase = match (phase, evt.name().as_ref()) {
-			(Phase::Root, b"status") => {
+			(Phase::Root, "status") => {
 				let [
 					romname,
 					is_paused,
@@ -92,13 +92,13 @@ impl State {
 					has_input_using_mouse,
 					debugger_present,
 				] = evt.find_attributes([
-					b"romname",
-					b"paused",
-					b"app_build",
-					b"app_version",
-					b"polling_input_seq",
-					b"has_input_using_mouse",
-					b"debugger_present",
+					"romname",
+					"paused",
+					"app_build",
+					"app_version",
+					"polling_input_seq",
+					"has_input_using_mouse",
+					"debugger_present",
 				])?;
 				let machine_name = romname.unwrap_or_default().into();
 				let is_paused = is_paused.map(parse_mame_bool).transpose()?;
@@ -118,13 +118,13 @@ impl State {
 				self.running.debugger_present = debugger_present;
 				Some(Phase::Status)
 			}
-			(Phase::Status, b"video") => {
+			(Phase::Status, "video") => {
 				let [speed_percent, throttled, throttle_rate, frameskip, is_recording] = evt.find_attributes([
-					b"speed_percent",
-					b"throttled",
-					b"throttle_rate",
-					b"frameskip",
-					b"is_recording",
+					"speed_percent",
+					"throttled",
+					"throttle_rate",
+					"frameskip",
+					"is_recording",
 				])?;
 				let speed_percent = speed_percent.map(|x| x.parse::<f32>()).transpose()?;
 				let throttled = throttled.map(parse_mame_bool).transpose()?;
@@ -135,11 +135,7 @@ impl State {
 					.map(|x| u8::try_from(x).ok());
 				let is_recording = is_recording.map(parse_mame_bool).transpose()?;
 
-				debug!(
-					throttled=?throttled,
-					throttle_rate=?throttle_rate,
-					"status State::handle_start()"
-				);
+				debug!(?throttled, ?throttle_rate, "status State::handle_start()");
 
 				self.running.speed_percent = speed_percent.or(self.running.speed_percent);
 				self.running.is_throttled = throttled.or(self.running.is_throttled);
@@ -148,39 +144,39 @@ impl State {
 				self.running.is_recording = is_recording.or(self.running.is_recording);
 				None
 			}
-			(Phase::Status, b"sound") => {
-				let [system_mute, attenuation] = evt.find_attributes([b"system_mute", b"attenuation"])?;
+			(Phase::Status, "sound") => {
+				let [system_mute, attenuation] = evt.find_attributes(["system_mute", "attenuation"])?;
 				let system_mute = system_mute.map(parse_mame_bool).transpose()?;
 				let attenuation = attenuation.map(|x| x.parse::<i32>()).transpose()?;
 				self.running.system_mute = system_mute.or(self.running.system_mute);
 				self.running.sound_attenuation = attenuation.or(self.running.sound_attenuation);
 				None
 			}
-			(Phase::Status, b"cheats") => {
+			(Phase::Status, "cheats") => {
 				self.running.cheats = Some(Vec::new());
 				Some(Phase::StatusCheats)
 			}
-			(Phase::Status, b"images") => {
+			(Phase::Status, "images") => {
 				self.running.images = Some(Vec::new());
 				Some(Phase::StatusImages)
 			}
-			(Phase::Status, b"cassettes") => {
+			(Phase::Status, "cassettes") => {
 				self.running.cassettes = Some(Vec::new());
 				Some(Phase::StatusCassettes)
 			}
-			(Phase::Status, b"slots") => {
+			(Phase::Status, "slots") => {
 				self.running.slots = Some(Vec::new());
 				Some(Phase::StatusSlots)
 			}
-			(Phase::Status, b"inputs") => {
+			(Phase::Status, "inputs") => {
 				self.running.inputs = Some(Vec::new());
 				Some(Phase::StatusInputs)
 			}
-			(Phase::Status, b"input_devices") => {
+			(Phase::Status, "input_devices") => {
 				self.running.input_device_classes = Some(Vec::new());
 				Some(Phase::StatusInputDevices)
 			}
-			(Phase::StatusCheats, b"cheat") => {
+			(Phase::StatusCheats, "cheat") => {
 				let [
 					id,
 					enabled,
@@ -191,14 +187,14 @@ impl State {
 					has_changed_script,
 					comment,
 				] = evt.find_attributes([
-					b"id",
-					b"enabled",
-					b"description",
-					b"has_run_script",
-					b"has_on_script",
-					b"has_off_script",
-					b"has_changed_script",
-					b"comment",
+					"id",
+					"enabled",
+					"description",
+					"has_run_script",
+					"has_on_script",
+					"has_off_script",
+					"has_changed_script",
+					"comment",
 				])?;
 				let id = id.ok_or(ThisError::MissingMandatoryAttribute("id"))?.into();
 				let enabled = parse_mame_bool(enabled.ok_or(ThisError::MissingMandatoryAttribute("enabled"))?)?;
@@ -227,9 +223,9 @@ impl State {
 				self.running.cheats.as_mut().unwrap().push(cheat);
 				Some(Phase::Cheat)
 			}
-			(Phase::StatusImages, b"image") => {
+			(Phase::StatusImages, "image") => {
 				let [tag, filename, loaded_through_softlist] =
-					evt.find_attributes([b"tag", b"filename", b"loaded_through_softlist"])?;
+					evt.find_attributes(["tag", "filename", "loaded_through_softlist"])?;
 				let tag = tag.ok_or(ThisError::MissingMandatoryAttribute("tag"))?;
 				let tag = normalize_tag(tag).into();
 				let loaded_through_softlist = loaded_through_softlist.map(parse_mame_bool).transpose()?;
@@ -245,7 +241,7 @@ impl State {
 				self.running.images.as_mut().unwrap().push(image);
 				Some(Phase::Image)
 			}
-			(Phase::StatusCassettes, b"cassette") => {
+			(Phase::StatusCassettes, "cassette") => {
 				let [
 					tag,
 					is_stopped,
@@ -256,14 +252,14 @@ impl State {
 					position,
 					length,
 				] = evt.find_attributes([
-					b"tag",
-					b"is_stopped",
-					b"is_playing",
-					b"is_recording",
-					b"motor_state",
-					b"speaker_state",
-					b"position",
-					b"length",
+					"tag",
+					"is_stopped",
+					"is_playing",
+					"is_recording",
+					"motor_state",
+					"speaker_state",
+					"position",
+					"length",
 				])?;
 				let tag = tag.ok_or(ThisError::MissingMandatoryAttribute("tag"))?;
 				let tag = normalize_tag(tag).into();
@@ -293,14 +289,13 @@ impl State {
 				self.running.cassettes.as_mut().unwrap().push(cassette);
 				None
 			}
-			(Phase::Cheat, b"parameter") => {
+			(Phase::Cheat, "parameter") => {
 				let current_cheat = self.running.cheats.as_mut().unwrap().last_mut().unwrap();
 				if current_cheat.parameter.is_some() {
 					return Err(ThisError::InvalidMultipleTags("parameter").into());
 				}
 
-				let [value, minimum, maximum, step] =
-					evt.find_attributes([b"value", b"minimum", b"maximum", b"step"])?;
+				let [value, minimum, maximum, step] = evt.find_attributes(["value", "minimum", "maximum", "step"])?;
 				let value = value.unwrap_or_default().into();
 				let minimum = minimum
 					.ok_or(ThisError::MissingMandatoryAttribute("minimum"))?
@@ -320,8 +315,8 @@ impl State {
 				current_cheat.parameter = Some(parameter);
 				Some(Phase::CheatParameter)
 			}
-			(Phase::CheatParameter, b"item") => {
-				let [value, text] = evt.find_attributes([b"value", b"text"])?;
+			(Phase::CheatParameter, "item") => {
+				let [value, text] = evt.find_attributes(["value", "text"])?;
 				let value = value.ok_or(ThisError::MissingMandatoryAttribute("value"))?.parse()?;
 				let text = text.ok_or(ThisError::MissingMandatoryAttribute("text"))?.into();
 
@@ -330,14 +325,14 @@ impl State {
 				current_cheat.parameter.as_mut().unwrap().items.push(item);
 				None
 			}
-			(Phase::Image, b"details") => {
+			(Phase::Image, "details") => {
 				let [instance_name, is_readable, is_writeable, is_creatable, must_be_loaded] =
 					evt.find_attributes([
-						b"instance_name",
-						b"is_readable",
-						b"is_writeable",
-						b"is_creatable",
-						b"must_be_loaded",
+						"instance_name",
+						"is_readable",
+						"is_writeable",
+						"is_creatable",
+						"must_be_loaded",
 					])?;
 				let instance_name = instance_name
 					.ok_or(ThisError::MissingMandatoryAttribute("instance_name"))?
@@ -363,8 +358,8 @@ impl State {
 				self.phase_specific = Some(PhaseSpecificState::Formats(Vec::with_capacity(32)));
 				Some(Phase::ImageDetails)
 			}
-			(Phase::ImageDetails, b"format") => {
-				let [name, description] = evt.find_attributes([b"name", b"description"])?;
+			(Phase::ImageDetails, "format") => {
+				let [name, description] = evt.find_attributes(["name", "description"])?;
 				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?.into();
 				let description = description
 					.ok_or(ThisError::MissingMandatoryAttribute("description"))?
@@ -382,10 +377,10 @@ impl State {
 				formats.push(format);
 				Some(Phase::ImageDetailsFormat)
 			}
-			(Phase::ImageDetailsFormat, b"extension") => Some(Phase::ImageDetailsFormatExtension),
-			(Phase::StatusSlots, b"slot") => {
+			(Phase::ImageDetailsFormat, "extension") => Some(Phase::ImageDetailsFormatExtension),
+			(Phase::StatusSlots, "slot") => {
 				let [name, fixed, has_selectable_options, current_option] =
-					evt.find_attributes([b"name", b"fixed", b"has_selectable_options", b"current_option"])?;
+					evt.find_attributes(["name", "fixed", "has_selectable_options", "current_option"])?;
 				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?;
 				let name = normalize_tag(name).into();
 				let fixed = parse_mame_bool(fixed.ok_or(ThisError::MissingMandatoryAttribute("fixed"))?)?;
@@ -404,9 +399,9 @@ impl State {
 				self.phase_specific = Some(PhaseSpecificState::Slot(current_option));
 				Some(Phase::Slot)
 			}
-			(Phase::Slot, b"option") => {
+			(Phase::Slot, "option") => {
 				// parse attributes
-				let [name, selectable] = evt.find_attributes([b"name", b"selectable"])?;
+				let [name, selectable] = evt.find_attributes(["name", "selectable"])?;
 				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?.into();
 				let selectable =
 					parse_mame_bool(selectable.ok_or(ThisError::MissingMandatoryAttribute("selectable"))?)?;
@@ -427,7 +422,7 @@ impl State {
 				current_slot.options.push(option);
 				None
 			}
-			(Phase::StatusInputs, b"input") => {
+			(Phase::StatusInputs, "input") => {
 				let [
 					port_tag,
 					mask,
@@ -440,16 +435,16 @@ impl State {
 					value,
 					first_keyboard_code,
 				] = evt.find_attributes([
-					b"port_tag",
-					b"mask",
-					b"class",
-					b"group",
-					b"type",
-					b"player",
-					b"is_analog",
-					b"name",
-					b"value",
-					b"first_keyboard_code",
+					"port_tag",
+					"mask",
+					"class",
+					"group",
+					"type",
+					"player",
+					"is_analog",
+					"name",
+					"value",
+					"first_keyboard_code",
 				])?;
 
 				let port_tag = port_tag.ok_or(ThisError::MissingMandatoryAttribute("port_tag"))?;
@@ -484,8 +479,8 @@ impl State {
 				self.running.inputs.as_mut().unwrap().push(input);
 				Some(Phase::Input)
 			}
-			(Phase::Input, b"seq") => {
-				let [seq_type, tokens] = evt.find_attributes([b"type", b"tokens"])?;
+			(Phase::Input, "seq") => {
+				let [seq_type, tokens] = evt.find_attributes(["type", "tokens"])?;
 				let seq_type = seq_type.ok_or(ThisError::MissingMandatoryAttribute("seq_type"))?;
 				let seq_type = seq_type.parse::<SeqType>()?;
 				let tokens = tokens.ok_or(ThisError::MissingMandatoryAttribute("tokens"))?;
@@ -499,8 +494,8 @@ impl State {
 				*current_input_tokens = Some(tokens.into());
 				None
 			}
-			(Phase::StatusInputDevices, b"class") => {
-				let [name, enabled, multi] = evt.find_attributes([b"name", b"enabled", b"multi"])?;
+			(Phase::StatusInputDevices, "class") => {
+				let [name, enabled, multi] = evt.find_attributes(["name", "enabled", "multi"])?;
 				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?.parse()?;
 				let enabled = parse_mame_bool(&enabled.ok_or(ThisError::MissingMandatoryAttribute("enabled"))?)?;
 				let multi = parse_mame_bool(&multi.ok_or(ThisError::MissingMandatoryAttribute("multi"))?)?;
@@ -516,8 +511,8 @@ impl State {
 				input_device_classes.push(input_device_class);
 				Some(Phase::InputDeviceClass)
 			}
-			(Phase::InputDeviceClass, b"device") => {
-				let [name, id, devindex] = evt.find_attributes([b"name", b"id", b"devindex"])?;
+			(Phase::InputDeviceClass, "device") => {
+				let [name, id, devindex] = evt.find_attributes(["name", "id", "devindex"])?;
 				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?.into();
 				let id = id.ok_or(ThisError::MissingMandatoryAttribute("id"))?.into();
 				let devindex = devindex.ok_or(ThisError::MissingMandatoryAttribute("devindex"))?;
@@ -534,8 +529,8 @@ impl State {
 				input_device_classes.last_mut().unwrap().devices.push(input_device);
 				Some(Phase::InputDevice)
 			}
-			(Phase::InputDevice, b"item") => {
-				let [name, token, code] = evt.find_attributes([b"name", b"token", b"code"])?;
+			(Phase::InputDevice, "item") => {
+				let [name, token, code] = evt.find_attributes(["name", "token", "code"])?;
 				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?.into();
 				let token = token.as_deref().ok_or(ThisError::MissingMandatoryAttribute("token"))?;
 				let token = token.into();

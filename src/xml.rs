@@ -2,7 +2,6 @@
 use std::borrow::Cow;
 use std::fmt::Debug;
 use std::io::BufRead;
-use std::str::from_utf8;
 
 use anyhow::Error;
 use anyhow::Result;
@@ -80,13 +79,13 @@ where
 					self.internal_text(string)?
 				}
 				Event::GeneralRef(bytes_ref) => {
-					let bytes: &[u8] = bytes_ref.as_ref();
-					let string = match bytes {
-						b"amp" => "&".into(),
-						b"lt" => "<".into(),
-						b"gt" => ">".into(),
-						b"quot" => "\"".into(),
-						b"apos" => "'".into(),
+					let text = bytes_ref.as_ref();
+					let string = match text {
+						"amp" => "&".into(),
+						"lt" => "<".into(),
+						"gt" => ">".into(),
+						"quot" => "\"".into(),
+						"apos" => "'".into(),
 						_ => {
 							let ch = bytes_ref.resolve_char_ref()?.ok_or_else(|| {
 								let message = format!("Unknown bytes_ref {bytes_ref:?}");
@@ -184,7 +183,7 @@ impl<'a> XmlElement<'a> {
 		self.bytes_start.name()
 	}
 
-	pub fn find_attributes<const N: usize>(&'a self, attrs: [&[u8]; N]) -> Result<[Option<Cow<'a, str>>; N]> {
+	pub fn find_attributes<const N: usize>(&'a self, attrs: [&str; N]) -> Result<[Option<Cow<'a, str>>; N]> {
 		const DEFAULT_ATTRVAL: Option<Cow<str>> = None;
 		let mut result: [Option<Cow<'a, str>>; N] = [DEFAULT_ATTRVAL; N];
 
@@ -210,29 +209,20 @@ impl<'a> XmlElement<'a> {
 
 impl Debug for XmlElement<'_> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "<{}", String::from_utf8_lossy(self.name().as_ref()))?;
+		write!(f, "<{}", self.name().as_ref())?;
 		for x in self.bytes_start.attributes().with_checks(false) {
 			let attribute = x.unwrap();
-			write!(
-				f,
-				" {}=\"{}\"",
-				String::from_utf8_lossy(attribute.key.as_ref()),
-				String::from_utf8_lossy(attribute.value.as_ref())
-			)?;
+			write!(f, " {}=\"{}\"", attribute.key.as_ref(), attribute.value.as_ref())?;
 		}
 		write!(f, ">")?;
 		Ok(())
 	}
 }
 
-fn cow_bytes_to_str(cow: Cow<'_, [u8]>) -> Result<Cow<'_, str>> {
+fn cow_bytes_to_str(cow: Cow<'_, str>) -> Result<Cow<'_, str>> {
 	match cow {
-		Cow::Borrowed(bytes) => {
-			let s = from_utf8(bytes)?;
-			Ok(unescape(s)?)
-		}
-		Cow::Owned(bytes) => {
-			let text = String::from_utf8(bytes)?;
+		Cow::Borrowed(text) => Ok(unescape(text)?),
+		Cow::Owned(text) => {
 			let unescaped_text = unescape(&text)?;
 			let unescaped_text = if matches!(unescaped_text, Cow::Borrowed(x) if x.len() == text.len()) {
 				text
@@ -285,7 +275,7 @@ mod test {
 			match event {
 				Ok(XmlEvent::Start(x)) => {
 					let name = x.name();
-					let name = from_utf8(name.as_ref()).unwrap();
+					let name = name.as_ref();
 					if name == "unknown" {
 						reader.start_unknown_tag();
 					} else {
@@ -323,22 +313,22 @@ mod test {
 		assert_eq!(Ok(expected), actual);
 	}
 
-	#[test_case(0, Cow::Borrowed(b""), Ok(""))]
-	#[test_case(1, Cow::Owned(b"".into()), Ok(""))]
-	#[test_case(2, Cow::Borrowed(b"foo"), Ok("foo"))]
-	#[test_case(3, Cow::Owned(b"foo".into()), Ok("foo"))]
-	#[test_case(4, Cow::Borrowed(b"&lt;escaping&gt; &amp; things"), Ok("<escaping> & things"))]
-	#[test_case(5, Cow::Owned(b"&lt;escaping&gt; &amp; things".into()), Ok("<escaping> & things"))]
-	pub fn cow_bytes_to_str(_index: usize, input: Cow<'_, [u8]>, expected: Result<&str, ()>) {
+	#[test_case(0, Cow::Borrowed(""), Ok(""))]
+	#[test_case(1, Cow::Owned(String::new()), Ok(""))]
+	#[test_case(2, Cow::Borrowed("foo"), Ok("foo"))]
+	#[test_case(3, Cow::Owned("foo".into()), Ok("foo"))]
+	#[test_case(4, Cow::Borrowed("&lt;escaping&gt; &amp; things"), Ok("<escaping> & things"))]
+	#[test_case(5, Cow::Owned("&lt;escaping&gt; &amp; things".into()), Ok("<escaping> & things"))]
+	pub fn cow_bytes_to_str(_index: usize, input: Cow<'_, str>, expected: Result<&str, ()>) {
 		let actual = super::cow_bytes_to_str(input);
 		let actual = actual.as_ref().map_or_else(|_| Err(()), |x| Ok(x.as_ref()));
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, "<root alpha=\"aaa\" bravo=\"bbb\" charlie=\"ccc\"/>", [b"alpha", b"bravo", b"charlie"], &[Some("aaa"), Some("bbb"), Some("ccc")])]
-	#[test_case(1, "<root alpha=\"ddd\" bravo=\"eee\" charlie=\"fff\"/>", [b"alpha", b"delta", b"echo"], &[Some("ddd"), None, None])]
-	#[test_case(2, "<root alpha=\"ggg\"/>", [b"alpha", b"bravo", b"charlie"], &[Some("ggg"), None, None])]
-	pub fn find_attributes(_index: usize, xml: &str, attributes: [&[u8]; 3], expected: &[Option<&str>]) {
+	#[test_case(0, "<root alpha=\"aaa\" bravo=\"bbb\" charlie=\"ccc\"/>", ["alpha", "bravo", "charlie"], &[Some("aaa"), Some("bbb"), Some("ccc")])]
+	#[test_case(1, "<root alpha=\"ddd\" bravo=\"eee\" charlie=\"fff\"/>", ["alpha", "delta", "echo"], &[Some("ddd"), None, None])]
+	#[test_case(2, "<root alpha=\"ggg\"/>", ["alpha", "bravo", "charlie"], &[Some("ggg"), None, None])]
+	pub fn find_attributes(_index: usize, xml: &str, attributes: [&str; 3], expected: &[Option<&str>]) {
 		let mut reader = XmlReader::from_reader(xml.as_bytes(), true);
 		let mut buf = Vec::new();
 

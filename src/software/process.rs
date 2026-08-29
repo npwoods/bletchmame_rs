@@ -71,14 +71,14 @@ impl State {
 	pub fn handle_start(&mut self, evt: XmlElement<'_>) -> Result<Option<Phase>> {
 		let phase = self.phase_stack.last().unwrap_or(&Phase::Root);
 		let new_phase = match (phase, evt.name().as_ref()) {
-			(Phase::Root, b"softwarelist") => {
-				let [name, description] = evt.find_attributes([b"name", b"description"])?;
+			(Phase::Root, "softwarelist") => {
+				let [name, description] = evt.find_attributes(["name", "description"])?;
 				self.software_list.name = name.unwrap_or_default().into();
 				self.software_list.description = description.unwrap_or_default().into();
 				Some(Phase::SoftwareList)
 			}
-			(Phase::SoftwareList, b"software") => {
-				let [name] = evt.find_attributes([b"name"])?;
+			(Phase::SoftwareList, "software") => {
+				let [name] = evt.find_attributes(["name"])?;
 				let Some(name) = name else {
 					error!("handle_start(): Missing name attribute");
 					return Ok(None);
@@ -95,11 +95,11 @@ impl State {
 				self.current_software = Some(software);
 				Some(Phase::Software)
 			}
-			(Phase::Software, b"description") => Some(Phase::SoftwareDescription),
-			(Phase::Software, b"year") => Some(Phase::SoftwareYear),
-			(Phase::Software, b"publisher") => Some(Phase::SoftwarePublisher),
-			(Phase::Software, b"part") => {
-				let [name, interface] = evt.find_attributes([b"name", b"interface"])?;
+			(Phase::Software, "description") => Some(Phase::SoftwareDescription),
+			(Phase::Software, "year") => Some(Phase::SoftwareYear),
+			(Phase::Software, "publisher") => Some(Phase::SoftwarePublisher),
+			(Phase::Software, "part") => {
+				let [name, interface] = evt.find_attributes(["name", "interface"])?;
 				if let Some((name, interface)) = Option::zip(name, interface) {
 					let (name, interface) = (name.into(), interface.into());
 					let part = SoftwarePart {
@@ -112,8 +112,8 @@ impl State {
 				self.current_data_areas = Some(Vec::new());
 				Some(Phase::SoftwarePart)
 			}
-			(Phase::SoftwarePart, b"dataarea") => {
-				let [name, size] = evt.find_attributes([b"name", b"size"])?;
+			(Phase::SoftwarePart, "dataarea") => {
+				let [name, size] = evt.find_attributes(["name", "size"])?;
 				let name = name.unwrap_or_default().into();
 				let size = parse(&size.unwrap_or_default())?;
 				let data_area = SoftwareDataArea {
@@ -125,9 +125,8 @@ impl State {
 				self.current_assets = Some(Vec::new());
 				Some(Phase::SoftwarePartDataArea)
 			}
-			(Phase::SoftwarePartDataArea, b"rom") => {
-				let [name, size, crc, sha1, status] =
-					evt.find_attributes([b"name", b"size", b"crc", b"sha1", b"status"])?;
+			(Phase::SoftwarePartDataArea, "rom") => {
+				let [name, size, crc, sha1, status] = evt.find_attributes(["name", "size", "crc", "sha1", "status"])?;
 				let Some(name) = name else {
 					// the software list tag is <rom> but this is likely not a ROM (e.g. -
 					// NVRAM); software lists are weird

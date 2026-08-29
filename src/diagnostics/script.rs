@@ -39,15 +39,15 @@ impl State {
 	fn handle_start(&mut self, evt: XmlElement<'_>) -> Result<Option<Phase>> {
 		let phase = self.phase_stack.last().unwrap_or(&Phase::Root);
 		let new_phase = match (phase, evt.name().as_ref()) {
-			(Phase::Root, b"script") => {
-				let [required_version] = evt.find_attributes([b"requiredVersion"])?;
+			(Phase::Root, "script") => {
+				let [required_version] = evt.find_attributes(["requiredVersion"])?;
 				if let Some(required_version) = required_version {
 					let required_version = MameVersion::from(required_version.as_ref());
 					self.required_version = Some(required_version);
 				}
 				Some(Phase::Script)
 			}
-			(Phase::Script, b"command") => Some(Phase::Command),
+			(Phase::Script, "command") => Some(Phase::Command),
 			_ => None,
 		};
 		Ok(new_phase)

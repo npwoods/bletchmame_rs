@@ -47,26 +47,26 @@ impl State {
 	pub fn handle_start(&mut self, evt: XmlElement<'_>) -> Result<Option<Phase>> {
 		let phase = self.phase_stack.last().unwrap_or(&Phase::Root);
 		let new_phase = match (phase, evt.name().as_ref()) {
-			(Phase::Root, b"history") => {
-				let [_version, _date] = evt.find_attributes([b"version", b"date"])?;
+			(Phase::Root, "history") => {
+				let [_version, _date] = evt.find_attributes(["version", "date"])?;
 				Some(Phase::History)
 			}
-			(Phase::History, b"entry") => Some(Phase::Entry),
-			(Phase::Entry, b"systems") => Some(Phase::EntrySystems),
-			(Phase::Entry, b"software") => Some(Phase::EntrySoftware),
-			(Phase::Entry, b"text") => {
+			(Phase::History, "entry") => Some(Phase::Entry),
+			(Phase::Entry, "systems") => Some(Phase::EntrySystems),
+			(Phase::Entry, "software") => Some(Phase::EntrySoftware),
+			(Phase::Entry, "text") => {
 				self.text = Some(String::with_capacity(2048));
 				Some(Phase::EntryText)
 			}
-			(Phase::EntrySystems, b"system") => {
-				let [name] = evt.find_attributes([b"name"])?;
+			(Phase::EntrySystems, "system") => {
+				let [name] = evt.find_attributes(["name"])?;
 				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?.into();
 				let entry_info = EntryInfo::System { name };
 				self.entry_infos.push(entry_info);
 				Some(Phase::EntrySystems)
 			}
-			(Phase::EntrySoftware, b"item") => {
-				let [list, name] = evt.find_attributes([b"list", b"name"])?;
+			(Phase::EntrySoftware, "item") => {
+				let [list, name] = evt.find_attributes(["list", "name"])?;
 				let list = list.ok_or(ThisError::MissingMandatoryAttribute("list"))?.into();
 				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?.into();
 				let entry_info = EntryInfo::Software { list, name };
