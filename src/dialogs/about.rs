@@ -1,5 +1,6 @@
 use slint::CloseRequestResponse;
 use tokio::sync::mpsc;
+use tracing::error;
 
 use crate::dialogs::SenderExt;
 use crate::guiutils::modal::ModalStack;
@@ -13,6 +14,13 @@ pub async fn dialog_about(modal_stack: ModalStack) {
 
 	// set the version
 	modal.dialog().set_version(VERSION.into());
+
+	// set up the link-clicked callback
+	modal.dialog().on_link_clicked(|link| {
+		if let Err(e) = open::that(&link) {
+			error!("Failed to open link: {}", e);
+		}
+	});
 
 	// set up the close handler
 	let tx_clone = tx.clone();

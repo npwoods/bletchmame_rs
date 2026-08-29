@@ -12,6 +12,8 @@ export component AboutDialog inherits Window {
     icon: Icons.bletchmame;
     in property <string> version;
 
+    callback link-clicked(link: string);
+
     property <image> logo-image: @image_url("../bletchmame_logo.svg");
 
     HorizontalBox {
@@ -30,12 +32,23 @@ export component AboutDialog inherits Window {
                 vertical-stretch: 0;
             }
 
-            Text {
-                text: "version " + version;
-                font-size: 20px;
-                horizontal-alignment: right;
-                vertical-alignment: top;
-                vertical-stretch: 0;
+            HorizontalBox {
+                StyledText {
+                    vertical-alignment: center;
+                    text: @markdown("[www.bletchmame.org](https://www.bletchmame.org)");
+                    default-font-size: 20px;
+                    link-clicked(link) => {
+                        root.link-clicked(link);
+                    }
+                }
+
+                Text {
+                    text: "version " + version;
+                    font-size: 20px;
+                    horizontal-alignment: right;
+                    vertical-alignment: center;
+                    vertical-stretch: 0;
+                }
             }
 
             AboutSlint {
