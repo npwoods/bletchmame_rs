@@ -193,14 +193,14 @@ impl State {
 		let phase = self.phase_stack.last().unwrap_or(&Phase::Root);
 		let evt_name = evt.name();
 		let new_phase = match (phase, evt_name.as_ref()) {
-			(Phase::Root, b"mame") => {
-				let [build] = evt.find_attributes([b"build"])?;
+			(Phase::Root, "mame") => {
+				let [build] = evt.find_attributes(["build"])?;
 				self.build_strindex = self.strings.lookup(&build.unwrap_or_default());
 				Some(Phase::Mame)
 			}
-			(Phase::Mame, b"machine") => {
+			(Phase::Mame, "machine") => {
 				let [name, source_file, clone_of, rom_of, runnable] =
-					evt.find_attributes([b"name", b"sourcefile", b"cloneof", b"romof", b"runnable"])?;
+					evt.find_attributes(["name", "sourcefile", "cloneof", "romof", "runnable"])?;
 
 				debug!(name =?name, source_file=?source_file, runnable=?runnable,
 					"handle_start()"
@@ -251,20 +251,12 @@ impl State {
 				self.machines.push_db(machine)?;
 				Some(Phase::Machine)
 			}
-			(Phase::Machine, b"description") => Some(Phase::MachineDescription),
-			(Phase::Machine, b"year") => Some(Phase::MachineYear),
-			(Phase::Machine, b"manufacturer") => Some(Phase::MachineManufacturer),
-			(Phase::Machine, b"rom") => {
+			(Phase::Machine, "description") => Some(Phase::MachineDescription),
+			(Phase::Machine, "year") => Some(Phase::MachineYear),
+			(Phase::Machine, "manufacturer") => Some(Phase::MachineManufacturer),
+			(Phase::Machine, "rom") => {
 				let [name, bios, size, crc, sha1, region, offset, status, optional] = evt.find_attributes([
-					b"name",
-					b"bios",
-					b"size",
-					b"crc",
-					b"sha1",
-					b"region",
-					b"offset",
-					b"status",
-					b"optional",
+					"name", "bios", "size", "crc", "sha1", "region", "offset", "status", "optional",
 				])?;
 				let name = name.mandatory("name")?;
 				let size = size.as_deref().map(str::parse::<u64>).transpose()?;
@@ -299,16 +291,9 @@ impl State {
 				});
 				None
 			}
-			(Phase::Machine, b"disk") => {
+			(Phase::Machine, "disk") => {
 				let [name, merge, sha1, region, index, writable, status, optional] = evt.find_attributes([
-					b"name",
-					b"merge",
-					b"sha1",
-					b"region",
-					b"index",
-					b"writable",
-					b"status",
-					b"optional",
+					"name", "merge", "sha1", "region", "index", "writable", "status", "optional",
 				])?;
 				let name = name.mandatory("name")?;
 				let asset_hash = AssetHash::from_hex_strings(None, sha1.as_deref())?;
@@ -340,8 +325,8 @@ impl State {
 				});
 				None
 			}
-			(Phase::Machine, b"sample") => {
-				let [name] = evt.find_attributes([b"name"])?;
+			(Phase::Machine, "sample") => {
+				let [name] = evt.find_attributes(["name"])?;
 				let name = name.mandatory("name")?;
 				let name_strindex = self.strings.lookup(&name);
 				let sample = binary::Sample { name_strindex };
@@ -351,8 +336,8 @@ impl State {
 				});
 				None
 			}
-			(Phase::Machine, b"biosset") => {
-				let [name, description, is_default] = evt.find_attributes([b"name", b"description", b"default"])?;
+			(Phase::Machine, "biosset") => {
+				let [name, description, is_default] = evt.find_attributes(["name", "description", "default"])?;
 				let name_strindex = self.strings.lookup(&name.mandatory("name")?);
 				let description_strindex = self.strings.lookup(&description.mandatory("description")?);
 				let is_default = is_default.map(parse_mame_bool).transpose()?.unwrap_or(false);
@@ -373,8 +358,8 @@ impl State {
 				});
 				None
 			}
-			(Phase::Machine, b"chip") => {
-				let [chip_type, tag, name, clock] = evt.find_attributes([b"type", b"tag", b"name", b"clock"])?;
+			(Phase::Machine, "chip") => {
+				let [chip_type, tag, name, clock] = evt.find_attributes(["type", "tag", "name", "clock"])?;
 				let Ok(chip_type) = (*chip_type.mandatory("type")?).parse::<ChipType>() else {
 					// presumably an unknown chip type; ignore
 					return Ok(None);
@@ -394,8 +379,8 @@ impl State {
 				});
 				None
 			}
-			(Phase::Machine, b"configuration" | b"dipswitch") => {
-				let [name, tag, mask] = evt.find_attributes([b"name", b"tag", b"mask"])?;
+			(Phase::Machine, "configuration" | "dipswitch") => {
+				let [name, tag, mask] = evt.find_attributes(["name", "tag", "mask"])?;
 				let name = name.mandatory("name")?;
 				let tag = normalize_tag(tag.mandatory("tag")?);
 				let mask = (*mask.mandatory("mask")?).parse::<u32>()?.into();
@@ -415,8 +400,8 @@ impl State {
 				});
 				Some(Phase::MachineConfiguration)
 			}
-			(Phase::MachineConfiguration, b"confsetting" | b"dipvalue") => {
-				let [name, value, is_default] = evt.find_attributes([b"name", b"value", b"default"])?;
+			(Phase::MachineConfiguration, "confsetting" | "dipvalue") => {
+				let [name, value, is_default] = evt.find_attributes(["name", "value", "default"])?;
 				let name_strindex = self.strings.lookup(&name.mandatory("name")?);
 				let value = value.mandatory("value")?.parse::<u32>()?.into();
 				let is_default = is_default.map(parse_mame_bool).transpose()?.unwrap_or(false);
@@ -439,8 +424,8 @@ impl State {
 				});
 				Some(Phase::MachineConfigurationSetting)
 			}
-			(Phase::MachineConfigurationSetting, b"condition") => {
-				let [tag, relation, mask, value] = evt.find_attributes([b"tag", b"relation", b"mask", b"value"])?;
+			(Phase::MachineConfigurationSetting, "condition") => {
+				let [tag, relation, mask, value] = evt.find_attributes(["tag", "relation", "mask", "value"])?;
 				let tag = normalize_tag(tag.mandatory("tag")?);
 				let tag_strindex = self.strings.lookup(&tag);
 				let Ok(condition_relation) = relation.mandatory("relation")?.parse::<binary::ConditionRelation>()
@@ -462,9 +447,9 @@ impl State {
 				});
 				None
 			}
-			(Phase::Machine, b"device") => {
+			(Phase::Machine, "device") => {
 				let [device_type, tag, mandatory, interface] =
-					evt.find_attributes([b"type", b"tag", b"mandatory", b"interface"])?;
+					evt.find_attributes(["type", "tag", "mandatory", "interface"])?;
 				let device_type = device_type
 					.and_then(|x| x.parse::<DeviceType>().ok())
 					.unwrap_or(DeviceType::Unknown);
@@ -488,8 +473,8 @@ impl State {
 				self.phase_specific = Some(PhaseSpecificState::Extensions(String::with_capacity(1024)));
 				Some(Phase::MachineDevice)
 			}
-			(Phase::Machine, b"device_ref") => {
-				let [name, tag] = evt.find_attributes([b"name", b"tag"])?;
+			(Phase::Machine, "device_ref") => {
+				let [name, tag] = evt.find_attributes(["name", "tag"])?;
 				let name = name.mandatory("name")?;
 				let name_strindex = self.strings.lookup(&name);
 				let tag = tag.map(normalize_tag);
@@ -504,8 +489,8 @@ impl State {
 				});
 				None
 			}
-			(Phase::Machine, b"slot") => {
-				let [name] = evt.find_attributes([b"name"])?;
+			(Phase::Machine, "slot") => {
+				let [name] = evt.find_attributes(["name"])?;
 				let name = name.mandatory("slot")?;
 				let name = normalize_tag(name);
 				let name_strindex = self.strings.lookup(&name);
@@ -522,8 +507,8 @@ impl State {
 				});
 				Some(Phase::MachineSlot)
 			}
-			(Phase::Machine, b"softwarelist") => {
-				let [tag, name, status, filter] = evt.find_attributes([b"tag", b"name", b"status", b"filter"])?;
+			(Phase::Machine, "softwarelist") => {
+				let [tag, name, status, filter] = evt.find_attributes(["tag", "name", "status", "filter"])?;
 				let status = status.mandatory("status")?;
 				let Ok(status) = (*status).parse::<SoftwareListStatus>() else {
 					// presumably an unknown software list status; ignore
@@ -554,14 +539,14 @@ impl State {
 				list.push(machine_name_strindex);
 				None
 			}
-			(Phase::Machine, b"ramoption") => {
-				let [is_default] = evt.find_attributes([b"default"])?;
+			(Phase::Machine, "ramoption") => {
+				let [is_default] = evt.find_attributes(["default"])?;
 				let is_default = is_default.map(parse_mame_bool).transpose()?.unwrap_or_default();
 				self.phase_specific = Some(PhaseSpecificState::RamOption(is_default));
 				Some(Phase::MachineRamOption)
 			}
-			(Phase::Machine, b"driver") => {
-				let [status, emulation, savestate] = evt.find_attributes([b"status", b"emulation", b"savestate"])?;
+			(Phase::Machine, "driver") => {
+				let [status, emulation, savestate] = evt.find_attributes(["status", "emulation", "savestate"])?;
 				let status = status.as_deref().map(|s| s.parse()).transpose()?;
 				let emulation = emulation.as_deref().map(|s| s.parse()).transpose()?;
 				let savestate = savestate.as_deref().map(|s| s.parse()).transpose()?;
@@ -572,8 +557,8 @@ impl State {
 				});
 				None
 			}
-			(Phase::Machine, b"feature") => {
-				let [feature_type, status, overall] = evt.find_attributes([b"type", b"status", b"overall"])?;
+			(Phase::Machine, "feature") => {
+				let [feature_type, status, overall] = evt.find_attributes(["type", "status", "overall"])?;
 				let feature_type_attr = feature_type.mandatory("type")?;
 				let Ok(feature_type) = (*feature_type_attr).parse::<binary::FeatureType>() else {
 					// unknown feature type; ignore
@@ -600,8 +585,8 @@ impl State {
 				});
 				None
 			}
-			(Phase::MachineDevice, b"extension") => {
-				let [name] = evt.find_attributes([b"name"])?;
+			(Phase::MachineDevice, "extension") => {
+				let [name] = evt.find_attributes(["name"])?;
 				if let Some(name) = name {
 					let PhaseSpecificState::Extensions(extensions) = self.phase_specific.as_mut().unwrap() else {
 						unreachable!();
@@ -613,8 +598,8 @@ impl State {
 				}
 				None
 			}
-			(Phase::MachineSlot, b"slotoption") => {
-				let [name, devname, is_default] = evt.find_attributes([b"name", b"devname", b"default"])?;
+			(Phase::MachineSlot, "slotoption") => {
+				let [name, devname, is_default] = evt.find_attributes(["name", "devname", "default"])?;
 				let name = name.mandatory("name")?;
 				let devname = devname.mandatory("devname")?;
 				let name_strindex = self.strings.lookup(&name);
