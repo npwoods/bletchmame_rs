@@ -9,6 +9,7 @@ use i_slint_backend_winit::WinitWindowAccessor;
 use raw_window_handle::HasWindowHandle;
 use raw_window_handle::RawWindowHandle;
 use slint::ComponentHandle;
+use slint::winit_030::invoke_from_event_loop_with_active_event_loop;
 use tokio::sync::oneshot;
 use tracing::info;
 use tracing::info_span;
@@ -26,15 +27,10 @@ use crate::platform::WindowAttributesExt;
 #[derive(Clone, Default)]
 pub struct WinitBackendRuntime(Rc<RefCell<WinitBackendRuntimeInner>>);
 
-type InvokeWithActiveEventLoopFunc =
-	Box<dyn Fn(Box<dyn FnOnce(&ActiveEventLoop) + Send>) -> Result<(), i_slint_core::api::EventLoopError> + 'static>;
-
 #[derive(Default)]
 struct WinitBackendRuntimeInner {
 	live: Vec<Rc<WinitChildWindow>>,
 	modal_parent_raw_handle: Option<RawWindowHandle>,
-	// Store an invokee that accepts a boxed callback taking the ActiveEventLoop and returns a Result.
-	invoke_with_event_loop: Option<InvokeWithActiveEventLoopFunc>,
 }
 
 type DispatchWinitWindowEventToParentFn = Box<dyn Fn(&ActiveEventLoop, &WindowEvent) + Send>;
@@ -82,7 +78,6 @@ impl WinitBackendRuntime {
 			builder = builder.with_renderer_name(renderer);
 		}
 		let slint_backend = builder.build()?;
-		self.0.borrow_mut().invoke_with_event_loop = Some(slint_backend.get_invoke_with_active_event_loop_func());
 		Ok(Box::new(slint_backend) as Box<_>)
 	}
 
@@ -134,7 +129,7 @@ impl WinitBackendRuntime {
 			);
 			let _ = sender.send(result);
 		});
-		let _ = (self.0.borrow().invoke_with_event_loop.as_ref().unwrap())(callback);
+		let _ = invoke_from_event_loop_with_active_event_loop(callback);
 
 		// and await the result
 		let child_window = receiver.await??;
