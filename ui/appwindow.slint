@@ -407,8 +407,8 @@ export component AppWindow inherits Window {
                 for entry[index] in menu-entries-throttle: MenuItem {
                     title: entry.title;
                     checkable: true;
-                    checked: index == menu-entries-throttle-current-index;
-                    private property <bool> selected: index == menu-entries-throttle-current-index;
+                    checked: index == menu-entries-throttle-current-index && is-throttled;
+                    private property <bool> selected: index == menu-entries-throttle-current-index && is-throttled;
                     changed selected => {
                         self.checked = self.selected;
                     }
