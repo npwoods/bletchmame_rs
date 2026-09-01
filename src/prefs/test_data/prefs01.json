@@ -26,8 +26,8 @@
         "historyFile": "/home/mame_files/history_lite.xml"
     },
     "windowSize": {
-        "width": 1806.0,
-        "height": 2892.0
+        "width": 1806,
+        "height": 2892
     },
     "isFullscreen": false,
     "prescale": 20,

@@ -1,5 +1,7 @@
 pub mod pathtype;
 mod preflight;
+mod serde_position;
+mod serde_size;
 mod serde_slots;
 mod var;
 
@@ -28,8 +30,8 @@ use itertools::Itertools;
 use num::clamp;
 use serde::Deserialize;
 use serde::Serialize;
-use slint::LogicalPosition;
-use slint::LogicalSize;
+use slint::PhysicalPosition;
+use slint::PhysicalSize;
 use slint::ToSharedString;
 use smol_str::SmolStr;
 use smol_str::format_smolstr;
@@ -57,11 +59,11 @@ pub struct Preferences {
 	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub paths: Rc<PrefsPaths>,
 
-	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
-	pub window_position: Option<PrefsPosition>,
+	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default", with = "serde_position")]
+	pub window_position: Option<PhysicalPosition>,
 
-	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
-	pub window_size: Option<PrefsSize>,
+	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default", with = "serde_size")]
+	pub window_size: Option<PhysicalSize>,
 
 	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub main_window_left_column_width: Option<f32>,
@@ -293,50 +295,6 @@ impl PreflightProblem {
 	pub fn problem_type(&self) -> Option<PathType> {
 		let s = self.get_str("ProblemType")?;
 		Some(PathType::from_str(s).unwrap())
-	}
-}
-
-#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct PrefsPosition {
-	pub x: f32,
-	pub y: f32,
-}
-
-impl From<LogicalPosition> for PrefsPosition {
-	fn from(value: LogicalPosition) -> Self {
-		Self { x: value.x, y: value.y }
-	}
-}
-
-impl From<PrefsPosition> for LogicalPosition {
-	fn from(value: PrefsPosition) -> Self {
-		Self { x: value.x, y: value.y }
-	}
-}
-
-#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct PrefsSize {
-	pub width: f32,
-	pub height: f32,
-}
-
-impl From<LogicalSize> for PrefsSize {
-	fn from(value: LogicalSize) -> Self {
-		Self {
-			width: value.width,
-			height: value.height,
-		}
-	}
-}
-
-impl From<PrefsSize> for LogicalSize {
-	fn from(value: PrefsSize) -> Self {
-		Self {
-			width: value.width,
-			height: value.height,
-		}
 	}
 }
 

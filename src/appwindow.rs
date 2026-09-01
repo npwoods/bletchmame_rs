@@ -89,7 +89,6 @@ use crate::prefs::BuiltinCollection;
 use crate::prefs::ColumnType;
 use crate::prefs::Preferences;
 use crate::prefs::PrefsCollection;
-use crate::prefs::PrefsSize;
 use crate::prefs::SortOrder;
 use crate::prefs::pathtype::PathType;
 use crate::runtime::MameStderr;
@@ -142,11 +141,6 @@ const FRAMESKIP_RATES: &[Option<u8>] = &[
 
 const MINIMUM_MAME_RECORD_MOVIE: MameVersion = MameVersion::new(0, 221); // recording movies by specifying absolute paths was introduced in MAME 0.221
 const MINIMUM_MAME_CLASSIC_MENU: MameVersion = MameVersion::new(0, 274);
-
-const DEFAULT_SIZE: PrefsSize = PrefsSize {
-	width: 920.0,
-	height: 520.0,
-};
 
 /// Arguments to the application (derivative from the command line); almost all of this
 /// are power user features or diagnostics
@@ -597,17 +591,12 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		.unwrap_or_else(|| Preferences::fresh(prefs_path.to_str().map(|x| x.into())));
 
 	// update window preferences
-	let window_physical_position = preferences
-		.window_position
-		.as_ref()
-		.map(|pos| LogicalPosition::from(*pos).to_physical(app_window.window().scale_factor()));
-	let window_physical_size = LogicalSize::from(preferences.window_size.unwrap_or(DEFAULT_SIZE))
-		.to_physical(app_window.window().scale_factor());
-
-	if let Some(window_physical_position) = window_physical_position {
-		app_window.window().set_position(window_physical_position);
+	if let Some(window_position) = preferences.window_position {
+		app_window.window().set_position(window_position);
 	}
-	app_window.window().set_size(window_physical_size);
+	if let Some(window_size) = preferences.window_size {
+		app_window.window().set_size(window_size);
+	}
 	if let Some(main_window_left_column_width) = preferences.main_window_left_column_width {
 		app_window.set_column_left_width(main_window_left_column_width);
 	}
@@ -1890,14 +1879,10 @@ fn update_prefs(model: &Rc<AppModel>) {
 	model.modify_prefs(|prefs| {
 		// update window position
 		let app_window = model.app_window();
-		let physical_position = app_window.window().position();
-		let logical_position = physical_position.to_logical(app_window.window().scale_factor());
-		prefs.window_position = Some(logical_position.into());
+		prefs.window_position = Some(app_window.window().position());
 
 		// update window size
-		let physical_size = app_window.window().size();
-		let logical_size = physical_size.to_logical(app_window.window().scale_factor());
-		prefs.window_size = Some(logical_size.into());
+		prefs.window_size = Some(app_window.window().size());
 
 		// splitter columns
 		prefs.main_window_left_column_width = Some(app_window.get_column_left_width());
