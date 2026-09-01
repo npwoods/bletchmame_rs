@@ -4,7 +4,9 @@ All notable changes to this project are documented in this file.
 ## [3.0] - Unreleased
 - After three years, this is a complete rewrite of BletchMAME in Rust using the Slint toolkit
 - Instead of launching MAME for each emulation session, MAME is now spun up and reused across emulation sessions
-- Too many user interface changes to list; this is a completely new application
+- Very fast system and software list lookup
+- Dark mode support
+- Too many other user interface changes to list; this is a completely new application
 - Special thanks to "nerd4gw" for collaborating with this complete reinvension of BletchMAME
 
 ## [2.17] - 2023-07-13
