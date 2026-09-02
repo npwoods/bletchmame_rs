@@ -13,7 +13,12 @@ pub async fn dialog_about(modal_stack: ModalStack) {
 	let (tx, mut rx) = mpsc::channel(1);
 
 	// set the version
-	modal.dialog().set_version(VERSION.into());
+	let version = if VERSION.starts_with('0') {
+		"(development version)".into()
+	} else {
+		format!("verssion {VERSION}").into()
+	};
+	modal.dialog().set_version(version);
 
 	// set up the link-clicked callback
 	modal.dialog().on_link_clicked(|link| {
