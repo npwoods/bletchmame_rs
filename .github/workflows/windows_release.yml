@@ -99,11 +99,12 @@ jobs:
       - name: Prepare Artifacts
         shell: bash
         run: |
-          mkdir -p rel
-          mv BletchMAME.msi rel/BletchMAME_${VERSION_UNDERSCORES}.msi
-          7z a rel/BletchMAME_${VERSION_UNDERSCORES}.zip ./target/release/BletchMAME.exe
-          7z a rel/BletchMAME_${VERSION_UNDERSCORES}.zip readme.html
-          7z a rel/BletchMAME_${VERSION_UNDERSCORES}.zip plugins
+          mkdir -p rel/msi/
+          mkdir -p rel/zip/BletchMAME_${VERSION_UNDERSCORES}/
+          mv BletchMAME.msi rel/msi/BletchMAME_${VERSION_UNDERSCORES}.msi
+          cp ./target/release/BletchMAME.exe rel/zip/BletchMAME_${VERSION_UNDERSCORES}/
+          cp readme.html rel/zip/BletchMAME_${VERSION_UNDERSCORES}/
+          cp -r plugins rel/zip/BletchMAME_${VERSION_UNDERSCORES}/
 
       # Upload build output MSI
       - name: Upload build output MSI
@@ -111,7 +112,7 @@ jobs:
         if: success() && github.ref == 'refs/heads/master'
         with:
           name: BletchMAME_${{ env.VERSION_UNDERSCORES }}.msi
-          path: rel/*.msi
+          path: rel/msi/
 
       # Upload build output ZIP
       - name: Upload build output ZIP
@@ -119,4 +120,4 @@ jobs:
         if: success() && github.ref == 'refs/heads/master'
         with:
           name: BletchMAME_${{ env.VERSION_UNDERSCORES }}.zip
-          path: rel/*.zip
+          path: rel/zip/
