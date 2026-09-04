@@ -6,13 +6,14 @@
 
 # read a line from stdin and extract version
 my $input = <STDIN>;
-if (!defined $input || $input !~ /v([0-9]+)\.([0-9]+)(\-[0-9]+)?/) {
-    die "Cannot process build string";
+$input =~ s/\r//;
+$input =~ s/\n//;
+if ($input !~ /^v([0-9]+)\.([0-9]+)(?:-([0-9]+)-g[0-9a-f]+)?(?:-dirty)?$/) {
+    die "Cannot process build string: $input";
 }
 my $major = $1;
 my $minor = $2;
-my $build = $3 // '';
-$build =~ s/^\-//;
+my $build = defined($3) ? $3 : '';
 my $delim = '.';
 
 if ($build eq "") {
