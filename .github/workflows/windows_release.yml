@@ -44,7 +44,11 @@ jobs:
         shell: bash
         run: |
           VERSION=$(git describe --tags | perl scripts/process_version.pl)
-          cargo set-version "$VERSION"
+          CRATE_VERSION="$VERSION"
+          if [[ "$CRATE_VERSION" =~ ^[0-9]+\.[0-9]+$ ]]; then
+            CRATE_VERSION="$CRATE_VERSION.0"
+          fi
+          cargo set-version "$CRATE_VERSION"
           VERSION_UNDERSCORES=${VERSION//./_}
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "VERSION_UNDERSCORES=$VERSION_UNDERSCORES" >> $GITHUB_ENV
