@@ -16,7 +16,8 @@ pub async fn dialog_about(modal_stack: ModalStack) {
 	let version = if VERSION.starts_with('0') {
 		"(development version)".into()
 	} else {
-		format!("verssion {VERSION}").into()
+		let version = VERSION.strip_suffix(".0").unwrap_or(VERSION);
+		format!("version {}", version).into()
 	};
 	modal.dialog().set_version(version);
 
