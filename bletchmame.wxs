@@ -3,6 +3,8 @@
   <Product Id="*" UpgradeCode="a0f6babb-15f5-48f9-a000-665f644a7019" Version="$(var.VERSION)" Language="1033" Name="BletchMAME" Manufacturer="BletchMAME">
     <Package InstallerVersion="300" Compressed="yes" Platform="x64"/>
     <Media Id="1" Cabinet="myapplication.cab" EmbedCab="yes" />
+    <Icon Id="BletchMAMEIcon" SourceFile="ui\icons\bletchmame.ico" />
+    <Property Id="ARPPRODUCTICON" Value="BletchMAMEIcon" />
     
     <!-- Step 1: Define the directory structure -->
     <Directory Id="TARGETDIR" Name="SourceDir">
