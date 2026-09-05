@@ -9,7 +9,7 @@ use i_slint_backend_winit::WinitWindowAccessor;
 use raw_window_handle::HasWindowHandle;
 use raw_window_handle::RawWindowHandle;
 use slint::ComponentHandle;
-use slint::winit_030::invoke_from_event_loop_with_active_event_loop;
+use slint::winit_030::invoke_from_active_event_loop;
 use tokio::sync::oneshot;
 use tracing::info;
 use tracing::info_span;
@@ -129,7 +129,7 @@ impl WinitBackendRuntime {
 			);
 			let _ = sender.send(result);
 		});
-		let _ = invoke_from_event_loop_with_active_event_loop(callback);
+		let _ = invoke_from_active_event_loop(callback);
 
 		// and await the result
 		let child_window = receiver.await??;
