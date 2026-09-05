@@ -3,7 +3,7 @@
   <Product Id="*" UpgradeCode="a0f6babb-15f5-48f9-a000-665f644a7019" Version="$(var.VERSION)" Language="1033" Name="BletchMAME" Manufacturer="BletchMAME">
     <Package InstallerVersion="300" Compressed="yes" Platform="x64"/>
     <Media Id="1" Cabinet="myapplication.cab" EmbedCab="yes" />
-    <Icon Id="BletchMAMEIcon" SourceFile="ui\icons\bletchmame.ico" />
+    <Icon Id="BletchMAMEIcon" SourceFile="$(var.ICON)" />
     <Property Id="ARPPRODUCTICON" Value="BletchMAMEIcon" />
     
     <!-- Step 1: Define the directory structure -->
@@ -49,6 +49,7 @@
     
   	<!-- Step 4: UX of the installer -->
     <WixVariable Id="WixUILicenseRtf" Value="LICENSE.rtf" />
+    <WixVariable Id="WixUIDialogBmp" Value="$(var.DIALOG_BMP)" />
     <UIRef Id="WixUI_Mondo" />
     <UIRef Id="WixUI_ErrorProgressText" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch BletchMAME" />

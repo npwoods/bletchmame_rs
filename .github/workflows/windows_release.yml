@@ -41,17 +41,8 @@ jobs:
 
       # Determine version and set crate version
       - name: Determine version and set crate version
-        shell: bash
         run: |
-          VERSION=$(git describe --tags | perl scripts/process_version.pl)
-          CRATE_VERSION="$VERSION"
-          if [[ "$CRATE_VERSION" =~ ^[0-9]+\.[0-9]+$ ]]; then
-            CRATE_VERSION="$CRATE_VERSION.0"
-          fi
-          cargo set-version "$CRATE_VERSION"
-          VERSION_UNDERSCORES=${VERSION//./_}
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "VERSION_UNDERSCORES=$VERSION_UNDERSCORES" >> $GITHUB_ENV
+          python scripts/set_crate_version.py
 
       # Build
       - name: Build
@@ -67,10 +58,7 @@ jobs:
             mkdir -p deps
             curl -L -f "https://github.com/jgm/pandoc/releases/download/3.9/pandoc-3.9-windows-x86_64.zip" > deps/pandoc-windows-x86_64.zip
             7z x deps/pandoc-windows-x86_64.zip -odeps
-
-      # Generate readme.html
-      - name: Generate readme.html
-        run: deps/pandoc-3.9/pandoc.exe README.md -o readme.html
+            echo "$GITHUB_WORKSPACE/deps/pandoc-3.9" >> "$GITHUB_PATH"
 
       # Add WiX to PATH
       - name: Add WiX to PATH
@@ -90,32 +78,20 @@ jobs:
           echo $wixBin >> $env:GITHUB_PATH
           Write-Host "Using WiX from $wixBin"
     
-      # Build MSI - Candle
-      - name: Build MSI - Candle
-        shell: bash
-        run: candle -v bletchmame.wxs -dVERSION="$VERSION" -out bletchmame.wixobj
-            
-      # Build MSI - Light
-      - name: Build MSI - Light
-        run: light -v -ext WixUIExtension -ext WixUtilExtension bletchmame.wixobj -out BletchMAME.msi
-
-      # Prepare Artifacts
-      - name: Prepare Artifacts
+      # Build Windows artifacts
+      - name: Build Windows artifacts
+        id: build-artifacts
         shell: bash
         run: |
-          mkdir -p rel/msi/
-          mkdir -p rel/zip/BletchMAME_${VERSION_UNDERSCORES}/
-          mv BletchMAME.msi rel/msi/BletchMAME_${VERSION_UNDERSCORES}.msi
-          cp ./target/release/BletchMAME.exe rel/zip/BletchMAME_${VERSION_UNDERSCORES}/
-          cp readme.html rel/zip/BletchMAME_${VERSION_UNDERSCORES}/
-          cp -r plugins rel/zip/BletchMAME_${VERSION_UNDERSCORES}/
+          ARTIFACT_NAME=$(python scripts/release_windows_artifacts.py)
+          echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> "$GITHUB_ENV"
 
       # Upload build output MSI
       - name: Upload build output MSI
         uses: actions/upload-artifact@v4
         if: success() && github.ref == 'refs/heads/master'
         with:
-          name: BletchMAME_${{ env.VERSION_UNDERSCORES }}.msi
+          name: ${{ env.ARTIFACT_NAME }}.msi
           path: rel/msi/
 
       # Upload build output ZIP
@@ -123,5 +99,5 @@ jobs:
         uses: actions/upload-artifact@v4
         if: success() && github.ref == 'refs/heads/master'
         with:
-          name: BletchMAME_${{ env.VERSION_UNDERSCORES }}.zip
+          name: ${{ env.ARTIFACT_NAME }}.zip
           path: rel/zip/
