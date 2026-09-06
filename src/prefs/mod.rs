@@ -158,6 +158,12 @@ pub struct PrefsPaths {
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub history_file: Option<SmolStr>,
+
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub artwork: Vec<SmolStr>,
+
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub bgfx: Vec<SmolStr>,
 }
 
 impl PrefsPaths {
@@ -226,6 +232,8 @@ fn access_paths(path_type: PathType) -> (fn(&PrefsPaths) -> &[SmolStr], PathsSto
 		PathType::Nvram => ((|x| x.nvram.as_slice()), PathsStore::Single(|x| &mut x.nvram)),
 		PathType::Cheats => ((|x| x.cheats.as_slice()), PathsStore::Single(|x| &mut x.cheats)),
 		PathType::Snapshots => ((|x| &x.snapshots), PathsStore::Multiple(|x| &mut x.snapshots)),
+		PathType::Artwork => ((|x| &x.artwork), PathsStore::Multiple(|x| &mut x.artwork)),
+		PathType::Bgfx => ((|x| &x.bgfx), PathsStore::Multiple(|x| &mut x.bgfx)),
 		PathType::History => (
 			(|x| x.history_file.as_slice()),
 			PathsStore::Single(|x| &mut x.history_file),
@@ -536,6 +544,8 @@ fn fresh_preferences(prefs_path: Option<SmolStr>, path_separator: char) -> Prefe
 		diff: prefs_path.clone(),
 		inis: prefs_path.iter().cloned().collect(),
 		nvram: prefs_path.clone(),
+		artwork: [format_smolstr!("$(MAMEPATH){path_separator}artwork")].into(),
+		bgfx: [format_smolstr!("$(MAMEPATH){path_separator}bgfx")].into(),
 		..Default::default()
 	};
 	let paths = paths.into();

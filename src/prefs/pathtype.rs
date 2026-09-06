@@ -50,6 +50,10 @@ pub enum PathType {
 	Cheats,
 	#[strum(to_string = "Snapshots")]
 	Snapshots,
+	#[strum(to_string = "Artwork", props(MameArgument = "-artpath"))]
+	Artwork,
+	#[strum(to_string = "BGFX", props(MameArgument = "-bgfx_path"))]
+	Bgfx,
 	#[strum(to_string = "History")]
 	History,
 }
@@ -80,7 +84,9 @@ impl PathType {
 			| Self::Diff
 			| Self::Ini
 			| Self::Nvram
-			| Self::Cheats => PickType::Dir,
+			| Self::Cheats
+			| Self::Artwork
+			| Self::Bgfx => PickType::Dir,
 			Self::Snapshots => PickType::DirOrFile,
 		}
 	}
