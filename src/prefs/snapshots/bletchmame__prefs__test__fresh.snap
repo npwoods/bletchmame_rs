@@ -7,6 +7,12 @@ expression: prefs
     "plugins": [
       "$(BLETCHMAMEPATH)\\plugins",
       "$(MAMEPATH)\\plugins"
+    ],
+    "artwork": [
+      "$(MAMEPATH)\\artwork"
+    ],
+    "bgfx": [
+      "$(MAMEPATH)\\bgfx"
     ]
   },
   "isFullscreen": false,
