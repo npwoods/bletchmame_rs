@@ -21,10 +21,13 @@ import {
 } from "@slint/material.slint";
 import { SimpleMenuEntry } from "common.slint";
 import { Icons } from "icons.slint";
-import { TapeControl, Cassette } from "tapecontrol.slint";
-import { HorizontalSplitter } from "splitter.slint";
-import { ReportView, Report } from "report.slint";
-import { InfoDisplay, InfoDisplayComponent } from "infodisplay.slint";
+import { TapeControl, Cassette } from "components/tapecontrol.slint";
+import { HorizontalSplitter } from "components/splitter.slint";
+import { ReportView, Report } from "components/report.slint";
+import {
+    InfoDisplay,
+    InfoDisplayComponent,
+} from "components/infodisplay.slint";
 
 struct CollectionContextMenuInfo {
     move-up-action: string,
