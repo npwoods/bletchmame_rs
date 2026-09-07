@@ -162,41 +162,6 @@ function get_slot_default_option_init(slot)
 end
 local get_slot_default_option = get_slot_default_option_init
 
--- get the running_machine - this is different in MAME 0.227 and beyond
-local machine, machine_debugger, machine_input, machine_ioport, machine_natkeyboard
-local machine_options, machine_sound, machine_uiinput, machine_video, ui, plugins
-if (type(manager.machine) == "function") then
-	machine				= function() return manager:machine() end
-	machine_debugger	= function() return manager:machine():debugger() end
-	machine_input		= function() return manager:machine():input() end
-	machine_ioport		= function() return manager:machine():ioport() end
-	machine_natkeyboard	= function() return manager:machine():ioport():natkeyboard() end
-	machine_options		= function() return manager:machine():options() end
-	machine_sound		= function() return manager:machine():sound() end
-	machine_uiinput		= function() return manager:machine():uiinput() end
-	machine_video		= function() return manager:machine():video() end
-	ui					= function() return manager:ui() end
-	plugins				= function() return manager:plugins() end
-else
-	machine				= function() return manager.machine end
-	machine_debugger	= function() return manager.machine.debugger end
-	machine_input		= function() return manager.machine.input end
-	machine_ioport		= function() return manager.machine.ioport end
-	machine_natkeyboard	= function()
-		if manager.machine.natkeyboard then
-			return manager.machine.natkeyboard
-		else
-			return manager.machine.ioport.natkeyboard
-		end
-	end
-	machine_options		= function() return manager.machine.options end
-	machine_sound		= function() return manager.machine.sound end
-	machine_uiinput		= function() return manager.machine.uiinput end
-	machine_video		= function() return manager.machine.video end
-	ui					= function() return manager.ui end
-	plugins				= function() return manager.plugins end
-end
-
 function get_collection(collection)
 	-- return a list of [images|cassettes], avoiding dupes
 	--
@@ -215,7 +180,7 @@ function find_image_by_tag(tag)
 		tag = ":" .. tag
 	end
 
-	for _,image in pairs(get_collection(machine().images)) do
+	for _,image in pairs(get_collection(manager.machine.images)) do
 		if get_device_tag(image.device) == tag then
 			return image
 		end
@@ -227,7 +192,7 @@ function find_port_and_field(tag, mask)
 		tag = ":" .. tag
 	end
 
-	local port = machine_ioport().ports[tag]
+	local port = manager.machine.ioport.ports[tag]
 	if not port then
 		return
 	end
@@ -266,7 +231,7 @@ function update_mouse_enabled()
 	local enabled = mouse_enabled_by_ui and not is_polling_input_seq()
 
 	-- only try to modify the property if it has changed
-	local mouse_device_class = machine_input().device_classes["mouse"]
+	local mouse_device_class = manager.machine.input.device_classes["mouse"]
 	if (mouse_device_class.enabled ~= enabled) then
 		-- in MAME 0.227, the enabled property was made read only without an adequate
 		-- substitute, so we need to detect this scenario
@@ -282,7 +247,7 @@ end
 
 function stop_polling_input_seq()
 	current_poll_callback = nil
-	ui():set_aggressive_input_focus(false)
+	manager.ui:set_aggressive_input_focus(false)
 	update_mouse_enabled()
 end
 
@@ -293,8 +258,8 @@ function has_input_using_mouse()
 		-- check this input seq for mouse codes; we clean the seq before checking because if
 		-- it references an unknown mouse we don't care about it
 		local seq = field:input_seq(seq_type)
-		local cleaned_seq = machine_input():seq_clean(seq)
-		local tokens = machine_input():seq_to_tokens(cleaned_seq)
+		local cleaned_seq = manager.machine.input:seq_clean(seq)
+		local tokens = manager.machine.input:seq_to_tokens(cleaned_seq)
 
 		for _, token in pairs(split(tokens)) do
 			if (string.match(tokens, "MOUSECODE_")) then
@@ -303,7 +268,7 @@ function has_input_using_mouse()
 		end
 	end
 
-	for _,port in pairs(machine_ioport().ports) do
+	for _,port in pairs(manager.machine.ioport.ports) do
 		for _,field in pairs(port.fields) do
 			check_seq(field, "standard")
 			if field.is_analog then
@@ -320,18 +285,18 @@ function get_slot_option(tag)
 	if (tag:sub(1, 1) == ":") then
 		tag = tag:sub(2, tag:len())
 	end
-	return machine_options():slot_option(tag)
+	return manager.machine.options:slot_option(tag)
 end
 
 function reset_emulation(is_hard)
 	-- are we paused?  we want to make sure we can restore this state
-	local is_paused = machine().paused
+	local is_paused = manager.machine.paused
 
 	-- do the reset
 	if is_hard then
-		machine():hard_reset()
+		manager.machine:hard_reset()
 	else
-		machine():soft_reset()
+		manager.machine:soft_reset()
 	end
 
 	-- and set the state to the proper status
@@ -368,24 +333,24 @@ function emit_status(light, out)
 	-- previous versions, similar to get_device_tag
 	local get_item_code, get_image_filename, get_loaded_through_softlist
 	local get_speed_percent, get_effective_frameskip, get_is_recording
-	if type(machine_video().speed_percent) == "function" then
+	if type(manager.machine.video.speed_percent) == "function" then
 		get_item_code				= function(item) return item:code() end
 		get_image_filename			= function(image) return image:filename() end
 		get_loaded_through_softlist	= function(image) return image:loaded_through_softlist() end
-		get_speed_percent			= function() return machine_video():speed_percent() end
-		get_effective_frameskip		= function() return machine_video():effective_frameskip() end
-		get_is_recording			= function() return machine_video():is_recording() end
+		get_speed_percent			= function() return manager.machine.video:speed_percent() end
+		get_effective_frameskip		= function() return manager.machine.video:effective_frameskip() end
+		get_is_recording			= function() return manager.machine.video:is_recording() end
 	else
 		get_item_code				= function(item) return item.code end
 		get_image_filename			= function(image) return image.filename end
 		get_loaded_through_softlist	= function(image) return image.loaded_through_softlist end
-		get_speed_percent			= function() return machine_video().speed_percent end
-		get_effective_frameskip		= function() return machine_video().effective_frameskip end
-		get_is_recording			= function() return machine_video().is_recording end
+		get_speed_percent			= function() return manager.machine.video.speed_percent end
+		get_effective_frameskip		= function() return manager.machine.video.effective_frameskip end
+		get_is_recording			= function() return manager.machine.video.is_recording end
 	end
 
 	-- we don't always want to send details
-	local emit_details = not light or machine().paused or is_polling_input_seq()
+	local emit_details = not light or manager.machine.paused or is_polling_input_seq()
 
 	-- start emitting status
 	emit("<status");
@@ -406,11 +371,11 @@ function emit_status(light, out)
 		emit("\ttime=\"" .. tostring(emu.time()) .. "\"");
 		emit("\tpid=\"" .. tostring(emu.pid()) .. "\"");
 		emit("\tpolling_input_seq=\"" .. tostring(is_polling_input_seq()) .. "\"");
-		emit("\tnatural_keyboard_in_use=\"" .. tostring(machine_natkeyboard().in_use) .. "\"");
-		emit("\tpaused=\"" .. tostring(machine().paused) .. "\"");
+		emit("\tnatural_keyboard_in_use=\"" .. tostring(manager.machine.natkeyboard.in_use) .. "\"");
+		emit("\tpaused=\"" .. tostring(manager.machine.paused) .. "\"");
 		emit("\tstartup_text=\"\"");
-		emit("\tdebugger_present=\"" .. string_from_bool(machine_debugger()) .. "\"");
-		emit("\tshow_profiler=\"" .. tostring(ui().show_profiler) .. "\"");
+		emit("\tdebugger_present=\"" .. string_from_bool(manager.machine.debugger) .. "\"");
+		emit("\tshow_profiler=\"" .. tostring(manager.ui.show_profiler) .. "\"");
 		if (not light) then
 			emit("\thas_input_using_mouse=\"" .. tostring(has_input_using_mouse()) .. "\"");
 		end
@@ -420,20 +385,20 @@ function emit_status(light, out)
 		-- <video> (video_manager)
 		emit("\t<video");
 		emit("\t\tspeed_percent=\"" .. tostring(get_speed_percent()) .. "\"");
-		emit("\t\tframeskip=\"" .. tostring(machine_video().frameskip) .. "\"");
+		emit("\t\tframeskip=\"" .. tostring(manager.machine.video.frameskip) .. "\"");
 		emit("\t\teffective_frameskip=\"" .. tostring(get_effective_frameskip()) .. "\"");
-		emit("\t\tthrottled=\"" .. tostring(machine_video().throttled) .. "\"");
-		emit("\t\tthrottle_rate=\"" .. tostring(machine_video().throttle_rate) .. "\"");
+		emit("\t\tthrottled=\"" .. tostring(manager.machine.video.throttled) .. "\"");
+		emit("\t\tthrottle_rate=\"" .. tostring(manager.machine.video.throttle_rate) .. "\"");
 		emit("\t\tis_recording=\"" .. string_from_bool(get_is_recording()) .. "\"");
 		emit("\t/>");
 
 		-- <sound> (sound_manager)
 		emit("\t<sound");
-		if (machine_sound().system_mute ~= nil) then
-			emit("\t\tsystem_mute=\"" .. string_from_bool(machine_sound().system_mute) .. "\"");
+		if (manager.machine.sound.system_mute ~= nil) then
+			emit("\t\tsystem_mute=\"" .. string_from_bool(manager.machine.sound.system_mute) .. "\"");
 		end
-		if (machine_sound().attenuation) then
-			emit("\t\tattenuation=\"" .. tostring(machine_sound().attenuation) .. "\"");
+		if (manager.machine.sound.attenuation) then
+			emit("\t\tattenuation=\"" .. tostring(manager.machine.sound.attenuation) .. "\"");
 		end
 		emit("\t/>");
 
@@ -479,7 +444,7 @@ function emit_status(light, out)
 
 		-- <images>
 		emit("\t<images>")
-		for _,image in pairs(get_collection(machine().images)) do
+		for _,image in pairs(get_collection(manager.machine.images)) do
 			local filename = get_image_filename(image)
 			if filename == nil then
 				filename = ""
@@ -527,9 +492,9 @@ function emit_status(light, out)
 		emit("\t</images>")
 
 		-- <cassettes>
-		if pcall(function() return machine().cassettes end) then
+		if pcall(function() return manager.machine.cassettes end) then
 			emit("\t<cassettes>")
-			for _,cassette in pairs(get_collection(machine().cassettes)) do
+			for _,cassette in pairs(get_collection(manager.machine.cassettes)) do
 				emit(string.format("\t\t<cassette tag=\"%s\" is_stopped=\"%s\" is_playing=\"%s\" is_recording=\"%s\" motor_state=\"%s\" speaker_state=\"%s\" position=\"%s\" length=\"%s\"/>",
 					xml_encode(get_device_tag(cassette.device)),
 					string_from_bool(cassette.is_stopped),
@@ -545,9 +510,9 @@ function emit_status(light, out)
 
 		if emit_details then
 			-- <slots>
-			if pcall(function() return machine().slots end) then
+			if pcall(function() return manager.machine.slots end) then
 				emit("\t<slots>");
-				for name,slot in pairs(machine().slots) do
+				for name,slot in pairs(manager.machine.slots) do
 					-- perform logic equivalent to menu_slot_devices::get_current_option()
 					local current_option_name
 					if (slot.fixed) then
@@ -579,7 +544,7 @@ function emit_status(light, out)
 
 			-- <inputs>
 			emit("\t<inputs>")
-			for _,port in pairs(machine_ioport().ports) do
+			for _,port in pairs(manager.machine.ioport.ports) do
 				for _,field in pairs(port.fields) do
 					if field.enabled then
 						local type_class = field.type_class
@@ -589,7 +554,7 @@ function emit_status(light, out)
 							.. " port_tag=\"" .. xml_encode(get_device_tag(port)) .. "\""
 							.. " mask=\"" .. tostring(field.mask) .. "\""
 							.. " class=\"" .. type_class .. "\""
-							.. " group=\"" .. tostring(machine_ioport():type_group(field.type, field.player)) .. "\""
+							.. " group=\"" .. tostring(manager.machine.ioport:type_group(field.type, field.player)) .. "\""
 							.. " type=\"" .. field.type .. "\""
 							.. " player=\"" .. field.player .. "\""
 							.. " is_analog=\"" .. string_from_bool(field.is_analog) .. "\""
@@ -627,7 +592,7 @@ function emit_status(light, out)
 
 							for _,seq_type in pairs(seq_types) do
 								emit("\t\t\t<seq type=\"" .. seq_type
-									.. "\" tokens=\"" .. xml_encode(machine_input():seq_to_tokens(field:input_seq(seq_type)))
+									.. "\" tokens=\"" .. xml_encode(manager.machine.input:seq_to_tokens(field:input_seq(seq_type)))
 									.. "\"/>")
 							end
 						end
@@ -639,7 +604,7 @@ function emit_status(light, out)
 			emit("\t</inputs>")
 
 			emit("\t<input_devices>")
-			for _,devclass in pairs(machine_input().device_classes) do
+			for _,devclass in pairs(manager.machine.input.device_classes) do
 				emit("\t\t<class name=\"" .. xml_encode(devclass.name)
 					.. "\" enabled=\"" .. string_from_bool(devclass.enabled)
 					.. "\" multi=\"" .. string_from_bool(devclass.multi) .. "\">")
@@ -650,7 +615,7 @@ function emit_status(light, out)
 					for id,item in pairs(device.items) do
 						emit("\t\t\t\t<item name=\"" .. xml_encode(item.name)
 							.. "\" token=\"" .. xml_encode(item.token)
-							.. "\" code=\"" .. xml_encode(machine_input():code_to_token(get_item_code(item)))
+							.. "\" code=\"" .. xml_encode(manager.machine.input:code_to_token(get_item_code(item)))
 							.. "\"/>")
 					end
 					emit("\t\t\t</device>")
@@ -682,7 +647,7 @@ function command_start(args)
 	while #start_load_args > 0 and start_load_args[1]:sub(1, 1) == "-" do
 		local arg_name = table.remove(start_load_args, 1):sub(2)
 		local arg_value = table.remove(start_load_args, 1)
-		local entry = machine_options().entries[arg_name]
+		local entry = manager.machine.options.entries[arg_name]
 		local sample_value = entry:default_value();
 		if math.type(sample_value) == "integer" then
 			arg_value = math.tointeger(arg_value)
@@ -699,7 +664,7 @@ end
 -- STOP command
 function command_stop(args)
 	if state == "ACTIVE" then
-		machine():exit()
+		manager.machine:exit()
 		print("@INFO ### Stopping emulation")
 	else
 		print("@OK ### No running emulation")
@@ -708,7 +673,7 @@ end
 
 -- EXIT command
 function command_exit(args)
-	machine():exit()
+	manager.machine:exit()
 	state = "EXITING"
 	print("@OK ### Exit scheduled")
 end
@@ -723,7 +688,7 @@ end
 local wake_up_time = nil
 function command_sleep(args)
 	-- if we're sleeping, unpause
-	if machine().paused then
+	if manager.machine.paused then
 		emu.unpause()
 	end
 
@@ -759,33 +724,33 @@ end
 
 -- DEBUGGER command
 function command_debugger(args)
-	if not machine_debugger() then
+	if not manager.machine.debugger then
 		print("@ERROR ### Debugger not present")
 		return
 	end
 
-	machine_debugger().execution_state = 'stop'
+	manager.machine.debugger.execution_state = 'stop'
 	print("@OK ### Dropping into debugger")
 end
 
 -- CLASSIC_MENU command
 function command_classic_menu(args)
-	ui():show_menu()
-	machine_uiinput().presses_enabled = true
+	manager.ui:show_menu()
+	manager.machine.uiinput.presses_enabled = true
 	print("@OK ### Showing the classic menu")
 end
 
 -- THROTTLED command
 function command_throttled(args)
-	machine_video().throttled = toboolean(args[2])
-	print("@OK STATUS ### Throttled set to " .. tostring(machine_video().throttled))
+	manager.machine.video.throttled = toboolean(args[2])
+	print("@OK STATUS ### Throttled set to " .. tostring(manager.machine.video.throttled))
 	emit_status()
 end
 
 -- THROTTLE_RATE command
 function command_throttle_rate(args)
-	machine_video().throttle_rate = tonumber(args[2])
-	print("@OK STATUS ### Throttle rate set to " .. tostring(machine_video().throttle_rate))
+	manager.machine.video.throttle_rate = tonumber(args[2])
+	print("@OK STATUS ### Throttle rate set to " .. tostring(manager.machine.video.throttle_rate))
 	emit_status()
 end
 
@@ -797,60 +762,60 @@ function command_frameskip(args)
 	else
 		frameskip = tonumber(args[2])
 	end
-	machine_video().frameskip = frameskip
-	print("@OK STATUS ### Frame skip rate set to " .. tostring(machine_video().frameskip))
+	manager.machine.video.frameskip = frameskip
+	print("@OK STATUS ### Frame skip rate set to " .. tostring(manager.machine.video.frameskip))
 	emit_status()
 end
 
 -- INPUT command
 function command_input(args)
-	machine_ioport():natkeyboard():post(args[2])
+	manager.machine.ioport:natkeyboard():post(args[2])
 	print("@OK ### Text inputted")
 end
 
 -- PASTE command
 function command_paste(args)
-	machine_ioport():natkeyboard():paste(args[2])
+	manager.machine.ioport:natkeyboard():paste(args[2])
 	print("@OK ### Text inputted from clipboard")
 end
 
 -- SET_SYSTEM_MUTE command
 function command_set_system_mute(args)
-	machine_sound().system_mute = toboolean(args[2])
-	print("@OK STATUS ### System mute set to " .. tostring(machine_sound().system_mute))
+	manager.machine.sound.system_mute = toboolean(args[2])
+	print("@OK STATUS ### System mute set to " .. tostring(manager.machine.sound.system_mute))
 	emit_status()
 end
 
 -- SET_ATTENUATION command
 function command_set_attenuation(args)
-	machine_sound().attenuation = tonumber(args[2])
-	print("@OK STATUS ### Sound attenuation set to " .. tostring(machine_sound().attenuation))
+	manager.machine.sound.attenuation = tonumber(args[2])
+	print("@OK STATUS ### Sound attenuation set to " .. tostring(manager.machine.sound.attenuation))
 	emit_status()
 end
 
 -- SET_NATURAL_KEYBOARD_IN_USE command
 function command_set_natural_keyboard_in_use(args)
-	machine_ioport():natkeyboard().in_use = toboolean(args[2])
-	print("@OK STATUS ### Natural keyboard in use set to " .. tostring(machine_ioport():natkeyboard().in_use))
+	manager.machine.ioport:natkeyboard().in_use = toboolean(args[2])
+	print("@OK STATUS ### Natural keyboard in use set to " .. tostring(manager.machine.ioport:natkeyboard().in_use))
 	emit_status()
 end
 
 -- STATE_LOAD command
 function command_state_load(args)
-	machine():load(args[2])
+	manager.machine:load(args[2])
 	print("@OK ### Scheduled state load of '" .. args[2] .. "'")
 end
 
 -- STATE_SAVE command
 function command_state_save(args)
-	machine():save(args[2])
+	manager.machine:save(args[2])
 	print("@OK ### Scheduled state save of '" .. args[2] .. "'")
 end
 
 -- STATE_SAVE_AND_EXIT command
 function command_state_save_and_exit(args)
-	machine():save(args[2])
-	machine():exit()
+	manager.machine:save(args[2])
+	manager.machine:exit()
 	print("@OK ### Scheduled state save of '" .. args[2] .. "' and an exit")
 end
 
@@ -858,7 +823,7 @@ end
 function command_save_snapshot(args)
 	-- hardcoded for first screen now
 	local index = tonumber(args[2])
-	for k,v in pairs(machine().screens) do
+	for k,v in pairs(manager.machine.screens) do
 		if index == 0 then
 			screen = v
 			break
@@ -872,14 +837,14 @@ end
 
 -- BEGIN_RECORDING command
 function command_begin_recording(args)
-	machine_video():begin_recording(args[2], args[3])
+	manager.machine.video:begin_recording(args[2], args[3])
 	print("@OK STATUS ### Began recording '" .. args[2] .. "'")
 	emit_status()
 end
 
 -- END_RECORDING command
 function command_end_recording(args)
-	machine_video():end_recording()
+	manager.machine.video:end_recording()
 	print("@OK STATUS ### Ended recording")
 	emit_status()
 end
@@ -935,7 +900,7 @@ function command_change_slots(args)
 		end
 		opt:specify(slot_option_value)
 	end
-	pause_when_restarted = machine().paused
+	pause_when_restarted = manager.machine.paused
 	reset_emulation(true)
 	print("@OK ### Slots changed and hard reset scheduled")
 end
@@ -969,7 +934,7 @@ function command_seq_set(args)
 		if (tokens == "*") then
 			seq = field:default_input_seq(seq_type)
 		else
-			seq = machine_input():seq_from_tokens(tokens)
+			seq = manager.machine.input:seq_from_tokens(tokens)
 		end
 		field:set_input_seq(seq_type, seq)
 
@@ -1002,13 +967,13 @@ function command_seq_poll_start(args)
 	-- optional start seq
 	local start_seq
 	if (args[5] and args[5] ~= "") then
-		start_seq = machine_input():seq_from_tokens(args[5])
+		start_seq = manager.machine.input:seq_from_tokens(args[5])
 	end
 
 	-- start polling! (this was changed radically in MAME 0.227, so this is quite complicated and it
 	-- also involves setting up seq_poll_continue to hide these nuances)
 	local seq_poll_continue
-	if machine_input().seq_poll_start ~= nil then
+	if manager.machine.input.seq_poll_start ~= nil then
 		-- MAME 0.226 and prior technique
 		local input_seq_class
 		if (field.is_analog and args[4] == "standard") then
@@ -1018,21 +983,21 @@ function command_seq_poll_start(args)
 		end
 
 		-- start polling
-		machine_input():seq_poll_start(input_seq_class, start_seq)
+		manager.machine.input:seq_poll_start(input_seq_class, start_seq)
 
 		-- and prepare seq_poll_continue
 		seq_poll_continue = function()
-			if machine_input():seq_poll() then
-				return machine_input():seq_poll_final()
+			if manager.machine.input:seq_poll() then
+				return manager.machine.input:seq_poll_final()
 			end
 		end
 	else
 		-- MAME 0.227 and later technique
 		local sequence_poller
 		if (field.is_analog and args[4] == "standard") then
-			sequence_poller = machine_input():axis_sequence_poller()
+			sequence_poller = manager.machine.input:axis_sequence_poller()
 		else
-			sequence_poller = machine_input():switch_sequence_poller()
+			sequence_poller = manager.machine.input:switch_sequence_poller()
 		end
 
 		-- start polling
@@ -1055,14 +1020,14 @@ function command_seq_poll_start(args)
 		local final_seq = seq_poll_continue()
 		if final_seq then
 			-- we got something - specify the input seq
-			machine_input():seq_pressed(final_seq)
+			manager.machine.input:seq_pressed(final_seq)
 			field:set_input_seq(args[4], final_seq)
 					
 			-- and terminate polling
 			stop_polling_input_seq()
 		end
 	end
-	ui():set_aggressive_input_focus(true)
+	manager.ui:set_aggressive_input_focus(true)
 	update_mouse_enabled()
 	print("@OK STATUS ### Starting polling")
 	emit_status()
@@ -1111,14 +1076,14 @@ function command_set_mouse_enabled(args)
 
 	-- show a popup if we have the silly mouse enabled problem
 	if not old_mouse_enabled_by_ui and mouse_enabled_by_ui and has_mouse_enabled_problem then
-		machine():popmessage("This version of MAME does not support hot changes to mouse capture; the mouse may not be usable")
+		manager.machine:popmessage("This version of MAME does not support hot changes to mouse capture; the mouse may not be usable")
 	end
 end
 
 -- SHOW_PROFILER command
 function command_show_profiler(args)
-	ui().show_profiler = toboolean(args[2])
-	print("@OK STATUS ### Show profiler set to " .. tostring(ui().show_profiler))
+	manager.ui.show_profiler = toboolean(args[2])
+	print("@OK STATUS ### Show profiler set to " .. tostring(manager.ui.show_profiler))
 	emit_status()
 end
 
@@ -1147,7 +1112,7 @@ end
 
 -- CASSETTE_SEEK command
 function command_cassette_seek(args)
-	local cassette = machine().cassettes[args[2]]
+	local cassette = manager.machine.cassettes[args[2]]
 	if not cassette then
 		print("@ERROR ### Can't find cassette device with tag '" .. args[2] .. "'")
 		return
@@ -1160,14 +1125,14 @@ end
 
 -- DEBUG_COMMAND command
 function command_debug_command(args)
-	if not machine_debugger() then
+	if not manager.machine.debugger then
 		print("@ERROR ### Debugger not present")
 		return
 	end
 
 	-- loop; this is a batch command
 	for i = 2,#args do
-		machine_debugger():command(args[i])
+		manager.machine.debugger:command(args[i])
 	end
 
 	print("@OK STATUS ### Debugger commands executed")
@@ -1290,19 +1255,19 @@ function startplugin()
 	-- we want to hold off until the prestart event; register a handler for it
 	function callback_prestart()
 		-- prestart has been invoked; set up MAME for our control
-		machine_uiinput().presses_enabled = false
-		if machine_debugger() then
-			machine_debugger().execution_state = 'run'
+		manager.machine.uiinput.presses_enabled = false
+		if manager.machine.debugger then
+			manager.machine.debugger.execution_state = 'run'
 		end
 		update_mouse_enabled()
 		
 		-- turn off image display status; we like our own UX
-		pcall(function() ui().image_display_enabled = false end)
+		pcall(function() manager.ui.image_display_enabled = false end)
 
 		-- switch based off the state
 		if state == "EXITING" then
 			-- we're exiting - keep on exiting!
-			machine():exit()
+			manager.machine:exit()
 		elseif emu.romname() == "___empty" then
 			-- we're idling
 			state = "IDLE"
@@ -1324,7 +1289,7 @@ function startplugin()
 					end
 					opt:specify(slot_option_value)
 				end
-				machine():hard_reset()
+				manager.machine:hard_reset()
 				state = "RESET_UNPAUSED"
 				will_reset = true
 			else
@@ -1414,19 +1379,19 @@ function startplugin()
 	function callback_before_load_settings()
 		function fix_default_input_seq(field, seq_type)
 			local old_default_seq = field:default_input_seq(seq_type)
-			local cleaned_default_seq = machine_input():seq_clean(old_default_seq)
-			local cleaned_default_seq_tokens = machine_input():seq_to_tokens(cleaned_default_seq)
+			local cleaned_default_seq = manager.machine.input:seq_clean(old_default_seq)
+			local cleaned_default_seq_tokens = manager.machine.input:seq_to_tokens(cleaned_default_seq)
 			local match = string.match(cleaned_default_seq_tokens, "JOYCODE_[0-9A-Z_]+ OR MOUSECODE_[0-9A-Z_]+")
 			if match then		
 				local new_default_seq_tokens = string.match(cleaned_default_seq_tokens, "JOYCODE_[0-9A-Z_]+")
 				if new_default_seq_tokens then
-					local new_default_seq = machine_input():seq_from_tokens(new_default_seq_tokens)
+					local new_default_seq = manager.machine.input:seq_from_tokens(new_default_seq_tokens)
 					field:set_default_input_seq(seq_type, new_default_seq)
 				end
 			end
 		end
 
-		for _,port in pairs(machine_ioport().ports) do
+		for _,port in pairs(manager.machine.ioport.ports) do
 			for _,field in pairs(port.fields) do
 				fix_default_input_seq(field, "standard")
 				if field.is_analog then
@@ -1444,7 +1409,7 @@ function startplugin()
 	end)
 
 	-- activate the cheat plugin, if present (and not started separately)
-	local cheatentry = plugins()["cheat"]
+	local cheatentry = manager.plugins["cheat"]
 	local cheatplugin
 	if cheatentry and not cheatentry.start then -- don't try to start it twice
 		local stat, res = pcall(require, cheatentry.name)
