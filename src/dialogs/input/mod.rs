@@ -10,7 +10,6 @@ use easy_ext::ext;
 use itertools::Itertools;
 use slint::ModelRc;
 use slint::ToSharedString;
-use slint::VecModel;
 use strum::EnumString;
 
 use crate::action::Action;
@@ -23,6 +22,7 @@ use crate::status::InputDeviceClass;
 use crate::status::InputDeviceClassName;
 use crate::status::InputDeviceItem;
 use crate::ui::SimpleMenuEntry;
+use crate::util::IteratorExt as _;
 
 #[derive(Copy, Clone, Debug)]
 enum InputAxis {
@@ -239,7 +239,7 @@ fn build_context_menu<'a>(
 			SimpleMenuEntry { title, action }
 		})
 		.chain(multiple_action)
-		.collect::<Vec<_>>();
+		.collect_model_rc();
 
 	let entries_2 = [
 		("Specify...", specify_action),
@@ -255,12 +255,8 @@ fn build_context_menu<'a>(
 				SimpleMenuEntry { title, action }
 			})
 		})
-		.collect::<Vec<_>>();
+		.collect_model_rc();
 
-	let entries_1 = VecModel::from(entries_1);
-	let entries_2 = VecModel::from(entries_2);
-	let entries_1 = ModelRc::new(entries_1);
-	let entries_2 = ModelRc::new(entries_2);
 	(entries_1, entries_2)
 }
 

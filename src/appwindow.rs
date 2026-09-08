@@ -115,6 +115,7 @@ use crate::ui::ListItem;
 use crate::ui::ReportIssue;
 use crate::ui::SearchBarItem;
 use crate::ui::SimpleMenuEntry;
+use crate::util::IteratorExt;
 use crate::version::MameVersion;
 
 const SOUND_ATTENUATION_OFF: i32 = -32;
@@ -743,10 +744,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 			table_column.width = column.width;
 			table_column
 		})
-		.collect::<Vec<_>>();
-	let items_columns = VecModel::from(items_columns);
-	let items_columns = Rc::new(items_columns);
-	let items_columns = ModelRc::from(items_columns);
+		.collect_model_rc();
 	app_window.set_items_columns(items_columns);
 
 	// set up items filter
@@ -866,9 +864,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 			let action = Action::OptionsThrottleRate(rate).encode_for_slint();
 			SimpleMenuEntry { title, action }
 		})
-		.collect::<Vec<_>>();
-	let menu_entries_throttle = VecModel::from(menu_entries_throttle);
-	let menu_entries_throttle = ModelRc::new(menu_entries_throttle);
+		.collect_model_rc();
 	app_window.set_menu_entries_throttle(menu_entries_throttle);
 
 	// frameskip menu
@@ -882,9 +878,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 			let action = Action::OptionsFrameskip(rate).encode_for_slint();
 			SimpleMenuEntry { title, action }
 		})
-		.collect::<Vec<_>>();
-	let menu_entries_frameskip = VecModel::from(menu_entries_frameskip);
-	let menu_entries_frameskip = ModelRc::new(menu_entries_frameskip);
+		.collect_model_rc();
 	app_window.set_menu_entries_frameskip(menu_entries_frameskip);
 
 	// builtin collections menu
@@ -894,9 +888,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 			let action = Action::SettingsToggleBuiltinCollection(b).encode_for_slint();
 			SimpleMenuEntry { title, action }
 		})
-		.collect::<Vec<_>>();
-	let menu_entries_builtin_collections = VecModel::from(menu_entries_builtin_collections);
-	let menu_entries_builtin_collections = ModelRc::new(menu_entries_builtin_collections);
+		.collect_model_rc();
 	app_window.set_menu_entries_builtin_collections(menu_entries_builtin_collections);
 
 	// cassettes
@@ -1987,16 +1979,14 @@ fn searchbar_items(model: &AppModel, text: &str) -> Vec<SearchBarItem> {
 }
 
 fn translate_searchbar_items(model: ModelRc<SearchBarItem>) -> ModelRc<ListItem> {
-	let items = model
+	model
 		.iter()
 		.map(|item| ListItem {
 			text: item.text,
 			avatar_icon: item.icon,
 			..Default::default()
 		})
-		.collect::<Vec<_>>();
-	let model = VecModel::from(items);
-	ModelRc::new(model)
+		.collect_model_rc()
 }
 
 fn mame_command_line_key(prefs: &Preferences) -> impl Eq + '_ {

@@ -32,6 +32,7 @@ mod snapview;
 mod software;
 mod status;
 mod threadlocalbubble;
+mod util;
 mod version;
 mod xml;
 

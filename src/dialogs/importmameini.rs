@@ -11,7 +11,6 @@ use slint::ModelNotify;
 use slint::ModelRc;
 use slint::ModelTracker;
 use slint::ToSharedString;
-use slint::VecModel;
 use tokio::sync::mpsc;
 
 use crate::dialogs::SenderExt;
@@ -21,6 +20,7 @@ use crate::importmameini::ImportMameIni;
 use crate::prefs::PrefsPaths;
 use crate::ui::ImportMameIniDialog;
 use crate::ui::ImportMameIniDialogEntry;
+use crate::util::IteratorExt as _;
 
 const MAME_INI_EXTENSION: &str = "ini";
 const MAME_INI_FILE_TYPES: &[(Option<&str>, &str)] = &[(None, MAME_INI_EXTENSION)];
@@ -150,9 +150,7 @@ impl Model for ImportMameIniModel {
 			.dispositions
 			.iter()
 			.map(|d| d.to_shared_string())
-			.collect::<Vec<_>>();
-		let dispositions = VecModel::from(dispositions);
-		let dispositions = ModelRc::new(dispositions);
+			.collect_model_rc();
 
 		let current_disposition_index = entry.current_disposition_index.get().try_into().unwrap();
 

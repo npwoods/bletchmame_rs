@@ -22,7 +22,6 @@ use slint::ModelTracker;
 use slint::SharedString;
 use slint::StandardListViewItem;
 use slint::ToSharedString;
-use slint::VecModel;
 use smallvec::SmallVec;
 use smol_str::SmolStr;
 use tracing::debug;
@@ -53,6 +52,7 @@ use crate::software::SoftwareListDispenser;
 use crate::ui::InfoDisplay;
 use crate::ui::ItemContextMenuInfo;
 use crate::ui::SimpleMenuEntry;
+use crate::util::IteratorExt as _;
 
 pub struct ItemsTableModel {
 	info_db: RefCell<Option<Rc<InfoDb>>>,
@@ -1163,9 +1163,7 @@ impl From<LocalItemContextMenuInfo> for ItemContextMenuInfo {
 			.run_descs
 			.into_iter()
 			.map(MenuDesc::encode_for_slint)
-			.collect::<Vec<_>>();
-		let run_descs = VecModel::from(run_descs);
-		let run_descs = ModelRc::new(run_descs);
+			.collect_model_rc();
 		let configure_action = value
 			.configure_action
 			.as_ref()
@@ -1180,9 +1178,7 @@ impl From<LocalItemContextMenuInfo> for ItemContextMenuInfo {
 			.add_to_existing_folder_descs
 			.into_iter()
 			.map(MenuDesc::encode_for_slint)
-			.collect::<Vec<_>>();
-		let add_to_existing_folder_descs = VecModel::from(add_to_existing_folder_descs);
-		let add_to_existing_folder_descs = ModelRc::new(add_to_existing_folder_descs);
+			.collect_model_rc();
 		let new_folder_action = value.new_folder_action.encode_for_slint();
 		let remove_from_folder_desc = value
 			.remove_from_folder_desc

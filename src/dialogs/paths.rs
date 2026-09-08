@@ -12,7 +12,6 @@ use slint::ModelRc;
 use slint::ModelTracker;
 use slint::SharedString;
 use slint::ToSharedString;
-use slint::VecModel;
 use slint::Weak;
 use slint::spawn_local;
 use strum::IntoEnumIterator;
@@ -27,6 +26,7 @@ use crate::prefs::PrefsPaths;
 use crate::prefs::pathtype::PathType;
 use crate::ui::PathsDialog;
 use crate::ui::PathsListViewItem;
+use crate::util::IteratorExt as _;
 
 #[derive(Clone)]
 struct State {
@@ -54,9 +54,7 @@ pub async fn dialog_paths(
 	let state = Rc::new(state);
 
 	// set up the "path labels" combo box
-	let path_labels = PathType::iter().map(|x| x.to_shared_string()).collect::<Vec<_>>();
-	let path_labels = VecModel::from(path_labels);
-	let path_labels = ModelRc::new(path_labels);
+	let path_labels = PathType::iter().map(|x| x.to_shared_string()).collect_model_rc();
 	modal.dialog().set_path_labels(path_labels);
 
 	// set up the "ok" button

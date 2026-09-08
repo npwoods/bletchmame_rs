@@ -3,7 +3,6 @@ use slint::ComponentHandle;
 use slint::LogicalPosition;
 use slint::ModelRc;
 use slint::ToSharedString;
-use slint::VecModel;
 use tokio::sync::mpsc;
 
 use crate::action::Action;
@@ -22,6 +21,7 @@ use crate::ui::DevicesAndImagesContextMenuInfo;
 use crate::ui::DevicesAndImagesDialog;
 use crate::ui::DevicesAndImagesState;
 use crate::ui::SimpleMenuEntry;
+use crate::util::IteratorExt;
 
 pub async fn dialog_devices_and_images(
 	modal_stack: ModalStack,
@@ -139,9 +139,7 @@ pub fn entry_popup_menu(
 				let action = Action::encode_for_slint(&action);
 				SimpleMenuEntry { title, action }
 			})
-			.collect::<Vec<_>>();
-		let connect_to_serial_port_actions = VecModel::from(connect_to_serial_port_actions);
-		let connect_to_serial_port_actions = ModelRc::new(connect_to_serial_port_actions);
+			.collect_model_rc();
 
 		let connect_to_socket_action = {
 			let tag = entry.tag.to_string();

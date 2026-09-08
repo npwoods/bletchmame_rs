@@ -10,7 +10,6 @@ use slint::ModelRc;
 use slint::ModelTracker;
 use slint::SharedString;
 use slint::ToSharedString;
-use slint::VecModel;
 use strum::EnumIter;
 use strum::IntoEnumIterator;
 use strum::IntoStaticStr;
@@ -26,6 +25,7 @@ use crate::status::Cheat;
 use crate::status::Status;
 use crate::ui::CheatsDialog;
 use crate::ui::CheatsDialogEntry;
+use crate::util::IteratorExt as _;
 
 struct CheatDialogModel {
 	cheats: RefCell<Arc<[Cheat]>>,
@@ -174,9 +174,7 @@ impl Model for CheatDialogModel {
 			.unwrap_or_default()
 			.iter()
 			.map(|item| item.text.to_shared_string())
-			.collect::<Vec<_>>();
-		let items = VecModel::from(items);
-		let items = ModelRc::new(items);
+			.collect_model_rc();
 
 		// and return the entry
 		let entry = Self::Data {

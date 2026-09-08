@@ -9,7 +9,6 @@ use slint::ModelNotify;
 use slint::ModelRc;
 use slint::ModelTracker;
 use slint::ToSharedString;
-use slint::VecModel;
 use smol_str::SmolStr;
 use tokio::task::spawn_blocking;
 
@@ -21,6 +20,7 @@ use crate::audit::AuditSeverity;
 use crate::audit::PathType;
 use crate::info::DeviceType;
 use crate::ui::Icons;
+use crate::util::IteratorExt as _;
 
 pub struct AuditModel {
 	assets: Arc<[Asset]>,
@@ -143,9 +143,7 @@ fn make_ui_asset(asset: &Asset, audit_result: Option<&AuditResult>, icons: &Audi
 			.unwrap_or_default()
 			.iter()
 			.map(|r| r.to_shared_string())
-			.collect::<Vec<_>>();
-		let audit_messages = VecModel::from(audit_messages);
-		let audit_messages = ModelRc::new(audit_messages);
+			.collect_model_rc();
 		let browse_action = audit_result
 			.as_ref()
 			.and_then(|r| r.path.as_ref())
@@ -193,10 +191,8 @@ fn make_ui_asset(asset: &Asset, audit_result: Option<&AuditResult>, icons: &Audi
 
 pub fn audit_static_model(audit_results: &[(Asset, AuditResult)], icons: Icons<'_>) -> ModelRc<crate::ui::AuditAsset> {
 	let icons = AuditIcons::new(icons);
-	let data = audit_results
+	audit_results
 		.iter()
 		.map(|(asset, audit_result)| make_ui_asset(asset, Some(audit_result), &icons))
-		.collect::<Vec<_>>();
-	let model = VecModel::from(data);
-	ModelRc::new(model)
+		.collect_model_rc()
 }

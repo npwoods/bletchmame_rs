@@ -55,6 +55,7 @@ use crate::ui::DevicesAndImagesState;
 use crate::ui::Icons;
 use crate::ui::InfoDisplay;
 use crate::ui::SoftwareMachine;
+use crate::util::IteratorExt as _;
 
 struct State {
 	dialog_weak: Weak<ConfigureDialog>,
@@ -364,9 +365,7 @@ impl State {
 							checked,
 						}
 					})
-					.collect::<Vec<_>>();
-				let software_machines = VecModel::from(software_machines);
-				let software_machines = ModelRc::new(software_machines);
+					.collect_model_rc();
 
 				// look up in the software list
 				let software_list_name = SmolStr::from(item.software_list);
