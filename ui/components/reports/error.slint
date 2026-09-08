@@ -1,0 +1,260 @@
+import {
+    HorizontalBox,
+    VerticalBox,
+    TextEdit,
+    Button,
+} from "std-widgets.slint";
+
+export struct SessionErrorReportInfo {
+    error-message: string,
+    mame-stderr-text: string,
+    exit-code: string,
+}
+
+export component SessionErrorReport {
+    // properties
+    in property <SessionErrorReportInfo> info;
+    property <string> monospace-font-family: "Consolas";
+
+    // callbacks
+    callback continue-button-clicked();
+
+    height: 100%;
+
+    HorizontalBox {
+        alignment: center;
+
+        VerticalBox {
+            alignment: center;
+            height: 100%;
+            width: 100%;
+
+            // report message
+            Text {
+                text: "MAME has errored and shut down";
+                horizontal-alignment: center;
+                font-size: 24px;
+                wrap: word-wrap;
+            }
+
+            // report submessage
+            Text {
+                text: root.info.error-message;
+                horizontal-alignment: center;
+                font-size: 12px;
+                wrap: word-wrap;
+            }
+
+            // report MAME stderr output
+            if root.info.mame-stderr-text != "": TextEdit {
+                width: 600px;
+                height: 300px;
+                text: root.info.mame-stderr-text;
+                font-size: 10px;
+                font-family: monospace-font-family;
+                read-only: true;
+            }
+
+            // report MAME exit code
+            if root.info.exit-code != "": Text {
+                text: "(exit code " + root.info.exit-code + ")";
+                horizontal-alignment: right;
+                font-size: 12px;
+            }
+
+            // continue button
+            HorizontalBox {
+                alignment: center;
+
+                Button {
+                    text: "Continue";
+                    clicked => {
+                        root.continue-button-clicked();
+                    }
+                }
+            }
+        }
+    }
+}
+
+export struct InfoDbStatusMismatchReportInfo {
+    status-build: string,
+    infodb-build: string,
+}
+
+export component InfoDbStatusMismatchReport {
+    // properties
+    in property <InfoDbStatusMismatchReportInfo> info;
+    property <string> report-message: "The MAME Status Update is reporting version " + root.info.status-build + " and the MAME Machine Info output is reporting version " + root.info.infodb-build;
+
+    // callbacks
+    callback retry-button-clicked();
+
+    height: 100%;
+
+    HorizontalBox {
+        alignment: center;
+
+        VerticalBox {
+            alignment: center;
+            height: 100%;
+            width: 100%;
+
+            // report message
+            Text {
+                text: root.report-message;
+                horizontal-alignment: center;
+                font-size: 24px;
+                wrap: word-wrap;
+            }
+
+            // retry button
+            HorizontalBox {
+                alignment: center;
+
+                Button {
+                    text: "Retry";
+                    clicked => {
+                        root.retry-button-clicked();
+                    }
+                }
+            }
+        }
+    }
+}
+
+export struct InvalidStatusUpdateReportInfo {
+    problems: [string],
+}
+
+export component InvalidStatusUpdateReport {
+    // properties
+    in property <InvalidStatusUpdateReportInfo> info;
+
+    // callbacks
+    callback continue-button-clicked();
+
+    height: 100%;
+
+    HorizontalBox {
+        alignment: center;
+
+        VerticalBox {
+            alignment: center;
+            height: 100%;
+            width: 100%;
+
+            // report message
+            Text {
+                text: "Status update from MAME is incorrect";
+                horizontal-alignment: center;
+                font-size: 24px;
+                wrap: word-wrap;
+            }
+
+            for problem in info.problems: HorizontalBox {
+                Text {
+                    horizontal-alignment: left;
+                    text: problem;
+                }
+            }
+
+            // continue button
+            HorizontalBox {
+                alignment: center;
+
+                Button {
+                    text: "Continue";
+                    clicked => {
+                        root.continue-button-clicked();
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component InfoDbBuildFailureReport {
+    // properties
+    in property <string> error-message;
+
+    // callbacks
+    callback continue-button-clicked();
+
+    height: 100%;
+
+    HorizontalBox {
+        alignment: center;
+
+        VerticalBox {
+            alignment: center;
+            height: 100%;
+            width: 100%;
+
+            // report message
+            Text {
+                text: "Failure processing machine information from MAME";
+                horizontal-alignment: center;
+                font-size: 24px;
+                wrap: word-wrap;
+            }
+
+            // report submessage
+            Text {
+                text: root.error-message;
+                horizontal-alignment: center;
+                font-size: 12px;
+                wrap: word-wrap;
+            }
+
+            // continue button
+            HorizontalBox {
+                alignment: center;
+
+                Button {
+                    text: "Continue";
+                    clicked => {
+                        root.continue-button-clicked();
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component InfoDbBuildCancelledReport {
+    // callbacks
+    callback continue-button-clicked();
+
+    height: 100%;
+
+    HorizontalBox {
+        alignment: center;
+
+        VerticalBox {
+            alignment: center;
+            height: 100%;
+            width: 100%;
+
+            // report message
+            Text {
+                text: "Processing machine information from MAME was cancelled";
+                horizontal-alignment: center;
+                font-size: 24px;
+                wrap: word-wrap;
+            }
+
+            // continue button
+            HorizontalBox {
+                alignment: center;
+
+                Button {
+                    text: "Continue";
+                    clicked => {
+                        root.continue-button-clicked();
+                    }
+                }
+            }
+        }
+    }
+}

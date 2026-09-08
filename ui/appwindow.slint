@@ -23,7 +23,35 @@ import { SimpleMenuEntry } from "common.slint";
 import { Icons } from "icons.slint";
 import { TapeControl, Cassette } from "components/tapecontrol.slint";
 import { HorizontalSplitter } from "components/splitter.slint";
-import { ReportView, Report } from "components/report.slint";
+import {
+    SessionStartingReport,
+    SessionRestartingReport,
+    SessionRestartingForEmuReport,
+    SessionShuttingDownReport,
+    EmuStartingReport,
+    EmuStoppingReport,
+    AuditingReport,
+    InfoDbBuildReport,
+} from "components/reports/working.slint";
+import {
+    PreflightFailureReport,
+    PreflightFailureReportInfo,
+} from "components/reports/preflight.slint";
+import {
+    SessionErrorReport,
+    SessionErrorReportInfo,
+    InfoDbStatusMismatchReport,
+    InfoDbStatusMismatchReportInfo,
+    InvalidStatusUpdateReport,
+    InvalidStatusUpdateReportInfo,
+    InfoDbBuildFailureReport,
+    InfoDbBuildCancelledReport,
+} from "components/reports/error.slint";
+import {
+    AuditFailureReport,
+    AuditFailureReportInfo,
+    AuditErrorReport,
+} from "components/reports/audit.slint";
 import {
     InfoDisplay,
     InfoDisplayComponent,
@@ -64,7 +92,8 @@ export component AppWindow inherits Window {
     forward-focus: items-table-view;
 
     function display-mode() -> string {
-        return "[" + mode() + "]" + (mode() == "report" && report.spinning ? "[busy]" : "");
+        let is-busy = has-report-session-starting || has-report-session-restarting-for-emu || has-report-session-shutting-down || has-report-emu-starting || has-report-emu-stopping || report-auditing-progress >= 0.0 || has-report-infodb-build;
+        return "[" + mode() + "]" + (mode() == "report" && is-busy ? "[busy]" : "");
     }
 
     // properties that influence the title
@@ -137,6 +166,9 @@ export component AppWindow inherits Window {
     in property <string> menu-action-help-about;
     in property <string> key-action-selected-item-run;
     in property <string> key-action-selected-item-context-menu;
+    in property <string> action-infodb-build-cancel;
+    in property <string> action-audit-cancel;
+    in property <string> action-reactivate-mame;
 
     // content area position
     out property <length> content-area-x: content-area.absolute-position.x;
@@ -251,13 +283,31 @@ export component AppWindow inherits Window {
     pure callback get-statusbar-cassette(tag: string) -> Cassette;
 
     // the report view
-    in property <Report> report;
-    callback issue-button-clicked(int);
+    in property <bool> has-report;
+    in property <bool> has-report-session-starting;
+    in property <bool> has-report-session-restarting;
+    in property <bool> has-report-session-restarting-for-emu;
+    in property <bool> has-report-session-shutting-down;
+    in property <bool> has-report-emu-starting;
+    in property <bool> has-report-emu-stopping;
+    in property <string> report-auditing-asset-name;
+    in property <float> report-auditing-progress;
+    in property <bool> has-report-infodb-build;
+    in property <string> report-infodb-build-machine-description;
+    in property <PreflightFailureReportInfo> report-preflight-failure-info;
+    in property <SessionErrorReportInfo> report-session-error-info;
+    in property <InfoDbStatusMismatchReportInfo> report-infodb-status-mismatch-info;
+    in property <InvalidStatusUpdateReportInfo> report-invalid-status-update-info;
+    in property <string> report-infodb-build-failure-report-error-message;
+    in property <bool> has-report-infodb-build-cancelled;
+    in property <AuditFailureReportInfo> report-audit-failure-info;
+    in property <string> report-audit-error-message;
+    in property <bool> has-report-audit-cancelled;
 
     // mode - drives what is visible and what is not
     in property <bool> has-started;
     pure function mode() -> string {
-        if (self.report.message != "") {
+        if (has-report) {
             "report"
         } else if !has-started {
             "starting"
@@ -986,12 +1036,85 @@ export component AppWindow inherits Window {
                 }
             }
 
-            // report view
-            ReportView {
+            // the various reports
+            Rectangle {
                 visible: root.mode() == "report";
-                report: root.report;
-                issue-button-clicked(index) => root.issue-button-clicked(index);
-                menu-item-action(action) => root.menu-item-action(action);
+
+                if has-report-session-starting: SessionStartingReport { }
+                if has-report-session-restarting: SessionRestartingReport { }
+                if has-report-session-restarting-for-emu: SessionRestartingForEmuReport { }
+                if has-report-session-shutting-down: SessionShuttingDownReport { }
+                if has-report-emu-starting: EmuStartingReport { }
+                if has-report-emu-stopping: EmuStoppingReport { }
+                if report-auditing-progress >= 0.0: AuditingReport {
+                    asset-name: report-auditing-asset-name;
+                    spinning-progress: report-auditing-progress;
+                    cancel-button-clicked => {
+                        menu-item-action(root.action-audit-cancel);
+                    }
+                }
+                if has-report-infodb-build: InfoDbBuildReport {
+                    machine-description: report-infodb-build-machine-description;
+                    cancel-button-clicked => {
+                        menu-item-action(root.action-infodb-build-cancel);
+                    }
+                }
+                if report-preflight-failure-info.problems.length > 0: PreflightFailureReport {
+                    info: report-preflight-failure-info;
+                    action(action) => {
+                        menu-item-action(action);
+                    }
+                }
+                if report-session-error-info.error-message != "": SessionErrorReport {
+                    info: report-session-error-info;
+                    continue-button-clicked => {
+                        menu-item-action(root.action-reactivate-mame);
+                    }
+                }
+                if report-infodb-status-mismatch-info.infodb-build != "": InfoDbStatusMismatchReport {
+                    info: report-infodb-status-mismatch-info;
+                    retry-button-clicked => {
+                        menu-item-action(root.action-reactivate-mame);
+                    }
+                }
+                if report-invalid-status-update-info.problems.length > 0: InvalidStatusUpdateReport {
+                    info: report-invalid-status-update-info;
+                    continue-button-clicked => {
+                        menu-item-action(root.action-reactivate-mame);
+                    }
+                }
+                if report-infodb-build-failure-report-error-message != "": InfoDbBuildFailureReport {
+                    error-message: report-infodb-build-failure-report-error-message;
+                    continue-button-clicked => {
+                        menu-item-action(root.action-reactivate-mame);
+                    }
+                }
+                if has-report-infodb-build-cancelled: InfoDbBuildCancelledReport {
+                    continue-button-clicked => {
+                        menu-item-action(root.action-reactivate-mame);
+                    }
+                }
+                if report-audit-failure-info.audit-results.length > 0: AuditFailureReport {
+                    info: report-audit-failure-info;
+                    cancel-button-clicked => {
+                        menu-item-action(root.action-reactivate-mame);
+                    }
+                    menu-item-action(action) => {
+                        menu-item-action(action);
+                    }
+                }
+                if report-audit-error-message != "": AuditErrorReport {
+                    error-message: report-audit-error-message;
+                    continue-button-clicked => {
+                        menu-item-action(root.action-reactivate-mame);
+                    }
+                }
+                if has-report-audit-cancelled: AuditErrorReport {
+                    error-message: report-audit-error-message;
+                    continue-button-clicked => {
+                        menu-item-action(root.action-reactivate-mame);
+                    }
+                }
             }
         }
 

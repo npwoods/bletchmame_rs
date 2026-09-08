@@ -21,7 +21,7 @@ use crate::ui::DevicesAndImagesContextMenuInfo;
 use crate::ui::DevicesAndImagesDialog;
 use crate::ui::DevicesAndImagesState;
 use crate::ui::SimpleMenuEntry;
-use crate::util::IteratorExt;
+use crate::util::IteratorExt as _;
 
 pub async fn dialog_devices_and_images(
 	modal_stack: ModalStack,

@@ -1,4 +1,3 @@
-use std::fmt::Display;
 use std::mem::replace;
 use std::ops::ControlFlow;
 use std::path::Path;
@@ -14,11 +13,10 @@ use std::time::Instant;
 use anyhow::Error;
 use anyhow::Result;
 use more_asserts::assert_gt;
+use slint::SharedString;
+use slint::ToSharedString;
 use slint::invoke_from_event_loop;
 use smol_str::SmolStr;
-use smol_str::ToSmolStr;
-use smol_str::format_smolstr;
-use strum::EnumProperty;
 use throttle::Throttle;
 use tracing::debug;
 use tracing::info;
@@ -32,6 +30,7 @@ use crate::interaction_monitor::InteractionMonitor;
 use crate::job::Canceller;
 use crate::job::Job;
 use crate::mconfig::MachineConfig;
+use crate::models::audit::audit_static_model;
 use crate::prefs::Preferences;
 use crate::prefs::PreflightProblem;
 use crate::prefs::PrefsVideo;
@@ -46,6 +45,14 @@ use crate::status::Update;
 use crate::status::UpdateXmlProblem;
 use crate::status::ValidationError;
 use crate::threadlocalbubble::ThreadLocalBubble;
+use crate::ui::AuditFailureReportInfo;
+use crate::ui::Icons;
+use crate::ui::InfoDbStatusMismatchReportInfo;
+use crate::ui::InvalidStatusUpdateReportInfo;
+use crate::ui::PreflightFailureReportInfo;
+use crate::ui::PreflightFailureReportProblem;
+use crate::ui::SessionErrorReportInfo;
+use crate::util::IteratorExt as _;
 use crate::version::MameVersion;
 
 use crate::runtime::session::Error as SessionError;
@@ -107,39 +114,22 @@ enum SessionActiveState {
 	},
 }
 
-#[derive(Debug, EnumProperty)]
+#[derive(Debug)]
 enum Failure {
-	#[strum(props(Message = "BletchMAME requires additional configuration in order to properly interface with MAME"))]
 	Preflight(Box<[PreflightProblem]>),
-
-	#[strum(props(Message = "MAME has errored and shut down"))]
 	SessionError(SessionError),
-
-	#[strum(props(Submessage = "This is a very unexpected internal error"))]
 	InfoDbStatusMismatch {
 		status_build: MameVersion,
 		infodb_build: MameVersion,
 	},
-
-	#[strum(props(Message = "Status update from MAME is incorrect"))]
 	InvalidStatusUpdate(Vec<UpdateXmlProblem>),
-
-	#[strum(props(Message = "Failure processing machine information from MAME"))]
 	InfoDbBuild(Error),
-
-	#[strum(props(Message = "Processing machine information from MAME was cancelled"))]
 	InfoDbBuildCancelled,
-
-	#[strum(props(Message = "Audit failure before run"))]
 	AuditResults {
 		items: Box<[(Asset, AuditResult)]>,
 		proceed_action: Action,
 	},
-
-	#[strum(props(Message = "Unexpected error auditing before run"))]
 	AuditError(Error),
-
-	#[strum(props(Message = "Audit was cancelled"))]
 	AuditCancelled,
 }
 
@@ -166,29 +156,37 @@ const PROGRESS_THROTTLE_TIMEOUT: Duration = Duration::from_millis(100);
 // debugging feature to make auditing easier to debug
 const AUDIT_DELAY: Option<Duration> = None;
 
-#[derive(Default, Debug)]
-pub struct Report {
-	pub message: SmolStr,
-	pub submessage: Option<SmolStr>,
-	pub mame_stderr_output: Option<SmolStr>,
-	pub mame_exit_code: Option<i32>,
-	pub button1: Option<Button>,
-	pub button2: Option<Button>,
-	pub spinner_progress: Option<f32>,
-	pub issues: Vec<Issue>,
-	pub audit_results: Box<[(Asset, AuditResult)]>,
-}
+#[derive(Debug)]
+pub enum Report {
+	// session related reports
+	SessionStarting,
+	SessionRestarting,
+	SessionRestartingForEmu,
+	SessionShuttingDown,
 
-#[derive(Clone, Debug)]
-pub struct Button {
-	pub text: SmolStr,
-	pub action: Action,
-}
+	// messages for an emulation starting up or shutting down
+	EmuStarting,
+	EmuStopping,
+	Auditing {
+		asset_name: Option<SharedString>,
+		progress: f32,
+	},
 
-#[derive(Clone, Debug)]
-pub struct Issue {
-	pub text: SmolStr,
-	pub button: Option<Button>,
+	// InfoDb building
+	InfoDbBuild {
+		machine_description: Option<SharedString>,
+	},
+
+	// failure conditions
+	PreflightFailure(PreflightFailureReportInfo),
+	SessionError(SessionErrorReportInfo),
+	InfoDbStatusMismatch(InfoDbStatusMismatchReportInfo),
+	InvalidStatusUpdate(InvalidStatusUpdateReportInfo),
+	InfoDbBuildFailure(SharedString),
+	InfoDbBuildCancelled,
+	AuditFailure(AuditFailureReportInfo),
+	AuditError(SharedString),
+	AuditCancelled,
 }
 
 impl AppState {
@@ -775,123 +773,109 @@ impl AppState {
 			.unwrap_or_default()
 	}
 
-	pub fn report(&self) -> Option<Report> {
-		#[derive(Debug)]
-		enum ReportType<'a> {
-			// session related reports
-			SessionStarting,
-			SessionRestarting,
-			SessionRestartingForEmu,
-			SessionShuttingDown,
-
-			// messages for an emulation starting up or shutting down
-			EmuStarting,
-			EmuStopping,
-			Auditing(Option<&'a SmolStr>, f32),
-
-			// InfoDb building
-			InfoDbBuild(Option<&'a str>),
-
-			// failure reports
-			FailureReport(&'a Failure),
-		}
-
+	pub fn report(&self, icons: Icons<'_>) -> Option<Report> {
 		// lots of gnarly logic here
-		let report_type = if let Some(info_db_build) = self.info_db_build.as_ref() {
+		if let Some(info_db_build) = self.info_db_build.as_ref() {
 			// report that we have an active InfoDb build
-			Some(ReportType::InfoDbBuild(info_db_build.machine_description.as_deref()))
+			let report = Report::InfoDbBuild {
+				machine_description: info_db_build.machine_description.as_deref().map(SharedString::from),
+			};
+			Some(report)
 		} else if let Some(failure) = self.failure.as_ref() {
 			// report that something out there failed
-			Some(ReportType::FailureReport(failure))
+			match failure {
+				Failure::Preflight(problems) => {
+					let problems = problems
+						.iter()
+						.map(PreflightFailureReportProblem::from)
+						.collect_model_rc();
+					let info = PreflightFailureReportInfo { problems };
+					Some(Report::PreflightFailure(info))
+				}
+				Failure::SessionError(error) => {
+					let error_message = error.to_shared_string();
+					let mame_stderr_text = error.mame_stderr_text.as_deref().unwrap_or_default().into();
+					let exit_code = error.exit_code.map(|c| c.to_shared_string()).unwrap_or_default();
+					let info = SessionErrorReportInfo {
+						error_message,
+						mame_stderr_text,
+						exit_code,
+					};
+					Some(Report::SessionError(info))
+				}
+				Failure::InfoDbStatusMismatch {
+					status_build,
+					infodb_build,
+				} => {
+					let status_build = status_build.to_shared_string();
+					let infodb_build = infodb_build.to_shared_string();
+					let info = InfoDbStatusMismatchReportInfo {
+						status_build,
+						infodb_build,
+					};
+					Some(Report::InfoDbStatusMismatch(info))
+				}
+				Failure::InvalidStatusUpdate(update_xml_problems) => {
+					let problems = update_xml_problems
+						.iter()
+						.map(|problem| problem.to_shared_string())
+						.collect_model_rc();
+					let info = InvalidStatusUpdateReportInfo { problems };
+					Some(Report::InvalidStatusUpdate(info))
+				}
+				Failure::InfoDbBuild(error) => {
+					let error_message = error.to_shared_string();
+					Some(Report::InfoDbBuildFailure(error_message))
+				}
+				Failure::InfoDbBuildCancelled => Some(Report::InfoDbBuildCancelled),
+				Failure::AuditResults { items, proceed_action } => {
+					let audit_results = items.as_ref();
+					let audit_results = audit_static_model(audit_results, icons);
+					let proceed_action = proceed_action.encode_for_slint();
+
+					let info = AuditFailureReportInfo {
+						audit_results,
+						proceed_action,
+					};
+					Some(Report::AuditFailure(info))
+				}
+				Failure::AuditError(error) => {
+					let error_message = error.to_shared_string();
+					Some(Report::AuditError(error_message))
+				}
+				Failure::AuditCancelled => Some(Report::AuditCancelled),
+			}
 		} else if let Some(session) = self.live.as_ref().and_then(|live| live.session.as_ref()) {
 			match &session.session_state {
-				SessionState::ShuttingDown => Some(ReportType::SessionShuttingDown),
+				SessionState::ShuttingDown => Some(Report::SessionShuttingDown),
 				SessionState::Stopping => None,
 				SessionState::Restarting { start_args, .. } => {
 					if start_args.is_some() {
-						Some(ReportType::SessionRestartingForEmu)
+						Some(Report::SessionRestartingForEmu)
 					} else {
-						Some(ReportType::SessionRestarting)
+						Some(Report::SessionRestarting)
 					}
 				}
 				SessionState::Active { active_state, .. } => match active_state {
-					SessionActiveState::Normal => session.status.is_none().then_some(ReportType::SessionStarting),
-					SessionActiveState::EmuStarting => Some(ReportType::EmuStarting),
-					SessionActiveState::EmuStopping => Some(ReportType::EmuStopping),
+					SessionActiveState::Normal => session.status.is_none().then_some(Report::SessionStarting),
+					SessionActiveState::EmuStarting => Some(Report::EmuStarting),
+					SessionActiveState::EmuStopping => Some(Report::EmuStopping),
 					SessionActiveState::Auditing {
 						current_asset_name,
 						current_progress,
 						..
-					} => Some(ReportType::Auditing(current_asset_name.as_ref(), *current_progress)),
+					} => {
+						let report = Report::Auditing {
+							asset_name: current_asset_name.as_deref().map(SharedString::from),
+							progress: *current_progress,
+						};
+						Some(report)
+					}
 				},
 			}
 		} else {
 			None
-		};
-
-		report_type.map(|report_type| match report_type {
-			ReportType::InfoDbBuild(machine_description) => {
-				let message = "Building MAME machine info database...".into();
-				let submessage = machine_description.map(|x| x.into()).unwrap_or_default();
-				let button = Button {
-					text: "Cancel".into(),
-					action: Action::InfoDbBuildCancel,
-				};
-				Report {
-					message,
-					submessage: Some(submessage),
-					button1: Some(button),
-					spinner_progress: Some(f32::NAN),
-					..Default::default()
-				}
-			}
-			ReportType::SessionRestarting => Report {
-				message: "Resetting MAME...".into(),
-				spinner_progress: Some(f32::NAN),
-				..Default::default()
-			},
-			ReportType::SessionRestartingForEmu => Report {
-				message: "Starting emulation...".into(),
-				submessage: Some("MAME needs to be reset to run this emulation".into()),
-				spinner_progress: Some(f32::NAN),
-				..Default::default()
-			},
-			ReportType::SessionStarting => Report {
-				message: "Starting MAME...".into(),
-				submessage: Some("Waiting for MAME startup to be complete".into()),
-				spinner_progress: Some(f32::NAN),
-				..Default::default()
-			},
-			ReportType::SessionShuttingDown => Report {
-				message: "MAME is shutting down...".into(),
-				spinner_progress: Some(f32::NAN),
-				..Default::default()
-			},
-			ReportType::EmuStarting => Report {
-				message: "Starting emulation...".into(),
-				spinner_progress: Some(f32::NAN),
-				..Default::default()
-			},
-			ReportType::EmuStopping => Report {
-				message: "Stopping emulation...".into(),
-				spinner_progress: Some(f32::NAN),
-				..Default::default()
-			},
-			ReportType::Auditing(current_asset_name, current_progress) => {
-				let button = Button {
-					text: "Cancel".into(),
-					action: Action::AuditCancel,
-				};
-				Report {
-					message: "Auditing assets...".into(),
-					submessage: current_asset_name.cloned(),
-					spinner_progress: Some(current_progress),
-					button1: Some(button),
-					..Default::default()
-				}
-			}
-			ReportType::FailureReport(failure) => failure.report(),
-		})
+		}
 	}
 
 	pub fn is_building_infodb(&self) -> bool {
@@ -920,121 +904,6 @@ impl AppState {
 			*interaction_monitor = Some(InteractionMonitor::new()?);
 		}
 		Ok(())
-	}
-}
-
-impl Failure {
-	pub fn report(&self) -> Report {
-		// primary message
-		let message = if let Self::InfoDbStatusMismatch {
-			status_build,
-			infodb_build,
-		} = self
-		{
-			format_smolstr!(
-				"The MAME Status Update is reporting version {status_build} and the MAME Machine Info output is reporting version {infodb_build}"
-			)
-		} else {
-			self.get_str("Message").unwrap().into()
-		};
-
-		// secondary message
-		let submessage: Option<&dyn Display> = match self {
-			Self::SessionError(error) => Some(error),
-			Self::InfoDbBuild(error) | Self::AuditError(error) => Some(error),
-			_ => None,
-		};
-		let submessage = submessage
-			.map(|x| format_smolstr!("{x}"))
-			.or_else(|| self.get_str("Submessage").map(SmolStr::new_static));
-
-		// issues
-		let issues = match self {
-			Self::Preflight(preflight_problems) => preflight_problems
-				.iter()
-				.map(|problem| {
-					let text = problem.to_smolstr();
-					let button = problem.problem_type().map(|path_type| {
-						let text = format_smolstr!("Choose {path_type}");
-						let action = Action::SettingsPaths(Some(path_type));
-						Button { text, action }
-					});
-					Issue { text, button }
-				})
-				.collect(),
-
-			Self::InvalidStatusUpdate(errors) => errors
-				.iter()
-				.map(|e| Issue {
-					text: format!("{e}").into(),
-					button: None,
-				})
-				.collect(),
-			_ => Default::default(),
-		};
-
-		// MAME error output and exit code
-		let (mame_stderr_output, mame_exit_code) = if let Failure::SessionError(error) = self {
-			(error.mame_stderr_text.clone(), error.exit_code)
-		} else {
-			(None, None)
-		};
-
-		// action buttons
-		let (button1, button2) = match self {
-			Self::SessionError(_) | Self::AuditError(_) | Self::AuditCancelled => {
-				let button1 = Button {
-					text: "Continue".into(),
-					action: Action::ReactivateMame,
-				};
-				(Some(button1), None)
-			}
-			Self::AuditResults { proceed_action, .. } => {
-				let button1 = Button {
-					text: "Cancel".into(),
-					action: Action::ReactivateMame,
-				};
-				let button2 = Button {
-					text: "Proceed (not recommended)".into(),
-					action: proceed_action.clone(),
-				};
-				(Some(button1), Some(button2))
-			}
-			Self::InfoDbBuild(_) => {
-				let button1 = Button {
-					text: "Retry".into(),
-					action: Action::HelpRefreshInfoDb,
-				};
-				(Some(button1), None)
-			}
-			Self::InfoDbStatusMismatch { .. } => {
-				let button1 = Button {
-					text: "Retry".into(),
-					action: Action::ReactivateMame,
-				};
-				(Some(button1), None)
-			}
-			_ => (None, None),
-		};
-
-		// auditing results
-		let audit_results = if let Self::AuditResults { items, .. } = self {
-			items.clone()
-		} else {
-			Default::default()
-		};
-
-		Report {
-			message,
-			submessage,
-			issues,
-			mame_stderr_output,
-			mame_exit_code,
-			button1,
-			button2,
-			spinner_progress: None,
-			audit_results,
-		}
 	}
 }
 
@@ -1224,5 +1093,24 @@ fn validate_and_update_status(
 		}
 	} else {
 		(status.cloned(), pending_status.cloned(), result)
+	}
+}
+
+impl From<&PreflightProblem> for PreflightFailureReportProblem {
+	fn from(problem: &PreflightProblem) -> Self {
+		let text = problem.to_shared_string();
+		let path_type = problem
+			.problem_type()
+			.map(|path_type| path_type.to_shared_string())
+			.unwrap_or_default();
+		let action = problem
+			.problem_type()
+			.map(|path_type| Action::SettingsPaths(Some(path_type)));
+		let action = action.map(|action| action.encode_for_slint()).unwrap_or_default();
+		Self {
+			text,
+			path_type,
+			action,
+		}
 	}
 }

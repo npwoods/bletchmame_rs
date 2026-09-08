@@ -1,0 +1,104 @@
+import {
+    HorizontalBox,
+    VerticalBox,
+    Spinner,
+    Button,
+} from "std-widgets.slint";
+
+// Abstract component for simple reports
+component WorkingReportComponent {
+    // properties
+    in property <string> message;
+    in property <string> submessage;
+    in property <bool> has-cancel-button;
+    in property <float> spinning-progress: -1.0;
+    callback cancel-button-clicked();
+
+    height: 100%;
+
+    HorizontalBox {
+        alignment: center;
+
+        VerticalBox {
+            alignment: center;
+            Spinner {
+                width: 150px;
+                height: 150px;
+                indeterminate: root.spinning-progress < 0.0;
+                progress: root.spinning-progress;
+            }
+        }
+
+        VerticalBox {
+            alignment: center;
+            height: 100%;
+            width: 100%;
+
+            // report message
+            Text {
+                text: message;
+                horizontal-alignment: center;
+                font-size: 24px;
+                wrap: word-wrap;
+            }
+
+            // report submessage
+            if submessage != "": Text {
+                text: submessage;
+                horizontal-alignment: center;
+                font-size: 12px;
+                wrap: word-wrap;
+            }
+
+            // cancel button
+            if has-cancel-button: HorizontalBox {
+                alignment: center;
+
+                Button {
+                    text: "Cancel";
+                    clicked => {
+                        root.cancel-button-clicked();
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component SessionStartingReport inherits WorkingReportComponent {
+    message: "Starting MAME...";
+}
+
+export component SessionRestartingReport inherits WorkingReportComponent {
+    message: "Resetting MAME...";
+}
+
+export component SessionRestartingForEmuReport inherits SessionRestartingReport {
+    submessage: "MAME needs to be reset to run this emulation";
+}
+
+export component SessionShuttingDownReport inherits WorkingReportComponent {
+    message: "MAME is shutting down";
+}
+
+export component EmuStartingReport inherits WorkingReportComponent {
+    message: "Starting emulation...";
+}
+
+export component EmuStoppingReport inherits WorkingReportComponent {
+    message: "Stopping emulation...";
+}
+
+export component AuditingReport inherits WorkingReportComponent {
+    in property <string> asset-name;
+    message: "Auditing assets...";
+    submessage: self.asset-name;
+    has-cancel-button: true;
+}
+
+export component InfoDbBuildReport inherits WorkingReportComponent {
+    in property <string> machine-description;
+    message: "Building MAME machine info database...";
+    submessage: self.machine-description;
+    has-cancel-button: true;
+}
