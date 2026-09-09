@@ -5,8 +5,6 @@ use std::rc::Rc;
 use itertools::Itertools;
 use more_asserts::assert_ge;
 use slint::CloseRequestResponse;
-use slint::ModelRc;
-use slint::VecModel;
 use smol_str::SmolStr;
 use tokio::sync::mpsc;
 use tracing::info;
@@ -17,6 +15,7 @@ use crate::guiutils::modal::ModalStack;
 use crate::runtime::command::MameCommand;
 use crate::runtime::command::SeqType;
 use crate::ui::InputSelectMultipleDialog;
+use crate::util::IteratorExt as _;
 
 pub async fn dialog_input_select_multiple(
 	modal_stack: ModalStack,
@@ -35,9 +34,7 @@ pub async fn dialog_input_select_multiple(
 		.as_ref()
 		.iter()
 		.map(|(text, _)| text.as_str().into())
-		.collect::<Vec<_>>();
-	let entries = VecModel::from(entries);
-	let entries = ModelRc::new(entries);
+		.collect_model_rc();
 	modal.dialog().set_entries(entries);
 
 	// set up checkbox toggled handler

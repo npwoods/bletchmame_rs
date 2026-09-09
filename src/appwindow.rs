@@ -40,6 +40,7 @@ use tracing::warn;
 
 use crate::action::Action;
 use crate::appstate::AppState;
+use crate::appstate::Report;
 use crate::backend::BackendRuntime;
 use crate::backend::ChildWindow;
 use crate::backend::WindowExt as _;
@@ -81,7 +82,6 @@ use crate::guiutils::is_context_menu_event;
 use crate::guiutils::modal::ModalStack;
 use crate::history::History;
 use crate::history_xml::HistoryXml;
-use crate::models::audit::audit_static_model;
 use crate::models::collectionsview::CollectionsViewModel;
 use crate::models::itemstable::EmptyReason;
 use crate::models::itemstable::ItemsTableModel;
@@ -112,9 +112,9 @@ use crate::ui;
 use crate::ui::AppWindow;
 use crate::ui::Icons;
 use crate::ui::ListItem;
-use crate::ui::ReportIssue;
 use crate::ui::SearchBarItem;
 use crate::ui::SimpleMenuEntry;
+use crate::util::IteratorExt;
 use crate::version::MameVersion;
 
 const SOUND_ATTENUATION_OFF: i32 = -32;
@@ -317,8 +317,9 @@ impl AppModel {
 			let state = self.state.borrow();
 			let status = state.status();
 			let running = status.and_then(|s| s.running.as_ref());
-			let report = state.report();
 			let app_window = self.app_window();
+			let icons = Icons::get(&app_window);
+			let report = state.report(icons);
 
 			// status changed channel - used by the "Devices & Images" dialog
 			if let Some(status) = status {
@@ -378,80 +379,59 @@ impl AppModel {
 			});
 
 			// report view
-			let ui_report = report.as_ref().map(|report| {
-				let message = report.message.to_shared_string();
-				let submessage = report.submessage.as_deref().unwrap_or_default().to_shared_string();
-				let mame_stderr_output = report
-					.mame_stderr_output
-					.as_ref()
-					.map(|s| s.to_shared_string())
-					.unwrap_or_default();
-				let mame_exit_code = report
-					.mame_exit_code
-					.as_ref()
-					.map(|code| code.to_shared_string())
-					.unwrap_or_default();
-				let spinning = report.spinner_progress.is_some();
-				let spinning_progress = report.spinner_progress.unwrap_or_default();
-				let spinning_progress = if spinning_progress.is_nan() {
-					-1.0
-				} else {
-					spinning_progress
-				};
-				let (button1_text, button1_action) = report
-					.button1
-					.as_ref()
-					.map(|b| (b.text.to_shared_string(), b.action.encode_for_slint()))
-					.unwrap_or_default();
-				let (button2_text, button2_action) = report
-					.button2
-					.as_ref()
-					.map(|b| (b.text.to_shared_string(), b.action.encode_for_slint()))
-					.unwrap_or_default();
-				let issues = report
-					.issues
-					.iter()
-					.map(|issue| {
-						let text = issue.text.to_shared_string();
-						let button_text = issue
-							.button
-							.as_ref()
-							.map(|b| b.text.to_shared_string())
-							.unwrap_or_default();
-						ReportIssue { text, button_text }
-					})
-					.collect::<Vec<_>>();
-				let issues = VecModel::from(issues);
-				let issues = ModelRc::new(issues);
-				let icons = Icons::get(&app_window);
-				let audit_results = report.audit_results.as_ref();
-				let audit_results = audit_static_model(audit_results, icons);
-				ui::Report {
-					message,
-					submessage,
-					mame_stderr_output,
-					mame_exit_code,
-					spinning,
-					spinning_progress,
-					button1_text,
-					button1_action,
-					button2_text,
-					button2_action,
-					issues,
-					audit_results,
-				}
+			app_window.set_has_report(report.is_some());
+			app_window.set_has_report_session_starting(matches!(report, Some(Report::SessionStarting)));
+			app_window.set_has_report_session_restarting(matches!(report, Some(Report::SessionRestarting)));
+			app_window
+				.set_has_report_session_restarting_for_emu(matches!(report, Some(Report::SessionRestartingForEmu)));
+			app_window.set_has_report_session_shutting_down(matches!(report, Some(Report::SessionShuttingDown)));
+			app_window.set_has_report_emu_starting(matches!(report, Some(Report::EmuStarting)));
+			app_window.set_has_report_emu_stopping(matches!(report, Some(Report::EmuStopping)));
+			app_window.set_report_auditing_asset_name(match &report {
+				Some(Report::Auditing { asset_name, .. }) => asset_name.as_ref().cloned().unwrap_or_default(),
+				_ => "".into(),
 			});
-
-			// Slint can be aggressive at rebuilding the menubar on Windows; this can cause
-			// the Windows taskbar to flicker when BletchMAME is full screen (see
-			// https://github.com/slint-ui/slint/issues/13113), and the `report` variable
-			// drives the mode
-			//
-			// avoiding unnecessarily setting the report is an imperfect mitigation, but it
-			// avoids flickering during a live emulation
-			if ui_report.is_some() || !app_window.get_report().message.is_empty() {
-				app_window.set_report(ui_report.unwrap_or_default());
-			}
+			app_window.set_report_auditing_progress(match &report {
+				Some(Report::Auditing { progress, .. }) => *progress,
+				_ => -1.0,
+			});
+			app_window.set_has_report_infodb_build(matches!(report, Some(Report::InfoDbBuild { .. })));
+			app_window.set_report_infodb_build_machine_description(match &report {
+				Some(Report::InfoDbBuild {
+					machine_description, ..
+				}) => machine_description.as_ref().cloned().unwrap_or_default(),
+				_ => "".into(),
+			});
+			app_window.set_report_preflight_failure_info(match &report {
+				Some(Report::PreflightFailure(info)) => info.clone(),
+				_ => Default::default(),
+			});
+			app_window.set_report_session_error_info(match &report {
+				Some(Report::SessionError(info)) => info.clone(),
+				_ => Default::default(),
+			});
+			app_window.set_report_infodb_status_mismatch_info(match &report {
+				Some(Report::InfoDbStatusMismatch(info)) => info.clone(),
+				_ => Default::default(),
+			});
+			app_window.set_report_invalid_status_update_info(match &report {
+				Some(Report::InvalidStatusUpdate(info)) => info.clone(),
+				_ => Default::default(),
+			});
+			app_window.set_report_infodb_build_failure_report_error_message(match &report {
+				Some(Report::InfoDbBuildFailure(error)) => error.clone(),
+				_ => "".into(),
+			});
+			app_window.set_has_report_infodb_build_cancelled(matches!(report, Some(Report::InfoDbBuildCancelled)));
+			app_window.set_report_audit_failure_info(match &report {
+				Some(Report::AuditFailure(info)) => info.clone(),
+				_ => Default::default(),
+			});
+			app_window.set_report_audit_error_message(match &report {
+				Some(Report::AuditError(error_message)) => error_message.clone(),
+				_ => "".into(),
+			});
+			app_window.set_has_report_audit_cancelled(matches!(report, Some(Report::AuditCancelled)));
 		}
 
 		// menus
@@ -743,10 +723,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 			table_column.width = column.width;
 			table_column
 		})
-		.collect::<Vec<_>>();
-	let items_columns = VecModel::from(items_columns);
-	let items_columns = Rc::new(items_columns);
-	let items_columns = ModelRc::from(items_columns);
+		.collect_model_rc();
 	app_window.set_items_columns(items_columns);
 
 	// set up items filter
@@ -846,18 +823,6 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		}
 	});
 
-	// issue button
-	let model_clone = model.clone();
-	app_window.on_issue_button_clicked(move |index| {
-		let index = usize::try_from(index).unwrap();
-		let action = {
-			let state = model_clone.state.borrow();
-			let issue = state.report().unwrap().issues.into_iter().nth(index).unwrap();
-			issue.button.unwrap().action
-		};
-		handle_action(&model_clone, action);
-	});
-
 	// throttle menu
 	let menu_entries_throttle = THROTTLE_RATES
 		.iter()
@@ -866,9 +831,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 			let action = Action::OptionsThrottleRate(rate).encode_for_slint();
 			SimpleMenuEntry { title, action }
 		})
-		.collect::<Vec<_>>();
-	let menu_entries_throttle = VecModel::from(menu_entries_throttle);
-	let menu_entries_throttle = ModelRc::new(menu_entries_throttle);
+		.collect_model_rc();
 	app_window.set_menu_entries_throttle(menu_entries_throttle);
 
 	// frameskip menu
@@ -882,9 +845,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 			let action = Action::OptionsFrameskip(rate).encode_for_slint();
 			SimpleMenuEntry { title, action }
 		})
-		.collect::<Vec<_>>();
-	let menu_entries_frameskip = VecModel::from(menu_entries_frameskip);
-	let menu_entries_frameskip = ModelRc::new(menu_entries_frameskip);
+		.collect_model_rc();
 	app_window.set_menu_entries_frameskip(menu_entries_frameskip);
 
 	// builtin collections menu
@@ -894,9 +855,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 			let action = Action::SettingsToggleBuiltinCollection(b).encode_for_slint();
 			SimpleMenuEntry { title, action }
 		})
-		.collect::<Vec<_>>();
-	let menu_entries_builtin_collections = VecModel::from(menu_entries_builtin_collections);
-	let menu_entries_builtin_collections = ModelRc::new(menu_entries_builtin_collections);
+		.collect_model_rc();
 	app_window.set_menu_entries_builtin_collections(menu_entries_builtin_collections);
 
 	// cassettes
@@ -952,6 +911,9 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		app_window.set_menu_action_help_about(HelpAbout.encode_for_slint());
 		app_window.set_key_action_selected_item_run(SelectedItemRun.encode_for_slint());
 		app_window.set_key_action_selected_item_context_menu(SelectedItemContextMenu.encode_for_slint());
+		app_window.set_action_infodb_build_cancel(InfoDbBuildCancel.encode_for_slint());
+		app_window.set_action_audit_cancel(AuditCancel.encode_for_slint());
+		app_window.set_action_reactivate_mame(ReactivateMame.encode_for_slint());
 	}
 
 	// now create the "real initial" state, now that we have a model to work with
@@ -1987,16 +1949,14 @@ fn searchbar_items(model: &AppModel, text: &str) -> Vec<SearchBarItem> {
 }
 
 fn translate_searchbar_items(model: ModelRc<SearchBarItem>) -> ModelRc<ListItem> {
-	let items = model
+	model
 		.iter()
 		.map(|item| ListItem {
 			text: item.text,
 			avatar_icon: item.icon,
 			..Default::default()
 		})
-		.collect::<Vec<_>>();
-	let model = VecModel::from(items);
-	ModelRc::new(model)
+		.collect_model_rc()
 }
 
 fn mame_command_line_key(prefs: &Preferences) -> impl Eq + '_ {

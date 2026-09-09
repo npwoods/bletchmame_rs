@@ -7,7 +7,7 @@ import {
     LineEdit,
 } from "std-widgets.slint";
 
-import { SimpleMenuEntry } from "common.slint";
+import { SimpleMenuEntry } from "../common.slint";
 import { HorizontalSplitter } from "splitter.slint";
 
 export struct DeviceAndImageEntry {
@@ -16,17 +16,17 @@ export struct DeviceAndImageEntry {
     option-names: [string],
     option-descriptions: [string],
     current-option-index: int,
-    filename: string}
+    filename: string
+}
 
-export struct DevicesAndImagesState {
-    entries: [DeviceAndImageEntry],
-    none-string: string}
+export struct DevicesAndImagesState { entries: [DeviceAndImageEntry], none-string: string }
 
 export struct DevicesAndImagesContextMenuInfo {
     load-image-action: string,
     connect-to-serial-port-actions: [SimpleMenuEntry],
     connect-to-socket-action: string,
-    unload-action: string}
+    unload-action: string
+}
 
 export component DevicesAndImagesList {
     // properties

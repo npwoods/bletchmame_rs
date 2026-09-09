@@ -1,0 +1,58 @@
+import {
+    HorizontalBox,
+    VerticalBox,
+    Button,
+} from "std-widgets.slint";
+
+export struct PreflightFailureReportProblem {
+    text: string,
+    path-type: string,
+    action: string,
+}
+
+export struct PreflightFailureReportInfo {
+    problems: [PreflightFailureReportProblem],
+}
+
+export component PreflightFailureReport {
+    // properties
+    in property <PreflightFailureReportInfo> info;
+
+    // callbacks
+    callback action(string);
+
+    height: 100%;
+
+    HorizontalBox {
+        alignment: center;
+
+        VerticalBox {
+            alignment: center;
+            height: 100%;
+            width: 100%;
+
+            // report message
+            Text {
+                text: "BletchMAME requires additional configuration in order to properly interface with MAME";
+                horizontal-alignment: center;
+                font-size: 24px;
+                wrap: word-wrap;
+            }
+
+            for problem in info.problems: HorizontalBox {
+                Text {
+                    horizontal-alignment: left;
+                    text: problem.text;
+                }
+
+                Button {
+                    visible: problem.path-type != "";
+                    text: "Choose " + problem.path-type;
+                    clicked => {
+                        root.action(problem.action);
+                    }
+                }
+            }
+        }
+    }
+}

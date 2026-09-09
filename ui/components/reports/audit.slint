@@ -1,0 +1,160 @@
+import {
+    HorizontalBox,
+    VerticalBox,
+    Button,
+    ScrollView,
+} from "std-widgets.slint";
+import { AuditAsset, AuditAssetView } from "../audit.slint";
+
+export struct AuditFailureReportInfo {
+    audit-results: [AuditAsset],
+    proceed-action: string,
+}
+
+export component AuditFailureReport {
+    // properties
+    in property <AuditFailureReportInfo> info;
+
+    // callbacks
+    callback cancel-button-clicked();
+    callback menu-item-action(action: string);
+
+    height: 100%;
+
+    HorizontalBox {
+        alignment: center;
+
+        VerticalBox {
+            alignment: center;
+            height: 100%;
+            width: 100%;
+
+            // report message
+            Text {
+                text: "Audit failure before run";
+                horizontal-alignment: center;
+                font-size: 24px;
+                wrap: word-wrap;
+            }
+
+            // buttons
+            HorizontalBox {
+                alignment: center;
+
+                Button {
+                    text: "Cancel";
+                    clicked => {
+                        root.cancel-button-clicked();
+                    }
+                }
+
+                Button {
+                    text: "Proceed (not recommended)";
+                    clicked => {
+                        root.menu-item-action(root.info.proceed-action);
+                    }
+                }
+            }
+
+            // report audit assets
+            if info.audit-results.length > 0: ScrollView {
+                height: 100%;
+                width: 450px;
+                vertical-scrollbar-policy: always-on;
+                VerticalLayout {
+                    for asset in info.audit-results: AuditAssetView {
+                        asset: asset;
+                        menu-item-action(action) => {
+                            root.menu-item-action(action);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component AuditErrorReport {
+    // properties
+    in property <string> error-message;
+
+    // callbacks
+    callback continue-button-clicked();
+
+    height: 100%;
+
+    HorizontalBox {
+        alignment: center;
+
+        VerticalBox {
+            alignment: center;
+            height: 100%;
+            width: 100%;
+
+            // report message
+            Text {
+                text: "Unexpected error auditing before run";
+                horizontal-alignment: center;
+                font-size: 24px;
+                wrap: word-wrap;
+            }
+
+            // report submessage
+            Text {
+                text: root.error-message;
+                horizontal-alignment: center;
+                font-size: 12px;
+                wrap: word-wrap;
+            }
+
+            // continue button
+            HorizontalBox {
+                alignment: center;
+
+                Button {
+                    text: "Continue";
+                    clicked => {
+                        root.continue-button-clicked();
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component AuditCancelledReport {
+    // callbacks
+    callback continue-button-clicked();
+
+    height: 100%;
+
+    HorizontalBox {
+        alignment: center;
+
+        VerticalBox {
+            alignment: center;
+            height: 100%;
+            width: 100%;
+
+            // report message
+            Text {
+                text: "UnexpecteAudit was cancelled";
+                horizontal-alignment: center;
+                font-size: 24px;
+                wrap: word-wrap;
+            }
+
+            // continue button
+            HorizontalBox {
+                alignment: center;
+
+                Button {
+                    text: "Continue";
+                    clicked => {
+                        root.continue-button-clicked();
+                    }
+                }
+            }
+        }
+    }
+}
