@@ -26,6 +26,7 @@ use zip::ZipArchive;
 use zip::result::ZipError;
 
 use crate::history_xml::HistoryXml;
+use crate::info::InfoDb;
 use crate::prefs::PrefsCollection;
 use crate::prefs::PrefsItemRef;
 
@@ -150,13 +151,33 @@ impl MultiPath {
 	}
 }
 
-pub fn load_image_from_paths(paths: &[MultiPath], name: &str) -> Result<Option<Image>> {
+pub fn load_image_from_paths(paths: &[MultiPath], name: &str, info_db: Option<&InfoDb>) -> Result<Option<Image>> {
+	let result = load_image_from_paths_one(paths, name)?;
+	if let Some(result) = result {
+		// good, we got this on the first try
+		Ok(Some(result))
+	} else {
+		// didn't find this one; try the parent (of course, `name` could be a software name but in that case the
+		// lookup will fail) ¯\_(ツ)_/¯
+		let parent_name = info_db
+			.and_then(|info_db| info_db.machines().find(name).ok())
+			.and_then(|machine| machine.clone_of())
+			.map(|machine| machine.name());
+		if let Some(parent_name) = parent_name {
+			load_image_from_paths_one(paths, parent_name)
+		} else {
+			Ok(None)
+		}
+	}
+}
+
+fn load_image_from_paths_one(paths: &[MultiPath], name: &str) -> Result<Option<Image>> {
 	let name = format!("{name}.png");
 	let bytes = paths
 		.iter()
 		.filter_map(|x| {
-			x.read(&name).unwrap_or_else(|e| {
-				warn!(error=?e, "load_image_from_paths() returned error");
+			x.read(&name).unwrap_or_else(|error| {
+				warn!(?error, "load_image_from_paths_one() returned error");
 				None
 			})
 		})

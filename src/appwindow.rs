@@ -238,10 +238,14 @@ impl AppModel {
 			let multi_paths = make_multi_paths(&prefs.paths.snapshots);
 			let app_window = self.app_window();
 			let app_window_weak = self.app_window_weak.clone();
+			let model_weak = Rc::downgrade(self);
 			app_window.on_get_snap_image(move |name| {
-				load_image_from_paths(&multi_paths, &name)
-					.inspect_err(|e| {
-						warn!(error=?e, name=?name, "load_image_from_paths() returned error");
+				let info_db = model_weak
+					.upgrade()
+					.and_then(|model| model.state.borrow().info_db().cloned());
+				load_image_from_paths(&multi_paths, &name, info_db.as_deref())
+					.inspect_err(|error| {
+						warn!(?error, ?name, "load_image_from_paths() returned error");
 					})
 					.ok()
 					.flatten()
