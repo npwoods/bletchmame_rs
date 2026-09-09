@@ -3,6 +3,7 @@ All notable changes to this project are documented in this file.
 
 ## [3.1] - Unreleased
 - Adding support for configuring MAME "Artwork" and "BGFX" paths
+- When loading snapshots, load snapshots for parents if snapshots specific to clones are not present
 
 ## [3.0] - 2026-09-04
 - After three years, this is a complete rewrite of BletchMAME in Rust using the Slint toolkit
