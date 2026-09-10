@@ -59,7 +59,11 @@ impl MameArguments {
 
 		// video arguments
 		let video = video_override.unwrap_or(&prefs.video);
-		let video_args = ["-prescale".into(), Cow::Owned(video.prescale.to_string())].into_iter();
+		let mut video_args = vec!["-prescale".into(), Cow::Owned(video.prescale.to_string())];
+		if let Some(video_option) = video.video_option.as_ref() {
+			video_args.push("-video".into());
+			video_args.push(video_option.to_arg().to_string().into());
+		}
 
 		// debugger arguments
 		//

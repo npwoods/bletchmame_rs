@@ -34,6 +34,7 @@ mod status;
 mod threadlocalbubble;
 mod util;
 mod version;
+mod videoconfig;
 mod xml;
 
 #[cfg(feature = "diagnostics")]

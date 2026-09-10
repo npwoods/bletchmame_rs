@@ -2,7 +2,7 @@
 All notable changes to this project are documented in this file.
 
 ## [3.1] - Unreleased
-- Adding support for configuring MAME "Artwork" and "BGFX" paths
+- Adding support for configuring MAME "Artwork" and "BGFX" paths and MAME video options (`-video` at the command line)
 - When loading snapshots, load snapshots for parents if snapshots specific to clones are not present
 
 ## [3.0] - 2026-09-04

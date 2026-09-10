@@ -1,3 +1,4 @@
+#![allow(unused)]
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::iter::once;
@@ -56,9 +57,11 @@ use crate::ui::Icons;
 use crate::ui::InfoDisplay;
 use crate::ui::SoftwareMachine;
 use crate::util::IteratorExt as _;
+use crate::videoconfig::VideoConfigInfo;
 
 struct State {
 	dialog_weak: Weak<ConfigureDialog>,
+	pub video_config_info: VideoConfigInfo,
 	modal_stack: ModalStack,
 	rom_paths: Arc<[SmolStr]>,
 	sample_paths: Arc<[SmolStr]>,
@@ -196,11 +199,18 @@ pub async fn dialog_configure(
 	});
 
 	// video options
-	modal.dialog().set_video_use_default_settings(video.is_none());
 	modal
 		.dialog()
-		.set_video_settings(video.as_ref().map(|v| v.into()).unwrap_or_else(|| global_video.into()));
-	modal.dialog().set_video_default_settings(global_video.into());
+		.set_video_config_info(state.video_config_info.ui_config_info.clone());
+	modal.dialog().set_video_use_default_settings(video.is_none());
+	modal.dialog().set_video_settings(
+		state
+			.video_config_info
+			.to_ui_video_settings(video.as_ref().unwrap_or(global_video)),
+	);
+	modal
+		.dialog()
+		.set_video_default_settings(state.video_config_info.to_ui_video_settings(global_video));
 
 	// loading error?
 	if let Some(error) = state.error() {
@@ -391,6 +401,7 @@ impl State {
 		};
 		let state = Self {
 			dialog_weak,
+			video_config_info: VideoConfigInfo::new(),
 			modal_stack,
 			rom_paths: paths.roms.clone().into(),
 			sample_paths: paths.samples.clone().into(),
@@ -680,8 +691,10 @@ impl State {
 			}
 		};
 
-		let video = (!dialog.get_video_use_default_settings())
-			.then(|| PrefsVideo::try_from(&dialog.get_video_settings()).unwrap());
+		let video: Option<PrefsVideo> = (!dialog.get_video_use_default_settings()).then(|| {
+			self.video_config_info
+				.from_ui_video_settings(&dialog.get_video_settings())
+		});
 
 		let id = Default::default();
 		PrefsItem { id, details, video }

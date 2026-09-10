@@ -32,7 +32,6 @@ use serde::Deserialize;
 use serde::Serialize;
 use slint::PhysicalPosition;
 use slint::PhysicalSize;
-use slint::ToSharedString;
 use smol_str::SmolStr;
 use smol_str::format_smolstr;
 use strum::EnumIter;
@@ -244,6 +243,9 @@ fn access_paths(path_type: PathType) -> (fn(&PrefsPaths) -> &[SmolStr], PathsSto
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct PrefsVideo {
+	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub video_option: Option<VideoOption>,
+
 	pub prescale: u8,
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
@@ -253,32 +255,40 @@ pub struct PrefsVideo {
 impl Default for PrefsVideo {
 	fn default() -> Self {
 		Self {
+			video_option: None,
 			prescale: 1,
 			extra_mame_arguments: "".into(),
 		}
 	}
 }
 
-impl TryFrom<&crate::ui::VideoSettings> for PrefsVideo {
-	type Error = anyhow::Error;
-
-	fn try_from(value: &crate::ui::VideoSettings) -> std::result::Result<Self, Self::Error> {
-		let prescale = value.prescale.try_into()?;
-		let extra_mame_arguments = value.extra_mame_arguments.as_str().trim().into();
-		Ok(Self {
-			prescale,
-			extra_mame_arguments,
-		})
-	}
+#[derive(Clone, Debug, strum::Display, Serialize, Deserialize, PartialEq, Eq, EnumProperty)]
+pub enum VideoOption {
+	#[serde(rename = "d3d")]
+	#[strum(props(Arg = "d3d"))]
+	Direct3D,
+	#[serde(rename = "bgfx")]
+	#[strum(props(Arg = "bgfx"))]
+	Bgfx,
+	#[serde(rename = "gdi")]
+	#[strum(props(Arg = "gdi"))]
+	Gdi,
+	#[serde(rename = "opengl")]
+	#[strum(props(Arg = "opengl"))]
+	OpenGL,
+	#[serde(rename = "none")]
+	#[strum(props(Arg = "none"))]
+	None,
+	#[serde(untagged)]
+	Unknown(String),
 }
 
-impl From<&PrefsVideo> for crate::ui::VideoSettings {
-	fn from(value: &PrefsVideo) -> Self {
-		let prescale = value.prescale.into();
-		let extra_mame_arguments = value.extra_mame_arguments.to_shared_string();
-		Self {
-			prescale,
-			extra_mame_arguments,
+impl VideoOption {
+	pub fn to_arg(&self) -> &'_ str {
+		if let Self::Unknown(s) = self {
+			s.as_ref()
+		} else {
+			self.get_str("Arg").unwrap()
 		}
 	}
 }
