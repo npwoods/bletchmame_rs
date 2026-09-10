@@ -1,18 +1,21 @@
 import {
     Button,
+    ComboBox,
     HorizontalBox,
     Slider,
     TextEdit,
     VerticalBox,
 } from "std-widgets.slint";
 
-export struct VideoSettings {
-    prescale: int,
-    extra-mame-arguments: string}
+export struct VideoConfigInfo {
+    video-option-descriptions: [string],
+}
+export struct VideoSettings { video-option-index: int, prescale: int, extra-mame-arguments: string }
 
 export component VideoConfigComponent {
     // properties
     in property <bool> enabled: true;
+    in property <VideoConfigInfo> config-info;
     in-out property <VideoSettings> settings: { prescale: 1 };
     property <length> label-width: 140px;
 
@@ -23,6 +26,21 @@ export component VideoConfigComponent {
 
     // controls
     VerticalBox {
+        HorizontalBox {
+            vertical-stretch: 0;
+            Text {
+                width: label-width;
+                vertical-alignment: center;
+                text: "Video:";
+            }
+
+            ComboBox {
+                model: root.config-info.video-option-descriptions;
+                current-index <=> root.settings.video-option-index;
+                enabled: root.enabled;
+            }
+        }
+
         HorizontalBox {
             vertical-stretch: 0;
             Text {

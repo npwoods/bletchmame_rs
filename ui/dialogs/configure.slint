@@ -18,6 +18,7 @@ import {
 } from "../components/devimageslist.slint";
 import { Icons } from "../icons.slint";
 import {
+    VideoConfigInfo,
     VideoConfigComponent,
     VideoSettings,
 } from "../components/videoconfig.slint";
@@ -50,6 +51,7 @@ export component ConfigureDialog inherits Window {
     in property <[SoftwareMachine]> software-machines;
     in property <bool> software-machines-bulk-all-enabled;
     in property <bool> software-machines-bulk-none-enabled;
+    in property <VideoConfigInfo> video-config-info;
     in-out property <VideoSettings> video-settings: { prescale: 20 };
     in property <VideoSettings> video-default-settings: { prescale: 1 };
     in-out property <bool> video-use-default-settings: true;
@@ -210,6 +212,7 @@ export component ConfigureDialog inherits Window {
                         VideoConfigComponent {
                             vertical-stretch: 1;
                             enabled: !root.video-use-default-settings;
+                            config-info: root.video-config-info;
                             settings <=> root.video-current-settings;
                         }
                     }

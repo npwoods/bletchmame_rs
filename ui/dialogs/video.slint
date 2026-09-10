@@ -8,13 +8,18 @@ import {
     VerticalBox,
 } from "std-widgets.slint";
 import { Icons } from "../icons.slint";
-import { VideoConfigComponent, VideoSettings } from "../components/videoconfig.slint";
+import {
+    VideoConfigInfo,
+    VideoConfigComponent,
+    VideoSettings,
+} from "../components/videoconfig.slint";
 
 export component VideoDialog inherits Window {
     // callbacks
     callback ok-clicked();
 
     // properties
+    in property <VideoConfigInfo> config-info;
     in-out property <VideoSettings> settings: default-settings;
     in property <VideoSettings> original-settings: default-settings;
     in property <VideoSettings> default-settings: { prescale: 1 };
@@ -26,6 +31,7 @@ export component VideoDialog inherits Window {
     VerticalBox {
         video-config-component := VideoConfigComponent {
             vertical-stretch: 1;
+            config-info <=> root.config-info;
             settings <=> root.settings;
         }
 
