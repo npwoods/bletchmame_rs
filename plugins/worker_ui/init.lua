@@ -637,16 +637,13 @@ end
 function command_start(args)
 	emu.start(args[2])
 
-	-- prep initial load args
-	start_load_args = {}
-	for i = 3,#args do
-		start_load_args[i -2] = args[i]
-	end
-
-	-- evaluate options
-	while #start_load_args > 0 and start_load_args[1]:sub(1, 1) == "-" do
-		local arg_name = table.remove(start_load_args, 1):sub(2)
-		local arg_value = table.remove(start_load_args, 1)
+	for i = 3,#args-1,2 do
+		if args[i+0]:sub(1, 1) ~= "-" then
+			print("@ERROR ### Expected hyphen at start of command!")
+			return			
+		end
+		local arg_name = args[i+0]:sub(2)
+		local arg_value = args[i+1]
 		local entry = manager.machine.options.entries[arg_name]
 		local sample_value = entry:default_value();
 		if math.type(sample_value) == "integer" then
@@ -659,6 +656,7 @@ function command_start(args)
 	end
 
 	print("@INFO ### Starting emulation...")
+	state = "RESET_UNPAUSED"
 end
 
 -- STOP command
@@ -852,16 +850,29 @@ end
 -- LOAD command
 function command_load(args)
 	-- loop; this is a batch command
-	for i = 2,#args-1,2 do		
-		local image = find_image_by_tag(args[i+0])
+	for i = 2,#args-1,2 do
+		local k = args[i+0]
+		local v = args[i+1]
+
+		local image = find_image_by_tag(k)
 		if not image then
-			print("@ERROR ### Cannot find device '" .. args[i+0] .. "'")
+			print("@ERROR ### Cannot find device '" .. k .. "'")
 			return
 		end
-		image:load(args[i+1])
+
+		if v:sub(1,1) == "?" then
+			image:load_software(v:sub(2))
+		else
+			image:load(v)
+		end
+
+		if i < #args-1 then
+			print("@INFO ### Device '" .. k .. "' loaded '" .. v .. "' successfully")
+		else
+			print("@OK STATUS ### Device '" .. k .. "' loaded '" .. v .. "' successfully")
+			emit_status()
+		end
 	end
-	print("@OK STATUS ### Device '" .. args[2] .. "' loaded '" .. args[3] .. "' successfully")
-	emit_status()
 end
 
 -- UNLOAD command
@@ -1274,59 +1285,18 @@ function startplugin()
 			print("@OK STATUS ### Idle; no emulation running; ready for commands")
 			emit_status()
 		else
-			-- we're active (this could be the result of starting an emulation, or a soft/hard
-			-- reset); first  do we need to load images on start?  if so load them
-			local will_reset = false
-			if #start_load_args > 0 and start_load_args[1]:sub(1, 1) == "&" then
-				-- changing slots
-				while #start_load_args > 0 and start_load_args[1]:sub(1, 1) == "&" do
-					local slot_option_name = table.remove(start_load_args, 1):sub(2)
-					local slot_option_value = table.remove(start_load_args, 1)
-					local opt = get_slot_option(slot_option_name)
-					if not opt then
-						print("@ERROR ### Cannot find slot option '" .. slot_option_name .. "'")
-						return
-					end
-					opt:specify(slot_option_value)
-				end
-				manager.machine:hard_reset()
-				state = "RESET_UNPAUSED"
-				will_reset = true
-			else
-				-- changing images (if any)
-				while #start_load_args > 0 do
-					local k = table.remove(start_load_args, 1)
-					local v = table.remove(start_load_args, 1)
-					local image = find_image_by_tag(k)
-					if image then
-						if v:sub(1, 1) == "?" then
-							image:load_software(v:sub(2))
-						else
-							image:load(v)
-						end
-						if image.is_reset_on_load then
-							will_reset = true
-						end
-					end
-				end
-				start_load_args = {}
+			-- we're active; take note that this could be the result of starting an
+			-- emulation, or a soft/hard reset)
+			if state == "RESET_PAUSED" then
+				emu.pause()
+			elseif state == "RESET_UNPAUSED" then
+				emu.unpause()
 			end
 
-			-- it is possible that loading an image will force a reset; we need to only
-			-- enter this block if we don't expect a reset
-			if not will_reset then
-				-- do we need to pause/unpause?
-				if state == "RESET_PAUSED" then
-					emu.pause()
-				elseif state == "RESET_UNPAUSED" then
-					emu.unpause()
-				end
-
-				-- and finally we're active
-				state = "ACTIVE"
-				print("@OK STATUS ### Emulation reset")
-				emit_status()
-			end
+			-- and finally we're active
+			state = "ACTIVE"
+			print("@OK STATUS ### Emulation reset")
+			emit_status()
 		end
 	end
 	emu.register_prestart(function() 

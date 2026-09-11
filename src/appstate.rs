@@ -293,8 +293,9 @@ impl AppState {
 
 		// are we starting with a command?
 		if let Some(start_args) = start_args.as_deref() {
-			let command = MameCommand::start(start_args);
-			command_sender.send(command).unwrap();
+			for command in MameCommand::start(start_args) {
+				command_sender.send(command).unwrap();
+			}
 		}
 
 		// finally return all the state
@@ -395,10 +396,9 @@ impl AppState {
 			};
 		} else if start_args.video == session.video {
 			// it does, lets go!
-			let command = MameCommand::start(&start_args);
-
-			// dispatch the command
-			command_sender.send(command).unwrap();
+			for command in MameCommand::start(&start_args) {
+				command_sender.send(command).unwrap();
+			}
 
 			// and set the state to "starting"
 			*active_state = SessionActiveState::EmuStarting;
@@ -487,10 +487,9 @@ impl AppState {
 				// the audit succeeded; not check to seee if the video matchesdoes the video match?
 				if start_args.video == session.video {
 					// it does, lets go!
-					let command = MameCommand::start(&start_args);
-
-					// dispatch the command
-					command_sender.send(command).unwrap();
+					for command in MameCommand::start(&start_args) {
+						command_sender.send(command).unwrap();
+					}
 
 					// and set the state to "starting"
 					*active_state = SessionActiveState::EmuStarting;

@@ -149,10 +149,7 @@ impl MachineConfig {
 		let opts = start_args
 			.slots
 			.iter()
-			.filter_map(|(name, value)| {
-				let name = name.as_str().strip_prefix("&")?;
-				Some((name, (!value.is_empty()).then_some(value.as_str())))
-			})
+			.map(|(name, value)| (name.as_str(), (!value.is_empty()).then_some(value.as_str())))
 			.collect::<Vec<_>>();
 		Self::from_machine_name_and_slots(info_db, &start_args.machine_name, &opts)
 	}

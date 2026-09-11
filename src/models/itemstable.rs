@@ -295,9 +295,7 @@ impl ItemsTableModel {
 				let slots = machine_config
 					.changed_slots(None)
 					.into_iter()
-					.map(|(slot_name, slot_value)| {
-						(format!("&{slot_name}").into(), slot_value.unwrap_or_default().into())
-					})
+					.map(|(slot_name, slot_value)| (slot_name.into(), slot_value.unwrap_or_default().into()))
 					.collect::<Vec<_>>();
 				let images = images
 					.iter()
