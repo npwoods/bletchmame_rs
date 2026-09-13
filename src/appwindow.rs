@@ -1319,11 +1319,6 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 				model.app_window().set_menubar_visible(true);
 			}
 		}
-		Action::ErrorMessageBox(message) => {
-			let model_clone = model.clone();
-			let fut = dialog_message_box::<OkOnly>(model_clone.modal_stack.clone(), "Error", message);
-			spawn_local(fut).unwrap();
-		}
 		Action::Start(start_args) => {
 			model.update_state(|state| state.start(start_args, false));
 		}
