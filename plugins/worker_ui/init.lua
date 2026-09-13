@@ -1299,6 +1299,11 @@ function startplugin()
 			emit_status()
 		end
 	end
+	if emu.register_before_startup_screens then
+		emu.register_before_startup_screens(function()
+			print("@STARTUPSCREENS")
+		end)
+	end
 	emu.register_prestart(function() 
 		protected_call(callback_prestart, "callback_prestart")
 	end)

@@ -105,6 +105,7 @@ enum SessionState {
 enum SessionActiveState {
 	Normal,
 	EmuStarting,
+	EmuStartupScreens,
 	EmuStopping,
 	Auditing {
 		job: Job<AuditJobResult>,
@@ -678,7 +679,7 @@ impl AppState {
 		// if we have an active session, we may need to alter the active state
 		let is_running = session.status.as_deref().is_some_and(|s| s.running.is_some());
 		let now_normal = match active_state {
-			SessionActiveState::EmuStarting => is_running,
+			SessionActiveState::EmuStarting | SessionActiveState::EmuStartupScreens => is_running,
 			SessionActiveState::EmuStopping => !is_running,
 			_ => false,
 		};
@@ -732,6 +733,20 @@ impl AppState {
 		result
 	}
 
+	pub fn startup_screens(&mut self) -> bool {
+		let Some(session) = self.live.as_mut().and_then(|live| live.session.as_mut()) else {
+			return false;
+		};
+		let SessionState::Active { active_state, .. } = &mut session.session_state else {
+			return false;
+		};
+		if !matches!(active_state, SessionActiveState::EmuStarting) {
+			return false;
+		}
+		*active_state = SessionActiveState::EmuStartupScreens;
+		true
+	}
+
 	pub fn shutdown(&mut self) -> ControlFlow<()> {
 		let session = self.live.as_mut().and_then(|live| live.session.as_mut());
 		if let Some(session) = session {
@@ -751,6 +766,24 @@ impl AppState {
 			.as_ref()
 			.and_then(|live| live.session.as_ref())
 			.and_then(|session| session.status.as_deref())
+	}
+
+	pub fn is_running(&self) -> bool {
+		self.live
+			.as_ref()
+			.and_then(|live| {
+				live.session.as_ref().map(|session| {
+					session.status.as_deref().is_some_and(|s| s.running.is_some())
+						|| matches!(
+							session.session_state,
+							SessionState::Active {
+								active_state: SessionActiveState::EmuStartupScreens,
+								..
+							}
+						)
+				})
+			})
+			.unwrap_or_default()
 	}
 
 	pub fn running_machine_description(&self) -> &'_ str {
@@ -858,6 +891,7 @@ impl AppState {
 				SessionState::Active { active_state, .. } => match active_state {
 					SessionActiveState::Normal => session.status.is_none().then_some(Report::SessionStarting),
 					SessionActiveState::EmuStarting => Some(Report::EmuStarting),
+					SessionActiveState::EmuStartupScreens => None,
 					SessionActiveState::EmuStopping => Some(Report::EmuStopping),
 					SessionActiveState::Auditing {
 						current_asset_name,

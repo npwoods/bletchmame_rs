@@ -70,6 +70,7 @@ pub enum Action {
 	MameSessionEnded,
 	#[strum(props(IsFrequent = "true"))]
 	MameStatusUpdate(Box<Update>),
+	MameStartupScreens,
 
 	// Other
 	Start(Arc<MameStartArgs>),
