@@ -99,6 +99,7 @@ export component AppWindow inherits Window {
     // properties that influence the title
     in property <bool> prefix-title-with-mode: false;
     in property <string> apptitle: @tr("BletchMAME");
+    in property <bool> is-running;
     in property <string> running-machine-desc;
 
     // the menu bar
@@ -311,7 +312,7 @@ export component AppWindow inherits Window {
             "report"
         } else if !has-started {
             "starting"
-        } else if (self.running-machine-desc != "") {
+        } else if is-running {
             "running"
         } else {
             "ready"

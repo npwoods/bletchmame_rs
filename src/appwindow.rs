@@ -330,12 +330,13 @@ impl AppModel {
 				self.status_changed_channel.publish(status);
 			}
 
-			// running machine description
+			// is running and running machine description
+			app_window.set_is_running(state.is_running());
 			app_window.set_running_machine_desc(state.running_machine_description().into());
 
 			// child window visibility
 			if let Some(child_window) = &*self.child_window.borrow() {
-				child_window.set_active(running.is_some() && report.is_none());
+				child_window.set_active(state.is_running() && report.is_none());
 			}
 
 			// status bar speed text
@@ -1319,10 +1320,8 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 				model.app_window().set_menubar_visible(true);
 			}
 		}
-		Action::ErrorMessageBox(message) => {
-			let model_clone = model.clone();
-			let fut = dialog_message_box::<OkOnly>(model_clone.modal_stack.clone(), "Error", message);
-			spawn_local(fut).unwrap();
+		Action::MameStartupScreens => {
+			model.update_state(AppState::startup_screens);
 		}
 		Action::Start(start_args) => {
 			model.update_state(|state| state.start(start_args, false));

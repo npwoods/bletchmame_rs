@@ -73,6 +73,7 @@ enum ThisError {
 pub enum MameEvent {
 	SessionEnded,
 	StatusUpdate(Box<Update>),
+	StartupScreens,
 }
 
 pub fn spawn_mame_session_thread(
@@ -86,11 +87,12 @@ pub fn spawn_mame_session_thread(
 	let event_callback = move |event| {
 		let callback_bubble = callback_bubble.clone();
 		invoke_from_event_loop(move || {
-			let command = match event {
+			let action = match event {
 				MameEvent::SessionEnded => Action::MameSessionEnded,
 				MameEvent::StatusUpdate(update) => Action::MameStatusUpdate(update),
+				MameEvent::StartupScreens => Action::MameStartupScreens,
 			};
-			(callback_bubble.unwrap())(command)
+			(callback_bubble.unwrap())(action)
 		})
 		.unwrap();
 	};
@@ -210,8 +212,13 @@ pub fn interact_with_mame(
 
 	loop {
 		info!("Calling read_response_from_mame()");
-		let (update, is_signal) =
-			read_response_from_mame(&mut mame_stdout, &watchdog, &emit_interaction_monitor, &mut line)?;
+		let (update, is_signal) = read_response_from_mame(
+			&mut mame_stdout,
+			&watchdog,
+			&emit_interaction_monitor,
+			&event_callback,
+			&mut line,
+		)?;
 
 		if let Some(update) = update {
 			is_running = update.is_running();
@@ -232,6 +239,7 @@ fn read_response_from_mame(
 	mame_stdout: &mut impl BufRead,
 	watchdog: &Watchdog,
 	emit_interaction_monitor: &dyn for<'a> Fn(EmitType, &'a str),
+	event_callback: &dyn Fn(MameEvent),
 	line: &mut String,
 ) -> anyhow::Result<(Option<Update>, bool)> {
 	#[derive(Debug, Clone, Copy, PartialEq)]
@@ -239,6 +247,7 @@ fn read_response_from_mame(
 		Ok,
 		OkStatus,
 		Info,
+		StartupScreens,
 		Cruft,
 	}
 
@@ -257,6 +266,7 @@ fn read_response_from_mame(
 					"OK" => Ok(ResponseLine::Ok),
 					"OK STATUS" => Ok(ResponseLine::OkStatus),
 					"INFO" => Ok(ResponseLine::Info),
+					"STARTUPSCREENS" => Ok(ResponseLine::StartupScreens),
 					"ERROR" => Err(ThisError::MameErrorResponse(comment.unwrap_or_default().to_string()).into()),
 					_ => Err(ThisError::MameResponseNotUnderstood(line.to_string()).into()),
 				};
@@ -293,10 +303,14 @@ fn read_response_from_mame(
 		None
 	};
 
+	if resp == ResponseLine::StartupScreens {
+		event_callback(MameEvent::StartupScreens);
+	}
+
 	// is the response a "signal", indicating that it is our turn to issue a command?
 	let is_signal = match resp {
 		ResponseLine::Ok | ResponseLine::OkStatus => true,
-		ResponseLine::Info | ResponseLine::Cruft => false,
+		ResponseLine::Info | ResponseLine::Cruft | ResponseLine::StartupScreens => false,
 	};
 
 	Ok((update, is_signal))
