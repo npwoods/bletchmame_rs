@@ -9,14 +9,14 @@ name = "bletchmame"
 anyhow = "1.0.104"
 base64 = "0.23.1"
 binary-search = "0.1.3"
-byte-unit = "5.2.5"
+byte-unit = "5.2.6"
 byteorder = "1.5.0"
 clap = { version = "4", features = ["derive"] }
-console = "0.16.4"
+console = "0.16.6"
 cpp = "0.5.11"
-crc32fast = "1.5.1"
+crc32fast = "1.5.2"
 default-ext = "0.1.0"
-dirs = "6.0.0"
+dirs = "7.0.0"
 dpi = "0.1.2"
 easy-ext = "1.0.3"
 glob = { version = "0.3.4", optional = true }
@@ -29,7 +29,7 @@ levenshtein = "1.0.5"
 more-asserts = "0.3.1"
 nu-utils = "0.115.1"
 num = "0.4.3"
-open = "5.4.2"
+open = "5.4.4"
 parallel_worker = "1.0.2"
 parse_int = "0.9.0"
 path-absolutize = "4.0.1"
@@ -40,11 +40,11 @@ raw-window-handle = "0.6.2"
 rfd = "0.17.2"
 serde = { version = "1.0.229", features = ["rc"] }
 serde_json = "1.0.151"
-serialport = "4.10.0"
+serialport = "4.10.1"
 sevenz-rust2 = "0.22.2"
 sha1 = "0.11.0"
 showfile = "0.1.1"
-smallvec = "1.15.2"
+smallvec = "1.16.1"
 smol_str = { version = "0.3.6", features = ["serde"] }
 splitty = "1.0.2"
 strum = { version = "0.28.0", features = ["derive"] }
@@ -64,9 +64,9 @@ tracing = { version = "0.1.44", features = [
 ] }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 unicase = "2.9.0"
-uuid = { version = "1.26.0", features = ["v4"] }
+uuid = { version = "1.26.1", features = ["v4"] }
 winit = "0.30.13"
-zerocopy = { version = "0.8.56", features = ["derive"] }
+zerocopy = { version = "0.8.57", features = ["derive"] }
 zip = "8.6.0"
 
 # Slint dependencies
