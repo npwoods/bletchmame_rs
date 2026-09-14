@@ -64,7 +64,6 @@ pub use self::entities::Feature;
 pub use self::entities::Machine;
 pub use self::entities::MachineSoftwareList;
 pub use self::entities::MachinesView;
-pub use self::entities::RamOption;
 pub use self::entities::Rom;
 pub use self::entities::Sample;
 pub use self::entities::Slot;
@@ -106,7 +105,6 @@ pub struct InfoDb {
 	software_lists: RootView<binary::SoftwareList>,
 	software_list_machine_indexes: RootView<UsizeDb>,
 	machine_software_lists: RootView<binary::MachineSoftwareList>,
-	ram_options: RootView<binary::RamOption>,
 	strings_offset: usize,
 	build: MameVersion,
 }
@@ -139,7 +137,6 @@ impl InfoDb {
 		let software_lists = next_root_view(&mut cursor, hdr.software_list_count)?;
 		let software_list_machine_indexes = next_root_view(&mut cursor, hdr.software_list_machine_count)?;
 		let machine_software_lists = next_root_view(&mut cursor, hdr.machine_software_lists_count)?;
-		let ram_options = next_root_view(&mut cursor, hdr.ram_option_count)?;
 
 		// get the build
 		let build_str = read_string(&data[cursor.start..], hdr.build_strindex).unwrap_or_default();
@@ -165,7 +162,6 @@ impl InfoDb {
 			software_lists,
 			software_list_machine_indexes,
 			machine_software_lists,
-			ram_options,
 			strings_offset: cursor.start,
 			build,
 		};
@@ -347,10 +343,6 @@ impl InfoDb {
 
 	pub fn software_list_machine_indexes(&self) -> impl View<'_, Object<'_, UsizeDb>> {
 		self.make_view(&self.software_list_machine_indexes)
-	}
-
-	pub fn ram_options(&self) -> impl View<'_, RamOption<'_>> {
-		self.make_view(&self.ram_options)
 	}
 
 	fn string(&self, offset: UsizeDb) -> &'_ str {

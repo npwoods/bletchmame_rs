@@ -476,9 +476,6 @@ pub struct PrefsMachineItem {
 	pub images: HashMap<String, ImageDesc>,
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
-	pub ram_size: Option<u64>,
-
-	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub bios: Option<String>,
 }
 

@@ -41,8 +41,6 @@ export component ConfigureDialog inherits Window {
     in property <InfoDisplay> info;
     in property <DevicesAndImagesState> dev-images-state;
     in property <string> dev-images-error;
-    in property <[string]> ram-sizes-model;
-    in-out property <int> ram-sizes-index;
     in property <[string]> bios-selection-model;
     in-out property <int> bios-selection-index;
     in property <[AuditAsset]> audit-assets;
@@ -147,26 +145,11 @@ export component ConfigureDialog inherits Window {
                                 row: 0;
                                 col: 0;
                                 vertical-alignment: center;
-                                text: "RAM Size:";
-                            }
-
-                            ComboBox {
-                                row: 0;
-                                col: 1;
-                                model: root.ram-sizes-model;
-                                enabled: root.ram-sizes-model.length >= 2;
-                                current-index <=> ram-sizes-index;
-                            }
-
-                            Text {
-                                row: 1;
-                                col: 0;
-                                vertical-alignment: center;
                                 text: "BIOS Selection:";
                             }
 
                             ComboBox {
-                                row: 1;
+                                row: 0;
                                 col: 1;
                                 model: root.bios-selection-model;
                                 enabled: root.bios-selection-model.length >= 2;

@@ -47,7 +47,6 @@ pub struct Header {
 	pub software_list_count: UsizeDb,
 	pub software_list_machine_count: UsizeDb,
 	pub machine_software_lists_count: UsizeDb,
-	pub ram_option_count: UsizeDb,
 }
 
 #[repr(C, packed)]
@@ -86,8 +85,6 @@ pub struct Machine {
 	pub slot_options_end: UsizeDb,
 	pub machine_software_lists_start: UsizeDb,
 	pub machine_software_lists_end: UsizeDb,
-	pub ram_options_start: UsizeDb,
-	pub ram_options_end: UsizeDb,
 
 	pub driver_status: DriverQuality,
 	pub driver_emulation: DriverQuality,
@@ -497,13 +494,6 @@ pub struct MachineSoftwareList {
 	pub software_list_index: UsizeDb,
 	pub status: SoftwareListStatus,
 	pub filter_strindex: UsizeDb,
-}
-
-#[repr(C, packed)]
-#[derive(Clone, Copy, Debug, TryFromBytes, IntoBytes, Immutable, KnownLayout, PartialEq, Eq, Hash)]
-pub struct RamOption {
-	pub size: U64,
-	pub is_default: bool,
 }
 
 impl Fixup for MachineSoftwareList {

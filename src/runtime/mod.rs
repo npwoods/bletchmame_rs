@@ -31,7 +31,6 @@ pub enum MameStderr {
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct MameStartArgs {
 	pub machine_name: String,
-	pub ram_size: Option<u64>,
 	pub bios: Option<String>,
 	pub slots: Vec<(SmolStr, SmolStr)>,
 	pub images: Vec<(SmolStr, ImageDesc)>,
