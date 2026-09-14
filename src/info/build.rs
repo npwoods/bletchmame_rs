@@ -60,14 +60,12 @@ enum Phase {
 	MachineConfigurationSetting,
 	MachineDevice,
 	MachineSlot,
-	MachineRamOption,
 }
 
 const TEXT_CAPTURE_PHASES: &[Phase] = &[
 	Phase::MachineDescription,
 	Phase::MachineYear,
 	Phase::MachineManufacturer,
-	Phase::MachineRamOption,
 ];
 
 struct State {
@@ -89,14 +87,8 @@ struct State {
 	machine_software_lists: TableBuilder<binary::MachineSoftwareList>,
 	strings: StringTableBuilder,
 	software_lists: BTreeMap<String, SoftwareListBuild>,
-	ram_options: TableBuilder<binary::RamOption>,
 	build_strindex: UsizeDb,
-	phase_specific: Option<PhaseSpecificState>,
-}
-
-enum PhaseSpecificState {
-	Extensions(String),
-	RamOption(bool),
+	phase_specific: Option<String>,
 }
 
 #[derive(Debug, Default)]
@@ -131,7 +123,6 @@ enum ThisError {
 //           8241 slots
 //           3376 slot options
 //           7924 links
-//           1152 RAM options
 //        5337643 string bytes
 //
 // of course, the actual CAPACITY_* values are padded for future MAME versions
@@ -150,7 +141,6 @@ const CAPACITY_DEVICE_REFS: usize = 120000;
 const CAPACITY_SLOTS: usize = 9000;
 const CAPACITY_SLOT_OPTIONS: usize = 4000;
 const CAPACITY_MACHINE_SOFTWARE_LISTS: usize = 9000;
-const CAPACITY_RAM_OPTIONS: usize = 1500;
 const CAPACITY_STRING_TABLE: usize = 6000000;
 
 impl State {
@@ -179,7 +169,6 @@ impl State {
 			slots: TableBuilder::with_capacity(CAPACITY_SLOTS),
 			slot_options: TableBuilder::with_capacity(CAPACITY_SLOT_OPTIONS),
 			machine_software_lists: TableBuilder::with_capacity(CAPACITY_MACHINE_SOFTWARE_LISTS),
-			ram_options: TableBuilder::with_capacity(CAPACITY_RAM_OPTIONS),
 			software_lists: BTreeMap::new(),
 			strings,
 			build_strindex,
@@ -243,8 +232,6 @@ impl State {
 					slot_options_end: self.slot_options.len_db(),
 					machine_software_lists_start: self.machine_software_lists.len_db(),
 					machine_software_lists_end: self.machine_software_lists.len_db(),
-					ram_options_start: self.ram_options.len_db(),
-					ram_options_end: self.ram_options.len_db(),
 					runnable,
 					..Default::default()
 				};
@@ -470,7 +457,7 @@ impl State {
 				self.machines.modify_last(|machine| {
 					machine.devices_end += 1;
 				});
-				self.phase_specific = Some(PhaseSpecificState::Extensions(String::with_capacity(1024)));
+				self.phase_specific = Some(String::with_capacity(1024));
 				Some(Phase::MachineDevice)
 			}
 			(Phase::Machine, "device_ref") => {
@@ -539,12 +526,6 @@ impl State {
 				list.push(machine_name_strindex);
 				None
 			}
-			(Phase::Machine, "ramoption") => {
-				let [is_default] = evt.find_attributes(["default"])?;
-				let is_default = is_default.map(parse_mame_bool).transpose()?.unwrap_or_default();
-				self.phase_specific = Some(PhaseSpecificState::RamOption(is_default));
-				Some(Phase::MachineRamOption)
-			}
 			(Phase::Machine, "driver") => {
 				let [status, emulation, savestate] = evt.find_attributes(["status", "emulation", "savestate"])?;
 				let status = status.as_deref().map(|s| s.parse()).transpose()?;
@@ -588,9 +569,7 @@ impl State {
 			(Phase::MachineDevice, "extension") => {
 				let [name] = evt.find_attributes(["name"])?;
 				if let Some(name) = name {
-					let PhaseSpecificState::Extensions(extensions) = self.phase_specific.as_mut().unwrap() else {
-						unreachable!();
-					};
+					let extensions = self.phase_specific.as_mut().unwrap();
 					if !extensions.is_empty() {
 						extensions.push('\0');
 					}
@@ -694,11 +673,6 @@ impl State {
 					);
 					try_reuse_existing_collection(&mut machine.slots_start, &mut machine.slots_end, &mut self.slots);
 					try_reuse_existing_collection(
-						&mut machine.ram_options_start,
-						&mut machine.ram_options_end,
-						&mut self.ram_options,
-					);
-					try_reuse_existing_collection(
 						&mut machine.features_start,
 						&mut machine.features_end,
 						&mut self.features,
@@ -746,9 +720,7 @@ impl State {
 				});
 			}
 			Phase::MachineDevice => {
-				let PhaseSpecificState::Extensions(extensions) = self.phase_specific.take().unwrap() else {
-					unreachable!();
-				};
+				let extensions = self.phase_specific.take().unwrap();
 				let extensions = extensions.split('\0').sorted().join("\0");
 				let extensions_strindex = self.strings.lookup(&extensions);
 				self.devices.modify_last(|device| {
@@ -763,19 +735,6 @@ impl State {
 						&mut self.slot_options,
 					);
 				});
-			}
-			Phase::MachineRamOption => {
-				let PhaseSpecificState::RamOption(is_default) = self.phase_specific.take().unwrap() else {
-					unreachable!();
-				};
-				if let Ok(size) = text.unwrap().parse::<u64>() {
-					let size = size.into();
-					let ram_option = binary::RamOption { size, is_default };
-					self.ram_options.push_db(ram_option)?;
-					self.machines.modify_last(|machine| {
-						machine.ram_options_end += 1;
-					});
-				}
 			}
 			_ => {}
 		};
@@ -927,7 +886,6 @@ impl State {
 			software_list_count: software_lists.len_db(),
 			software_list_machine_count: software_list_machine_indexes.len_db(),
 			machine_software_lists_count: machine_software_lists.len_db(),
-			ram_option_count: self.ram_options.len_db(),
 		};
 
 		// get all bytes and return
@@ -956,7 +914,6 @@ impl State {
 			.chain(software_lists.iter().flat_map(IntoBytes::as_bytes))
 			.chain(software_list_machine_indexes.iter().flat_map(IntoBytes::as_bytes))
 			.chain(machine_software_lists.iter().flat_map(IntoBytes::as_bytes))
-			.chain(self.ram_options.into_vec().iter().flat_map(IntoBytes::as_bytes))
 			.copied()
 			.chain(self.strings.into_iter())
 			.collect();
@@ -1110,7 +1067,6 @@ pub fn calculate_sizes_hash() -> U64 {
 		size_of::<binary::SlotOption>(),
 		size_of::<binary::SoftwareList>(),
 		size_of::<binary::MachineSoftwareList>(),
-		size_of::<binary::RamOption>(),
 		binary::FeatureType::COUNT,
 		binary::DeviceType::COUNT,
 	]

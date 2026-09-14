@@ -109,7 +109,6 @@ fn print_stats(info_db: &InfoDb, elapsed_time: Duration) {
 			"Software List --> Machine Indexes",
 			info_db.machine_software_lists().len(),
 		),
-		("RAM Options", info_db.ram_options().len()),
 	];
 
 	// figure out how wide the largest label is

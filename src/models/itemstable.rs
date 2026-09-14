@@ -283,13 +283,11 @@ impl ItemsTableModel {
 			ItemDetails::Machine {
 				machine_config,
 				images,
-				ram_size,
 				bios,
 			} => {
 				let machine = machine_config.machine();
 				assert!(machine.runnable());
 				let machine_name = machine.name().into();
-				let ram_size = *ram_size;
 				let bios = bios.clone();
 
 				let slots = machine_config
@@ -304,7 +302,6 @@ impl ItemsTableModel {
 
 				let start_args = MameStartArgs {
 					machine_name,
-					ram_size,
 					bios,
 					slots,
 					images,
@@ -348,7 +345,6 @@ impl ItemsTableModel {
 							.map(|images| {
 								let start_args = MameStartArgs {
 									machine_name: machine.name().into(),
-									ram_size: None,
 									bios: None,
 									slots: [].into(),
 									images,
@@ -377,7 +373,6 @@ impl ItemsTableModel {
 					machine_name: machine_config.machine().name().to_string(),
 					slots: [].into(),
 					images: [].into(),
-					ram_size: None,
 					bios: None,
 				}),
 				ItemDetails::Software {
@@ -493,13 +488,11 @@ impl ItemsTableModel {
 			ItemDetails::Machine {
 				machine_config,
 				images,
-				ram_size,
 				bios,
 			} => {
 				let machine = machine_config.machine();
 				assert!(machine.runnable());
 				let machine_name = machine.name().into();
-				let ram_size = *ram_size;
 				let bios = bios.clone();
 
 				let slots = machine_config
@@ -516,7 +509,6 @@ impl ItemsTableModel {
 
 				let start_args = MameStartArgs {
 					machine_name,
-					ram_size,
 					bios,
 					slots,
 					images,
@@ -560,7 +552,6 @@ impl ItemsTableModel {
 							.map(|images| {
 								let start_args = MameStartArgs {
 									machine_name: machine.name().into(),
-									ram_size: None,
 									bios: None,
 									slots: [].into(),
 									images,
@@ -589,7 +580,6 @@ impl ItemsTableModel {
 					machine_name: machine_config.machine().name().to_string(),
 					slots: [].into(),
 					images: [].into(),
-					ram_size: None,
 					bios: None,
 				}),
 				ItemDetails::Software {
@@ -765,7 +755,6 @@ fn build_items_builtin_all(info_db: &Rc<InfoDb>) -> Rc<[Item]> {
 			let details = ItemDetails::Machine {
 				machine_config,
 				images: Default::default(),
-				ram_size: None,
 				bios: None,
 			};
 			details.into()
@@ -859,12 +848,10 @@ fn folder_item<'a>(
 			let machine_config =
 				MachineConfig::from_machine_name_and_slots(info_db.clone(), &item.machine_name, &item.slots)?;
 			let images = item.images.clone();
-			let ram_size = item.ram_size;
 			let bios: Option<String> = item.bios.clone();
 			ItemDetails::Machine {
 				machine_config,
 				images,
-				ram_size,
 				bios,
 			}
 		}
@@ -928,7 +915,6 @@ enum ItemDetails {
 		// commentary:  `MachineConfig` has its own `InfoDb`; maybe we need a lighter `MachineConfigPartial`?
 		machine_config: MachineConfig,
 		images: HashMap<String, ImageDesc>,
-		ram_size: Option<u64>,
 		bios: Option<String>,
 	},
 	Software {

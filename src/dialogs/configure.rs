@@ -72,7 +72,6 @@ struct State {
 enum CoreState {
 	Machine {
 		dimodel_state: DiModelState,
-		ram_size: Option<u64>,
 		bios: Option<String>,
 	},
 	Software {
@@ -171,16 +170,6 @@ pub async fn dialog_configure(
 
 	// info
 	modal.dialog().set_info(state.info());
-
-	// RAM options
-	if let Some((ram_option_texts, current_index)) = state.ram_options() {
-		let ram_option_texts = VecModel::from(ram_option_texts);
-		let ram_option_texts = ModelRc::new(ram_option_texts);
-		modal.dialog().set_ram_sizes_model(ram_option_texts);
-
-		let current_index = current_index.try_into().unwrap();
-		modal.dialog().set_ram_sizes_index(current_index);
-	}
 
 	// BIOS options
 	if let Some((bios_option_texts, current_index)) = state.bios_options() {
@@ -333,7 +322,6 @@ impl State {
 				let machine_index = info_db.machines().find_index(&item.machine_name).unwrap();
 				let machine_config =
 					MachineConfig::from_machine_index_and_slots(info_db.clone(), machine_index, &item.slots);
-				let ram_size = item.ram_size;
 				let bios = item.bios.clone();
 				let dimodel_state = match machine_config {
 					Ok(machine_config) => {
@@ -349,11 +337,7 @@ impl State {
 						error,
 					},
 				};
-				CoreState::Machine {
-					dimodel_state,
-					ram_size,
-					bios,
-				}
+				CoreState::Machine { dimodel_state, bios }
 			}
 			PrefsItemDetails::Software(item) => {
 				let software_list = info_db.software_lists().find(&item.software_list).unwrap();
@@ -425,42 +409,6 @@ impl State {
 		} else {
 			None
 		}
-	}
-
-	pub fn ram_options(&self) -> Option<(Vec<SharedString>, usize)> {
-		let CoreState::Machine {
-			dimodel_state,
-			ram_size,
-			..
-		} = &self.core
-		else {
-			return None;
-		};
-		dimodel_state.with_machine(|machine| {
-			let machine = machine.unwrap();
-			let ram_options = machine.ram_options();
-			(!ram_options.is_empty()).then(|| {
-				// figure out the default RAM option
-				let default_index = machine
-					.default_ram_option_index()
-					.expect("expected a default RAM option");
-				let default_text = ram_size_display_text(ram_options.get(default_index).unwrap().size());
-				let default_text = default_text_string(&default_text);
-
-				// build the text for the RAM options
-				let ram_option_texts = once(SharedString::from(default_text))
-					.chain(ram_options.iter().map(|opt| ram_size_display_text(opt.size()).into()))
-					.collect::<Vec<_>>();
-
-				// current RAM size option
-				let current_index = ram_size
-					.and_then(|ram_size| ram_options.iter().position(|x| x.size() == ram_size))
-					.map(|idx| idx + 1)
-					.unwrap_or_default();
-
-				(ram_option_texts, current_index)
-			})
-		})
 	}
 
 	pub fn bios_options(&self) -> Option<(Vec<SharedString>, usize)> {
@@ -638,10 +586,6 @@ impl State {
 					.images()
 					.filter_map(|(tag, filename)| filename.map(|image_desc| (tag.to_string(), image_desc.clone())))
 					.collect::<HashMap<_, _>>();
-				let ram_sizes_index = dialog.get_ram_sizes_index();
-				let ram_size = usize::try_from(ram_sizes_index - 1)
-					.ok()
-					.map(|index| machine.ram_options().get(index).unwrap().size());
 				let bios_index = dialog.get_bios_selection_index();
 				let bios = usize::try_from(bios_index - 1)
 					.ok()
@@ -650,7 +594,6 @@ impl State {
 					machine_name,
 					slots,
 					images,
-					ram_size,
 					bios,
 				};
 				PrefsItemDetails::Machine(item)
@@ -786,7 +729,6 @@ impl State {
 
 	pub fn reset_to_defaults(&self) {
 		let dialog = self.dialog_weak.unwrap();
-		dialog.set_ram_sizes_index(0);
 
 		match &self.core {
 			CoreState::Machine { dimodel_state, .. } => {
@@ -875,12 +817,6 @@ fn configure_dialog_title(description: &str, name: Option<&str>) -> String {
 	} else {
 		format!("Configure {description}")
 	}
-}
-
-fn ram_size_display_text(ram_size: u64) -> String {
-	let ram_size = byte_unit::Byte::from_u64(ram_size);
-	let (n, unit) = ram_size.get_exact_unit(true);
-	format!("{n} {unit}")
 }
 
 fn default_text_string(s: &str) -> String {

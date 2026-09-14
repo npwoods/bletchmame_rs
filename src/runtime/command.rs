@@ -30,14 +30,6 @@ impl MameCommand {
 	}
 
 	pub fn start(start_args: &MameStartArgs) -> Vec<Self> {
-		// RAM size
-		let ram_size_args_iter = if let Some(ram_size) = start_args.ram_size {
-			let args = [Cow::Borrowed("-ramsize"), ram_size.to_string().into()];
-			Either::Left(args.into_iter())
-		} else {
-			Either::Right([].into_iter())
-		};
-
 		// BIOS
 		let bios_args_iter = if let Some(bios) = start_args.bios.as_deref() {
 			let args = [Cow::Borrowed("-bios"), bios.to_string().into()];
@@ -47,9 +39,7 @@ impl MameCommand {
 		};
 
 		// and assemble the start command
-		let args = once(Cow::Borrowed(start_args.machine_name.as_str()))
-			.chain(ram_size_args_iter)
-			.chain(bios_args_iter);
+		let args = once(Cow::Borrowed(start_args.machine_name.as_str())).chain(bios_args_iter);
 		let mut results = vec![build("START", args)];
 
 		// slots
@@ -368,16 +358,9 @@ mod test {
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, "coco2b", None, &[], &["START coco2b"])]
-	#[test_case(1, "coco2b", Some(0x10000), &[], &["START coco2b -ramsize 65536"])]
-	#[test_case(2, "coco2b", None, &[("ext:fdc:wd17xx:0", "foo.dsk")], &["START coco2b", "LOAD ext:fdc:wd17xx:0 foo.dsk"])]
-	fn command_start(
-		_index: usize,
-		machine_name: &str,
-		ram_size: Option<u64>,
-		images: &[(&str, &str)],
-		expected: &[&str],
-	) {
+	#[test_case(0, "coco2b", &[], &["START coco2b"])]
+	#[test_case(1, "coco2b", &[("ext:fdc:wd17xx:0", "foo.dsk")], &["START coco2b", "LOAD ext:fdc:wd17xx:0 foo.dsk"])]
+	fn command_start(_index: usize, machine_name: &str, images: &[(&str, &str)], expected: &[&str]) {
 		let machine_name = machine_name.into();
 		let images = images
 			.iter()
@@ -389,7 +372,6 @@ mod test {
 			.collect::<Vec<_>>();
 		let start_args = MameStartArgs {
 			machine_name,
-			ram_size,
 			bios: None,
 			slots: [].into(),
 			images,

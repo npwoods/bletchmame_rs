@@ -39,7 +39,6 @@ pub type SlotOption<'a> = Object<'a, binary::SlotOption>;
 pub type SoftwareList<'a> = Object<'a, binary::SoftwareList>;
 pub type SoftwareListsView<'a> = SimpleView<'a, binary::SoftwareList>;
 pub type MachineSoftwareList<'a> = Object<'a, binary::MachineSoftwareList>;
-pub type RamOption<'a> = Object<'a, binary::RamOption>;
 
 impl<'a> Machine<'a> {
 	pub fn name(&self) -> &'a str {
@@ -140,15 +139,6 @@ impl<'a> Machine<'a> {
 	pub fn machine_software_lists(&self) -> impl View<'a, MachineSoftwareList<'a>> + use<'a> {
 		let range = self.obj().machine_software_lists_start.into()..self.obj().machine_software_lists_end.into();
 		self.db.machine_software_lists().sub_view(range)
-	}
-
-	pub fn ram_options(&self) -> impl View<'a, RamOption<'a>> + use<'a> {
-		let range = self.obj().ram_options_start.into()..self.obj().ram_options_end.into();
-		self.db.ram_options().sub_view(range)
-	}
-
-	pub fn default_ram_option_index(&self) -> Option<usize> {
-		self.ram_options().iter().position(|x| x.is_default())
 	}
 
 	pub fn driver_status(&self) -> DriverQuality {
@@ -481,16 +471,6 @@ impl Validatable for MachineSoftwareList<'_> {
 		let software_list_index = usize::from(self.obj().software_list_index);
 		ensure!(software_list_index < self.db.software_lists().len());
 		Ok(())
-	}
-}
-
-impl RamOption<'_> {
-	pub fn size(&self) -> u64 {
-		self.obj().size.into()
-	}
-
-	pub fn is_default(&self) -> bool {
-		self.obj().is_default
 	}
 }
 
