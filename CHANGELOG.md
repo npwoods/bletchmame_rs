@@ -3,7 +3,7 @@ All notable changes to this project are documented in this file.
 
 ## [3.1] - Unreleased
 - Adding support for configuring MAME "Artwork" and "BGFX" paths and MAME video options (`-video` at the command line)
-- When loading snapshots, load snapshots for parents if snapshots specific to clones are not present
+- Snapshot loading will now recognize parent snapshots in absence of clone-specific snapshots, and loading is now asynchronous
 - Removing support for RAM sizes (which was merged into general device configurations in MAME 0.290)
 - Simplifications to `worker_ui` LUA plugin (removing support for older MAMEs, moving startup orchestration to core application)
 
