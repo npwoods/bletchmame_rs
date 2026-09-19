@@ -8,6 +8,8 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
 use std::time::Instant;
 
 use i_slint_core::items::PointerEventKind;
@@ -100,7 +102,7 @@ use crate::runtime::command::MovieFormat;
 use crate::selection::SelectionManager;
 use crate::snapview::HistoryLoader;
 use crate::snapview::get_history_styled_text;
-use crate::snapview::load_image_from_paths;
+use crate::snapview::load_image_data_from_paths;
 use crate::snapview::make_multi_paths;
 use crate::snapview::snap_view_string;
 use crate::status::Cassette;
@@ -172,6 +174,7 @@ struct AppModel {
 	status_changed_channel: Channel<Status>,
 	child_window: RefCell<Option<ChildWindow>>,
 	history_loader: RefCell<Option<HistoryLoader>>,
+	snap_image_request_id: Arc<AtomicU64>,
 	searchbar_actions: RefCell<Vec<SharedString>>,
 	shutting_down: Cell<bool>,
 }
@@ -235,27 +238,6 @@ impl AppModel {
 		// update the snapshot paths?
 		if old_prefs.is_none_or(|old_prefs| prefs.paths.snapshots != old_prefs.paths.snapshots) {
 			info!("modify_prefs(): prefs.paths.snapshots changed");
-			let multi_paths = make_multi_paths(&prefs.paths.snapshots);
-			let app_window = self.app_window();
-			let app_window_weak = self.app_window_weak.clone();
-			let model_weak = Rc::downgrade(self);
-			app_window.on_get_snap_image(move |name| {
-				let info_db = model_weak
-					.upgrade()
-					.and_then(|model| model.state.borrow().info_db().cloned());
-				load_image_from_paths(&multi_paths, &name, info_db.as_deref())
-					.inspect_err(|error| {
-						warn!(?error, ?name, "load_image_from_paths() returned error");
-					})
-					.ok()
-					.flatten()
-					.or_else(|| {
-						app_window_weak
-							.upgrade()
-							.map(|app_window| Icons::get(&app_window).get_bletchmame_blank())
-					})
-					.unwrap_or_default()
-			});
 		}
 
 		if old_prefs.is_none_or(|old_prefs| prefs.paths.history_file != old_prefs.paths.history_file) {
@@ -618,6 +600,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		status_changed_channel: Channel::default(),
 		child_window: RefCell::new(child_window),
 		history_loader: RefCell::new(None),
+		snap_image_request_id: Arc::new(AtomicU64::new(0)),
 		searchbar_actions: RefCell::new([].into()),
 		shutting_down: Cell::new(false),
 	};
@@ -1747,6 +1730,7 @@ fn update_ui_for_current_history_item(model: &AppModel) {
 
 	// update the snap view
 	let current_snap_view = snap_view_string(&collection, prefs.current_history_entry().selection.first());
+	start_load_snap_image(model, &current_snap_view);
 	app_window.set_current_snap_view(current_snap_view);
 
 	// update the info display
@@ -1757,6 +1741,77 @@ fn update_ui_for_current_history_item(model: &AppModel) {
 
 	// and finish tracing
 	debug!(duration=?start_instant.elapsed(), "update_ui_for_current_history_item() completed");
+}
+
+fn start_load_snap_image(model: &AppModel, name: &str) {
+	let request_id = model
+		.snap_image_request_id
+		.fetch_add(1, Ordering::Relaxed)
+		.wrapping_add(1);
+	let app_window = model.app_window();
+	if name.is_empty() {
+		app_window.set_snap_image_is_loading(false);
+		app_window.set_current_snap_image(Icons::get(&app_window).get_bletchmame_blank());
+		return;
+	}
+
+	app_window.set_snap_image_is_loading(true);
+	let (paths, parent_name) = {
+		let state = model.state.borrow();
+		let paths = state
+			.preferences
+			.paths
+			.snapshots
+			.iter()
+			.map(PathBuf::from)
+			.collect::<Vec<_>>();
+		let parent_name = state
+			.info_db()
+			.and_then(|info_db| info_db.machines().find(name).ok())
+			.and_then(|machine| machine.clone_of())
+			.map(|machine| machine.name().to_string());
+		(paths, parent_name)
+	};
+	let name = name.to_owned();
+	let app_window_weak = model.app_window_weak.clone();
+	let snap_image_request_id = Arc::clone(&model.snap_image_request_id);
+
+	std::thread::spawn(move || {
+		let multi_paths = make_multi_paths(&paths);
+		let image = match load_image_data_from_paths(&multi_paths, &name, None) {
+			Ok(Some(image)) => Some(image),
+			Ok(None) => parent_name.as_deref().and_then(|parent_name| {
+				load_image_data_from_paths(&multi_paths, parent_name, None)
+					.ok()
+					.flatten()
+			}),
+			Err(error) => {
+				warn!(?error, ?name, "load_image_from_paths() returned error");
+				None
+			}
+		};
+
+		let _ = invoke_from_event_loop(move || {
+			let Some(app_window) = app_window_weak.upgrade() else {
+				return;
+			};
+			if snap_image_request_id.load(Ordering::Relaxed) != request_id {
+				return;
+			}
+			let image = image
+				.map(|(raw_bytes, width, height)| {
+					let buffer = slint::SharedPixelBuffer::<slint::Rgba8Pixel>::clone_from_slice(
+						raw_bytes.as_slice(),
+						width,
+						height,
+					);
+					slint::Image::from_rgba8(buffer)
+				})
+				.unwrap_or_else(|| Icons::get(&app_window).get_bletchmame_blank());
+			app_window.set_current_snap_image(image);
+			app_window.set_snap_image_is_loading(false);
+		});
+	});
 }
 
 fn update_items_columns_model(model: &AppModel) {

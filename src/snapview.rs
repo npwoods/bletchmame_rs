@@ -14,9 +14,6 @@ use parallel_worker::CancelableWorker;
 use parallel_worker::State;
 use parallel_worker::WorkerInit;
 use parallel_worker::WorkerMethods;
-use slint::Image;
-use slint::Rgba8Pixel;
-use slint::SharedPixelBuffer;
 use slint::SharedString;
 use slint::StyledText;
 use slint::ToSharedString;
@@ -151,27 +148,28 @@ impl MultiPath {
 	}
 }
 
-pub fn load_image_from_paths(paths: &[MultiPath], name: &str, info_db: Option<&InfoDb>) -> Result<Option<Image>> {
-	let result = load_image_from_paths_one(paths, name)?;
+pub fn load_image_data_from_paths(
+	paths: &[MultiPath],
+	name: &str,
+	info_db: Option<&InfoDb>,
+) -> Result<Option<(Vec<u8>, u32, u32)>> {
+	let result = load_image_data_from_paths_one(paths, name)?;
 	if let Some(result) = result {
-		// good, we got this on the first try
 		Ok(Some(result))
 	} else {
-		// didn't find this one; try the parent (of course, `name` could be a software name but in that case the
-		// lookup will fail) ¯\_(ツ)_/¯
 		let parent_name = info_db
 			.and_then(|info_db| info_db.machines().find(name).ok())
 			.and_then(|machine| machine.clone_of())
 			.map(|machine| machine.name());
 		if let Some(parent_name) = parent_name {
-			load_image_from_paths_one(paths, parent_name)
+			load_image_data_from_paths_one(paths, parent_name)
 		} else {
 			Ok(None)
 		}
 	}
 }
 
-fn load_image_from_paths_one(paths: &[MultiPath], name: &str) -> Result<Option<Image>> {
+fn load_image_data_from_paths_one(paths: &[MultiPath], name: &str) -> Result<Option<(Vec<u8>, u32, u32)>> {
 	let name = format!("{name}.png");
 	let bytes = paths
 		.iter()
@@ -199,11 +197,7 @@ fn load_image_from_paths_one(paths: &[MultiPath], name: &str) -> Result<Option<I
 	let height = rgba_image.height();
 	let raw_bytes = rgba_image.into_raw();
 
-	// create a SharedPixelBuffer by cloning from the slice of pixels
-	let buffer = SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(raw_bytes.as_slice(), width, height);
-
-	// create a slint::Image from the pixel buffer
-	Ok(Some(slint::Image::from_rgba8(buffer)))
+	Ok(Some((raw_bytes, width, height)))
 }
 
 pub fn get_history_styled_text(history: Option<&HistoryXml>, name: &str) -> StyledText {
