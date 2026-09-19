@@ -114,7 +114,7 @@ impl WinitBackendRuntime {
 		let dispatch_winit_window_event_to_parent = move |event_loop: &ActiveEventLoop, event: &WindowEvent| {
 			if let Some(parent_window) = parent_window_weak.upgrade() {
 				let parent_window = parent_window.window();
-				parent_window.dispatch_winit_window_event(event_loop, event);
+				let _ = parent_window.dispatch_winit_window_event(event_loop, event);
 			}
 		};
 		let dispatch_winit_window_event_to_parent = Box::<_>::from(dispatch_winit_window_event_to_parent);
