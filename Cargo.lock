@@ -737,7 +737,6 @@ dependencies = [
  "showfile",
  "slint",
  "slint-build",
- "slint-material-components",
  "smallvec",
  "smol_str 0.3.6",
  "splitty",
@@ -5825,11 +5824,6 @@ dependencies = [
  "quote",
  "spin_on",
 ]
-
-[[package]]
-name = "slint-material-components"
-version = "1.18.1"
-source = "git+https://github.com/npwoods/slint.git?rev=50761bae1fa8f896130f87a6dc43d5cbf36ee98d#50761bae1fa8f896130f87a6dc43d5cbf36ee98d"
 
 [[package]]
 name = "slotmap"
