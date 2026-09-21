@@ -1000,6 +1000,9 @@ export component AppWindow inherits Window {
                         min-height: 0px;
                         preferred-height: 300px;
                         Image {
+                            width: 100%;
+                            height: 100%;
+                            image-fit: contain;
                             visible: !root.snap-image-is-loading;
                             source: root.current-snap-image;
                         }
