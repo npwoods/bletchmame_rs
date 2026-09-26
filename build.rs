@@ -19,7 +19,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 	// build library paths
 	let cargo_manifest_dir = env::var_os("CARGO_MANIFEST_DIR").unwrap();
-	let slint_material_components_dir = Path::new(&cargo_manifest_dir).join("material-1.0/material.slint");
+	let slint_material_components_dir = Path::new(&cargo_manifest_dir).join("material-1.1.0/material.slint");
 	let library_paths = HashMap::from([("material".into(), slint_material_components_dir)]);
 
 	// build Slint stuff
