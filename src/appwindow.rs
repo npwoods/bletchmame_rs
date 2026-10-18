@@ -84,6 +84,7 @@ use crate::guiutils::is_context_menu_event;
 use crate::guiutils::modal::ModalStack;
 use crate::history::History;
 use crate::history_xml::HistoryXml;
+use crate::imagedesc::ImageDesc;
 use crate::models::collectionsview::CollectionsViewModel;
 use crate::models::itemstable::EmptyReason;
 use crate::models::itemstable::ItemsTableModel;
@@ -91,6 +92,7 @@ use crate::prefs::BuiltinCollection;
 use crate::prefs::ColumnType;
 use crate::prefs::Preferences;
 use crate::prefs::PrefsCollection;
+use crate::prefs::PrefsRecentImageEntry;
 use crate::prefs::SortOrder;
 use crate::prefs::pathtype::PathType;
 use crate::runtime::MameStderr;
@@ -172,6 +174,7 @@ struct AppModel {
 	modal_stack: ModalStack,
 	state: RefCell<AppState>,
 	status_changed_channel: Channel<Status>,
+	recent_images_changed_channel: Channel<Rc<[PrefsRecentImageEntry]>>,
 	child_window: RefCell<Option<ChildWindow>>,
 	history_loader: RefCell<Option<HistoryLoader>>,
 	snap_image_request_id: Arc<AtomicU64>,
@@ -541,6 +544,15 @@ impl AppModel {
 				.invoke_show_item_context_menu(context_commands, position);
 		}
 	}
+
+	pub fn add_recent_image(self: &Rc<Self>, machine_name: Option<&str>, device_tag: &str, image_desc: ImageDesc) {
+		// update the state
+		self.update_state(|state| state.add_recent_image(machine_name, device_tag, image_desc));
+
+		// and publish the recent images
+		let recent_images = self.state.borrow().preferences.recent_images.clone();
+		self.recent_images_changed_channel.publish(&recent_images);
+	}
 }
 
 pub async fn start(app_window: &AppWindow, args: AppArgs) {
@@ -598,6 +610,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		modal_stack,
 		state: RefCell::new(AppState::bogus()),
 		status_changed_channel: Channel::default(),
+		recent_images_changed_channel: Channel::default(),
 		child_window: RefCell::new(child_window),
 		history_loader: RefCell::new(None),
 		snap_image_request_id: Arc::new(AtomicU64::new(0)),
@@ -964,13 +977,16 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 			let info_db = model.state.borrow().info_db().cloned().unwrap();
 			let diconfig = DevicesImagesConfig::new(info_db);
 			let diconfig = diconfig.update_status(model.state.borrow().status().as_ref().unwrap());
+			let diconfig = diconfig.update_recent_images(model.state.borrow().preferences.recent_images.clone());
 			let status_update_channel = model.status_changed_channel.clone();
+			let recent_images_changed_channel = model.recent_images_changed_channel.clone();
 			let model_clone = model.clone();
 			let invoke_action = move |action| handle_action(&model_clone, action);
 			let fut = dialog_devices_and_images(
 				model.modal_stack.clone(),
 				diconfig,
 				status_update_channel,
+				recent_images_changed_channel,
 				invoke_action,
 			);
 			model.clone().spawn_maybe_pause(fut);
@@ -1454,7 +1470,19 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 			let model_clone = model.clone();
 			let fut = async move {
 				if let Some(image_desc) = dialog_load_image(model_clone.modal_stack.clone(), &formats).await {
-					let action = MameCommand::load_image(tag, &image_desc).into();
+					let image_desc = Some(image_desc);
+					let action = Action::LoadImage { tag, image_desc };
+					handle_action(&model_clone, action);
+				}
+			};
+			spawn_local(fut).unwrap();
+		}
+		Action::ConnectToSocketDialog { tag } => {
+			let model_clone = model.clone();
+			let fut = async move {
+				if let Some(image_desc) = dialog_connect_to_socket(model_clone.modal_stack.clone()).await {
+					let image_desc = Some(image_desc);
+					let action = Action::LoadImage { tag, image_desc };
 					handle_action(&model_clone, action);
 				}
 			};
@@ -1462,20 +1490,11 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 		}
 		Action::LoadImage { tag, image_desc } => {
 			if let Some(image_desc) = image_desc {
+				model.add_recent_image(None, &tag, image_desc.clone());
 				model.issue_command(MameCommand::load_image(tag, &image_desc));
 			} else {
 				model.issue_command(MameCommand::unload_image(&tag));
 			}
-		}
-		Action::ConnectToSocketDialog { tag } => {
-			let model_clone = model.clone();
-			let fut = async move {
-				if let Some(image_desc) = dialog_connect_to_socket(model_clone.modal_stack.clone()).await {
-					let action = MameCommand::load_image(tag, &image_desc).into();
-					handle_action(&model_clone, action);
-				}
-			};
-			spawn_local(fut).unwrap();
 		}
 		Action::InfoDbBuildProgress { machine_description } => {
 			model.update_state(|state| state.infodb_build_progress(machine_description))

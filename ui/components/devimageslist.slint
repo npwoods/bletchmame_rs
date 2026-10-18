@@ -25,7 +25,8 @@ export struct DevicesAndImagesContextMenuInfo {
     load-image-action: string,
     connect-to-serial-port-actions: [SimpleMenuEntry],
     connect-to-socket-action: string,
-    unload-action: string
+    unload-action: string,
+    recent-images: [SimpleMenuEntry]
 }
 
 export component DevicesAndImagesList {
@@ -95,6 +96,16 @@ export component DevicesAndImagesList {
                 enabled: root.context-menu-info.unload-action != "";
                 activated => {
                     menu-item-action(root.context-menu-info.unload-action);
+                }
+            }
+
+            if root.context-menu-info.recent-images.length > 0: MenuSeparator { }
+
+            for entry in root.context-menu-info.recent-images: MenuItem {
+                title: entry.title;
+                enabled: entry.action != "";
+                activated => {
+                    menu-item-action(entry.action);
                 }
             }
         }

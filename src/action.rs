@@ -105,12 +105,12 @@ pub enum Action {
 	LoadImageDialog {
 		tag: String,
 	},
+	ConnectToSocketDialog {
+		tag: String,
+	},
 	LoadImage {
 		tag: String,
 		image_desc: Option<ImageDesc>,
-	},
-	ConnectToSocketDialog {
-		tag: String,
 	},
 	InfoDbBuildProgress {
 		machine_description: String,

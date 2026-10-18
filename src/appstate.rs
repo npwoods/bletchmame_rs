@@ -19,12 +19,14 @@ use slint::invoke_from_event_loop;
 use smol_str::SmolStr;
 use throttle::Throttle;
 use tracing::debug;
+use tracing::error;
 use tracing::info;
 
 use crate::action::Action;
 use crate::audit::Asset;
 use crate::audit::AuditResult;
 use crate::audit::AuditSeverity;
+use crate::imagedesc::ImageDesc;
 use crate::info::InfoDb;
 use crate::interaction_monitor::InteractionMonitor;
 use crate::job::Canceller;
@@ -33,6 +35,7 @@ use crate::mconfig::MachineConfig;
 use crate::models::audit::audit_static_model;
 use crate::prefs::Preferences;
 use crate::prefs::PreflightProblem;
+use crate::prefs::PrefsRecentImageEntry;
 use crate::prefs::PrefsVideo;
 use crate::runtime::MameStartArgs;
 use crate::runtime::MameStderr;
@@ -937,6 +940,60 @@ impl AppState {
 			*interaction_monitor = Some(InteractionMonitor::new()?);
 		}
 		Ok(())
+	}
+
+	pub fn add_recent_image(&mut self, machine_name: Option<&str>, tag: &str, image_desc: ImageDesc) -> bool {
+		const MAX_RECENT_IMAGES: usize = 10;
+
+		// if we were not passed a machine name, get it from the running machine
+		let machine_name = if let Some(machine_name) = machine_name {
+			machine_name.into()
+		} else {
+			// find the current running machine
+			let machine_name = self
+				.live
+				.as_ref()
+				.and_then(|live| live.session.as_ref())
+				.and_then(|session| session.status.as_deref())
+				.and_then(|status| status.running.as_ref())
+				.map(|running| &running.machine_name);
+			let Some(machine_name) = machine_name else {
+				error!("AppState::add_recent_image() called with no running machine");
+				return false;
+			};
+			machine_name.clone()
+		};
+
+		// and build the recent entry
+		let mut recent_entry = self
+			.preferences
+			.recent_images
+			.iter()
+			.find(|entry| entry.device == tag && entry.machine == machine_name)
+			.cloned()
+			.unwrap_or_else(|| PrefsRecentImageEntry {
+				device: tag.into(),
+				machine: machine_name.clone(),
+				images: Vec::new(),
+			});
+
+		// and update the entry
+		recent_entry.images.retain(|image| image != &image_desc);
+		recent_entry.images.truncate(MAX_RECENT_IMAGES - 1);
+		recent_entry.images.insert(0, image_desc);
+
+		// and update recent images on prefs
+		self.preferences.recent_images = self
+			.preferences
+			.recent_images
+			.iter()
+			.filter(|entry| entry.device != tag || entry.machine != machine_name)
+			.cloned()
+			.chain(std::iter::once(recent_entry))
+			.collect();
+
+		debug!(?self.preferences.recent_images, "AppState::add_recent_image() updated recent images");
+		true
 	}
 }
 

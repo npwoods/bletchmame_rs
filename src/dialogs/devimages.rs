@@ -1,3 +1,6 @@
+use std::assert_matches;
+use std::rc::Rc;
+
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
 use slint::LogicalPosition;
@@ -15,6 +18,7 @@ use crate::guiutils::modal::ModalStack;
 use crate::imagedesc::ImageDesc;
 use crate::imagedesc::available_ports;
 use crate::models::devimages::DevicesAndImagesModel;
+use crate::prefs::PrefsRecentImageEntry;
 use crate::runtime::command::MameCommand;
 use crate::status::Status;
 use crate::ui::DevicesAndImagesContextMenuInfo;
@@ -27,6 +31,7 @@ pub async fn dialog_devices_and_images(
 	modal_stack: ModalStack,
 	diconfig: DevicesImagesConfig,
 	status_update_channel: Channel<Status>,
+	recent_images_changed_channel: Channel<Rc<[PrefsRecentImageEntry]>>,
 	invoke_action: impl Fn(Action) + Clone + 'static,
 ) {
 	// prepare the dialog
@@ -103,6 +108,20 @@ pub async fn dialog_devices_and_images(
 		dialog_weak.unwrap().set_config_dirty(dirty);
 	});
 
+	// subscribe to recent images changes
+	let model_clone = model.clone();
+	let dialog_weak = modal.dialog().as_weak();
+	let _subscription = recent_images_changed_channel.subscribe(move |recent_images| {
+		// update the model
+		let model = DevicesAndImagesModel::get_model(&model_clone);
+		let recent_images = recent_images.clone();
+		model.change_diconfig(|diconfig| Some(diconfig.update_recent_images(recent_images)));
+
+		// update the dirty flag
+		let dirty = model.with_diconfig(|diconfig| diconfig.is_dirty());
+		dialog_weak.unwrap().set_config_dirty(dirty);
+	});
+
 	// present the modal dialog
 	modal.run(async { rx.recv().await.unwrap() }).await;
 }
@@ -116,9 +135,7 @@ pub fn entry_popup_menu(
 ) {
 	let info = model.with_diconfig(|diconfig| {
 		let entry = diconfig.entry(entry_index).unwrap();
-		let EntryDetails::Image { .. } = &entry.details else {
-			unreachable!();
-		};
+		assert_matches!(entry.details, EntryDetails::Image { .. });
 
 		let load_image_action = {
 			let tag = entry.tag.to_string();
@@ -156,11 +173,31 @@ pub fn entry_popup_menu(
 		};
 		let unload_action = unload_action.as_ref().map(Action::encode_for_slint).unwrap_or_default();
 
+		let recent_images = diconfig
+			.recent_images()
+			.iter()
+			.find(|recent_entry| {
+				recent_entry.machine == diconfig.machine().unwrap().name() && recent_entry.device == entry.tag
+			})
+			.map(|recent_entry| recent_entry.images.as_slice())
+			.unwrap_or_default()
+			.iter()
+			.map(|image_desc| {
+				let title = image_desc.display_name().to_shared_string();
+				let tag = entry.tag.to_string();
+				let image_desc = Some(image_desc.clone());
+				let action = Action::LoadImage { tag, image_desc };
+				let action = Action::encode_for_slint(&action);
+				SimpleMenuEntry { title, action }
+			})
+			.collect_model_rc();
+
 		DevicesAndImagesContextMenuInfo {
 			load_image_action,
 			connect_to_serial_port_actions,
 			connect_to_socket_action,
 			unload_action,
+			recent_images,
 		}
 	});
 
