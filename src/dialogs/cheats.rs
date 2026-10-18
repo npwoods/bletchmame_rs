@@ -49,7 +49,7 @@ pub async fn dialog_cheats(
 	modal_stack: ModalStack,
 	cheats: Arc<[Cheat]>,
 	status_update_channel: Channel<Status>,
-	invoke_command: impl Fn(Action) + Clone + 'static,
+	invoke_action: impl Fn(Action) + Clone + 'static,
 ) {
 	// prepare the dialog
 	let modal = modal_stack.modal(|| CheatsDialog::new().unwrap());
@@ -83,7 +83,7 @@ pub async fn dialog_cheats(
 			});
 			MameCommand::set_cheat_state(cheat_id, enabled, parameter).into()
 		};
-		invoke_command(command);
+		invoke_action(command);
 	};
 	let set_cheat_state = Rc::new(set_cheat_state) as Rc<dyn Fn(i32, bool, Option<i32>)>;
 	let set_cheat_state_clone = set_cheat_state.clone();

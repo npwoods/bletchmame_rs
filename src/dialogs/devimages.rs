@@ -27,7 +27,7 @@ pub async fn dialog_devices_and_images(
 	modal_stack: ModalStack,
 	diconfig: DevicesImagesConfig,
 	status_update_channel: Channel<Status>,
-	invoke_command: impl Fn(Action) + Clone + 'static,
+	invoke_action: impl Fn(Action) + Clone + 'static,
 ) {
 	// prepare the dialog
 	let modal = modal_stack.modal(|| DevicesAndImagesDialog::new().unwrap());
@@ -45,14 +45,14 @@ pub async fn dialog_devices_and_images(
 
 	// set up the "apply changes" button
 	let model_clone = model.clone();
-	let invoke_command_clone = invoke_command.clone();
+	let invoke_action_clone = invoke_action.clone();
 	modal.dialog().on_apply_changes_clicked(move || {
 		let model = DevicesAndImagesModel::get_model(&model_clone);
 		let command = model.with_diconfig(|diconfig| {
 			let changed_slots = diconfig.list_slots(ListSlots::Dirty);
 			MameCommand::change_slots(&changed_slots).into()
 		});
-		invoke_command_clone(command);
+		invoke_action_clone(command);
 	});
 
 	// set up the close handler
@@ -65,7 +65,7 @@ pub async fn dialog_devices_and_images(
 	// set up the context menu command handler
 	modal.dialog().on_menu_item_action(move |command_string| {
 		if let Some(command) = Action::decode_from_slint(command_string) {
-			invoke_command(command);
+			invoke_action(command);
 		}
 	});
 
