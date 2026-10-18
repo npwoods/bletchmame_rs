@@ -112,6 +112,11 @@ pub enum Action {
 		tag: String,
 		image_desc: Option<ImageDesc>,
 	},
+	AddRecentImage {
+		machine_name: String,
+		tag: String,
+		image_desc: ImageDesc,
+	},
 	InfoDbBuildProgress {
 		machine_description: String,
 	},

@@ -1496,6 +1496,14 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 				model.issue_command(MameCommand::unload_image(&tag));
 			}
 		}
+		Action::AddRecentImage {
+			machine_name,
+			tag,
+			image_desc,
+		} => {
+			let machine_name = Some(machine_name.as_str());
+			model.add_recent_image(machine_name, &tag, image_desc);
+		}
 		Action::InfoDbBuildProgress { machine_description } => {
 			model.update_state(|state| state.infodb_build_progress(machine_description))
 		}
@@ -1503,6 +1511,8 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 		Action::InfoDbBuildCancel => model.update_state(AppState::infodb_build_cancel),
 		Action::ReactivateMame => model.update_state(AppState::activate),
 		Action::Configure { folder_name, index } => {
+			let model_clone = model.clone();
+			let invoke_action = { move |action| handle_action(&model_clone, action) };
 			let model_clone = model.clone();
 			let info_db = model.state.borrow().info_db().unwrap().clone();
 			let (folder_index, item) = model
@@ -1525,8 +1535,19 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 			let fut = async move {
 				let paths = model_clone.state.borrow().preferences.paths.clone();
 				let global_video = model_clone.state.borrow().preferences.video.clone();
-				if let Some(item) =
-					dialog_configure(model_clone.modal_stack.clone(), info_db, item, &paths, &global_video).await
+				let recent_images = model_clone.state.borrow().preferences.recent_images.clone();
+				let recent_images_changed_channel = model_clone.recent_images_changed_channel.clone();
+				if let Some(item) = dialog_configure(
+					model_clone.modal_stack.clone(),
+					info_db,
+					item,
+					&paths,
+					&global_video,
+					recent_images,
+					recent_images_changed_channel,
+					invoke_action,
+				)
+				.await
 				{
 					model_clone.modify_prefs(|prefs| {
 						let old_collection = prefs.collections[folder_index].clone();
