@@ -105,12 +105,17 @@ pub enum Action {
 	LoadImageDialog {
 		tag: String,
 	},
+	ConnectToSocketDialog {
+		tag: String,
+	},
 	LoadImage {
 		tag: String,
 		image_desc: Option<ImageDesc>,
 	},
-	ConnectToSocketDialog {
+	AddRecentImage {
+		machine_name: String,
 		tag: String,
+		image_desc: ImageDesc,
 	},
 	InfoDbBuildProgress {
 		machine_description: String,

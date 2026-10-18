@@ -63,7 +63,7 @@ pub async fn dialog_switches(
 	class: InputClass,
 	machine_index: Option<usize>,
 	status_update_channel: Channel<Status>,
-	invoke_command: impl Fn(Action) + Clone + 'static,
+	invoke_action: impl Fn(Action) + Clone + 'static,
 ) {
 	// prepare the dialog
 	let modal = modal_stack.modal(|| SwitchesDialog::new().unwrap());
@@ -79,11 +79,11 @@ pub async fn dialog_switches(
 		CloseRequestResponse::KeepWindowShown
 	});
 
-	// set up the invoke command callback
-	let invoke_command_clone = invoke_command.clone();
+	// set up the invoke action callback
+	let invoke_action_clone = invoke_action.clone();
 	modal.dialog().on_menu_item_action(move |command_string| {
 		if let Some(command) = Action::decode_from_slint(command_string) {
-			invoke_command_clone(command)
+			invoke_action_clone(command)
 		}
 	});
 
@@ -103,7 +103,7 @@ pub async fn dialog_switches(
 			let setting_index = setting_index.try_into().unwrap();
 			let option_index = option_index.try_into().unwrap();
 			let command = model.set_setting_option_command(setting_index, option_index);
-			invoke_command(command);
+			invoke_action(command);
 		});
 
 	// subscribe to status changes

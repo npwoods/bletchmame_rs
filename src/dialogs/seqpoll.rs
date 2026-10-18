@@ -38,7 +38,7 @@ pub async fn dialog_seq_poll(
 	inputs: impl AsRef<[Input]>,
 	input_device_classes: impl AsRef<[InputDeviceClass]>,
 	status_changed_channel: Channel<Status>,
-	invoke_command: impl Fn(Action) + Clone + 'static,
+	invoke_action: impl Fn(Action) + Clone + 'static,
 ) {
 	// prepare the dialog
 	let modal = modal_stack.modal(|| SeqPollDialog::new().unwrap());
@@ -127,18 +127,18 @@ pub async fn dialog_seq_poll(
 
 	// invoke the command to start polling
 	let command = MameCommand::seq_poll_start(port_tag, mask, seq_type, start_seq);
-	invoke_command(command.into());
+	invoke_action(command.into());
 
 	// present the modal dialog
 	let mouse_selection = modal.run(async { rx.recv().await.unwrap() }).await;
 
 	// invoke the command to stop polling
 	let command = MameCommand::seq_poll_stop();
-	invoke_command(command.into());
+	invoke_action(command.into());
 
 	// and if we have a mouse selection, specify it
 	if let Some(mouse_selection) = mouse_selection {
 		let command = mouse_input_commands.into_iter().nth(mouse_selection).unwrap();
-		invoke_command(command.into());
+		invoke_action(command.into());
 	}
 }

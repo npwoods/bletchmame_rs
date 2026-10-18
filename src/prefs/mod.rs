@@ -94,6 +94,9 @@ pub struct Preferences {
 	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub history_position: usize,
 
+	#[serde(skip_serializing_if = "default_ext::DefaultExt::is_default")]
+	pub recent_images: Rc<[PrefsRecentImageEntry]>,
+
 	pub show_stop_warning: bool,
 }
 
@@ -114,6 +117,7 @@ impl Default for Preferences {
 			collections: [].into(),
 			history: [].into(),
 			history_position: 0,
+			recent_images: [].into(),
 			show_stop_warning: true,
 		}
 	}
@@ -489,6 +493,14 @@ pub struct PrefsSoftwareItem {
 
 	#[serde(default, skip_serializing_if = "default_ext::DefaultExt::is_default")]
 	pub preferred_machines: Option<Vec<String>>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PrefsRecentImageEntry {
+	pub machine: SmolStr,
+	pub device: SmolStr,
+	pub images: Vec<ImageDesc>,
 }
 
 const PREFS: Option<&str> = Some("BletchMAME.json");

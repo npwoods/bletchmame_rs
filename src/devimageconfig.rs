@@ -7,6 +7,7 @@ use crate::info::InfoDb;
 use crate::info::Machine;
 use crate::info::View;
 use crate::mconfig::MachineConfig;
+use crate::prefs::PrefsRecentImageEntry;
 use crate::status::Status;
 
 #[derive(Debug)]
@@ -18,7 +19,8 @@ pub struct DevicesImagesConfig {
 #[derive(Debug)]
 struct DevicesImagesConfigCore {
 	machine_configs: MachineConfigPair,
-	entries: Box<[InternalEntry]>,
+	recent_images: Rc<[PrefsRecentImageEntry]>,
+	entries: Rc<[InternalEntry]>,
 }
 
 #[derive(Clone, Debug)]
@@ -157,12 +159,26 @@ impl DevicesImagesConfig {
 		Some(entry)
 	}
 
+	/// Updates the status of this configuration based on the running status from MAME
 	pub fn update_status(&self, status: &Status) -> Self {
 		// note that this logic won't error; this is because we expect the InfoDB and Status data
 		// to be in harmony; we really need a status validation step
 		let info_db = self.info_db.clone();
 		let machine_configs = self.core.as_ref().map(|x| &x.machine_configs);
-		internal_update_status(info_db, machine_configs, status)
+		let recent_images = self.core.as_ref().map(|x| x.recent_images.clone()).unwrap_or_default();
+		internal_update_status(info_db, machine_configs, recent_images, status)
+	}
+
+	/// Updates the recent images list in this configuration
+	pub fn update_recent_images(&self, recent_images: Rc<[PrefsRecentImageEntry]>) -> Self {
+		Self {
+			info_db: self.info_db.clone(),
+			core: self.core.as_ref().map(|core| DevicesImagesConfigCore {
+				machine_configs: core.machine_configs.clone(),
+				recent_images,
+				entries: core.entries.clone(),
+			}),
+		}
 	}
 
 	pub fn set_slot_option(&self, tag: &str, new_option_name: Option<&str>) -> Self {
@@ -189,7 +205,7 @@ impl DevicesImagesConfig {
 			.entries
 			.iter()
 			.filter_map(|entry| {
-				if let InternalEntryDetails::Image { image_desc } = &entry.details {
+				if let InternalEntryDetails::Image { image_desc, .. } = &entry.details {
 					Some((entry.tag.as_str(), image_desc.as_ref()))
 				} else {
 					None
@@ -198,7 +214,8 @@ impl DevicesImagesConfig {
 			.collect::<Vec<_>>();
 
 		// and build a new DevicesImagesConfig
-		diconfig_from_machine_configs_and_images(self.info_db.clone(), machine_configs, images)
+		let recent_images = core.recent_images.clone();
+		diconfig_from_machine_configs_and_images(self.info_db.clone(), machine_configs, images, recent_images)
 	}
 
 	pub fn list_slots(&self, disposition: ListSlots) -> Vec<(String, Option<&'_ str>)> {
@@ -226,6 +243,10 @@ impl DevicesImagesConfig {
 			};
 			Some((entry.tag.as_str(), image_desc.as_ref()))
 		})
+	}
+
+	pub fn recent_images(&self) -> &[PrefsRecentImageEntry] {
+		self.core.as_ref().map(|x| x.recent_images.as_ref()).unwrap_or_default()
 	}
 
 	pub fn set_images_from_slots(&self, mut image_func: impl FnMut(&str) -> Option<ImageDesc>) -> Self {
@@ -270,15 +291,18 @@ impl DevicesImagesConfig {
 			.collect::<Vec<_>>();
 
 		let machine_configs = core.machine_configs.clone();
-		diconfig_from_machine_configs_and_images(info_db, machine_configs, images)
+		let recent_images = core.recent_images.clone();
+		diconfig_from_machine_configs_and_images(info_db, machine_configs, images, recent_images)
 	}
 
 	pub fn reset_to_defaults(&self) -> Self {
 		let info_db = self.info_db.clone();
+		let recent_images = self.core.as_ref().map(|x| x.recent_images.clone()).unwrap_or_default();
 		if let Some(machine_config) = self.machine_config() {
 			let machine_index = machine_config.machine().index();
 			let machine_config = MachineConfig::from_machine_index(info_db, machine_index);
-			Self::from(machine_config)
+			let diconfig = Self::from(machine_config);
+			diconfig.update_recent_images(recent_images)
 		} else {
 			Self::new(info_db)
 		}
@@ -292,7 +316,7 @@ impl From<MachineConfig> for DevicesImagesConfig {
 			clean: value,
 			dirty: None,
 		};
-		diconfig_from_machine_configs_and_images(info_db, machine_configs, [].into())
+		diconfig_from_machine_configs_and_images(info_db, machine_configs, [].into(), [].into())
 	}
 }
 
@@ -305,6 +329,7 @@ impl MachineConfigPair {
 fn internal_update_status(
 	info_db: Rc<InfoDb>,
 	machine_configs: Option<&MachineConfigPair>,
+	recent_images: Rc<[PrefsRecentImageEntry]>,
 	status: &Status,
 ) -> DevicesImagesConfig {
 	// basic check; if not running, the config becomes extremely simple
@@ -359,13 +384,14 @@ fn internal_update_status(
 		.iter()
 		.map(|x| (x.tag.as_str(), x.image_desc.as_ref()))
 		.collect::<Vec<_>>();
-	diconfig_from_machine_configs_and_images(info_db, machine_configs, images)
+	diconfig_from_machine_configs_and_images(info_db, machine_configs, images, recent_images)
 }
 
 fn diconfig_from_machine_configs_and_images(
 	info_db: Rc<InfoDb>,
 	machine_configs: MachineConfigPair,
 	images: Vec<(&'_ str, Option<&'_ ImageDesc>)>,
+	recent_images: Rc<[PrefsRecentImageEntry]>,
 ) -> DevicesImagesConfig {
 	// identify all images
 	let mut images = images.into_iter().map(Some).collect::<Vec<_>>();
@@ -415,6 +441,7 @@ fn diconfig_from_machine_configs_and_images(
 	// return the new config
 	let core = DevicesImagesConfigCore {
 		machine_configs,
+		recent_images,
 		entries,
 	};
 	let core = Some(core);

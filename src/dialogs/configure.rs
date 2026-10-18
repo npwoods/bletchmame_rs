@@ -25,6 +25,7 @@ use tokio::sync::mpsc;
 
 use crate::action::Action;
 use crate::audit::Asset;
+use crate::channel::Channel;
 use crate::devimageconfig::DevicesImagesConfig;
 use crate::devimageconfig::EntryDetails;
 use crate::devimageconfig::ListSlots;
@@ -46,6 +47,7 @@ use crate::prefs::PrefsItem;
 use crate::prefs::PrefsItemDetails;
 use crate::prefs::PrefsMachineItem;
 use crate::prefs::PrefsPaths;
+use crate::prefs::PrefsRecentImageEntry;
 use crate::prefs::PrefsSoftwareItem;
 use crate::prefs::PrefsVideo;
 use crate::software::Software;
@@ -67,6 +69,7 @@ struct State {
 	sample_paths: Arc<[SmolStr]>,
 	software_list_paths: Arc<[SmolStr]>,
 	core: CoreState,
+	invoke_action: Box<dyn Fn(Action)>,
 }
 
 enum CoreState {
@@ -101,12 +104,16 @@ enum ThisError {
 	CanOnlyAuditSingleMachine,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn dialog_configure(
 	modal_stack: ModalStack,
 	info_db: Rc<InfoDb>,
 	item: PrefsItem,
 	paths: &PrefsPaths,
 	global_video: &PrefsVideo,
+	recent_images: Rc<[PrefsRecentImageEntry]>,
+	recent_images_changed_channel: Channel<Rc<[PrefsRecentImageEntry]>>,
+	invoke_action: impl Fn(Action) + 'static,
 ) -> Option<PrefsItem> {
 	// prepare the dialog
 	let modal = modal_stack.modal(|| ConfigureDialog::new().unwrap());
@@ -116,7 +123,15 @@ pub async fn dialog_configure(
 	let dialog_weak = modal.dialog().as_weak();
 	let modal_stack = modal_stack.clone();
 	let video = item.video.clone();
-	let state = State::new(dialog_weak, modal_stack, paths, &info_db, item);
+	let state = State::new(
+		dialog_weak,
+		modal_stack,
+		paths,
+		&info_db,
+		item,
+		recent_images,
+		invoke_action,
+	);
 	let state = Rc::new(state);
 
 	// set the title
@@ -247,6 +262,12 @@ pub async fn dialog_configure(
 		state_clone.reset_to_defaults();
 	});
 
+	// subscribe to recent images changes
+	let state_clone = state.clone();
+	let _subscription = recent_images_changed_channel.subscribe(move |recent_images| {
+		state_clone.set_recent_images(recent_images.clone());
+	});
+
 	// present the modal dialog
 	modal.run(async { rx.recv().await.unwrap() }).await
 }
@@ -280,7 +301,7 @@ fn context_menu_command(state: &Rc<State>, command: Action) {
 				}];
 				if let Some(image_desc) = dialog_load_image(state.modal_stack.clone(), &formats).await {
 					let image_desc = Some(image_desc);
-					state.set_image_imagedesc(tag, image_desc);
+					state.load_image(tag, image_desc);
 				}
 			};
 			spawn_local(fut).unwrap();
@@ -290,13 +311,13 @@ fn context_menu_command(state: &Rc<State>, command: Action) {
 			let fut = async move {
 				if let Some(image_desc) = dialog_connect_to_socket(state.modal_stack.clone()).await {
 					let image_desc = Some(image_desc);
-					state.set_image_imagedesc(tag, image_desc);
+					state.load_image(tag, image_desc);
 				}
 			};
 			spawn_local(fut).unwrap();
 		}
 		Action::LoadImage { tag, image_desc } => {
-			state.set_image_imagedesc(tag, image_desc);
+			state.load_image(tag, image_desc);
 		}
 		Action::Launch(path) => {
 			let _ = open::that(path);
@@ -315,6 +336,8 @@ impl State {
 		paths: &PrefsPaths,
 		info_db: &Rc<InfoDb>,
 		item: PrefsItem,
+		recent_images: Rc<[PrefsRecentImageEntry]>,
+		invoke_action: impl Fn(Action) + 'static,
 	) -> Self {
 		let core = match item.details {
 			PrefsItemDetails::Machine(item) => {
@@ -326,6 +349,7 @@ impl State {
 				let dimodel_state = match machine_config {
 					Ok(machine_config) => {
 						let diconfig = DevicesImagesConfig::from(machine_config);
+						let diconfig = diconfig.update_recent_images(recent_images);
 						let dimodel = DevicesAndImagesModel::new(diconfig);
 						let dimodel: ModelRc<DeviceAndImageEntry> = ModelRc::new(dimodel);
 						let images = RefCell::new(item.images);
@@ -391,6 +415,7 @@ impl State {
 			sample_paths: paths.samples.clone().into(),
 			software_list_paths: paths.software_lists.clone().into(),
 			core,
+			invoke_action: Box::new(invoke_action),
 		};
 		if matches!(&state.core, CoreState::Machine { .. }) {
 			state.update_images();
@@ -475,6 +500,18 @@ impl State {
 		};
 		let dimodel = DevicesAndImagesModel::get_model(dimodel);
 		dimodel.with_diconfig(callback)
+	}
+
+	pub fn set_recent_images(&self, recent_images: Rc<[PrefsRecentImageEntry]>) {
+		let CoreState::Machine {
+			dimodel_state: DiModelState::Ok { dimodel, .. },
+			..
+		} = &self.core
+		else {
+			return;
+		};
+		let dimodel = DevicesAndImagesModel::get_model(dimodel);
+		dimodel.change_diconfig(|diconfig| Some(diconfig.update_recent_images(recent_images)));
 	}
 
 	pub fn update_images(&self) {
@@ -649,12 +686,24 @@ impl State {
 			..
 		} = &self.core
 		else {
-			unreachable!()
+			panic!()
 		};
 		let dimodel = DevicesAndImagesModel::get_model(dimodel);
 		dimodel.set_slot_entry_option(entry_index, new_option_name);
 		self.update_images();
 		self.update_audit();
+	}
+
+	pub fn load_image(&self, tag: String, image_desc: Option<ImageDesc>) {
+		if let Some(image_desc) = &image_desc {
+			let machine_name = self.with_diconfig(|diconfig| diconfig.machine().unwrap().name().to_string());
+			(self.invoke_action)(Action::AddRecentImage {
+				machine_name,
+				tag: tag.clone(),
+				image_desc: image_desc.clone(),
+			});
+		}
+		self.set_image_imagedesc(tag, image_desc);
 	}
 
 	pub fn set_image_imagedesc(&self, tag: String, image_desc: Option<ImageDesc>) {
@@ -663,7 +712,7 @@ impl State {
 			..
 		} = &self.core
 		else {
-			unreachable!()
+			panic!()
 		};
 		if let Some(image_desc) = image_desc {
 			images.borrow_mut().insert(tag, image_desc);
@@ -675,7 +724,7 @@ impl State {
 
 	pub fn update_software_machines_bulk_enabled(&self) {
 		let CoreState::Software { software_machines, .. } = &self.core else {
-			unreachable!()
+			panic!()
 		};
 		let all_equal_value = software_machines
 			.as_any()

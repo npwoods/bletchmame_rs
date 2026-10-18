@@ -52,7 +52,7 @@ pub async fn dialog_input_xy(
 	inputs: Arc<[Input]>,
 	input_device_classes: Arc<[InputDeviceClass]>,
 	status_changed_channel: Channel<Status>,
-	invoke_command: impl Fn(Action) + Clone + 'static,
+	invoke_action: impl Fn(Action) + Clone + 'static,
 ) {
 	// prepare the dialog
 	let modal = modal_stack.modal(|| InputXyDialog::new().unwrap());
@@ -68,7 +68,7 @@ pub async fn dialog_input_xy(
 	// set up command handler
 	modal.dialog().on_menu_item_action(move |command_string| {
 		if let Some(command) = Action::decode_from_slint(command_string) {
-			invoke_command(command);
+			invoke_action(command);
 		}
 	});
 
