@@ -570,15 +570,15 @@ mod tests {
 	use super::Asset;
 	use super::assets_from_machine_config_and_images;
 
-	#[test_case(0, include_str!("../info/test_data/listxml_alienar.xml"), "alienar")]
-	#[test_case(1, include_str!("../info/test_data/listxml_coco.xml"), "coco2b")]
-	#[test_case(2, include_str!("../info/test_data/listxml_c64.xml"), "c64")]
-	#[test_case(3, include_str!("../info/test_data/listxml_fake.xml"), "fake")]
-	#[test_case(4, include_str!("../info/test_data/listxml_fake.xml"), "blah")]
-	#[test_case(5, include_str!("../info/test_data/listxml_fake.xml"), "fakefake")]
-	#[test_case(6, include_str!("../info/test_data/listxml_fake.xml"), "phony_withbios")]
-	#[test_case(7, include_str!("../info/test_data/listxml_fake.xml"), "phony_withbios_alpha")]
-	#[test_case(8, include_str!("../info/test_data/listxml_fake.xml"), "phony_withbios_bravo")]
+	#[test_case(0, include_str!("info/test_data/listxml_alienar.xml"), "alienar")]
+	#[test_case(1, include_str!("info/test_data/listxml_coco.xml"), "coco2b")]
+	#[test_case(2, include_str!("info/test_data/listxml_c64.xml"), "c64")]
+	#[test_case(3, include_str!("info/test_data/listxml_fake.xml"), "fake")]
+	#[test_case(4, include_str!("info/test_data/listxml_fake.xml"), "blah")]
+	#[test_case(5, include_str!("info/test_data/listxml_fake.xml"), "fakefake")]
+	#[test_case(6, include_str!("info/test_data/listxml_fake.xml"), "phony_withbios")]
+	#[test_case(7, include_str!("info/test_data/listxml_fake.xml"), "phony_withbios_alpha")]
+	#[test_case(8, include_str!("info/test_data/listxml_fake.xml"), "phony_withbios_bravo")]
 	fn assets_from_machine_config(_index: usize, xml: &str, machine_name: &str) {
 		// set the insta snapshot suffix; this is a parameterized test
 		let mut settings = insta::Settings::clone_current();
@@ -603,9 +603,9 @@ mod tests {
 	}
 
 	#[allow(clippy::zero_prefixed_literal)]
-	#[test_case(00, include_str!("../info/test_data/listxml_coco.xml"), include_str!("../software/test_data/softlist_coco_cart.xml"), "coco2b", "dagorath")]
-	#[test_case(01, include_str!("../info/test_data/listxml_coco.xml"), include_str!("../software/test_data/softlist_coco_flop.xml"), "coco2b", "zonx")]
-	#[test_case(02, include_str!("../info/test_data/listxml_bbcm.xml"), include_str!("../software/test_data/softlist_bbcm_cart.xml"), "bbcm", "click100")]
+	#[test_case(00, include_str!("info/test_data/listxml_coco.xml"), include_str!("software/test_data/softlist_coco_cart.xml"), "coco2b", "dagorath")]
+	#[test_case(01, include_str!("info/test_data/listxml_coco.xml"), include_str!("software/test_data/softlist_coco_flop.xml"), "coco2b", "zonx")]
+	#[test_case(02, include_str!("info/test_data/listxml_bbcm.xml"), include_str!("software/test_data/softlist_bbcm_cart.xml"), "bbcm", "click100")]
 	fn assets_from_machine_config_and_software(
 		_index: usize,
 		info_xml: &str,
