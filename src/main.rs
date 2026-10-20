@@ -2,6 +2,7 @@
 mod action;
 mod appstate;
 mod appwindow;
+mod archive;
 mod assethash;
 mod audit;
 mod backend;

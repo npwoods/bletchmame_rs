@@ -3,9 +3,7 @@ use std::cell::OnceCell;
 use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fs::File;
-use std::io::Cursor;
 use std::io::Read;
-use std::io::Seek;
 use std::iter::successors;
 use std::path::Path;
 use std::path::PathBuf;
@@ -13,22 +11,18 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use default_ext::DefaultExt;
-use easy_ext::ext;
 use itertools::Either;
 use itertools::Itertools;
-use sevenz_rust2::ArchiveReader as SevenZArchiveReader;
 use slint::SharedString;
 use smallvec::SmallVec;
 use smol_str::SmolStr;
-use strum::EnumProperty;
+use strum::VariantArray;
 use tracing::debug;
 use tracing::trace;
 use tracing::warn;
-use zip::ZipArchive;
-use zip::read::ZipFile;
-use zip::result::ZipError;
-use zip::result::ZipResult;
 
+use crate::archive::Archive;
+use crate::archive::ArchiveFormat;
 use crate::assethash::AssetHash;
 use crate::chd::chd_asset_hash;
 use crate::imagedesc::ImageDesc;
@@ -180,16 +174,13 @@ impl Asset {
 				software_list_name,
 				targets,
 			} => {
-				let path_types = if support_archives {
-					[PathType::File, PathType::Zip, PathType::SevenZ].as_slice()
-				} else {
-					[PathType::File].as_slice()
-				};
 				let iter = targets
 					.as_ref()
 					.iter()
 					.flat_map(|target| asset_paths_iter.clone().map(|path| (path, target.as_str())))
-					.flat_map(|(path, target)| path_types.iter().map(move |path_type| (path, target, *path_type)))
+					.flat_map(move |(path, target)| {
+						PathType::iter(support_archives).map(move |path_type| (path, target, path_type))
+					})
 					.map(|(path, target, path_type)| {
 						let path = if let Some(software_list_name) = software_list_name.as_deref() {
 							Cow::Owned(path.join(software_list_name))
@@ -197,11 +188,13 @@ impl Asset {
 							Cow::Borrowed(path)
 						};
 						let mut path = path.join(target);
-						if let Some(archive_extension) = path_type.get_str("ArchiveExtension") {
-							path.set_extension(archive_extension);
-						} else {
-							path = path.join(&self.name);
-						}
+						let path = match path_type {
+							PathType::File => path.join(&self.name),
+							PathType::Archive(format) => {
+								path.set_extension(format.extension());
+								path
+							}
+						};
 						(path, path_type)
 					});
 				Either::Left(iter)
@@ -274,13 +267,21 @@ impl Display for AuditMessage {
 	}
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, EnumProperty)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum PathType {
 	File,
-	#[strum(props(ArchiveExtension = "zip"))]
-	Zip,
-	#[strum(props(ArchiveExtension = "7z"))]
-	SevenZ,
+	Archive(ArchiveFormat),
+}
+
+impl PathType {
+	fn iter(support_archives: bool) -> impl Iterator<Item = Self> {
+		std::iter::once(Self::File).chain(
+			ArchiveFormat::VARIANTS
+				.iter()
+				.map(|format| Self::Archive(*format))
+				.filter(move |_| support_archives),
+		)
+	}
 }
 
 fn assets_from_machine_config_and_images<'a>(
@@ -512,18 +513,11 @@ fn try_audit(
 			let actual_hash = get_actual_hash(&mut file)?;
 			(actual_size, actual_hash)
 		}
-		PathType::Zip => {
-			let mut zip_archive = ZipArchive::new(file)?;
-			let mut zip_file = zip_archive.by_name_or_crc(asset_name, expected_asset_hash.crc)?;
-			let actual_size = zip_file.size();
-			let actual_hash = get_actual_hash(&mut zip_file)?;
-			(actual_size, actual_hash)
-		}
-		PathType::SevenZ => {
-			let data = SevenZArchiveReader::new(file, Default::default())?
-				.read_file_by_name_or_crc(asset_name, expected_asset_hash.crc)?;
-			let actual_size = data.len() as u64;
-			let actual_hash = get_actual_hash(&mut Cursor::new(&data))?;
+		PathType::Archive(format) => {
+			let mut archive = Archive::new(file, format)?;
+			let mut entry = archive.read_by_name_or_crc(asset_name, expected_asset_hash.crc)?;
+			let actual_size = entry.size();
+			let actual_hash = get_actual_hash(&mut entry)?;
 			(actual_size, actual_hash)
 		}
 	};
@@ -561,64 +555,12 @@ fn try_audit(
 	Ok(AuditResult { path, messages })
 }
 
-#[ext(ZipArchiveExt)]
-impl<R> ZipArchive<R>
-where
-	R: Read + Seek,
-{
-	/// This is an emulation of MAME's behavior by which you can load assets by CRC even if the name is wrong
-	pub fn by_name_or_crc(&mut self, name: &str, crc: Option<u32>) -> ZipResult<ZipFile<'_, R>> {
-		let file_number = match (self.index_for_name(name), crc) {
-			(Some(index), _) => Some(index),
-			(None, None) => None,
-			(None, Some(crc)) => {
-				(0..self.len()).find(|&file_number| self.by_index(file_number).is_ok_and(|file| file.crc32() == crc))
-			}
-		};
-		file_number
-			.map(|file_number| self.by_index(file_number))
-			.unwrap_or(Err(ZipError::FileNotFound))
-	}
-}
-
-#[ext(SevenZArchiveReaderExt)]
-impl<R> SevenZArchiveReader<R>
-where
-	R: Read + Seek,
-{
-	/// Same deal as ZipArchive::by_name_or_crc
-	pub fn read_file_by_name_or_crc(
-		&mut self,
-		name: &str,
-		crc: Option<u32>,
-	) -> std::result::Result<Vec<u8>, sevenz_rust2::Error> {
-		match self.read_file(name) {
-			Ok(data) => Ok(data),
-			Err(e) => {
-				let by_crc = crc.and_then(|crc| {
-					self.archive()
-						.files
-						.iter()
-						.find(|f| f.has_stream && f.has_crc && f.crc == crc as u64)
-						.map(|f| f.name.clone())
-						.and_then(|entry_name| self.read_file(&entry_name).ok())
-				});
-				by_crc.ok_or(e)
-			}
-		}
-	}
-}
-
 #[cfg(test)]
 mod tests {
-	use std::io::Cursor;
-	use std::io::Read;
 	use std::ops::ControlFlow;
 	use std::sync::Arc;
 
-	use sevenz_rust2::ArchiveReader as SevenZArchiveReader;
 	use test_case::test_case;
-	use zip::ZipArchive;
 
 	use crate::imagedesc::ImageDesc;
 	use crate::info::InfoDb;
@@ -626,8 +568,6 @@ mod tests {
 	use crate::software::SoftwareList;
 
 	use super::Asset;
-	use super::SevenZArchiveReaderExt as _;
-	use super::ZipArchiveExt as _;
 	use super::assets_from_machine_config_and_images;
 
 	#[test_case(0, include_str!("../info/test_data/listxml_alienar.xml"), "alienar")]
@@ -707,44 +647,5 @@ mod tests {
 
 		// and validate
 		insta::assert_debug_snapshot!(assets);
-	}
-
-	#[test_case(0, "correct_name.bin", None, Ok(("correct_name.bin", 0x3b5b2bc1)))]
-	#[test_case(1, "nonexistent_name.bin", Some(0x098825db), Ok(("wrong_name.bin", 0x098825db)))]
-	#[test_case(2, "correct_name.bin", Some(0x098825db), Ok(("correct_name.bin", 0x3b5b2bc1)))]
-	#[test_case(3, "nonexistent.bin", None, Err(()))]
-	#[test_case(4, "nonexistent.bin", Some(0xdeadbeef), Err(()))]
-	fn by_name_or_crc(_index: usize, name: &str, crc: Option<u32>, expected: Result<(&str, u32), ()>) {
-		// access the ZIP version
-		let zip_bytes = include_bytes!("test_data/ziparchive01.zip");
-		let cursor = Cursor::new(zip_bytes);
-		let mut archive = ZipArchive::new(cursor).unwrap();
-
-		// and validate
-		let mut file_result = archive.by_name_or_crc(name, crc);
-		let actual = file_result
-			.as_ref()
-			.map(|file| (file.name(), file.crc32()))
-			.map_err(|_| ());
-		assert_eq!(expected, actual);
-
-		// get the bytes to compare it with 7z
-		let expected = file_result
-			.as_mut()
-			.map(|file| {
-				let mut vec = Vec::new();
-				file.read_to_end(&mut vec).unwrap();
-				vec
-			})
-			.map_err(|_| ());
-
-		// access the 7z version
-		let sevenz_bytes = include_bytes!("test_data/7zarchive01.7z");
-		let cursor = Cursor::new(sevenz_bytes);
-		let mut archive = SevenZArchiveReader::new(cursor, Default::default()).unwrap();
-
-		// and validate
-		let actual = archive.read_file_by_name_or_crc(name, crc).map_err(|_| ());
-		assert_eq!(expected, actual);
 	}
 }
