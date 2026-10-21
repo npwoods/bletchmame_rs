@@ -19,9 +19,8 @@ use slint::StyledText;
 use slint::ToSharedString;
 use tracing::debug;
 use tracing::warn;
-use zip::ZipArchive;
-use zip::result::ZipError;
 
+use crate::archive::Archive;
 use crate::history_xml::HistoryXml;
 use crate::info::InfoDb;
 use crate::prefs::PrefsCollection;
@@ -29,14 +28,7 @@ use crate::prefs::PrefsItemRef;
 
 pub enum MultiPath {
 	Dir(PathBuf),
-	Zip(RefCell<ZipArchive<File>>),
-	SevenZ(RefCell<Box<sevenz_rust2::ArchiveReader<File>>>),
-}
-
-#[derive(Debug, thiserror::Error)]
-enum ThisError {
-	#[error("Unknown archive file extension: {0}")]
-	UnknownArchiveFileExtension(String),
+	Archive(Box<RefCell<Archive>>),
 }
 
 pub struct HistoryLoader(CancelableWorker<PathBuf, Result<HistoryXml>>);
@@ -96,40 +88,16 @@ impl MultiPath {
 		let result = if metadata.is_dir() {
 			Self::Dir(path.to_path_buf())
 		} else {
-			let file = File::open(path)?;
-			let extension = path.extension().and_then(|x| x.to_str()).map(|x| x.to_lowercase());
-			match extension.as_deref() {
-				Some("zip") => {
-					let zip = ZipArchive::new(file)?;
-					Ok(Self::Zip(RefCell::new(zip)))
-				}
-				Some("7z") => {
-					let file = File::open(path)?;
-					let archive = sevenz_rust2::ArchiveReader::new(file, Default::default())?;
-					Ok(Self::SevenZ(RefCell::new(archive.into())))
-				}
-				_ => Err(ThisError::UnknownArchiveFileExtension(extension.unwrap_or_default())),
-			}?
+			let archive = Archive::open(path)?;
+			let archive = RefCell::new(archive);
+			Self::Archive(archive.into())
 		};
 		Ok(result)
 	}
 
 	pub fn read(&self, name: &str) -> Result<Option<Vec<u8>>> {
 		match self {
-			Self::Zip(zip) => match zip.borrow_mut().by_name(name) {
-				Ok(mut file) => {
-					let mut buf = Vec::new();
-					file.read_to_end(&mut buf)?;
-					Ok(Some(buf))
-				}
-				Err(ZipError::FileNotFound) => Ok(None),
-				Err(e) => Err(e.into()),
-			},
-			Self::SevenZ(archive_reader) => archive_reader
-				.borrow_mut()
-				.read_file(name)
-				.map(Some)
-				.map_err(Into::into),
+			Self::Archive(archive) => archive.borrow_mut().read(name),
 			Self::Dir(path) => {
 				let path = path.join(name);
 				let file_result = File::open(&path);
