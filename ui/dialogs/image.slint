@@ -1,0 +1,52 @@
+import {
+    Button,
+    VerticalBox,
+    StandardListView,
+    HorizontalBox,
+    StandardButton,
+} from "std-widgets.slint";
+
+export component ImageArchiveDialog inherits Window {
+    preferred-width: 400px;
+    preferred-height: 400px;
+    title: image-filename;
+
+    // properties
+    in property <string> image-filename;
+    in property <[StandardListViewItem]> list-model;
+    out property <int> selected-item;
+    callback back-clicked();
+    callback ok-clicked();
+
+    VerticalBox {
+        StandardListView {
+            model: list-model;
+            current-item <=> selected-item;
+        }
+
+        HorizontalBox {
+            alignment: end;
+            Button {
+                text: "Back";
+                clicked => {
+                    root.back-clicked();
+                }
+            }
+
+            StandardButton {
+                kind: cancel;
+                clicked => {
+                    root.close();
+                }
+            }
+
+            StandardButton {
+                kind: ok;
+                enabled: root.selected-item >= 0;
+                clicked => {
+                    root.ok-clicked()
+                }
+            }
+        }
+    }
+}

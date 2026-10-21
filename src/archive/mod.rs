@@ -5,6 +5,7 @@ use std::io::Seek;
 use std::path::Path;
 
 use anyhow::Result;
+use itertools::Either;
 use sevenz_rust2::ArchiveReader as SevenZArchiveReader;
 use strum::VariantArray;
 use zip::ZipArchive;
@@ -70,6 +71,25 @@ where
 			}
 		};
 		Ok(Self { inner })
+	}
+
+	/// Lists the names of all file entries in the archive
+	pub fn list(&self) -> impl Iterator<Item = &'_ str> {
+		match &self.inner {
+			ArchiveInner::Zip(zip) => {
+				let iter = zip.file_names().filter(|name| !name.ends_with('/'));
+				Either::Left(iter)
+			}
+			ArchiveInner::SevenZ(sevenz) => {
+				let iter = sevenz
+					.archive()
+					.files
+					.iter()
+					.filter(|entry| !entry.is_directory)
+					.map(|entry| entry.name.as_str());
+				Either::Right(iter)
+			}
+		}
 	}
 
 	/// Reads the entire entry with the given name; returns `Ok(None)` if no such entry exists
