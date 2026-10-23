@@ -46,6 +46,9 @@ export component TapeControl {
         cassette-position-shadow = root.cassette.position;
     }
 
+    // only show if the cassette is present
+    visible: cassette.length > 0;
+
     VerticalLayout {
         vertical-stretch: 0;
         if buttons-panel: HorizontalLayout {
