@@ -743,6 +743,10 @@ impl InputSourceToken {
 			InputSourceToken::YAxis => Some(InputDeviceToken::YAxis),
 			InputSourceToken::ZAxis => Some(InputDeviceToken::ZAxis),
 			InputSourceToken::RZAxis => Some(InputDeviceToken::RZAxis),
+			InputSourceToken::Left => Some(InputDeviceToken::Hat1Left),
+			InputSourceToken::Right => Some(InputDeviceToken::Hat1Right),
+			InputSourceToken::Up => Some(InputDeviceToken::Hat1Up),
+			InputSourceToken::Down => Some(InputDeviceToken::Hat1Down),
 			_ => None,
 		}
 	}
