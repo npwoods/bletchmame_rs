@@ -156,9 +156,9 @@ impl InputDialogModel {
 				state.clusters = build_clusters(&state.inputs, self.class);
 				state.codes = build_codes(&state.input_device_classes);
 
-				let command = build_restore_defaults_command(&state.inputs, &state.clusters);
-				let command = command.as_ref().map(Action::encode_for_slint).unwrap_or_default();
-				self.dialog_weak.unwrap().set_restore_defaults_action(command);
+				let action = build_set_bulk_action(&state.inputs, &state.clusters, BulkSet::Default);
+				let action = action.encode_for_slint();
+				self.dialog_weak.unwrap().set_restore_defaults_action(action);
 
 				info!(inputs_len=?state.inputs.len(), input_device_classes_len=?state.input_device_classes.len(), "InputDialogModel::update(): Changing state");
 				dump_clusters_trace(state.inputs.as_ref(), state.clusters.as_ref());
@@ -337,15 +337,27 @@ fn build_clusters(inputs: &[Input], class: InputClass) -> Box<[InputCluster]> {
 		.collect()
 }
 
-fn build_restore_defaults_command(inputs: &[Input], clusters: &[InputCluster]) -> Option<Action> {
+#[derive(Debug)]
+enum BulkSet {
+	Default,
+}
+
+fn build_set_bulk_action<'a>(
+	inputs: &[Input],
+	clusters: impl IntoIterator<Item = &'a InputCluster>,
+	bulk_set: BulkSet,
+) -> Action {
+	let bulk_set_string = match bulk_set {
+		BulkSet::Default => "*",
+	};
+
 	let seqs = clusters
-		.iter()
+		.into_iter()
 		.flat_map(|cluster| input_cluster_input_seqs(inputs, cluster))
-		.map(|(input, _, seq_type)| (&input.port_tag, input.mask, seq_type, "*"))
+		.map(|(input, _, seq_type)| (&input.port_tag, input.mask, seq_type, bulk_set_string))
 		.collect::<Vec<_>>();
 
-	let command = MameCommand::seq_set(&seqs);
-	Some(command.into())
+	MameCommand::seq_set(&seqs).into()
 }
 
 fn input_cluster_from_input(index: usize, input: &Input) -> InputCluster {
