@@ -424,6 +424,10 @@ pub enum InputDeviceToken {
 	YAxis,
 	ZAxis,
 	RZAxis,
+	Hat1Left,
+	Hat1Right,
+	Hat1Up,
+	Hat1Down,
 	Button(u8),
 	Other(SmolStr),
 }
@@ -444,6 +448,10 @@ impl From<&str> for InputDeviceToken {
 				"YAXIS" => Self::YAxis,
 				"ZAXIS" => Self::ZAxis,
 				"RZAXIS" => Self::RZAxis,
+				"HAT1LEFT" => Self::Hat1Left,
+				"HAT1RIGHT" => Self::Hat1Right,
+				"HAT1UP" => Self::Hat1Up,
+				"HAT1DOWN" => Self::Hat1Down,
 				_ => Self::Other(s.into()),
 			}
 		}
