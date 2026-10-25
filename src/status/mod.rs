@@ -19,6 +19,7 @@ use tracing::debug;
 use crate::debugstr::DebugString;
 use crate::imagedesc::ImageDesc;
 use crate::info::InfoDb;
+use crate::runtime::command::SeqType;
 use crate::status::parse::parse_update;
 use crate::status::validate::validate_status;
 use crate::version::MameVersion;
@@ -295,18 +296,32 @@ pub struct Input {
 	pub name: SmolStr,
 	pub value: Option<u32>,
 	pub first_keyboard_code: Option<u32>,
-	pub seq_standard_tokens: Option<SmolStr>,
-	pub seq_increment_tokens: Option<SmolStr>,
-	pub seq_decrement_tokens: Option<SmolStr>,
+	pub seqs: Vec<InputSeq>,
+}
+
+impl Input {
+	pub fn seq_tokens(&self, seq_type: SeqType) -> &str {
+		self.try_seq_tokens(seq_type).expect("invalid seq_type")
+	}
+
+	pub fn try_seq_tokens(&self, seq_type: SeqType) -> Option<&str> {
+		(self.is_analog || seq_type == SeqType::Standard).then(|| {
+			self.seqs
+				.iter()
+				.find(|seq| seq.seq_type == seq_type)
+				.map(|seq| seq.tokens.as_str())
+				.unwrap_or_default()
+		})
+	}
 }
 
 impl Debug for Input {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 		let port = format!("{} {:#x}", self.port_tag, self.mask);
 		let seq_tokens_all = [
-			("", &self.seq_standard_tokens),
-			("[◄] ", &self.seq_decrement_tokens),
-			("[►] ", &self.seq_increment_tokens),
+			("", &self.try_seq_tokens(SeqType::Standard)),
+			("[◄] ", &self.try_seq_tokens(SeqType::Decrement)),
+			("[►] ", &self.try_seq_tokens(SeqType::Increment)),
 		];
 		let seq_tokens = seq_tokens_all
 			.iter()
@@ -325,6 +340,12 @@ impl Debug for Input {
 			.field("seq_tokens", &seq_tokens)
 			.finish()
 	}
+}
+
+#[derive(Clone, Deserialize, Serialize, PartialEq)]
+pub struct InputSeq {
+	pub seq_type: SeqType,
+	pub tokens: SmolStr,
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash, EnumProperty, EnumString)]
