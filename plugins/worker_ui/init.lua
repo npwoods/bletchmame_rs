@@ -593,6 +593,7 @@ function emit_status(light, out)
 							for _,seq_type in pairs(seq_types) do
 								emit("\t\t\t<seq type=\"" .. seq_type
 									.. "\" tokens=\"" .. xml_encode(manager.machine.input:seq_to_tokens(field:input_seq(seq_type)))
+									.. "\" default_tokens=\"" .. xml_encode(manager.machine.input:seq_to_tokens(field:default_input_seq(seq_type)))
 									.. "\"/>")
 							end
 						end
