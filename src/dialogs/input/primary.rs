@@ -501,10 +501,6 @@ fn build_player_category_info(
 		.map(|index| &clusters[*index])
 		.flat_map(|cluster| match cluster {
 			InputCluster::Single(index) => {
-				/*
-				let default_tokens = inputs[*index].seq_default_tokens(SeqType::Standard).unwrap_or_default();
-				let token = device_item_token_from_default_tokens(default_tokens);
-				 */
 				vec![Some((*index, UnclusteredInputType::Standard))]
 			}
 			InputCluster::Xy {
