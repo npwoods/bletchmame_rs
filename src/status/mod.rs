@@ -420,20 +420,35 @@ pub struct InputDeviceItem {
 	pub code: SmolStr,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, EnumString)]
-#[strum(serialize_all = "UPPERCASE")]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum InputDeviceToken {
 	XAxis,
 	YAxis,
 	ZAxis,
 	RZAxis,
-	#[strum(default)]
+	Button(u8),
 	Other(SmolStr),
 }
 
 impl InputDeviceToken {
 	pub fn is_axis(&self) -> bool {
-		!matches!(self, Self::Other(_))
+		matches!(self, Self::XAxis | Self::YAxis | Self::ZAxis | Self::RZAxis)
+	}
+}
+
+impl From<&str> for InputDeviceToken {
+	fn from(s: &str) -> Self {
+		if let Some(num) = s.strip_prefix("BUTTON").and_then(|s| s.parse().ok()) {
+			Self::Button(num)
+		} else {
+			match s {
+				"XAXIS" => Self::XAxis,
+				"YAXIS" => Self::YAxis,
+				"ZAXIS" => Self::ZAxis,
+				"RZAXIS" => Self::RZAxis,
+				_ => Self::Other(s.into()),
+			}
+		}
 	}
 }
 
@@ -545,9 +560,10 @@ mod test {
 	#[test_case(1, "YAXIS", InputDeviceToken::YAxis, true)]
 	#[test_case(2, "ZAXIS", InputDeviceToken::ZAxis, true)]
 	#[test_case(3, "RZAXIS", InputDeviceToken::RZAxis, true)]
-	#[test_case(4, "BUTTON1", InputDeviceToken::Other("BUTTON1".into()), false)]
+	#[test_case(4, "BUTTON1", InputDeviceToken::Button(1), false)]
+	#[test_case(5, "ZYXZYX", InputDeviceToken::Other("ZYXZYX".into()), false)]
 	fn input_device_token(_index: usize, s: &str, expected: InputDeviceToken, expected_is_axis: bool) {
-		let actual = InputDeviceToken::from_str(s).unwrap();
+		let actual = InputDeviceToken::from(s);
 		assert_eq!((&expected, expected_is_axis), (&actual, actual.is_axis()));
 	}
 }
