@@ -22,6 +22,7 @@ use crate::status::Input;
 use crate::status::InputDevice;
 use crate::status::InputDeviceClass;
 use crate::status::InputDeviceItem;
+use crate::status::InputSeq;
 use crate::status::RunningUpdate;
 use crate::status::Slot;
 use crate::status::SlotOption;
@@ -460,6 +461,7 @@ impl State {
 				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?.into();
 				let value = value.map(|value| value.parse::<u32>()).transpose()?;
 				let first_keyboard_code = first_keyboard_code.map(|x| x.parse()).transpose()?;
+				let seqs = Vec::with_capacity(if is_analog { 3 } else { 1 });
 
 				let input = Input {
 					port_tag,
@@ -472,26 +474,25 @@ impl State {
 					name,
 					value,
 					first_keyboard_code,
-					seq_standard_tokens: None,
-					seq_increment_tokens: None,
-					seq_decrement_tokens: None,
+					seqs,
 				};
 				self.running.inputs.as_mut().unwrap().push(input);
 				Some(Phase::Input)
 			}
 			(Phase::Input, "seq") => {
-				let [seq_type, tokens] = evt.find_attributes(["type", "tokens"])?;
+				let [seq_type, tokens, default_tokens] = evt.find_attributes(["type", "tokens", "default_tokens"])?;
 				let seq_type = seq_type.ok_or(ThisError::MissingMandatoryAttribute("seq_type"))?;
 				let seq_type = seq_type.parse::<SeqType>()?;
-				let tokens = tokens.ok_or(ThisError::MissingMandatoryAttribute("tokens"))?;
-
-				let current_input = self.running.inputs.as_mut().unwrap().last_mut().unwrap();
-				let current_input_tokens = match seq_type {
-					SeqType::Standard => &mut current_input.seq_standard_tokens,
-					SeqType::Increment => &mut current_input.seq_increment_tokens,
-					SeqType::Decrement => &mut current_input.seq_decrement_tokens,
+				let tokens = tokens.ok_or(ThisError::MissingMandatoryAttribute("tokens"))?.into();
+				let default_tokens = default_tokens
+					.map(|t| t.into())
+					.unwrap_or_else(|| SmolStr::clone(&tokens));
+				let seq = InputSeq {
+					seq_type,
+					tokens,
+					default_tokens,
 				};
-				*current_input_tokens = Some(tokens.into());
+				self.running.inputs.as_mut().unwrap().last_mut().unwrap().seqs.push(seq);
 				None
 			}
 			(Phase::StatusInputDevices, "class") => {
@@ -633,6 +634,7 @@ mod test {
 
 	use test_case::test_case;
 
+	use crate::runtime::command::SeqType;
 	use crate::status::InputClass;
 
 	use super::parse_update;
@@ -696,9 +698,16 @@ mod test {
 			expected_is_analog,
 			expected_name,
 			expected_first_keyboard_code,
-			expected_seq_standard_tokens,
-			expected_seq_increment_tokens,
-			expected_seq_decrement_tokens,
+			(
+				expected_seq_standard_tokens,
+				expected_seq_increment_tokens,
+				expected_seq_decrement_tokens,
+			),
+			(
+				expected_seq_standard_tokens,
+				expected_seq_increment_tokens,
+				expected_seq_decrement_tokens,
+			),
 		);
 
 		let reader = BufReader::new(xml.as_bytes());
@@ -718,9 +727,16 @@ mod test {
 			input.is_analog,
 			input.name.as_ref(),
 			input.first_keyboard_code,
-			input.seq_standard_tokens.as_deref(),
-			input.seq_increment_tokens.as_deref(),
-			input.seq_decrement_tokens.as_deref(),
+			(
+				input.try_seq_tokens(SeqType::Standard),
+				input.try_seq_tokens(SeqType::Increment),
+				input.try_seq_tokens(SeqType::Decrement),
+			),
+			(
+				input.try_seq_default_tokens(SeqType::Standard),
+				input.try_seq_default_tokens(SeqType::Increment),
+				input.try_seq_default_tokens(SeqType::Decrement),
+			),
 		);
 
 		assert_eq!(expected, actual);

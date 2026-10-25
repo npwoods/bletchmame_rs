@@ -140,15 +140,8 @@ fn build_code_text<'a>(
 	let result = input_seqs
 		.into_iter()
 		.filter_map(|(input, axis, seq_type)| {
-			let seq_tokens = match seq_type {
-				SeqType::Standard => &input.seq_standard_tokens,
-				SeqType::Decrement => &input.seq_decrement_tokens,
-				SeqType::Increment => &input.seq_increment_tokens,
-			};
-
-			seq_tokens
-				.as_deref()
-				.and_then(|seq_tokens| (!seq_tokens.is_empty()).then_some((axis, seq_type, seq_tokens)))
+			let seq_tokens = input.seq_tokens(seq_type);
+			(!seq_tokens.is_empty()).then_some((axis, seq_type, seq_tokens))
 		})
 		.map(|(axis, seq_type, seq_tokens)| {
 			let prefix = match (axis, seq_type) {

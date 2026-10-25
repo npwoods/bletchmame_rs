@@ -59,11 +59,7 @@ pub async fn dialog_seq_poll(
 		.unwrap();
 	let target_name = input.name.as_str();
 	let target_name_suffix = seq_type.suffix();
-	let seq_tokens = match seq_type {
-		SeqType::Standard => &input.seq_standard_tokens,
-		SeqType::Decrement => &input.seq_decrement_tokens,
-		SeqType::Increment => &input.seq_increment_tokens,
-	};
+	let seq_tokens = input.seq_tokens(seq_type);
 	let (dialog_title, dialog_caption, start_seq) = match poll_type {
 		SeqPollDialogType::Specify => (
 			format!("Specify {target_name}{target_name_suffix}"),
@@ -73,7 +69,7 @@ pub async fn dialog_seq_poll(
 		SeqPollDialogType::Add => (
 			format!("Add To {target_name}{target_name_suffix}"),
 			format!("Press key or button to add to {target_name}{target_name_suffix}"),
-			seq_tokens.as_deref().unwrap_or_default(),
+			seq_tokens,
 		),
 	};
 	modal.dialog().set_dialog_title(dialog_title.into());

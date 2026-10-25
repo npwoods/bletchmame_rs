@@ -19,6 +19,7 @@ use tracing::debug;
 use crate::debugstr::DebugString;
 use crate::imagedesc::ImageDesc;
 use crate::info::InfoDb;
+use crate::runtime::command::SeqType;
 use crate::status::parse::parse_update;
 use crate::status::validate::validate_status;
 use crate::version::MameVersion;
@@ -295,18 +296,46 @@ pub struct Input {
 	pub name: SmolStr,
 	pub value: Option<u32>,
 	pub first_keyboard_code: Option<u32>,
-	pub seq_standard_tokens: Option<SmolStr>,
-	pub seq_increment_tokens: Option<SmolStr>,
-	pub seq_decrement_tokens: Option<SmolStr>,
+	pub seqs: Vec<InputSeq>,
+}
+
+impl Input {
+	pub fn seq_tokens(&self, seq_type: SeqType) -> &str {
+		self.try_seq_tokens(seq_type).expect("invalid seq_type")
+	}
+
+	pub fn try_seq_tokens(&self, seq_type: SeqType) -> Option<&str> {
+		(self.is_analog || seq_type == SeqType::Standard).then(|| {
+			self.seqs
+				.iter()
+				.find(|seq| seq.seq_type == seq_type)
+				.map(|seq| seq.tokens.as_str())
+				.unwrap_or_default()
+		})
+	}
+
+	pub fn seq_default_tokens(&self, seq_type: SeqType) -> &str {
+		self.try_seq_default_tokens(seq_type).expect("invalid seq_type")
+	}
+
+	pub fn try_seq_default_tokens(&self, seq_type: SeqType) -> Option<&str> {
+		(self.is_analog || seq_type == SeqType::Standard).then(|| {
+			self.seqs
+				.iter()
+				.find(|seq| seq.seq_type == seq_type)
+				.map(|seq| seq.default_tokens.as_str())
+				.unwrap_or_default()
+		})
+	}
 }
 
 impl Debug for Input {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 		let port = format!("{} {:#x}", self.port_tag, self.mask);
 		let seq_tokens_all = [
-			("", &self.seq_standard_tokens),
-			("[◄] ", &self.seq_decrement_tokens),
-			("[►] ", &self.seq_increment_tokens),
+			("", &self.try_seq_tokens(SeqType::Standard)),
+			("[◄] ", &self.try_seq_tokens(SeqType::Decrement)),
+			("[►] ", &self.try_seq_tokens(SeqType::Increment)),
 		];
 		let seq_tokens = seq_tokens_all
 			.iter()
@@ -325,6 +354,13 @@ impl Debug for Input {
 			.field("seq_tokens", &seq_tokens)
 			.finish()
 	}
+}
+
+#[derive(Clone, Deserialize, Serialize, PartialEq)]
+pub struct InputSeq {
+	pub seq_type: SeqType,
+	pub tokens: SmolStr,
+	pub default_tokens: SmolStr,
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash, EnumProperty, EnumString)]
@@ -382,20 +418,35 @@ pub struct InputDeviceItem {
 	pub code: SmolStr,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, EnumString)]
-#[strum(serialize_all = "UPPERCASE")]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum InputDeviceToken {
 	XAxis,
 	YAxis,
 	ZAxis,
 	RZAxis,
-	#[strum(default)]
+	Button(u8),
 	Other(SmolStr),
 }
 
 impl InputDeviceToken {
 	pub fn is_axis(&self) -> bool {
-		!matches!(self, Self::Other(_))
+		matches!(self, Self::XAxis | Self::YAxis | Self::ZAxis | Self::RZAxis)
+	}
+}
+
+impl From<&str> for InputDeviceToken {
+	fn from(s: &str) -> Self {
+		if let Some(num) = s.strip_prefix("BUTTON").and_then(|s| s.parse().ok()) {
+			Self::Button(num)
+		} else {
+			match s {
+				"XAXIS" => Self::XAxis,
+				"YAXIS" => Self::YAxis,
+				"ZAXIS" => Self::ZAxis,
+				"RZAXIS" => Self::RZAxis,
+				_ => Self::Other(s.into()),
+			}
+		}
 	}
 }
 
@@ -507,9 +558,10 @@ mod test {
 	#[test_case(1, "YAXIS", InputDeviceToken::YAxis, true)]
 	#[test_case(2, "ZAXIS", InputDeviceToken::ZAxis, true)]
 	#[test_case(3, "RZAXIS", InputDeviceToken::RZAxis, true)]
-	#[test_case(4, "BUTTON1", InputDeviceToken::Other("BUTTON1".into()), false)]
+	#[test_case(4, "BUTTON1", InputDeviceToken::Button(1), false)]
+	#[test_case(5, "ZYXZYX", InputDeviceToken::Other("ZYXZYX".into()), false)]
 	fn input_device_token(_index: usize, s: &str, expected: InputDeviceToken, expected_is_axis: bool) {
-		let actual = InputDeviceToken::from_str(s).unwrap();
+		let actual = InputDeviceToken::from(s);
 		assert_eq!((&expected, expected_is_axis), (&actual, actual.is_axis()));
 	}
 }
