@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -14,6 +15,8 @@ use slint::ModelRc;
 use slint::ModelTracker;
 use slint::ToSharedString;
 use slint::Weak;
+use smol_str::SmolStr;
+use strum::EnumProperty;
 use strum::VariantArray;
 use tokio::sync::mpsc;
 use tracing::info;
@@ -35,12 +38,16 @@ use crate::runtime::command::MameCommand;
 use crate::runtime::command::SeqType;
 use crate::status::Input;
 use crate::status::InputClass;
+use crate::status::InputDevice;
 use crate::status::InputDeviceClass;
+use crate::status::InputDeviceClassName;
 use crate::status::InputDeviceToken;
 use crate::status::Status;
 use crate::ui::InputDialog;
+use crate::ui::InputDialogCategory;
 use crate::ui::InputDialogEntry;
 use crate::ui::SimpleMenuEntry;
+use crate::util::IteratorExt;
 
 struct InputDialogModel {
 	dialog_weak: Weak<InputDialog>,
@@ -54,7 +61,21 @@ struct InputDialogState {
 	pub inputs: Arc<[Input]>,
 	pub input_device_classes: Arc<[InputDeviceClass]>,
 	pub clusters: Box<[InputCluster]>,
+	pub categories: Box<[InputCategory]>,
 	pub codes: HashMap<Box<str>, Box<str>>,
+}
+
+#[derive(Debug)]
+struct InputCategory {
+	pub info: Option<InputCategoryInfo>,
+	pub cluster_indices: Box<[usize]>,
+}
+
+#[derive(Debug)]
+struct InputCategoryInfo {
+	pub player: u8,
+	pub options: Vec<(SmolStr, Option<Action>)>,
+	pub current_option_index: usize,
 }
 
 #[derive(Debug)]
@@ -65,6 +86,42 @@ enum InputCluster {
 		y_input_index: Option<usize>,
 		aggregate_name: Option<String>,
 	},
+}
+
+/// A model of the [`InputDialogEntry`]s that belong to a single category (player)
+struct InputDialogCategoryModel {
+	entries: Vec<InputDialogEntry>,
+	notify: ModelNotify,
+}
+
+impl InputDialogCategoryModel {
+	pub fn new(mut entries: Vec<InputDialogEntry>) -> Self {
+		entries.shrink_to_fit();
+		Self {
+			entries,
+			notify: ModelNotify::default(),
+		}
+	}
+}
+
+impl Model for InputDialogCategoryModel {
+	type Data = InputDialogEntry;
+
+	fn row_count(&self) -> usize {
+		self.entries.len()
+	}
+
+	fn row_data(&self, row: usize) -> Option<Self::Data> {
+		self.entries.get(row).cloned()
+	}
+
+	fn model_tracker(&self) -> &dyn ModelTracker {
+		&self.notify
+	}
+
+	fn as_any(&self) -> &dyn Any {
+		self
+	}
 }
 
 pub async fn dialog_input(
@@ -102,18 +159,21 @@ pub async fn dialog_input(
 	let model = Rc::new(model);
 	let model = ModelRc::new(model);
 	let model_clone = model.clone();
-	modal.dialog().set_entries(model_clone);
+	modal.dialog().set_categories(model_clone);
 
 	// set up the context button clicked handler
 	let dialog_weak = modal.dialog().as_weak();
 	let model_clone = model.clone();
-	modal.dialog().on_context_button_clicked(move |index, point| {
-		let dialog = dialog_weak.unwrap();
-		let model = InputDialogModel::get_model(&model_clone);
-		let index = index.try_into().unwrap();
-		let (entries_1, entries_2) = model.context_menu(index);
-		dialog.invoke_show_context_menu(entries_1, entries_2, point);
-	});
+	modal
+		.dialog()
+		.on_context_button_clicked(move |category_index, entry_index, point| {
+			let dialog = dialog_weak.unwrap();
+			let model = InputDialogModel::get_model(&model_clone);
+			let category_index = category_index.try_into().unwrap();
+			let entry_index = entry_index.try_into().unwrap();
+			let (entries_1, entries_2) = model.context_menu(category_index, entry_index);
+			dialog.invoke_show_context_menu(entries_1, entries_2, point);
+		});
 
 	// subscribe to status changes
 	let model_clone = model.clone();
@@ -154,6 +214,8 @@ impl InputDialogModel {
 				state.inputs = inputs;
 				state.input_device_classes = input_device_classes;
 				state.clusters = build_clusters(&state.inputs, self.class);
+				state.categories =
+					build_categories(&state.inputs, &state.input_device_classes, &state.clusters, self.class);
 				state.codes = build_codes(&state.input_device_classes);
 
 				let action = build_set_bulk_action(&state.inputs, &state.clusters, BulkSet::Default);
@@ -171,11 +233,17 @@ impl InputDialogModel {
 		}
 	}
 
-	pub fn context_menu(&self, index: usize) -> (ModelRc<SimpleMenuEntry>, ModelRc<SimpleMenuEntry>) {
+	pub fn context_menu(
+		&self,
+		category_index: usize,
+		entry_index: usize,
+	) -> (ModelRc<SimpleMenuEntry>, ModelRc<SimpleMenuEntry>) {
 		let state = self.state.borrow();
 		let inputs = state.inputs.as_ref();
 
-		match &state.clusters[index] {
+		let cluster_index = state.categories[category_index].cluster_indices[entry_index];
+
+		match &state.clusters[cluster_index] {
 			InputCluster::Single(index) => {
 				let input = &inputs[*index];
 				let specify_command = Some(Action::seq_specify_dialog(input, SeqType::Standard));
@@ -259,46 +327,56 @@ impl InputDialogModel {
 }
 
 impl Model for InputDialogModel {
-	type Data = InputDialogEntry;
+	type Data = InputDialogCategory;
 
 	fn row_count(&self) -> usize {
 		let state = self.state.borrow();
-		state.clusters.len()
+		state.categories.len()
 	}
 
 	fn row_data(&self, row: usize) -> Option<Self::Data> {
+		// get the basics about this category
 		let state = self.state.borrow();
-		let cluster = state.clusters.get(row)?;
-		let name = input_cluster_name(&state.inputs, cluster).into();
-		let input_seqs = input_cluster_input_seqs(&state.inputs, cluster);
-		let text = build_code_text(input_seqs, &state.codes).to_shared_string();
+		let category = state.categories.get(row)?;
 
-		let primary_action = match cluster {
-			InputCluster::Single(input_index) => {
-				let input = &state.inputs[*input_index];
-				Some(Action::seq_specify_dialog(input, SeqType::Standard))
-			}
-			InputCluster::Xy {
-				x_input_index,
-				y_input_index,
-				..
-			} => {
-				let x_input = x_input_index.map(|idx| &state.inputs[idx]);
-				let y_input = y_input_index.map(|idx| &state.inputs[idx]);
-				let command = Action::input_xy_dialog(x_input, y_input);
-				Some(command)
-			}
+		// does this category have info or is it anonymous?
+		let (name, option_names, option_actions, current_option_index) = if let Some(info) = &category.info {
+			let name = format!("Player {}", info.player).into();
+			let option_names = info
+				.options
+				.iter()
+				.map(|(name, _)| name.to_shared_string())
+				.collect_model_rc();
+			let option_actions = info
+				.options
+				.iter()
+				.map(|(_, action)| action.as_ref().map(Action::encode_for_slint).unwrap_or_default())
+				.collect_model_rc();
+			(name, option_names, option_actions, Some(info.current_option_index))
+		} else {
+			// this is an anonymous category, so we don't have any name nor options to show
+			Default::default()
 		};
-		let primary_action = primary_action
-			.as_ref()
-			.map(Action::encode_for_slint)
-			.unwrap_or_default();
+		let current_option_index = current_option_index.map(|x| x.try_into().unwrap()).unwrap_or(-1);
 
-		Some(InputDialogEntry {
+		// build the entries for this category
+		let entries = category
+			.cluster_indices
+			.iter()
+			.map(|cluster_index| build_entry(&state.inputs, &state.clusters[*cluster_index], &state.codes))
+			.collect::<Vec<_>>();
+		let entries = InputDialogCategoryModel::new(entries);
+		let entries = ModelRc::new(entries);
+
+		// and return the result
+		let result = InputDialogCategory {
 			name,
-			text,
-			primary_action,
-		})
+			entries,
+			option_names,
+			option_actions,
+			current_option_index,
+		};
+		Some(result)
 	}
 
 	fn model_tracker(&self) -> &dyn ModelTracker {
@@ -307,6 +385,39 @@ impl Model for InputDialogModel {
 
 	fn as_any(&self) -> &dyn Any {
 		self
+	}
+}
+
+fn build_entry(inputs: &[Input], cluster: &InputCluster, codes: &HashMap<Box<str>, Box<str>>) -> InputDialogEntry {
+	let name = input_cluster_name(inputs, cluster).into();
+	let input_seqs = input_cluster_input_seqs(inputs, cluster);
+	let text = build_code_text(input_seqs, codes).to_shared_string();
+
+	let primary_action = match cluster {
+		InputCluster::Single(input_index) => {
+			let input = &inputs[*input_index];
+			Some(Action::seq_specify_dialog(input, SeqType::Standard))
+		}
+		InputCluster::Xy {
+			x_input_index,
+			y_input_index,
+			..
+		} => {
+			let x_input = x_input_index.map(|idx| &inputs[idx]);
+			let y_input = y_input_index.map(|idx| &inputs[idx]);
+			let command = Action::input_xy_dialog(x_input, y_input);
+			Some(command)
+		}
+	};
+	let primary_action = primary_action
+		.as_ref()
+		.map(Action::encode_for_slint)
+		.unwrap_or_default();
+
+	InputDialogEntry {
+		name,
+		text,
+		primary_action,
 	}
 }
 
@@ -335,6 +446,310 @@ fn build_clusters(inputs: &[Input], class: InputClass) -> Box<[InputCluster]> {
 		.map(|(index, input)| input_cluster_from_input(index, input))
 		.coalesce(|a, b| coalesce_input_clusters(&a, &b).ok_or((a, b)))
 		.collect()
+}
+
+fn build_categories(
+	inputs: &[Input],
+	input_device_classes: &[InputDeviceClass],
+	clusters: &[InputCluster],
+	class: InputClass,
+) -> Box<[InputCategory]> {
+	clusters
+		.iter()
+		.enumerate()
+		.map(|(index, cluster)| (cluster_player(inputs, class, cluster), index))
+		.into_group_map()
+		.into_iter()
+		.sorted_by_key(|(player, _)| *player)
+		.map(|(player, cluster_indices)| {
+			let info = player.map(|player| {
+				build_player_category_info(inputs, input_device_classes, clusters, &cluster_indices, player)
+			});
+			let cluster_indices = cluster_indices.into();
+			InputCategory { info, cluster_indices }
+		})
+		.collect()
+}
+
+fn cluster_player(inputs: &[Input], class: InputClass, cluster: &InputCluster) -> Option<u8> {
+	// we only use player categories for controllers; for other input classes the category is anonymous
+	let use_player_categories = class == InputClass::Controller;
+
+	use_player_categories
+		.then(|| match cluster {
+			InputCluster::Single(input_index) => Some(*input_index),
+			InputCluster::Xy {
+				x_input_index,
+				y_input_index,
+				..
+			} => x_input_index.or(*y_input_index),
+		})
+		.flatten()
+		.map(|input_index| inputs[input_index].player)
+}
+
+fn build_player_category_info(
+	inputs: &[Input],
+	input_device_classes: &[InputDeviceClass],
+	clusters: &[InputCluster],
+	cluster_indices: &[usize],
+	player: u8,
+) -> InputCategoryInfo {
+	// it is simpler if we work in terms of "unclustered" inputs
+	let unclustered_inputs = cluster_indices
+		.iter()
+		.map(|index| &clusters[*index])
+		.flat_map(|cluster| match cluster {
+			InputCluster::Single(index) => {
+				/*
+				let default_tokens = inputs[*index].seq_default_tokens(SeqType::Standard).unwrap_or_default();
+				let token = device_item_token_from_default_tokens(default_tokens);
+				 */
+				vec![Some((*index, UnclusteredInputType::Standard))]
+			}
+			InputCluster::Xy {
+				x_input_index,
+				y_input_index,
+				..
+			} => vec![
+				x_input_index.map(|index| (index, UnclusteredInputType::XAxis)),
+				y_input_index.map(|index| (index, UnclusteredInputType::YAxis)),
+			],
+		})
+		.flatten()
+		.map(|(input_index, unclustered_input_type)| (&inputs[input_index], unclustered_input_type));
+
+	// identify the input "sources" - this can be an input device (e.g. - gamepad, mouse), or it could be "None"
+	let supported_device_classes = [InputDeviceClassName::Joystick, InputDeviceClassName::Mouse];
+	let sources = [
+		InputSource::None,
+		InputSource::Default,
+		InputSource::ArrowKeys,
+		InputSource::NumberPad,
+	]
+	.into_iter()
+	.chain(
+		input_device_classes
+			.iter_devices()
+			.filter(|(device_class, _)| supported_device_classes.contains(&device_class.name))
+			.map(|(device_class, device)| InputSource::Device(device_class, device)),
+	);
+
+	// now lets actually figure out the actual options
+	let options = sources
+		.map(|source| {
+			// get the title of this device
+			let title = SmolStr::from(source.title());
+
+			// figure out all of the input seqs that would be specified if we selected
+			// this input device - also figure out if it matches the current state
+			let seqs = unclustered_inputs
+				.clone()
+				.flat_map(|(input, unclustered_input_type)| {
+					// permute across the various seq types
+					let seq_codes = if input.is_analog {
+						vec![SeqType::Standard, SeqType::Increment, SeqType::Decrement]
+					} else {
+						vec![SeqType::Standard]
+					};
+					seq_codes
+						.into_iter()
+						.map(move |seq_type| (input, unclustered_input_type, seq_type))
+				})
+				.map(|(input, unclustered_input_type, seq_type)| {
+					// find the code with the pertinent token on the device, and does it match what is
+					// currently on the input?
+					let code = source.find_code(input, unclustered_input_type, seq_type);
+					let is_match = input.seq_tokens(seq_type) == code;
+					(input.port_tag.as_str(), input.mask, seq_type, code, is_match)
+				})
+				.collect::<Vec<_>>();
+
+			// its only a match if everything matches up
+			let is_match = seqs.iter().all(|(_, _, _, _, is_match)| *is_match);
+
+			// build the action; but we need to shuffle around the seqs first
+			let seqs = seqs
+				.into_iter()
+				.map(|(tag, mask, seq_type, code, _)| (tag, mask, seq_type, code))
+				.collect::<Vec<_>>();
+			let action = Action::from(MameCommand::seq_set(&seqs));
+
+			// finally return the info
+			(title, action, is_match)
+		})
+		.collect::<Vec<_>>();
+
+	// find the option that has is match on
+	let current_option_index = options.iter().position(|(_, _, is_match)| *is_match);
+
+	// reshuffle the options, to add the "(mixed)" item if necessary and to get rid of `is_match`
+	let options = current_option_index
+		.is_none()
+		.then_some(("(mixed)".into(), None))
+		.into_iter()
+		.chain(options.into_iter().map(|(title, action, _)| (title, Some(action))))
+		.collect::<Vec<_>>();
+
+	// now we can get the real index
+	let current_option_index = current_option_index.unwrap_or(0);
+
+	// InputCategoryInfo::player is one counted
+	let player = player + 1;
+
+	// and we're done!
+	InputCategoryInfo {
+		player,
+		options,
+		current_option_index,
+	}
+}
+
+#[derive(Debug, Clone, Copy)]
+enum UnclusteredInputType {
+	Standard,
+	XAxis,
+	YAxis,
+}
+
+#[derive(Debug, EnumProperty)]
+enum InputSource<'a> {
+	#[strum(props(Title = "None"))]
+	None,
+	#[strum(props(Title = "Default"))]
+	Default,
+	#[strum(props(Title = "Arrow Keys"))]
+	ArrowKeys,
+	#[strum(props(Title = "Number Pad"))]
+	NumberPad,
+	Device(&'a InputDeviceClass, &'a InputDevice),
+}
+
+impl<'a> InputSource<'a> {
+	pub fn title(&self) -> Cow<'a, str> {
+		match self {
+			InputSource::Device(device_class, device) => {
+				if let Some(prefix) = device_class.prefix() {
+					format!("{} #{} ({})", prefix, device.devindex + 1, device.name).into()
+				} else {
+					device.name.as_str().into()
+				}
+			}
+			_ => self
+				.get_str("Title")
+				.expect("missing title property on InputSource")
+				.into(),
+		}
+	}
+
+	pub fn find_code(
+		&self,
+		input: &'a Input,
+		unclustered_input_type: UnclusteredInputType,
+		seq_type: SeqType,
+	) -> &'a str {
+		let default_tokens = input.seq_default_tokens(seq_type);
+		let token = InputSourceToken::new(default_tokens, unclustered_input_type, seq_type);
+
+		match (self, token) {
+			(InputSource::Default, _) => default_tokens,
+			(InputSource::ArrowKeys, InputSourceToken::Left) => "KEYCODE_LEFT",
+			(InputSource::ArrowKeys, InputSourceToken::Right) => "KEYCODE_RIGHT",
+			(InputSource::ArrowKeys, InputSourceToken::Up) => "KEYCODE_UP",
+			(InputSource::ArrowKeys, InputSourceToken::Down) => "KEYCODE_DOWN",
+			(InputSource::NumberPad, InputSourceToken::Left) => "KEYCODE_4PAD",
+			(InputSource::NumberPad, InputSourceToken::Right) => "KEYCODE_6PAD",
+			(InputSource::NumberPad, InputSourceToken::Up) => "KEYCODE_8PAD",
+			(InputSource::NumberPad, InputSourceToken::Down) => "KEYCODE_2PAD",
+			(InputSource::NumberPad, InputSourceToken::Button(1)) => "KEYCODE_0PAD",
+			(InputSource::NumberPad, InputSourceToken::Button(2)) => "KEYCODE_DELPAD",
+			(InputSource::NumberPad, InputSourceToken::Button(3)) => "KEYCODE_ENTERPAD",
+			(InputSource::NumberPad, InputSourceToken::Button(4)) => "KEYCODE_PLUSPAD",
+			(InputSource::NumberPad, InputSourceToken::Button(5)) => "KEYCODE_MINUSPAD",
+			(InputSource::Device(_, device), token) => {
+				let token = token.as_input_device_token();
+				device
+					.items
+					.iter()
+					.find(|x| Some(&x.token) == token.as_ref())
+					.map(|input_device_item| input_device_item.code.as_str())
+					.unwrap_or_default()
+			}
+			(_, _) => "",
+		}
+	}
+}
+
+#[derive(Debug)]
+enum InputSourceToken {
+	Unknown,
+	Left,
+	Right,
+	Up,
+	Down,
+	Button(u8),
+	XAxis,
+	YAxis,
+	ZAxis,
+	RZAxis,
+}
+
+impl InputSourceToken {
+	pub fn new(default_tokens: &str, unclustered_input_type: UnclusteredInputType, seq_type: SeqType) -> Self {
+		fn parse_single(token: &str) -> Option<InputSourceToken> {
+			match token {
+				"KEYCODE_LEFT" => Some(InputSourceToken::Left),
+				"KEYCODE_RIGHT" => Some(InputSourceToken::Right),
+				"KEYCODE_UP" => Some(InputSourceToken::Up),
+				"KEYCODE_DOWN" => Some(InputSourceToken::Down),
+				_ => {
+					let rest = token
+						.strip_prefix("JOYCODE_")
+						.or_else(|| token.strip_prefix("MOUSECODE_"))?;
+					let (number, code) = rest.split_once('_')?;
+					let _ = number.parse::<u8>().ok()?;
+
+					if let Some(rest) = code.strip_prefix("BUTTON") {
+						Some(InputSourceToken::Button(rest.parse().ok()?))
+					} else {
+						match rest {
+							"XAXIS" => Some(InputSourceToken::XAxis),
+							"YAXIS" => Some(InputSourceToken::YAxis),
+							"ZAXIS" => Some(InputSourceToken::ZAxis),
+							"RZAXIS" => Some(InputSourceToken::RZAxis),
+							_ => None,
+						}
+					}
+				}
+			}
+		}
+
+		match (unclustered_input_type, seq_type) {
+			(UnclusteredInputType::XAxis, SeqType::Standard) => Self::XAxis,
+			(UnclusteredInputType::XAxis, SeqType::Decrement) => Self::Left,
+			(UnclusteredInputType::XAxis, SeqType::Increment) => Self::Right,
+			(UnclusteredInputType::YAxis, SeqType::Standard) => Self::YAxis,
+			(UnclusteredInputType::YAxis, SeqType::Decrement) => Self::Up,
+			(UnclusteredInputType::YAxis, SeqType::Increment) => Self::Down,
+			(UnclusteredInputType::Standard, SeqType::Standard) => default_tokens
+				.split(" OR ")
+				.filter_map(parse_single)
+				.next()
+				.unwrap_or(Self::Unknown),
+			_ => Self::Unknown,
+		}
+	}
+
+	fn as_input_device_token(&self) -> Option<InputDeviceToken> {
+		match self {
+			InputSourceToken::Button(num) => Some(InputDeviceToken::Button(*num)),
+			InputSourceToken::XAxis => Some(InputDeviceToken::XAxis),
+			InputSourceToken::YAxis => Some(InputDeviceToken::YAxis),
+			InputSourceToken::ZAxis => Some(InputDeviceToken::ZAxis),
+			InputSourceToken::RZAxis => Some(InputDeviceToken::RZAxis),
+			_ => None,
+		}
+	}
 }
 
 #[derive(Debug)]

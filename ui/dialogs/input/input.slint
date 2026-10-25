@@ -5,11 +5,19 @@ import {
     Button,
     StandardButton,
     ScrollView,
+    ComboBox,
 } from "std-widgets.slint";
 import { SimpleMenuEntry } from "../../common.slint";
 import { Icons } from "../../icons.slint";
 
 export struct InputDialogEntry { name: string, text: string, primary-action: string }
+export struct InputDialogCategory {
+    name: string,
+    entries: [InputDialogEntry],
+    option-names: [string],
+    option-actions: [string],
+    current-option-index: int
+}
 
 export component InputDialog inherits Window {
     title: dialog-title;
@@ -19,11 +27,11 @@ export component InputDialog inherits Window {
 
     // properties
     in property <string> dialog-title;
-    in property <[InputDialogEntry]> entries;
+    in property <[InputDialogCategory]> categories;
     in property <string> restore-defaults-action;
 
     // callbacks
-    callback context-button-clicked(int, Point);
+    callback context-button-clicked(int, int, Point);
     callback menu-item-action(string);
 
     // context menu
@@ -62,32 +70,57 @@ export component InputDialog inherits Window {
             VerticalBox {
                 padding: 3px;
                 vertical-stretch: 0;
-                for entry[index] in root.entries: HorizontalLayout {
-                    vertical-stretch: 0;
-                    height: 30px;
-                    Button {
-                        width: 300px;
-                        text: entry.name;
-                        enabled: entry.primary-action != "";
-                        clicked => {
-                            root.menu-item-action(entry.primary-action);
-                        }
-                    }
-
-                    Button {
-                        width: 40px;
-                        text: "▼";
-                        enabled: true;
-                        clicked => {
-                            root.context-button-clicked(index, { x: self.absolute-position.x, y: self.absolute-position.y + self.height });
-                        }
-                    }
-
-                    VerticalLayout {
-                        alignment: center;
+                for category[category-index] in root.categories: VerticalBox {
+                    if category.name != "": HorizontalLayout {
+                        vertical-stretch: 0;
+                        height: 40px;
+                        spacing: 8px;
+                        padding-left: 4px;
+                        padding-right: 4px;
                         Text {
-                            width: 100%;
-                            text: entry.text;
+                            width: 200px;
+                            horizontal-stretch: 0;
+                            text: category.name;
+                            vertical-alignment: center;
+                        }
+
+                        ComboBox {
+                            model: category.option-names;
+                            current-index: category.current-option-index;
+                            horizontal-stretch: 1;
+                            vertical-stretch: 0;
+                            selected => {
+                                root.menu-item-action(category.option-actions[self.current-index]);
+                            }
+                        }
+                    }
+                    for entry[index] in category.entries: HorizontalLayout {
+                        vertical-stretch: 0;
+                        height: 30px;
+                        Button {
+                            width: 300px;
+                            text: entry.name;
+                            enabled: entry.primary-action != "";
+                            clicked => {
+                                root.menu-item-action(entry.primary-action);
+                            }
+                        }
+
+                        Button {
+                            width: 40px;
+                            text: "▼";
+                            enabled: true;
+                            clicked => {
+                                root.context-button-clicked(category-index, index, { x: self.absolute-position.x, y: self.absolute-position.y + self.height });
+                            }
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            Text {
+                                width: 100%;
+                                text: entry.text;
+                            }
                         }
                     }
                 }
@@ -96,6 +129,7 @@ export component InputDialog inherits Window {
 
         HorizontalBox {
             alignment: end;
+            vertical-stretch: 0;
             Button {
                 text: @tr("Restore Defaults");
                 horizontal-stretch: 0;

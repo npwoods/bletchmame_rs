@@ -314,12 +314,10 @@ impl Input {
 		})
 	}
 
-	#[allow(dead_code)]
 	pub fn seq_default_tokens(&self, seq_type: SeqType) -> &str {
 		self.try_seq_default_tokens(seq_type).expect("invalid seq_type")
 	}
 
-	#[allow(dead_code)]
 	pub fn try_seq_default_tokens(&self, seq_type: SeqType) -> Option<&str> {
 		(self.is_analog || seq_type == SeqType::Standard).then(|| {
 			self.seqs
