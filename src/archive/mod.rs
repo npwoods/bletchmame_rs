@@ -221,4 +221,14 @@ mod tests {
 		let mut archive = Archive::new(Cursor::new(sevenz_bytes), ArchiveFormat::SevenZ).unwrap();
 		assert_eq!(expected, get_crc(&mut archive, name, crc));
 	}
+
+	#[test_case(0, include_bytes!("test_data/ziparchive01.zip"), ArchiveFormat::Zip, &["correct_name.bin", "wrong_name.bin"])]
+	#[test_case(1, include_bytes!("test_data/7zarchive01.7z"), ArchiveFormat::SevenZ, &["correct_name.bin", "wrong_name.bin"])]
+	fn list_filenames(_index: usize, bytes: &[u8], format: ArchiveFormat, expected: &[&str]) {
+		let cursor = Cursor::new(bytes);
+		let archive = Archive::new(cursor, format).unwrap();
+		let actual = archive.list().map(|x| x.to_string()).collect::<Vec<_>>();
+		let actual = actual.iter().map(|s| s.as_str()).collect::<Vec<_>>();
+		assert_eq!(expected, actual);
+	}
 }
