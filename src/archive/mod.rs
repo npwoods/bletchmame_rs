@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::fs::File;
 use std::io::Cursor;
 use std::io::Read;
@@ -27,6 +28,11 @@ impl ArchiveFormat {
 			Self::SevenZ => "7z",
 		}
 	}
+}
+
+#[derive(Clone, Debug)]
+pub struct ArchiveEntry<'a> {
+	pub filename: Cow<'a, str>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -73,11 +79,14 @@ where
 		Ok(Self { inner })
 	}
 
-	/// Lists the names of all file entries in the archive
-	pub fn list(&self) -> impl Iterator<Item = &'_ str> {
+	/// Lists the file entries in the archive
+	pub fn list(&self) -> impl Iterator<Item = Result<ArchiveEntry<'_>>> {
 		match &self.inner {
 			ArchiveInner::Zip(zip) => {
-				let iter = zip.file_names().filter(|name| !name.ends_with('/'));
+				let iter = zip
+					.file_names()
+					.filter(|result| !result.as_ref().is_ok_and(|name| name.ends_with('/')))
+					.map(|result| result.map(|filename| ArchiveEntry { filename }).map_err(|e| e.into()));
 				Either::Left(iter)
 			}
 			ArchiveInner::SevenZ(sevenz) => {
@@ -86,7 +95,12 @@ where
 					.files
 					.iter()
 					.filter(|entry| !entry.is_directory)
-					.map(|entry| entry.name.as_str());
+					.map(|entry| {
+						let entry = ArchiveEntry {
+							filename: Cow::Borrowed(&entry.name),
+						};
+						Ok(entry)
+					});
 				Either::Right(iter)
 			}
 		}
@@ -220,5 +234,18 @@ mod tests {
 		let sevenz_bytes = include_bytes!("test_data/7zarchive01.7z");
 		let mut archive = Archive::new(Cursor::new(sevenz_bytes), ArchiveFormat::SevenZ).unwrap();
 		assert_eq!(expected, get_crc(&mut archive, name, crc));
+	}
+
+	#[test_case(0, include_bytes!("test_data/ziparchive01.zip"), ArchiveFormat::Zip, &["correct_name.bin", "wrong_name.bin"])]
+	#[test_case(1, include_bytes!("test_data/7zarchive01.7z"), ArchiveFormat::SevenZ, &["correct_name.bin", "wrong_name.bin"])]
+	fn list_filenames(_index: usize, bytes: &[u8], format: ArchiveFormat, expected: &[&str]) {
+		let cursor = Cursor::new(bytes);
+		let archive = Archive::new(cursor, format).unwrap();
+		let actual = archive
+			.list()
+			.map(|x| x.unwrap().filename.into_owned())
+			.collect::<Vec<_>>();
+		let actual = actual.iter().map(|s| s.as_str()).collect::<Vec<_>>();
+		assert_eq!(expected, actual);
 	}
 }

@@ -54,8 +54,9 @@ async fn dialog_load_image_once(modal_stack: ModalStack, formats: &[Format]) -> 
 		// and identify the entries that can be shown as images
 		let entries = archive
 			.list()
-			.filter(|entry| is_supported_entry(entry, formats))
-			.map(String::from)
+			.filter_map(Result::ok)
+			.filter(|entry| is_supported_entry(&entry.filename, formats))
+			.map(|entry| String::from(entry.filename))
 			.collect::<Vec<_>>();
 
 		// get the entry index, either by dialog or unilaterally if there's only one entry
