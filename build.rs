@@ -3,6 +3,7 @@ use std::env;
 use std::error::Error;
 use std::fs;
 use std::fs::File;
+use std::io::BufReader;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -69,7 +70,8 @@ fn convert_png_to_ico(input_path: &str, output_path: &str) -> Result<(), Box<dyn
 
 	// read a PNG file from disk and add it to the collection:
 	let file = File::open(input_path)?;
-	let image = IconImage::read_png(file)?;
+	let reader = BufReader::new(file);
+	let image = IconImage::read_png(reader)?;
 	icon_dir.add_entry(IconDirEntry::encode(&image)?);
 
 	// finally, write the ICO file to disk:
