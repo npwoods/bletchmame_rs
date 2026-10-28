@@ -83,12 +83,10 @@ where
 	pub fn list(&self) -> impl Iterator<Item = Result<ArchiveEntry<'_>>> {
 		match &self.inner {
 			ArchiveInner::Zip(zip) => {
-				let iter = zip.file_names().filter(|name| !name.ends_with('/')).map(|filename| {
-					let entry = ArchiveEntry {
-						filename: Cow::Borrowed(&filename),
-					};
-					Ok(entry)
-				});
+				let iter = zip
+					.file_names()
+					.filter(|result| !result.as_ref().is_ok_and(|name| name.ends_with('/')))
+					.map(|result| result.map(|filename| ArchiveEntry { filename }).map_err(|e| e.into()));
 				Either::Left(iter)
 			}
 			ArchiveInner::SevenZ(sevenz) => {

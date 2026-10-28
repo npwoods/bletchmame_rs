@@ -67,7 +67,7 @@ unicase = "2.10.0"
 uuid = { version = "1.29.0", features = ["v4"] }
 winit = "0.30.13"
 zerocopy = { version = "0.8.63", features = ["derive"] }
-zip = "8.6.0"
+zip = "9.1.2"
 
 # Slint dependencies
 i-slint-backend-qt = { git = "https://github.com/slint-ui/slint.git", rev = "451bbd1ae74d569ed3d8e170a71a63d45d586f66", optional = true }
