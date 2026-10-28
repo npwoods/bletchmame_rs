@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::fs::File;
 use std::io::Cursor;
 use std::io::Read;
@@ -27,6 +28,11 @@ impl ArchiveFormat {
 			Self::SevenZ => "7z",
 		}
 	}
+}
+
+#[derive(Clone, Debug)]
+pub struct ArchiveEntry<'a> {
+	pub filename: Cow<'a, str>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -73,11 +79,16 @@ where
 		Ok(Self { inner })
 	}
 
-	/// Lists the names of all file entries in the archive
-	pub fn list(&self) -> impl Iterator<Item = &'_ str> {
+	/// Lists the file entries in the archive
+	pub fn list(&self) -> impl Iterator<Item = Result<ArchiveEntry<'_>>> {
 		match &self.inner {
 			ArchiveInner::Zip(zip) => {
-				let iter = zip.file_names().filter(|name| !name.ends_with('/'));
+				let iter = zip.file_names().filter(|name| !name.ends_with('/')).map(|filename| {
+					let entry = ArchiveEntry {
+						filename: Cow::Borrowed(&filename),
+					};
+					Ok(entry)
+				});
 				Either::Left(iter)
 			}
 			ArchiveInner::SevenZ(sevenz) => {
@@ -86,7 +97,12 @@ where
 					.files
 					.iter()
 					.filter(|entry| !entry.is_directory)
-					.map(|entry| entry.name.as_str());
+					.map(|entry| {
+						let entry = ArchiveEntry {
+							filename: Cow::Borrowed(&entry.name),
+						};
+						Ok(entry)
+					});
 				Either::Right(iter)
 			}
 		}
@@ -227,7 +243,10 @@ mod tests {
 	fn list_filenames(_index: usize, bytes: &[u8], format: ArchiveFormat, expected: &[&str]) {
 		let cursor = Cursor::new(bytes);
 		let archive = Archive::new(cursor, format).unwrap();
-		let actual = archive.list().map(|x| x.to_string()).collect::<Vec<_>>();
+		let actual = archive
+			.list()
+			.map(|x| x.unwrap().filename.into_owned())
+			.collect::<Vec<_>>();
 		let actual = actual.iter().map(|s| s.as_str()).collect::<Vec<_>>();
 		assert_eq!(expected, actual);
 	}
