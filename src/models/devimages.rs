@@ -3,16 +3,15 @@ use std::cell::RefCell;
 
 use slint::Model;
 use slint::ModelNotify;
-use slint::ModelRc;
 use slint::ModelTracker;
 use slint::SharedString;
 use slint::ToSharedString;
-use slint::VecModel;
 
 use crate::devimageconfig::DevicesImagesConfig;
 use crate::devimageconfig::EntryDetails;
 use crate::imagedesc::ImageDesc;
 use crate::ui::DeviceAndImageEntry;
+use crate::util::IteratorExt;
 
 pub struct DevicesAndImagesModel {
 	diconfig: RefCell<DevicesImagesConfig>,
@@ -88,12 +87,12 @@ impl Model for DevicesAndImagesModel {
 		let indent = entry.indent.try_into().unwrap();
 
 		// now figure out the slot/image-specific details
-		let (options, current_option_index, filename) = match entry.details {
+		let (option_names, option_descriptions, current_option_index, filename) = match entry.details {
 			EntryDetails::Slot {
 				options,
 				current_option_index,
 			} => {
-				let options = options
+				let (option_names, option_descriptions) = options
 					.into_iter()
 					.map(|opt| {
 						if let Some(name) = opt.name {
@@ -107,24 +106,22 @@ impl Model for DevicesAndImagesModel {
 							("".into(), self.none_string.clone())
 						}
 					})
-					.collect::<Vec<_>>();
-				let current_option_index = current_option_index.try_into().unwrap();
-				(options, current_option_index, "".into())
+					.collect::<(Vec<_>, Vec<_>)>();
+				(option_names, option_descriptions, Some(current_option_index), "".into())
 			}
 			EntryDetails::Image { image_desc } => {
 				let display_name = image_desc
 					.map(ImageDesc::display_name)
 					.unwrap_or_default()
 					.to_shared_string();
-				(Vec::default(), -1, display_name)
+				([].into(), [].into(), None, display_name)
 			}
 		};
 
-		let (option_names, option_descriptions): (Vec<_>, Vec<_>) = options.into_iter().unzip();
-		let option_names = VecModel::from(option_names);
-		let option_names = ModelRc::new(option_names);
-		let option_descriptions = VecModel::from(option_descriptions);
-		let option_descriptions = ModelRc::new(option_descriptions);
+		// massage these into what Slint wants
+		let current_option_index = current_option_index.map(|x| x.try_into().unwrap()).unwrap_or(-1);
+		let option_names = option_names.collect_model_rc();
+		let option_descriptions = option_descriptions.collect_model_rc();
 
 		let result = DeviceAndImageEntry {
 			display_tag,
