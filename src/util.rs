@@ -5,8 +5,9 @@ use slint::VecModel;
 #[ext(IteratorExt)]
 pub impl<I, T> I
 where
-	Self: Iterator<Item = T>,
+	Self: IntoIterator<Item = T>,
 {
+	/// Collects an iterable into a Slint model
 	fn collect_model_rc(self) -> ModelRc<T>
 	where
 		T: Clone + 'static,

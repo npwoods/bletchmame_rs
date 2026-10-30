@@ -76,7 +76,7 @@ pub async fn dialog_seq_poll(
 	modal.dialog().set_dialog_caption(dialog_caption.into());
 
 	// identify and build mouse input items
-	let (mouse_input_titles, mouse_input_commands): (Vec<_>, Vec<_>) = input_device_classes
+	let (mouse_input_titles, mouse_input_commands) = input_device_classes
 		.as_ref()
 		.iter()
 		.filter(|device_class| device_class.name == InputDeviceClassName::Mouse)
@@ -95,7 +95,7 @@ pub async fn dialog_seq_poll(
 		})
 		.sorted_by_key(|(name, _)| *name)
 		.map(|(name, command)| (SharedString::from(name), command))
-		.unzip();
+		.collect::<(Vec<_>, Vec<_>)>();
 
 	// set up the mouse input items menu...
 	let mouse_input_titles = VecModel::from(mouse_input_titles);
