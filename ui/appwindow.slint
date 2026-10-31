@@ -207,6 +207,8 @@ export component AppWindow inherits Window {
     // splitters
     in-out property <length> column-left-width: 200px;
     in-out property <length> column-right-width: 220px;
+    private property <length> center-min-width: 100px;
+    private property <length> column-right-min-width: 10px;
 
     // the collections view on the left
     in property <[NavigationItem]> collections-model;
@@ -868,7 +870,7 @@ export component AppWindow inherits Window {
                     min-value: 80px;
                 }
                 VerticalLayout {
-                    min-width: 10px;
+                    min-width: root.center-min-width;
                     alignment: stretch;
 
                     // toolbar below the current collection
@@ -938,6 +940,7 @@ export component AppWindow inherits Window {
                     items-table-touch-area := TouchArea {
                         vertical-stretch: 1;
                         min-height: 0px;
+                        min-width: root.center-min-width;
                         FocusScope {
                             items-table-view := StandardTableView {
                                 width: 100%;
@@ -990,7 +993,17 @@ export component AppWindow inherits Window {
 
                 if root.is-picture-area-visible: HorizontalSplitter {
                     value <=> root.column-right-width;
-                    min-value: 10px;
+                    min-value: root.column-right-min-width;
+                    // The right column may not grow so large that the center content
+                    // gets covered.  The center starts after the collections list and
+                    // its splitter; this splitter's width is the same.
+                    max-value: max(
+                        root.column-right-min-width,
+                        content-area.width
+                            - (root.is-collections-list-visible ? root.column-left-width + self.width : 0px)
+                            - root.center-min-width
+                            - self.width,
+                    );
                     multiple: -1.0;
                 }
                 if root.is-picture-area-visible: VerticalLayout {

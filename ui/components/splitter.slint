@@ -2,6 +2,7 @@ export component HorizontalSplitter {
     // properties
     in-out property <length> value;
     in property <length> min-value: 0px;
+    in property <length> max-value: 1000000px;
     in property <float> multiple: 1.0;
     in property <brush> background;
     width: 5px;
@@ -24,7 +25,7 @@ export component HorizontalSplitter {
             }
             changed mouse-x => {
                 if (is-down) {
-                    root.value = max(root.min-value, root.value + self.mouse-x * root.multiple);
+                    root.value = min(root.max-value, max(root.min-value, root.value + self.mouse-x * root.multiple));
                 }
             }
         }

@@ -10,6 +10,7 @@ All notable changes to this project are documented in this file.
 - Removing support for RAM sizes (which was merged into general device configurations in MAME 0.290)
 - Now only showing the tape control if a cassette image is actually loaded
 - Simplifications to `worker_ui` LUA plugin (removing support for older MAMEs, moving startup orchestration to core application)
+- Various cosmetic improvements
 
 ## [3.0] - 2026-09-04
 - After three years, this is a complete rewrite of BletchMAME in Rust using the Slint toolkit

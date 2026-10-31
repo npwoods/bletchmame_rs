@@ -50,4 +50,5 @@ This file contains concise, actionable information to help an AI agent be produc
 
 - Miscellaneous
   - Custom serializers for preferences are in modules named `src/prefs/serde_*.rs` and are referenced with `#[serde(with = "serde_*")]`
+  - Agents doing pure UI work are encourage to use Slint's "Live-Preview" mode (https://docs.slint.dev/latest/docs/slint/guide/tooling/live-preview/)
   - In unit tests, it is preferred to assert in the form `assert_eq!(expected, actual)` in that order
