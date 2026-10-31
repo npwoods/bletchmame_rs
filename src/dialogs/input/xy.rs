@@ -190,25 +190,18 @@ impl Model {
 						format!("{} ({})", item.name, device.name).into()
 					};
 					let seqs = vec![
-						(0, SeqType::Standard, item.code.as_str()),
-						(0, SeqType::Decrement, ""),
-						(0, SeqType::Increment, ""),
+						(input, SeqType::Standard, item.code.as_str()),
+						(input, SeqType::Decrement, ""),
+						(input, SeqType::Increment, ""),
 					];
 					(title, seqs)
 				});
 
 			// and build the rest of the context menu
-			let quick_item_inputs = [Some(input)];
 			let specify_command = Some(Action::seq_specify_dialog(input, seq_type));
 			let add_command = Some(Action::seq_add_dialog(input, seq_type));
 			let clear_command = Some(Action::seq_clear(input, seq_type));
-			build_context_menu(
-				&quick_item_inputs,
-				quick_items,
-				specify_command,
-				add_command,
-				clear_command,
-			)
+			build_context_menu(quick_items, specify_command, add_command, clear_command)
 		};
 
 		let dialog = self.dialog_weak.unwrap();

@@ -179,8 +179,7 @@ fn build_codes(input_device_classes: &[InputDeviceClass]) -> HashMap<Box<str>, B
 }
 
 fn build_context_menu<'a>(
-	quick_item_inputs: &[Option<&'a Input>],
-	quick_items: impl IntoIterator<Item = (Cow<'a, str>, Vec<(usize, SeqType, &'a str)>)>,
+	quick_items: impl IntoIterator<Item = (Cow<'a, str>, Vec<(&'a Input, SeqType, &'a str)>)>,
 	specify_action: Option<Action>,
 	add_action: Option<Action>,
 	clear_action: Option<Action>,
@@ -192,11 +191,6 @@ fn build_context_menu<'a>(
 		.map(|(title, seqs)| {
 			let seqs = seqs
 				.into_iter()
-				.filter_map(|(input_index, seq_type, code)| {
-					quick_item_inputs[input_index]
-						.as_ref()
-						.map(|input| (input, seq_type, code))
-				})
 				.map(|(input, seq_type, code)| (&input.port_tag, input.mask, seq_type, code))
 				.collect::<Vec<_>>();
 			(title, seqs)
