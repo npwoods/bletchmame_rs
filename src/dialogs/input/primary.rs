@@ -249,7 +249,7 @@ impl InputDialogModel {
 				let specify_command = Some(Action::seq_specify_dialog(input, SeqType::Standard));
 				let add_command = Some(Action::seq_add_dialog(input, SeqType::Standard));
 				let clear_command = Some(Action::seq_clear(input, SeqType::Standard));
-				build_context_menu(&[], [], specify_command, add_command, clear_command)
+				build_context_menu([], specify_command, add_command, clear_command)
 			}
 			InputCluster::Xy {
 				x_input_index,
@@ -258,65 +258,36 @@ impl InputDialogModel {
 			} => {
 				let x_input = x_input_index.map(|index| &inputs[index]);
 				let y_input = y_input_index.map(|index| &inputs[index]);
-
-				// prepare builtin quick items
-				let arrow_keys_seqs = vec![
-					(0, SeqType::Standard, ""),
-					(0, SeqType::Decrement, "KEYCODE_LEFT"),
-					(0, SeqType::Increment, "KEYCODE_RIGHT"),
-					(1, SeqType::Standard, ""),
-					(1, SeqType::Decrement, "KEYCODE_UP"),
-					(1, SeqType::Increment, "KEYCODE_DOWN"),
+				let xy_inputs = [
+					(UnclusteredInputType::XAxis, x_input),
+					(UnclusteredInputType::YAxis, y_input),
 				];
-				let numpad_seqs = vec![
-					(0, SeqType::Standard, ""),
-					(0, SeqType::Decrement, "KEYCODE_4PAD"),
-					(0, SeqType::Increment, "KEYCODE_6PAD"),
-					(1, SeqType::Standard, ""),
-					(1, SeqType::Decrement, "KEYCODE_2PAD"),
-					(1, SeqType::Increment, "KEYCODE_8PAD"),
-				];
-				let builtin_entries = [
-					("Arrow Keys".into(), arrow_keys_seqs),
-					("Number Pad".into(), numpad_seqs),
-				];
-
-				// prepare input device-specific quick items
-				let device_entries_iter = state.input_device_classes.iter_devices().map(|(device_class, device)| {
-					let title = if let Some(prefix) = device_class.prefix() {
-						format!("{} #{} ({})", prefix, device.devindex + 1, device.name).into()
-					} else {
-						device.name.as_str().into()
-					};
-					let codes = device
-						.items
-						.iter()
-						.flat_map(|item| {
-							let input_index = match item.token {
-								InputDeviceToken::XAxis => Some(0),
-								InputDeviceToken::YAxis => Some(1),
-								_ => None,
-							};
-							SeqType::VARIANTS
-								.iter()
-								.filter_map(move |seq_type| input_index.map(|input_index| (input_index, seq_type)))
-								.map(|(input_index, seq_type)| {
-									let code = if *seq_type == SeqType::Standard { &item.code } else { "" };
-									(input_index, *seq_type, code)
-								})
-						})
-						.collect::<Vec<_>>();
-					(title, codes)
-				});
-
-				// and combine them
-				let quick_items = builtin_entries.into_iter().chain(device_entries_iter);
+				let quick_items = [InputSource::ArrowKeys, InputSource::NumberPad]
+					.into_iter()
+					.chain(InputSource::from_status_devices(&state.input_device_classes))
+					.map(|source| {
+						let seqs = xy_inputs
+							.iter()
+							.filter_map(|(unclustered_input_type, input)| {
+								input.map(|input| (input, unclustered_input_type))
+							})
+							.flat_map(|(input, unclustered_input_type)| {
+								SeqType::VARIANTS
+									.iter()
+									.map(|seq_type| {
+										(*seq_type, source.find_code(input, *unclustered_input_type, *seq_type))
+									})
+									.map(move |(seq_type, code)| (input, seq_type, code))
+							})
+							.collect::<Vec<_>>();
+						let title = source.title();
+						(title, seqs)
+					});
 
 				// finally build the context menu
-				let quick_item_inputs = [x_input, y_input];
 				let specify_command = Some(Action::input_xy_dialog(x_input, y_input));
 				let clear_command = Some(Action::set_multi_seq(x_input, y_input, "", "", "", "", "", ""));
-				build_context_menu(&quick_item_inputs, quick_items, specify_command, None, clear_command)
+				build_context_menu(quick_items, specify_command, None, clear_command)
 			}
 		}
 	}
@@ -516,7 +487,6 @@ fn build_player_category_info(
 		.map(|(input_index, unclustered_input_type)| (&inputs[input_index], unclustered_input_type));
 
 	// identify the input "sources" - this can be an input device (e.g. - gamepad, mouse), or it could be "None"
-	let supported_device_classes = [InputDeviceClassName::Joystick, InputDeviceClassName::Mouse];
 	let sources = [
 		InputSource::None,
 		InputSource::Default,
@@ -524,12 +494,7 @@ fn build_player_category_info(
 		InputSource::NumberPad,
 	]
 	.into_iter()
-	.chain(
-		input_device_classes
-			.iter_devices()
-			.filter(|(device_class, _)| supported_device_classes.contains(&device_class.name))
-			.map(|(device_class, device)| InputSource::Device(device_class, device)),
-	);
+	.chain(InputSource::from_status_devices(input_device_classes));
 
 	// now lets actually figure out the actual options
 	let options = sources
@@ -673,6 +638,14 @@ impl<'a> InputSource<'a> {
 			}
 			(_, _) => "",
 		}
+	}
+
+	pub fn from_status_devices(input_device_classes: &'a [InputDeviceClass]) -> impl Iterator<Item = InputSource<'a>> {
+		let supported_device_classes = [InputDeviceClassName::Joystick, InputDeviceClassName::Mouse];
+		input_device_classes
+			.iter_devices()
+			.filter(move |(device_class, _)| supported_device_classes.contains(&device_class.name))
+			.map(|(device_class, device)| InputSource::Device(device_class, device))
 	}
 }
 
