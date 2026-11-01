@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use itertools::Either;
 use itertools::Itertools;
+use regex::regex;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
 use slint::Model;
@@ -649,7 +650,7 @@ impl<'a> InputSource<'a> {
 	}
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq)]
 enum InputSourceToken {
 	Unknown,
 	Left,
@@ -665,34 +666,6 @@ enum InputSourceToken {
 
 impl InputSourceToken {
 	pub fn new(default_tokens: &str, unclustered_input_type: UnclusteredInputType, seq_type: SeqType) -> Self {
-		fn parse_single(token: &str) -> Option<InputSourceToken> {
-			match token {
-				"KEYCODE_LEFT" => Some(InputSourceToken::Left),
-				"KEYCODE_RIGHT" => Some(InputSourceToken::Right),
-				"KEYCODE_UP" => Some(InputSourceToken::Up),
-				"KEYCODE_DOWN" => Some(InputSourceToken::Down),
-				_ => {
-					let rest = token
-						.strip_prefix("JOYCODE_")
-						.or_else(|| token.strip_prefix("MOUSECODE_"))?;
-					let (number, code) = rest.split_once('_')?;
-					let _ = number.parse::<u8>().ok()?;
-
-					if let Some(rest) = code.strip_prefix("BUTTON") {
-						Some(InputSourceToken::Button(rest.parse().ok()?))
-					} else {
-						match rest {
-							"XAXIS" => Some(InputSourceToken::XAxis),
-							"YAXIS" => Some(InputSourceToken::YAxis),
-							"ZAXIS" => Some(InputSourceToken::ZAxis),
-							"RZAXIS" => Some(InputSourceToken::RZAxis),
-							_ => None,
-						}
-					}
-				}
-			}
-		}
-
 		match (unclustered_input_type, seq_type) {
 			(UnclusteredInputType::XAxis, SeqType::Standard) => Self::XAxis,
 			(UnclusteredInputType::XAxis, SeqType::Decrement) => Self::Left,
@@ -702,7 +675,7 @@ impl InputSourceToken {
 			(UnclusteredInputType::YAxis, SeqType::Increment) => Self::Down,
 			(UnclusteredInputType::Standard, SeqType::Standard) => default_tokens
 				.split(" OR ")
-				.filter_map(parse_single)
+				.filter_map(parse_single_input_token)
 				.next()
 				.unwrap_or(Self::Unknown),
 			_ => Self::Unknown,
@@ -722,6 +695,34 @@ impl InputSourceToken {
 			InputSourceToken::Down => Some(InputDeviceToken::HatDown(1)),
 			_ => None,
 		}
+	}
+}
+
+fn parse_single_input_token(token: &str) -> Option<InputSourceToken> {
+	// use a regular expression to parse the string
+	let input_source_token_regex = regex!(
+		r"^(?:KEYCODE_(?<direction>LEFT|RIGHT|UP|DOWN)|(?:JOYCODE|MOUSECODE)_[0-9]+_(?:BUTTON(?<button>[0-9]+)|(?<axis>XAXIS|YAXIS|ZAXIS|RZAXIS)))$"
+	);
+
+	// parse the string using the regex and dissect the results
+	let captures = input_source_token_regex.captures(token);
+	let captures = captures.as_ref();
+	let direction = captures.and_then(|c| c.name("direction").map(|m| m.as_str()));
+	let button = captures.and_then(|c| c.name("button").and_then(|m| m.as_str().parse::<u8>().ok()));
+	let axis = captures.and_then(|c| c.name("axis").map(|m| m.as_str()));
+
+	// and match all the things
+	match (direction, button, axis) {
+		(Some("LEFT"), _, _) => Some(InputSourceToken::Left),
+		(Some("RIGHT"), _, _) => Some(InputSourceToken::Right),
+		(Some("UP"), _, _) => Some(InputSourceToken::Up),
+		(Some("DOWN"), _, _) => Some(InputSourceToken::Down),
+		(_, Some(button), _) => Some(InputSourceToken::Button(button)),
+		(_, _, Some("XAXIS")) => Some(InputSourceToken::XAxis),
+		(_, _, Some("YAXIS")) => Some(InputSourceToken::YAxis),
+		(_, _, Some("ZAXIS")) => Some(InputSourceToken::ZAxis),
+		(_, _, Some("RZAXIS")) => Some(InputSourceToken::RZAxis),
+		_ => None,
 	}
 }
 
@@ -875,5 +876,32 @@ fn dump_clusters_trace(inputs: &[Input], clusters: &[InputCluster]) {
 				}
 			}
 		}
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use test_case::test_case;
+
+	use super::InputSourceToken;
+
+	#[allow(clippy::zero_prefixed_literal)]
+	#[test_case(00, "", None)]
+	#[test_case(01, "KEYCODE_A", None)]
+	#[test_case(02, "KEYCODE_LEFT", Some(InputSourceToken::Left))]
+	#[test_case(03, "KEYCODE_RIGHT", Some(InputSourceToken::Right))]
+	#[test_case(04, "KEYCODE_UP", Some(InputSourceToken::Up))]
+	#[test_case(05, "KEYCODE_DOWN", Some(InputSourceToken::Down))]
+	#[test_case(06, "JOYCODE_1_BUTTON256", None)]
+	#[test_case(07, "JOYCODE_BUTTON1", None)]
+	#[test_case(08, "JOYCODE_1_BUTTON1", Some(InputSourceToken::Button(1)))]
+	#[test_case(09, "MOUSECODE_2_BUTTON3", Some(InputSourceToken::Button(3)))]
+	#[test_case(10, "JOYCODE_1_XAXIS", Some(InputSourceToken::XAxis))]
+	#[test_case(11, "MOUSECODE_1_YAXIS", Some(InputSourceToken::YAxis))]
+	#[test_case(12, "JOYCODE_1_ZAXIS", Some(InputSourceToken::ZAxis))]
+	#[test_case(13, "JOYCODE_1_RZAXIS", Some(InputSourceToken::RZAxis))]
+	fn parse_single_input_token(_index: usize, input: &str, expected: Option<InputSourceToken>) {
+		let actual = super::parse_single_input_token(input);
+		assert_eq!(expected, actual);
 	}
 }
