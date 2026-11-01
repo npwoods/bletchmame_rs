@@ -737,6 +737,7 @@ dependencies = [
  "qttypes",
  "quick-xml 0.42.0",
  "raw-window-handle",
+ "regex",
  "rfd",
  "serde",
  "serde_json",
