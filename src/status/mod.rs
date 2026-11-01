@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use itertools::Itertools;
+use regex::regex;
 use serde::Deserialize;
 use serde::Serialize;
 use smol_str::SmolStr;
@@ -424,10 +425,10 @@ pub enum InputDeviceToken {
 	YAxis,
 	ZAxis,
 	RZAxis,
-	Hat1Left,
-	Hat1Right,
-	Hat1Up,
-	Hat1Down,
+	HatLeft(u8),
+	HatRight(u8),
+	HatUp(u8),
+	HatDown(u8),
 	Button(u8),
 	Other(SmolStr),
 }
@@ -440,20 +441,29 @@ impl InputDeviceToken {
 
 impl From<&str> for InputDeviceToken {
 	fn from(s: &str) -> Self {
-		if let Some(num) = s.strip_prefix("BUTTON").and_then(|s| s.parse().ok()) {
-			Self::Button(num)
-		} else {
-			match s {
-				"XAXIS" => Self::XAxis,
-				"YAXIS" => Self::YAxis,
-				"ZAXIS" => Self::ZAxis,
-				"RZAXIS" => Self::RZAxis,
-				"HAT1LEFT" => Self::Hat1Left,
-				"HAT1RIGHT" => Self::Hat1Right,
-				"HAT1UP" => Self::Hat1Up,
-				"HAT1DOWN" => Self::Hat1Down,
-				_ => Self::Other(s.into()),
-			}
+		// use a regular expression to parse the string
+		let input_device_token_regex =
+			regex!(r"^(?<kind>BUTTON|HAT)(?<index>[0-9]+)(?<direction>LEFT|RIGHT|UP|DOWN)?$");
+
+		// parse the string using the regex and dissect the results
+		let captures = input_device_token_regex.captures(s);
+		let captures = captures.as_ref();
+		let direction = captures.and_then(|c| c.name("direction").map(|m| m.as_str()));
+		let kind = captures.map(|c| &c["kind"]).unwrap_or(s);
+		let index = captures.and_then(|c| c.name("index").and_then(|m| m.as_str().parse::<u8>().ok()));
+
+		// and match all the tings
+		match (kind, direction, index) {
+			("BUTTON", _, Some(index)) => Self::Button(index),
+			("HAT", Some("LEFT"), Some(index)) => Self::HatLeft(index),
+			("HAT", Some("RIGHT"), Some(index)) => Self::HatRight(index),
+			("HAT", Some("UP"), Some(index)) => Self::HatUp(index),
+			("HAT", Some("DOWN"), Some(index)) => Self::HatDown(index),
+			("XAXIS", _, _) => Self::XAxis,
+			("YAXIS", _, _) => Self::YAxis,
+			("ZAXIS", _, _) => Self::ZAxis,
+			("RZAXIS", _, _) => Self::RZAxis,
+			_ => Self::Other(s.into()),
 		}
 	}
 }
@@ -562,12 +572,21 @@ mod test {
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, "XAXIS", InputDeviceToken::XAxis, true)]
-	#[test_case(1, "YAXIS", InputDeviceToken::YAxis, true)]
-	#[test_case(2, "ZAXIS", InputDeviceToken::ZAxis, true)]
-	#[test_case(3, "RZAXIS", InputDeviceToken::RZAxis, true)]
-	#[test_case(4, "BUTTON1", InputDeviceToken::Button(1), false)]
-	#[test_case(5, "ZYXZYX", InputDeviceToken::Other("ZYXZYX".into()), false)]
+	#[allow(clippy::zero_prefixed_literal)]
+	#[test_case(00, "XAXIS", InputDeviceToken::XAxis, true)]
+	#[test_case(01, "YAXIS", InputDeviceToken::YAxis, true)]
+	#[test_case(02, "ZAXIS", InputDeviceToken::ZAxis, true)]
+	#[test_case(03, "RZAXIS", InputDeviceToken::RZAxis, true)]
+	#[test_case(04, "BUTTON1", InputDeviceToken::Button(1), false)]
+	#[test_case(05, "HAT1LEFT", InputDeviceToken::HatLeft(1), false)]
+	#[test_case(06, "HAT1RIGHT", InputDeviceToken::HatRight(1), false)]
+	#[test_case(07, "HAT1UP", InputDeviceToken::HatUp(1), false)]
+	#[test_case(08, "HAT1DOWN", InputDeviceToken::HatDown(1), false)]
+	#[test_case(09, "HAT2LEFT", InputDeviceToken::HatLeft(2), false)]
+	#[test_case(10, "HAT3RIGHT", InputDeviceToken::HatRight(3), false)]
+	#[test_case(11, "HAT4UP", InputDeviceToken::HatUp(4), false)]
+	#[test_case(12, "HAT5DOWN", InputDeviceToken::HatDown(5), false)]
+	#[test_case(13, "ZYXZYX", InputDeviceToken::Other("ZYXZYX".into()), false)]
 	fn input_device_token(_index: usize, s: &str, expected: InputDeviceToken, expected_is_axis: bool) {
 		let actual = InputDeviceToken::from(s);
 		assert_eq!((&expected, expected_is_axis), (&actual, actual.is_axis()));
