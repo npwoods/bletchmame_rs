@@ -1,10 +1,8 @@
-use std::collections::HashMap;
 use std::env;
 use std::error::Error;
 use std::fs;
 use std::fs::File;
 use std::io::BufReader;
-use std::path::Path;
 use std::path::PathBuf;
 
 use ico::IconDirEntry;
@@ -18,17 +16,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 	// dependencies
 	println!("cargo::rerun-if-changed={icon_png}");
 
-	// build library paths
-	let cargo_manifest_dir = env::var_os("CARGO_MANIFEST_DIR").unwrap();
-	let slint_material_components_dir = Path::new(&cargo_manifest_dir).join("material-1.1.0/material.slint");
-	let library_paths = HashMap::from([("material".into(), slint_material_components_dir)]);
-
-	// build Slint stuff
-	slint_build::compile_with_config(
-		"ui/main.slint",
-		slint_build::CompilerConfiguration::new().with_library_paths(library_paths),
-	)
-	.unwrap();
+	// build Slint stuff (settings live in slint-project.json)
+	slint_build::compile("slint-project.json").unwrap();
 
 	// Qt interop stuff
 	#[cfg(feature = "slint-qt-backend")]
