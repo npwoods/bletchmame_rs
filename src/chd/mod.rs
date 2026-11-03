@@ -103,8 +103,8 @@ mod test {
 
 	use crate::assethash::AssetHash;
 
-	#[test_case(0, include_bytes!("test_data/samplechd.chd"), "bfec48ae2439308ac3a547231a13f122ef303c76")]
-	fn chd_asset_hash(_index: usize, data: &[u8], expected: &str) {
+	#[test_case(include_bytes!("test_data/samplechd.chd"), "bfec48ae2439308ac3a547231a13f122ef303c76")]
+	fn chd_asset_hash(data: &[u8], expected: &str) {
 		let expected = Ok(AssetHash::from_hex_strings(None, Some(expected)).unwrap());
 		let actual = super::chd_asset_hash(data).map_err(|_| ());
 		assert_eq!(expected, actual);

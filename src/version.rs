@@ -121,12 +121,12 @@ mod test {
 
 	use super::MameVersion;
 
-	#[test_case(0, "", true)]
-	#[test_case(1, "xyz", true)]
-	#[test_case(2, "0.242 (mame0242)", false)]
-	#[test_case(3, "0.271 (mame0271)", false)]
-	#[test_case(4, "0.271 (mame0271-6790-g78849ebc06c-dirty)", true)]
-	fn general(_index: usize, s: &str, expected_is_dirty: bool) {
+	#[test_case("", true)]
+	#[test_case("xyz", true)]
+	#[test_case("0.242 (mame0242)", false)]
+	#[test_case("0.271 (mame0271)", false)]
+	#[test_case("0.271 (mame0271-6790-g78849ebc06c-dirty)", true)]
+	fn general(s: &str, expected_is_dirty: bool) {
 		let version = MameVersion::from(s);
 		let actual = (version.to_string(), version.is_dirty());
 
@@ -134,16 +134,16 @@ mod test {
 		assert_eq!(actual, expected);
 	}
 
-	#[test_case(0, "xyz", "xyz", None)]
-	#[test_case(1, "xyz", "0.242 (mame0242)", None)]
-	#[test_case(2, "0.243 (mame0243)", "xyz", None)]
-	#[test_case(3, "0.243 (mame0243)", "0.242 (mame0242)", Some(Ordering::Greater))]
-	#[test_case(4, "0.243 (mame0243)", "0.243 (mame0243)", Some(Ordering::Equal))]
-	#[test_case(5, "0.243 (mame0243)", "0.271 (mame0271)", Some(Ordering::Less))]
-	#[test_case(6, "0.243 (mame0243)", "0.271 (mame0271-6790-g78849ebc06c-dirty)", Some(Ordering::Less))]
-	#[test_case(7, "0.271 (mame0271)", "0.271 (mame0271-6790-g78849ebc06c-dirty)", Some(Ordering::Less))]
-	#[test_case(8, "0.272 (mame0272)", "0.271 (mame0271-6790-g78849ebc06c-dirty)", Some(Ordering::Greater))]
-	fn partial_cmp(_index: usize, a: &str, b: &str, expected: Option<Ordering>) {
+	#[test_case("xyz", "xyz", None)]
+	#[test_case("xyz", "0.242 (mame0242)", None)]
+	#[test_case("0.243 (mame0243)", "xyz", None)]
+	#[test_case("0.243 (mame0243)", "0.242 (mame0242)", Some(Ordering::Greater))]
+	#[test_case("0.243 (mame0243)", "0.243 (mame0243)", Some(Ordering::Equal))]
+	#[test_case("0.243 (mame0243)", "0.271 (mame0271)", Some(Ordering::Less))]
+	#[test_case("0.243 (mame0243)", "0.271 (mame0271-6790-g78849ebc06c-dirty)", Some(Ordering::Less))]
+	#[test_case("0.271 (mame0271)", "0.271 (mame0271-6790-g78849ebc06c-dirty)", Some(Ordering::Less))]
+	#[test_case("0.272 (mame0272)", "0.271 (mame0271-6790-g78849ebc06c-dirty)", Some(Ordering::Greater))]
+	fn partial_cmp(a: &str, b: &str, expected: Option<Ordering>) {
 		let a = MameVersion::from(a);
 		let b = MameVersion::from(b);
 		let actual: Option<Ordering> = PartialOrd::partial_cmp(&a, &b);

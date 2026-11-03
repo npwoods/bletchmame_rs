@@ -332,13 +332,13 @@ mod test {
 	use super::SeqToken::Or;
 	use super::SeqTokenModifier::RightSwitch;
 
-	#[test_case(0, "KEYCODE_0", &[Named("KEYCODE_0", None)])]
-	#[test_case(1, "KEYCODE_0 OR KEYCODE_1", &[Named("KEYCODE_0", None), Or, Named("KEYCODE_1", None)])]
-	#[test_case(2, "OR KEYCODE_A OR KEYCODE_B", &[Named("KEYCODE_A", None), Or, Named("KEYCODE_B", None)])]
-	#[test_case(3, "JOYCODE_1_BUTTON1", &[Named("JOYCODE_1_BUTTON1", None)])]
-	#[test_case(4, "JOYCODE_1_XAXIS", &[Named("JOYCODE_1_XAXIS", None)])]
-	#[test_case(5, "JOYCODE_1_XAXIS_RIGHT_SWITCH", &[Named("JOYCODE_1_XAXIS", Some(RightSwitch))])]
-	fn seq_tokens_from_string(_index: usize, s: &str, expected: &[SeqToken<'_>]) {
+	#[test_case("KEYCODE_0", &[Named("KEYCODE_0", None)])]
+	#[test_case("KEYCODE_0 OR KEYCODE_1", &[Named("KEYCODE_0", None), Or, Named("KEYCODE_1", None)])]
+	#[test_case("OR KEYCODE_A OR KEYCODE_B", &[Named("KEYCODE_A", None), Or, Named("KEYCODE_B", None)])]
+	#[test_case("JOYCODE_1_BUTTON1", &[Named("JOYCODE_1_BUTTON1", None)])]
+	#[test_case("JOYCODE_1_XAXIS", &[Named("JOYCODE_1_XAXIS", None)])]
+	#[test_case("JOYCODE_1_XAXIS_RIGHT_SWITCH", &[Named("JOYCODE_1_XAXIS", Some(RightSwitch))])]
+	fn seq_tokens_from_string(s: &str, expected: &[SeqToken<'_>]) {
 		let actual = super::seq_tokens_from_string(s).collect::<Vec<_>>();
 		assert_eq!(expected, actual.as_slice());
 	}

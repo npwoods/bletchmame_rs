@@ -1224,10 +1224,10 @@ mod test {
 
 	use super::super::InfoDb;
 
-	#[test_case(0, include_str!("test_data/listxml_alienar.xml"))]
-	#[test_case(1, include_str!("test_data/listxml_coco.xml"))]
-	#[test_case(2, include_str!("test_data/listxml_fake.xml"))]
-	pub fn data_from_listxml_output(_index: usize, xml: &str) {
+	#[test_case(include_str!("test_data/listxml_alienar.xml"))]
+	#[test_case(include_str!("test_data/listxml_coco.xml"))]
+	#[test_case(include_str!("test_data/listxml_fake.xml"))]
+	pub fn data_from_listxml_output(xml: &str) {
 		let reader = BufReader::new(xml.as_bytes());
 		let data = super::data_from_listxml_output(reader, |_| ControlFlow::Continue(()))
 			.unwrap()
@@ -1236,16 +1236,15 @@ mod test {
 		assert_matches!(result, Ok(_));
 	}
 
-	#[test_case(0, &[], 0, &[], Some(0))]
-	#[test_case(1, &[10, 11, 12, 13, 14, 15], 0, &[10, 11, 12, 13, 14, 15], Some(0))]
-	#[test_case(2, &[10, 11, 12, 13, 14, 15], 3, &[10, 11, 12, 13, 14, 15], None)]
-	#[test_case(3, &[10, 11, 12, 13, 14, 15, 13, 14, 15], 2, &[10, 11, 12, 13, 14, 15, 13], Some(4))]
-	#[test_case(4, &[10, 11, 12, 13, 14, 15, 13, 14, 15], 3, &[10, 11, 12, 13, 14, 15], Some(3))]
-	#[test_case(5, &[99, 99, 99, 99, 98], 2, &[99, 99, 99, 99, 98], None)]
-	#[test_case(6, &[99, 99, 99, 99, 99], 2, &[99, 99, 99], Some(1))]
-	#[test_case(7, &[99, 99, 11, 99, 99], 2, &[99, 99, 11], Some(0))]
+	#[test_case(&[], 0, &[], Some(0))]
+	#[test_case(&[10, 11, 12, 13, 14, 15], 0, &[10, 11, 12, 13, 14, 15], Some(0))]
+	#[test_case(&[10, 11, 12, 13, 14, 15], 3, &[10, 11, 12, 13, 14, 15], None)]
+	#[test_case(&[10, 11, 12, 13, 14, 15, 13, 14, 15], 2, &[10, 11, 12, 13, 14, 15, 13], Some(4))]
+	#[test_case(&[10, 11, 12, 13, 14, 15, 13, 14, 15], 3, &[10, 11, 12, 13, 14, 15], Some(3))]
+	#[test_case(&[99, 99, 99, 99, 98], 2, &[99, 99, 99, 99, 98], None)]
+	#[test_case(&[99, 99, 99, 99, 99], 2, &[99, 99, 99], Some(1))]
+	#[test_case(&[99, 99, 11, 99, 99], 2, &[99, 99, 11], Some(0))]
 	pub fn try_recycle_tail(
-		_index: usize,
 		initial_table: &[u32],
 		tail_len: usize,
 		expected_table: &[u32],

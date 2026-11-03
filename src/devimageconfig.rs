@@ -500,11 +500,11 @@ mod test {
 		let _ = (0..count).map(|index| config.entry(index).unwrap()).collect::<Vec<_>>();
 	}
 
-	#[test_case(0, include_str!("info/test_data/listxml_c64.xml"), include_str!("status/test_data/status_mame0273_c64_1.xml"))]
-	#[test_case(1, include_str!("info/test_data/listxml_c64.xml"), include_str!("status/test_data/status_mame0273_c64_epyxfast_1.xml"))]
-	#[test_case(2, include_str!("info/test_data/listxml_coco.xml"), include_str!("status/test_data/status_mame0270_coco2b_1.xml"))]
-	#[test_case(3, include_str!("info/test_data/listxml_coco.xml"), include_str!("status/test_data/status_mame0270_coco2b_5.xml"))]
-	fn update_status(_index: usize, info_xml: &str, status_xml: &str) {
+	#[test_case(include_str!("info/test_data/listxml_c64.xml"), include_str!("status/test_data/status_mame0273_c64_1.xml"))]
+	#[test_case(include_str!("info/test_data/listxml_c64.xml"), include_str!("status/test_data/status_mame0273_c64_epyxfast_1.xml"))]
+	#[test_case(include_str!("info/test_data/listxml_coco.xml"), include_str!("status/test_data/status_mame0270_coco2b_1.xml"))]
+	#[test_case(include_str!("info/test_data/listxml_coco.xml"), include_str!("status/test_data/status_mame0270_coco2b_5.xml"))]
+	fn update_status(info_xml: &str, status_xml: &str) {
 		// build the InfoDB
 		let info_db = InfoDb::from_listxml_output(info_xml.as_bytes(), |_| ControlFlow::Continue(()))
 			.unwrap()
@@ -523,8 +523,8 @@ mod test {
 		smoke_test_config(new_config);
 	}
 
-	#[test_case(0, include_str!("info/test_data/listxml_coco.xml"), "coco2b", "ext", Some("multi"))]
-	fn set_slot_option(_index: usize, info_xml: &str, machine_name: &str, tag: &str, new_option_name: Option<&str>) {
+	#[test_case(include_str!("info/test_data/listxml_coco.xml"), "coco2b", "ext", Some("multi"))]
+	fn set_slot_option(info_xml: &str, machine_name: &str, tag: &str, new_option_name: Option<&str>) {
 		// build the InfoDB
 		let info_db = InfoDb::from_listxml_output(info_xml.as_bytes(), |_| ControlFlow::Continue(()))
 			.unwrap()
@@ -539,10 +539,10 @@ mod test {
 		smoke_test_config(new_config);
 	}
 
-	#[test_case(0, include_str!("info/test_data/listxml_alienar.xml"))]
-	#[test_case(1, include_str!("info/test_data/listxml_c64.xml"))]
-	#[test_case(2, include_str!("info/test_data/listxml_coco.xml"))]
-	fn access_all_images(_index: usize, info_xml: &str) {
+	#[test_case(include_str!("info/test_data/listxml_alienar.xml"))]
+	#[test_case(include_str!("info/test_data/listxml_c64.xml"))]
+	#[test_case(include_str!("info/test_data/listxml_coco.xml"))]
+	fn access_all_images(info_xml: &str) {
 		// build the InfoDB
 		let info_db = InfoDb::from_listxml_output(info_xml.as_bytes(), |_| ControlFlow::Continue(()))
 			.unwrap()
@@ -566,16 +566,15 @@ mod test {
 		}
 	}
 
-	#[test_case(0, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[], &[], ListSlots::NonDefault, &[])]
-	#[test_case(1, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[], &[], ListSlots::Dirty, &[])]
-	#[test_case(2, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[], ListSlots::NonDefault, &[("ext", Some("multi"))])]
-	#[test_case(3, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[], ListSlots::Dirty, &[])]
-	#[test_case(4, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[("ext", None)], ListSlots::NonDefault, &[("ext", None)])]
-	#[test_case(5, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[("ext", None)], ListSlots::Dirty, &[("ext", None)])]
-	#[test_case(6, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[("ext", Some("fdc"))], ListSlots::NonDefault, &[])]
-	#[test_case(7, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[("ext", Some("fdc"))], ListSlots::Dirty, &[("ext", Some("fdc"))])]
+	#[test_case(include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[], &[], ListSlots::NonDefault, &[])]
+	#[test_case(include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[], &[], ListSlots::Dirty, &[])]
+	#[test_case(include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[], ListSlots::NonDefault, &[("ext", Some("multi"))])]
+	#[test_case(include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[], ListSlots::Dirty, &[])]
+	#[test_case(include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[("ext", None)], ListSlots::NonDefault, &[("ext", None)])]
+	#[test_case(include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[("ext", None)], ListSlots::Dirty, &[("ext", None)])]
+	#[test_case(include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[("ext", Some("fdc"))], ListSlots::NonDefault, &[])]
+	#[test_case(include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))], &[("ext", Some("fdc"))], ListSlots::Dirty, &[("ext", Some("fdc"))])]
 	fn list_slots(
-		_index: usize,
 		info_xml: &str,
 		machine_name: &str,
 		clean_options: &[(&str, Option<&str>)],

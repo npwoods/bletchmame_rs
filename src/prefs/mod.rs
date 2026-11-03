@@ -836,9 +836,9 @@ mod test {
 		insta::assert_json_snapshot!(prefs);
 	}
 
-	#[test_case(0, &["foo"])]
-	#[test_case(1, &["foo", "bar"])]
-	pub fn ensure_directory(_index: usize, path_parts: &[&str]) {
+	#[test_case(&["foo"])]
+	#[test_case(&["foo", "bar"])]
+	pub fn ensure_directory(path_parts: &[&str]) {
 		let tmp_dir = TempDir::new("temp").unwrap();
 		let mut path = tmp_dir.path().to_path_buf();
 		for x in path_parts {

@@ -253,20 +253,20 @@ mod test {
 	}
 
 	#[rustfmt::skip]
-	#[test_case( 0, "<foo><bar/></foo>", true, &[Part::Start("foo"), Part::Start("bar"), Part::End(None), Part::End(None)])]
-	#[test_case( 1, "<blah><unknown/></blah>", true, &[Part::Start("blah"), Part::End(None)])]
-	#[test_case( 2, "<alpha><bravo/><unknown/><charlie/></alpha>", true, &[Part::Start("alpha"), Part::Start("bravo"), Part::End(None), Part::Start("charlie"), Part::End(None), Part::End(None)])]
-	#[test_case( 3, "<alpha><text>Hello</text></alpha>", true, &[Part::Start("alpha"), Part::Start("text"), Part::End(Some("Hello")), Part::End(None)])]
-	#[test_case( 4, "<foo><bar/>", true, &[Part::Start("foo"), Part::Start("bar"), Part::End(None), Part::Error])]
-	#[test_case( 5, "</foo>", true, &[Part::Error])]
-	#[test_case( 6, "<foo/></bar>", true, &[Part::Start("foo"), Part::End(None), Part::Error])]
-	#[test_case( 7, "<foo/>EXTRANEOUS", false, &[Part::Start("foo"), Part::End(None)])]
-	#[test_case( 8, "<foo></foo>EXTRANEOUS", false, &[Part::Start("foo"), Part::End(None)])]
-	#[test_case( 9, "<foo/>EXTRANEOUS", true, &[Part::Start("foo"), Part::End(None), Part::Error])]
-	#[test_case(10, "<foo></foo>EXTRANEOUS", true, &[Part::Start("foo"), Part::End(None), Part::Error])]
-	#[test_case(11, "EXTRANEOUS", false, &[Part::Error])]
-	#[test_case(12, "EXTRANEOUS", true, &[Part::Error])]
-	pub fn general(_index: usize, xml: &str, read_to_end: bool, expected: &[Part]) {
+	#[test_case("<foo><bar/></foo>", true, &[Part::Start("foo"), Part::Start("bar"), Part::End(None), Part::End(None)])]
+	#[test_case("<blah><unknown/></blah>", true, &[Part::Start("blah"), Part::End(None)])]
+	#[test_case("<alpha><bravo/><unknown/><charlie/></alpha>", true, &[Part::Start("alpha"), Part::Start("bravo"), Part::End(None), Part::Start("charlie"), Part::End(None), Part::End(None)])]
+	#[test_case("<alpha><text>Hello</text></alpha>", true, &[Part::Start("alpha"), Part::Start("text"), Part::End(Some("Hello")), Part::End(None)])]
+	#[test_case("<foo><bar/>", true, &[Part::Start("foo"), Part::Start("bar"), Part::End(None), Part::Error])]
+	#[test_case("</foo>", true, &[Part::Error])]
+	#[test_case("<foo/></bar>", true, &[Part::Start("foo"), Part::End(None), Part::Error])]
+	#[test_case("<foo/>EXTRANEOUS", false, &[Part::Start("foo"), Part::End(None)])]
+	#[test_case("<foo></foo>EXTRANEOUS", false, &[Part::Start("foo"), Part::End(None)])]
+	#[test_case("<foo/>EXTRANEOUS", true, &[Part::Start("foo"), Part::End(None), Part::Error])]
+	#[test_case("<foo></foo>EXTRANEOUS", true, &[Part::Start("foo"), Part::End(None), Part::Error])]
+	#[test_case("EXTRANEOUS", false, &[Part::Error])]
+	#[test_case("EXTRANEOUS", true, &[Part::Error])]
+	pub fn general(xml: &str, read_to_end: bool, expected: &[Part]) {
 		let mut reader = XmlReader::from_reader(xml.as_bytes(), read_to_end);
 		let mut buf = Vec::new();
 
@@ -299,9 +299,9 @@ mod test {
 		assert_eq!(expected, &actual);
 	}
 
-	#[test_case(0, "<foo><bar/></foo>", "")]
-	#[test_case(1, "<foo><bar/></foo>BLAH", "BLAH")]
-	pub fn extra_data(_index: usize, xml: &str, expected: &str) {
+	#[test_case("<foo><bar/></foo>", "")]
+	#[test_case("<foo><bar/></foo>BLAH", "BLAH")]
+	pub fn extra_data(xml: &str, expected: &str) {
 		let mut xml_bytes = xml.as_bytes();
 		let mut xml_reader = XmlReader::from_reader(&mut xml_bytes, false);
 		let mut buf = Vec::new();
@@ -313,22 +313,22 @@ mod test {
 		assert_eq!(Ok(expected), actual);
 	}
 
-	#[test_case(0, Cow::Borrowed(""), Ok(""))]
-	#[test_case(1, Cow::Owned(String::new()), Ok(""))]
-	#[test_case(2, Cow::Borrowed("foo"), Ok("foo"))]
-	#[test_case(3, Cow::Owned("foo".into()), Ok("foo"))]
-	#[test_case(4, Cow::Borrowed("&lt;escaping&gt; &amp; things"), Ok("<escaping> & things"))]
-	#[test_case(5, Cow::Owned("&lt;escaping&gt; &amp; things".into()), Ok("<escaping> & things"))]
-	pub fn cow_bytes_to_str(_index: usize, input: Cow<'_, str>, expected: Result<&str, ()>) {
+	#[test_case(Cow::Borrowed(""), Ok(""))]
+	#[test_case(Cow::Owned(String::new()), Ok(""))]
+	#[test_case(Cow::Borrowed("foo"), Ok("foo"))]
+	#[test_case(Cow::Owned("foo".into()), Ok("foo"))]
+	#[test_case(Cow::Borrowed("&lt;escaping&gt; &amp; things"), Ok("<escaping> & things"))]
+	#[test_case(Cow::Owned("&lt;escaping&gt; &amp; things".into()), Ok("<escaping> & things"))]
+	pub fn cow_bytes_to_str(input: Cow<'_, str>, expected: Result<&str, ()>) {
 		let actual = super::cow_bytes_to_str(input);
 		let actual = actual.as_ref().map_or_else(|_| Err(()), |x| Ok(x.as_ref()));
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, "<root alpha=\"aaa\" bravo=\"bbb\" charlie=\"ccc\"/>", ["alpha", "bravo", "charlie"], &[Some("aaa"), Some("bbb"), Some("ccc")])]
-	#[test_case(1, "<root alpha=\"ddd\" bravo=\"eee\" charlie=\"fff\"/>", ["alpha", "delta", "echo"], &[Some("ddd"), None, None])]
-	#[test_case(2, "<root alpha=\"ggg\"/>", ["alpha", "bravo", "charlie"], &[Some("ggg"), None, None])]
-	pub fn find_attributes(_index: usize, xml: &str, attributes: [&str; 3], expected: &[Option<&str>]) {
+	#[test_case("<root alpha=\"aaa\" bravo=\"bbb\" charlie=\"ccc\"/>", ["alpha", "bravo", "charlie"], &[Some("aaa"), Some("bbb"), Some("ccc")])]
+	#[test_case("<root alpha=\"ddd\" bravo=\"eee\" charlie=\"fff\"/>", ["alpha", "delta", "echo"], &[Some("ddd"), None, None])]
+	#[test_case("<root alpha=\"ggg\"/>", ["alpha", "bravo", "charlie"], &[Some("ggg"), None, None])]
+	pub fn find_attributes(xml: &str, attributes: [&str; 3], expected: &[Option<&str>]) {
 		let mut reader = XmlReader::from_reader(xml.as_bytes(), true);
 		let mut buf = Vec::new();
 

@@ -126,14 +126,14 @@ mod test {
 
 	use super::StringTableBuilder;
 
-	#[test_case(0, &[""])]
-	#[test_case(1, &["Tiny"])]
-	#[test_case(2, &["ReallyReallyLarge"])]
-	#[test_case(3, &["", "Foo", "Bar", "Baz"])]
-	#[test_case(4, &["", "Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot"])]
-	#[test_case(5, &["Whatchamakallit", "Thingamajig", "0123456789", "01234_56789"])]
-	#[test_case(6, &["\0", " ", "Foo\0Bar", "Foo\u{1F4A9}Bar"])]
-	pub fn test(_index: usize, strings: &[&str]) {
+	#[test_case(&[""])]
+	#[test_case(&["Tiny"])]
+	#[test_case(&["ReallyReallyLarge"])]
+	#[test_case(&["", "Foo", "Bar", "Baz"])]
+	#[test_case(&["", "Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot"])]
+	#[test_case(&["Whatchamakallit", "Thingamajig", "0123456789", "01234_56789"])]
+	#[test_case(&["\0", " ", "Foo\0Bar", "Foo\u{1F4A9}Bar"])]
+	pub fn test(strings: &[&str]) {
 		let mut builder = StringTableBuilder::new(0);
 		let strindexes = strings.iter().map(|&s| builder.lookup(s)).collect::<Vec<_>>();
 		let string_table_bytes = builder.into_iter().collect::<Vec<_>>();
@@ -151,22 +151,22 @@ mod test {
 		assert_eq!(0, actual);
 	}
 
-	#[test_case(0, 0, Ok(""), b"\x9D\x9Bfoo\x80bar\x9F\x99")]
-	#[test_case(1, 2, Ok("foo"), b"\x9D\x9Bfoo\x80bar\x9F\x99")]
-	#[test_case(2, 6, Ok("bar"), b"\x9D\x9Bfoo\x80bar\x9F\x99")]
-	#[test_case(3, 10, Ok(""), b"\x9D\x9Bfoo\x80bar\x9F\x99")]
-	#[test_case(4, 11, Ok(""), b"\x9D\x9Bfoo\x80bar\x9F\x99")]
-	#[test_case(5, 4242, Err(()), b"\x9D\x9Bfoo\x80bar\x9F\x99")]
-	pub fn read_string(_index: usize, offset: usize, expected: std::result::Result<&str, ()>, bytes: &[u8]) {
+	#[test_case(0, Ok(""), b"\x9D\x9Bfoo\x80bar\x9F\x99")]
+	#[test_case(2, Ok("foo"), b"\x9D\x9Bfoo\x80bar\x9F\x99")]
+	#[test_case(6, Ok("bar"), b"\x9D\x9Bfoo\x80bar\x9F\x99")]
+	#[test_case(10, Ok(""), b"\x9D\x9Bfoo\x80bar\x9F\x99")]
+	#[test_case(11, Ok(""), b"\x9D\x9Bfoo\x80bar\x9F\x99")]
+	#[test_case(4242, Err(()), b"\x9D\x9Bfoo\x80bar\x9F\x99")]
+	pub fn read_string(offset: usize, expected: std::result::Result<&str, ()>, bytes: &[u8]) {
 		let expected = expected.map(String::from);
 		let actual = super::read_string(bytes, offset);
 		let actual = actual.map(String::from).map_err(|_| ());
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, "FooBarBaz", &["BarBaz", "Baz"])]
-	#[test_case(1, "AlphaBravoCharlie", &["BravoCharlie", "Charlie"])]
-	pub fn partial_strings(_index: usize, initial: &str, others: &[&str]) {
+	#[test_case("FooBarBaz", &["BarBaz", "Baz"])]
+	#[test_case("AlphaBravoCharlie", &["BravoCharlie", "Charlie"])]
+	pub fn partial_strings(initial: &str, others: &[&str]) {
 		let mut builder = StringTableBuilder::new(0);
 		let _ = builder.lookup(initial);
 		let len = builder.data.len();
@@ -178,8 +178,8 @@ mod test {
 		}
 	}
 
-	#[test_case(0, &["?!", "!!"], &["", "!", "!!", "?!"])]
-	pub fn no_dupes_in_map(_index: usize, lookups: &[&str], expected: &[&str]) {
+	#[test_case(&["?!", "!!"], &["", "!", "!!", "?!"])]
+	pub fn no_dupes_in_map(lookups: &[&str], expected: &[&str]) {
 		let mut builder = StringTableBuilder::new(0);
 		for s in lookups {
 			let _ = builder.lookup(s);

@@ -417,12 +417,12 @@ impl From<ThisError> for Error {
 mod test {
 	use test_case::test_case;
 
-	#[test_case(0, "", "\"\"")]
-	#[test_case(1, "foo", "foo")]
-	#[test_case(2, "\"foo\"", "\"\\\"foo\\\"\"")]
-	#[test_case(3, "foo bar", "\"foo bar\"")]
+	#[test_case("", "\"\"")]
+	#[test_case("foo", "foo")]
+	#[test_case("\"foo\"", "\"\\\"foo\\\"\"")]
+	#[test_case("foo bar", "\"foo bar\"")]
 
-	fn quote_argument_for_interaction_monitor(_index: usize, s: &str, expected: &str) {
+	fn quote_argument_for_interaction_monitor(s: &str, expected: &str) {
 		let actual = super::quote_argument_for_interaction_monitor(s);
 		assert_eq!(actual, expected);
 	}

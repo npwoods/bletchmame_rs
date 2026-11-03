@@ -53,21 +53,21 @@ mod test {
 		size: Option<PhysicalSize>,
 	}
 
-	#[test_case(0, None, json!({}))]
-	#[test_case(1, Some(PhysicalSize { width: 100, height: 100}), json!({"width": 100, "height": 100}))]
-	#[test_case(2, Some(PhysicalSize { width: 250, height: 180}), json!({"width": 250, "height": 180}))]
-	fn serialize(_index: usize, size: Option<PhysicalSize>, expected: Value) {
+	#[test_case(None, json!({}))]
+	#[test_case(Some(PhysicalSize { width: 100, height: 100}), json!({"width": 100, "height": 100}))]
+	#[test_case(Some(PhysicalSize { width: 250, height: 180}), json!({"width": 250, "height": 180}))]
+	fn serialize(size: Option<PhysicalSize>, expected: Value) {
 		let obj = Dummy { size };
 		let actual = serde_json::to_value(&obj).unwrap();
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, json!({}), None)]
-	#[test_case(1, json!({"width": 100, "height": 100}), Some(PhysicalSize { width: 100, height: 100}))]
-	#[test_case(2, json!({"width": 250, "height": 180}), Some(PhysicalSize { width: 250, height: 180}))]
-	#[test_case(3, json!({"width": 100.0, "height": 100.0}), Some(PhysicalSize { width: 100, height: 100}))]
-	#[test_case(4, json!({"width": 250.0, "height": 180.0}), Some(PhysicalSize { width: 250, height: 180}))]
-	fn deserialize(_index: usize, json: Value, expected: Option<PhysicalSize>) {
+	#[test_case(json!({}), None)]
+	#[test_case(json!({"width": 100, "height": 100}), Some(PhysicalSize { width: 100, height: 100}))]
+	#[test_case(json!({"width": 250, "height": 180}), Some(PhysicalSize { width: 250, height: 180}))]
+	#[test_case(json!({"width": 100.0, "height": 100.0}), Some(PhysicalSize { width: 100, height: 100}))]
+	#[test_case(json!({"width": 250.0, "height": 180.0}), Some(PhysicalSize { width: 250, height: 180}))]
+	fn deserialize(json: Value, expected: Option<PhysicalSize>) {
 		let actual = serde_json::from_value::<Dummy>(json).unwrap().size;
 		assert_eq!(expected, actual);
 	}

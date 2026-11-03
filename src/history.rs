@@ -210,29 +210,23 @@ impl HistoryContainer for Preferences {
 mod test {
 	use test_case::test_case;
 
-	#[test_case(0, 0, 3, 1, None)]
-	#[test_case(1, 0, 3, -1, Some(1))]
-	#[test_case(2, 1, 3, 1, Some(0))]
-	#[test_case(3, 1, 3, -1, Some(2))]
-	#[test_case(4, 2, 3, 1, Some(1))]
-	#[test_case(5, 2, 3, -1, None)]
-	pub fn advance_position(_index: usize, position: usize, length: usize, delta: isize, expected: Option<usize>) {
+	#[test_case(0, 3, 1, None)]
+	#[test_case(0, 3, -1, Some(1))]
+	#[test_case(1, 3, 1, Some(0))]
+	#[test_case(1, 3, -1, Some(2))]
+	#[test_case(2, 3, 1, Some(1))]
+	#[test_case(2, 3, -1, None)]
+	pub fn advance_position(position: usize, length: usize, delta: isize, expected: Option<usize>) {
 		let actual = super::advance_position(position, length, delta);
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, &['A', 'B', 'C', 'D'], 2, &['A', 'B', 'C', 'D'], 2)]
-	#[test_case(1, &['A', 'X', 'C', 'D'], 2, &['A', 'C', 'D'], 1)]
-	#[test_case(2, &['A', 'B', 'X', 'D'], 2, &['A', 'B', 'D'], 2)]
-	#[test_case(3, &['A', 'B', 'C', 'X'], 2, &['A', 'B', 'C'], 2)]
-	#[test_case(4, &['A', 'B', 'C', 'X'], 3, &['A', 'B', 'C'], 2)]
-	pub fn retain_with_position(
-		_index: usize,
-		input: &[char],
-		input_position: usize,
-		expected: &[char],
-		expected_position: usize,
-	) {
+	#[test_case(&['A', 'B', 'C', 'D'], 2, &['A', 'B', 'C', 'D'], 2)]
+	#[test_case(&['A', 'X', 'C', 'D'], 2, &['A', 'C', 'D'], 1)]
+	#[test_case(&['A', 'B', 'X', 'D'], 2, &['A', 'B', 'D'], 2)]
+	#[test_case(&['A', 'B', 'C', 'X'], 2, &['A', 'B', 'C'], 2)]
+	#[test_case(&['A', 'B', 'C', 'X'], 3, &['A', 'B', 'C'], 2)]
+	pub fn retain_with_position(input: &[char], input_position: usize, expected: &[char], expected_position: usize) {
 		let input = input.to_vec();
 		let (actual, actual_position) = super::retain_with_position(input, input_position, |&x| x != 'X');
 		assert_eq!((expected.to_vec(), expected_position), (actual, actual_position));

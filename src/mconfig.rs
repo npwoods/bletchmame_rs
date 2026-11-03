@@ -473,10 +473,10 @@ mod test {
 	use super::TagLookup;
 	use super::ThisError;
 
-	#[test_case(0, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[])]
-	#[test_case(1, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))])]
-	#[test_case(2, include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi")), ("ext:multi:slot4:fdc:wd17xx:1", None)])]
-	fn from_machine_name_and_slots(_index: usize, info_xml: &str, machine_name: &str, opts: &[(&str, Option<&str>)]) {
+	#[test_case(include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[])]
+	#[test_case(include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi"))])]
+	#[test_case(include_str!("info/test_data/listxml_coco.xml"), "coco2b", &[("ext", Some("multi")), ("ext:multi:slot4:fdc:wd17xx:1", None)])]
+	fn from_machine_name_and_slots(info_xml: &str, machine_name: &str, opts: &[(&str, Option<&str>)]) {
 		// build the InfoDB
 		let info_db = InfoDb::from_listxml_output(info_xml.as_bytes(), |_| ControlFlow::Continue(()))
 			.unwrap()
@@ -487,12 +487,11 @@ mod test {
 		assert_matches!(actual, Ok(_));
 	}
 
-	#[test_case(0, include_str!("info/test_data/listxml_coco.xml"), "coco2b", "ext", Some("fdc"), Ok(false))]
-	#[test_case(1, include_str!("info/test_data/listxml_coco.xml"), "coco2b", "ext", Some("multi"), Ok(true))]
-	#[test_case(2, include_str!("info/test_data/listxml_coco.xml"), "coco2b", "ext:fdc:wd17xx:0", None, Ok(true))]
-	#[test_case(3, include_str!("info/test_data/listxml_coco.xml"), "coco2b", "ext:fdc:wd17xx:0", Some("525dd"), Ok(false))]
+	#[test_case(include_str!("info/test_data/listxml_coco.xml"), "coco2b", "ext", Some("fdc"), Ok(false))]
+	#[test_case(include_str!("info/test_data/listxml_coco.xml"), "coco2b", "ext", Some("multi"), Ok(true))]
+	#[test_case(include_str!("info/test_data/listxml_coco.xml"), "coco2b", "ext:fdc:wd17xx:0", None, Ok(true))]
+	#[test_case(include_str!("info/test_data/listxml_coco.xml"), "coco2b", "ext:fdc:wd17xx:0", Some("525dd"), Ok(false))]
 	fn set_slot_option(
-		_index: usize,
 		info_xml: &str,
 		machine_name: &str,
 		tag: &str,
@@ -515,14 +514,13 @@ mod test {
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, include_str!("info/test_data/listxml_coco.xml"), "coco2b", None, "", Ok(("coco2b", None)))]
-	#[test_case(1, include_str!("info/test_data/listxml_coco.xml"), "coco2b", None, "ext", Ok(("coco2b", Some("ext"))))]
-	#[test_case(2, include_str!("info/test_data/listxml_coco.xml"), "coco2b", None, "ext:fdc", Ok(("coco_fdc", None)))]
-	#[test_case(3, include_str!("info/test_data/listxml_coco.xml"), "coco2b", None, "ext:fdc:wd17xx:0", Ok(("coco_fdc", Some("wd17xx:0"))))]
-	#[test_case(4, include_str!("info/test_data/listxml_coco.xml"), "coco2b", None, "ext:fdc:wd17xx:1", Ok(("coco_fdc", Some("wd17xx:1"))))]
-	#[test_case(5, include_str!("info/test_data/listxml_coco.xml"), "coco2b", Some(("ext", Some("multi"))), "ext:multi:slot4:fdc:wd17xx:1", Ok(("coco_fdc", Some("wd17xx:1"))))]
+	#[test_case(include_str!("info/test_data/listxml_coco.xml"), "coco2b", None, "", Ok(("coco2b", None)))]
+	#[test_case(include_str!("info/test_data/listxml_coco.xml"), "coco2b", None, "ext", Ok(("coco2b", Some("ext"))))]
+	#[test_case(include_str!("info/test_data/listxml_coco.xml"), "coco2b", None, "ext:fdc", Ok(("coco_fdc", None)))]
+	#[test_case(include_str!("info/test_data/listxml_coco.xml"), "coco2b", None, "ext:fdc:wd17xx:0", Ok(("coco_fdc", Some("wd17xx:0"))))]
+	#[test_case(include_str!("info/test_data/listxml_coco.xml"), "coco2b", None, "ext:fdc:wd17xx:1", Ok(("coco_fdc", Some("wd17xx:1"))))]
+	#[test_case(include_str!("info/test_data/listxml_coco.xml"), "coco2b", Some(("ext", Some("multi"))), "ext:multi:slot4:fdc:wd17xx:1", Ok(("coco_fdc", Some("wd17xx:1"))))]
 	fn set_slot_option_and_lookup_tag(
-		_index: usize,
 		info_xml: &str,
 		machine_name: &str,
 		set_option: Option<(&str, Option<&str>)>,
@@ -562,12 +560,11 @@ mod test {
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, include_str!("info/test_data/listxml_coco.xml"), "coco2b", None, &[], &[])]
-	#[test_case(1, include_str!("info/test_data/listxml_coco.xml"), "coco2b", Some(&[]), &[], &[])]
-	#[test_case(2, include_str!("info/test_data/listxml_coco.xml"), "coco2b", None, &[("ext", Some("multi"))], &[("ext", Some("multi"))])]
-	#[test_case(3, include_str!("info/test_data/listxml_coco.xml"), "coco2b", None, &[("ext", Some("multi")), ("ext:multi:slot4:fdc:wd17xx:1", None)], &[("ext", Some("multi")), ("ext:multi:slot4:fdc:wd17xx:1", None)])]
+	#[test_case(include_str!("info/test_data/listxml_coco.xml"), "coco2b", None, &[], &[])]
+	#[test_case(include_str!("info/test_data/listxml_coco.xml"), "coco2b", Some(&[]), &[], &[])]
+	#[test_case(include_str!("info/test_data/listxml_coco.xml"), "coco2b", None, &[("ext", Some("multi"))], &[("ext", Some("multi"))])]
+	#[test_case(include_str!("info/test_data/listxml_coco.xml"), "coco2b", None, &[("ext", Some("multi")), ("ext:multi:slot4:fdc:wd17xx:1", None)], &[("ext", Some("multi")), ("ext:multi:slot4:fdc:wd17xx:1", None)])]
 	fn changed_slots(
-		_index: usize,
 		info_xml: &str,
 		machine_name: &str,
 		opts1: Option<&[(&str, Option<&str>)]>,

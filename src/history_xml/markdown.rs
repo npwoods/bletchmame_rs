@@ -126,43 +126,39 @@ mod tests {
 	use slint::StyledText;
 	use test_case::test_case;
 
-	#[allow(clippy::zero_prefixed_literal)]
-	#[test_case(00, "", "")]
-	#[test_case(01, "no formatting", "no formatting")]
-	#[test_case(02, "- HEADER -", "**HEADER**")]
-	#[test_case(03, "---", "\\---")]
-	#[test_case(04, "-----", "\\-----")]
-	#[test_case(05, "# Stuff after hash", "\\# Stuff after hash")]
-	#[test_case(06, "#### Stuff after hashes", "\\#### Stuff after hashes")]
-	#[test_case(07, "> Stuff after block quote", "\\> Stuff after block quote")]
-	#[test_case(08, ">>> Stuff after block quotes", "\\>>> Stuff after block quotes")]
-	#[test_case(09, "=======================", "\\=======================")]
-	#[test_case(10, "<a href=\"https://www.mamedev.org\">MAME</a>", "[MAME](https://www.mamedev.org)")]
-	fn markdown_from_history_text(_index: usize, input: &str, expected: &str) {
+	#[test_case("", "")]
+	#[test_case("no formatting", "no formatting")]
+	#[test_case("- HEADER -", "**HEADER**")]
+	#[test_case("---", "\\---")]
+	#[test_case("-----", "\\-----")]
+	#[test_case("# Stuff after hash", "\\# Stuff after hash")]
+	#[test_case("#### Stuff after hashes", "\\#### Stuff after hashes")]
+	#[test_case("> Stuff after block quote", "\\> Stuff after block quote")]
+	#[test_case(">>> Stuff after block quotes", "\\>>> Stuff after block quotes")]
+	#[test_case("=======================", "\\=======================")]
+	#[test_case("<a href=\"https://www.mamedev.org\">MAME</a>", "[MAME](https://www.mamedev.org)")]
+	fn markdown_from_history_text(input: &str, expected: &str) {
 		let actual = super::markdown_from_history_text(input);
 		let _ = StyledText::from_markdown(&actual).expect("markdown_from_history_text() should produce valid markdown");
 		assert_eq!(&actual, expected);
 	}
 
-	#[allow(clippy::zero_prefixed_literal)]
-	#[test_case(00, "no url", "no url")]
-	#[test_case(01, "http://google.com", "[http://google.com](http://google.com)")]
-	#[test_case(02, "https://google.com", "[https://google.com](https://google.com)")]
-	#[test_case(03, "Visit http://google.com for info.", "Visit [http://google.com](http://google.com) for info.")]
-	#[test_case(04, "Check (https://www.mamedev.org)", "Check ([https://www.mamedev.org](https://www.mamedev.org))")]
-	#[test_case(05, "<a href=\"https://www.mamedev.org\">MAME</a>", "[MAME](https://www.mamedev.org)")]
-	#[test_case(06, "Link: <a href=\"http://info.com\">Info</a>.", "Link: [Info](http://info.com).")]
+	#[test_case("no url", "no url")]
+	#[test_case("http://google.com", "[http://google.com](http://google.com)")]
+	#[test_case("https://google.com", "[https://google.com](https://google.com)")]
+	#[test_case("Visit http://google.com for info.", "Visit [http://google.com](http://google.com) for info.")]
+	#[test_case("Check (https://www.mamedev.org)", "Check ([https://www.mamedev.org](https://www.mamedev.org))")]
+	#[test_case("<a href=\"https://www.mamedev.org\">MAME</a>", "[MAME](https://www.mamedev.org)")]
+	#[test_case("Link: <a href=\"http://info.com\">Info</a>.", "Link: [Info](http://info.com).")]
 	#[test_case(
-		07,
 		"Multiple: http://one.com and https://two.com!",
 		"Multiple: [http://one.com](http://one.com) and [https://two.com](https://two.com)!"
 	)]
 	#[test_case(
-		08,
 		"Mixed: <a href=\"http://google.com\">Google</a> and http://bing.com",
 		"Mixed: [Google](http://google.com) and [http://bing.com](http://bing.com)"
 	)]
-	fn markdown_urls(_index: usize, input: &str, expected: &str) {
+	fn markdown_urls(input: &str, expected: &str) {
 		let actual = super::markdown_urls(input);
 		assert_eq!(&actual, expected);
 	}

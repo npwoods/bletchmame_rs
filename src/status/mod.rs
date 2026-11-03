@@ -562,32 +562,31 @@ mod test {
 		assert!(Arc::ptr_eq(&old_run.input_device_classes, &run.input_device_classes));
 	}
 
-	#[test_case(0, "keyboard", InputDeviceClassName::Keyboard)]
-	#[test_case(1, "joystick", InputDeviceClassName::Joystick)]
-	#[test_case(2, "lightgun", InputDeviceClassName::Lightgun)]
-	#[test_case(3, "mouse", InputDeviceClassName::Mouse)]
-	#[test_case(4, "xyz", InputDeviceClassName::Other("xyz".into()))]
-	fn parse_input_device_class_name(_index: usize, s: &str, expected: InputDeviceClassName) {
+	#[test_case("keyboard", InputDeviceClassName::Keyboard)]
+	#[test_case("joystick", InputDeviceClassName::Joystick)]
+	#[test_case("lightgun", InputDeviceClassName::Lightgun)]
+	#[test_case("mouse", InputDeviceClassName::Mouse)]
+	#[test_case("xyz", InputDeviceClassName::Other("xyz".into()))]
+	fn parse_input_device_class_name(s: &str, expected: InputDeviceClassName) {
 		let actual = InputDeviceClassName::from_str(s).unwrap();
 		assert_eq!(expected, actual);
 	}
 
-	#[allow(clippy::zero_prefixed_literal)]
-	#[test_case(00, "XAXIS", InputDeviceToken::XAxis, true)]
-	#[test_case(01, "YAXIS", InputDeviceToken::YAxis, true)]
-	#[test_case(02, "ZAXIS", InputDeviceToken::ZAxis, true)]
-	#[test_case(03, "RZAXIS", InputDeviceToken::RZAxis, true)]
-	#[test_case(04, "BUTTON1", InputDeviceToken::Button(1), false)]
-	#[test_case(05, "HAT1LEFT", InputDeviceToken::HatLeft(1), false)]
-	#[test_case(06, "HAT1RIGHT", InputDeviceToken::HatRight(1), false)]
-	#[test_case(07, "HAT1UP", InputDeviceToken::HatUp(1), false)]
-	#[test_case(08, "HAT1DOWN", InputDeviceToken::HatDown(1), false)]
-	#[test_case(09, "HAT2LEFT", InputDeviceToken::HatLeft(2), false)]
-	#[test_case(10, "HAT3RIGHT", InputDeviceToken::HatRight(3), false)]
-	#[test_case(11, "HAT4UP", InputDeviceToken::HatUp(4), false)]
-	#[test_case(12, "HAT5DOWN", InputDeviceToken::HatDown(5), false)]
-	#[test_case(13, "ZYXZYX", InputDeviceToken::Other("ZYXZYX".into()), false)]
-	fn input_device_token(_index: usize, s: &str, expected: InputDeviceToken, expected_is_axis: bool) {
+	#[test_case("XAXIS", InputDeviceToken::XAxis, true)]
+	#[test_case("YAXIS", InputDeviceToken::YAxis, true)]
+	#[test_case("ZAXIS", InputDeviceToken::ZAxis, true)]
+	#[test_case("RZAXIS", InputDeviceToken::RZAxis, true)]
+	#[test_case("BUTTON1", InputDeviceToken::Button(1), false)]
+	#[test_case("HAT1LEFT", InputDeviceToken::HatLeft(1), false)]
+	#[test_case("HAT1RIGHT", InputDeviceToken::HatRight(1), false)]
+	#[test_case("HAT1UP", InputDeviceToken::HatUp(1), false)]
+	#[test_case("HAT1DOWN", InputDeviceToken::HatDown(1), false)]
+	#[test_case("HAT2LEFT", InputDeviceToken::HatLeft(2), false)]
+	#[test_case("HAT3RIGHT", InputDeviceToken::HatRight(3), false)]
+	#[test_case("HAT4UP", InputDeviceToken::HatUp(4), false)]
+	#[test_case("HAT5DOWN", InputDeviceToken::HatDown(5), false)]
+	#[test_case("ZYXZYX", InputDeviceToken::Other("ZYXZYX".into()), false)]
+	fn input_device_token(s: &str, expected: InputDeviceToken, expected_is_axis: bool) {
 		let actual = InputDeviceToken::from(s);
 		assert_eq!((&expected, expected_is_axis), (&actual, actual.is_axis()));
 	}

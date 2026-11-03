@@ -1251,8 +1251,8 @@ mod test {
 		}
 	}
 
-	#[test_case(0, include_str!("../info/test_data/listxml_coco.xml"), include_str!("../prefs/test_data/prefs01.json"), "Favorites")]
-	pub fn update_with_folder_count(_index: usize, info_xml: &str, prefs_xml: &str, folder_name: &str) {
+	#[test_case(include_str!("../info/test_data/listxml_coco.xml"), include_str!("../prefs/test_data/prefs01.json"), "Favorites")]
+	pub fn update_with_folder_count(info_xml: &str, prefs_xml: &str, folder_name: &str) {
 		// set up the model
 		let selection = SelectionManager::new_internal(|| 0, |_| {});
 		let model = ItemsTableModel::new(selection, |_| {});
@@ -1292,10 +1292,9 @@ mod test {
 		assert_eq!(items.len(), items_in_model.len());
 	}
 
-	#[test_case(0, include_str!("../info/test_data/listxml_coco.xml"), "coco_cart", "baseball", &["coco", "coco2b", "coco2bh", "coco3", "coco3h", "coco3p", "cocoh"])]
-	#[test_case(1, include_str!("../info/test_data/listxml_fake.xml"), "coco_cart", "baseball", &["fake"])]
+	#[test_case(include_str!("../info/test_data/listxml_coco.xml"), "coco_cart", "baseball", &["coco", "coco2b", "coco2bh", "coco3", "coco3h", "coco3p", "cocoh"])]
+	#[test_case(include_str!("../info/test_data/listxml_fake.xml"), "coco_cart", "baseball", &["fake"])]
 	pub fn build_items_builtin_all_software(
-		_index: usize,
 		info_xml: &str,
 		software_list_name: &str,
 		software_name: &str,
@@ -1335,8 +1334,8 @@ mod test {
 		assert_eq!(expected_machine_names, actual_item_machine_names.as_slice());
 	}
 
-	#[test_case(0, include_str!("../info/test_data/listxml_coco.xml"), "coco2b", 112)]
-	pub fn build_items_machine_software(_index: usize, info_xml: &str, machine_name: &str, expected_item_count: usize) {
+	#[test_case(include_str!("../info/test_data/listxml_coco.xml"), "coco2b", 112)]
+	pub fn build_items_machine_software(info_xml: &str, machine_name: &str, expected_item_count: usize) {
 		// prepare an InfoDb and a mock software list dispenser
 		let info_db = InfoDb::from_listxml_output(info_xml.as_bytes(), |_| ControlFlow::Continue(()))
 			.unwrap()

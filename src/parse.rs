@@ -52,28 +52,28 @@ mod test {
 
 	use super::internal_normalize_tag;
 
-	#[test_case(0, "0", Ok(false))]
-	#[test_case(1, "1", Ok(true))]
-	#[test_case(2, "false", Ok(false))]
-	#[test_case(3, "true", Ok(true))]
-	#[test_case(4, "no", Ok(false))]
-	#[test_case(5, "yes", Ok(true))]
-	#[test_case(6, "", Err(()))]
-	#[test_case(7, "zyx", Err(()))]
-	fn parse_mame_bool(_index: usize, s: &str, expected: Result<bool, ()>) {
+	#[test_case("0", Ok(false))]
+	#[test_case("1", Ok(true))]
+	#[test_case("false", Ok(false))]
+	#[test_case("true", Ok(true))]
+	#[test_case("no", Ok(false))]
+	#[test_case("yes", Ok(true))]
+	#[test_case("", Err(()))]
+	#[test_case("zyx", Err(()))]
+	fn parse_mame_bool(s: &str, expected: Result<bool, ()>) {
 		let actual = super::parse_mame_bool(s).map_err(|_| ());
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, "ext", None)]
-	#[test_case(1, "ext:", Some("ext"))]
-	#[test_case(2, ":ext", Some("ext"))]
-	#[test_case(3, ":ext:", Some("ext"))]
-	#[test_case(4, "ext:fdcv11:wd17xx:0:qd", None)]
-	#[test_case(5, ":ext:fdcv11:wd17xx:0:qd", Some("ext:fdcv11:wd17xx:0:qd"))]
-	#[test_case(6, "ext:fdcv11:wd17xx:0:qd:", Some("ext:fdcv11:wd17xx:0:qd"))]
-	#[test_case(7, "ext:fdcv11::::wd17xx:0:qd", Some("ext:fdcv11:wd17xx:0:qd"))]
-	pub fn normalize_tag(_index: usize, tag: &str, expected: Option<&str>) {
+	#[test_case("ext", None)]
+	#[test_case("ext:", Some("ext"))]
+	#[test_case(":ext", Some("ext"))]
+	#[test_case(":ext:", Some("ext"))]
+	#[test_case("ext:fdcv11:wd17xx:0:qd", None)]
+	#[test_case(":ext:fdcv11:wd17xx:0:qd", Some("ext:fdcv11:wd17xx:0:qd"))]
+	#[test_case("ext:fdcv11:wd17xx:0:qd:", Some("ext:fdcv11:wd17xx:0:qd"))]
+	#[test_case("ext:fdcv11::::wd17xx:0:qd", Some("ext:fdcv11:wd17xx:0:qd"))]
+	pub fn normalize_tag(tag: &str, expected: Option<&str>) {
 		let actual = internal_normalize_tag(tag);
 		assert_eq!(expected, actual.as_deref());
 	}

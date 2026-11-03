@@ -59,11 +59,11 @@ mod test {
 		pub field: Vec<(String, Option<String>)>,
 	}
 
-	#[test_case(0, r#"{}"#, &[])]
-	#[test_case(1, r#"{ "ext": null }"#, &[("ext", None)])]
-	#[test_case(2, r#"{ "ext": "multi" }"#, &[("ext", Some("multi"))])]
-	#[test_case(3, r#"{ "ext": "multi", "ext:multi:slot4:fdc:wd17xx:1": "525sd" }"#, &[("ext", Some("multi")), ("ext:multi:slot4:fdc:wd17xx:1", Some("525sd"))])]
-	pub fn test(_index: usize, json: &str, expected: &[(&str, Option<&str>)]) {
+	#[test_case(r#"{}"#, &[])]
+	#[test_case(r#"{ "ext": null }"#, &[("ext", None)])]
+	#[test_case(r#"{ "ext": "multi" }"#, &[("ext", Some("multi"))])]
+	#[test_case(r#"{ "ext": "multi", "ext:multi:slot4:fdc:wd17xx:1": "525sd" }"#, &[("ext", Some("multi")), ("ext:multi:slot4:fdc:wd17xx:1", Some("525sd"))])]
+	pub fn test(json: &str, expected: &[(&str, Option<&str>)]) {
 		let json = format!(r#"{{ "field": {json} }}"#);
 		let obj = serde_json::from_str::<Dummy>(&json).unwrap();
 		let actual = obj.field.as_slice();

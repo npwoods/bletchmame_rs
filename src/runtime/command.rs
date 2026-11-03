@@ -349,18 +349,18 @@ mod test {
 	use super::SeqType;
 
 	#[rustfmt::skip]
-	#[test_case(0, MameCommand::stop(), "STOP")]
-	#[test_case(1, MameCommand::load_image("ext:fdc:wd17xx:0", &ImageDesc::File("foo bar.dsk".into())), "LOAD ext:fdc:wd17xx:0 \"foo bar.dsk\"")]
-	#[test_case(2, MameCommand::load_images(&[("ext:fdc:wd17xx:0", &ImageDesc::File("foo bar.dsk".into()))]), "LOAD ext:fdc:wd17xx:0 \"foo bar.dsk\"")]
-	#[test_case(3, MameCommand::seq_set(&[("foobar", 0x20, SeqType::Standard, "KEYCODE_X or KEYCODE_Y")]), "SEQ_SET foobar 32 standard \"KEYCODE_X or KEYCODE_Y\"")]
-	fn command_test(_index: usize, command: MameCommand, expected: &str) {
+	#[test_case(MameCommand::stop(), "STOP")]
+	#[test_case(MameCommand::load_image("ext:fdc:wd17xx:0", &ImageDesc::File("foo bar.dsk".into())), "LOAD ext:fdc:wd17xx:0 \"foo bar.dsk\"")]
+	#[test_case(MameCommand::load_images(&[("ext:fdc:wd17xx:0", &ImageDesc::File("foo bar.dsk".into()))]), "LOAD ext:fdc:wd17xx:0 \"foo bar.dsk\"")]
+	#[test_case(MameCommand::seq_set(&[("foobar", 0x20, SeqType::Standard, "KEYCODE_X or KEYCODE_Y")]), "SEQ_SET foobar 32 standard \"KEYCODE_X or KEYCODE_Y\"")]
+	fn command_test(command: MameCommand, expected: &str) {
 		let actual = command.text();
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, "coco2b", &[], &["START coco2b"])]
-	#[test_case(1, "coco2b", &[("ext:fdc:wd17xx:0", "foo.dsk")], &["START coco2b", "LOAD ext:fdc:wd17xx:0 foo.dsk"])]
-	fn command_start(_index: usize, machine_name: &str, images: &[(&str, &str)], expected: &[&str]) {
+	#[test_case("coco2b", &[], &["START coco2b"])]
+	#[test_case("coco2b", &[("ext:fdc:wd17xx:0", "foo.dsk")], &["START coco2b", "LOAD ext:fdc:wd17xx:0 foo.dsk"])]
+	fn command_start(machine_name: &str, images: &[(&str, &str)], expected: &[&str]) {
 		let machine_name = machine_name.into();
 		let images = images
 			.iter()
@@ -382,10 +382,10 @@ mod test {
 		assert_eq!(expected, &actual);
 	}
 
-	#[test_case(0, "", "\"\"")]
-	#[test_case(1, "Foo", "Foo")]
-	#[test_case(2, "Foo Bar", "\"Foo Bar\"")]
-	fn quote_if_needed(_index: usize, s: &str, expected: &str) {
+	#[test_case("", "\"\"")]
+	#[test_case("Foo", "Foo")]
+	#[test_case("Foo Bar", "\"Foo Bar\"")]
+	fn quote_if_needed(s: &str, expected: &str) {
 		let actual = super::quote_if_needed(s.into());
 		assert_eq!(expected, &actual);
 	}
