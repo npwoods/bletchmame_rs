@@ -71,11 +71,11 @@ zerocopy = { version = "0.8.63", features = ["derive"] }
 zip = "9.1.2"
 
 # Slint dependencies
-i-slint-backend-qt = { git = "https://github.com/slint-ui/slint.git", rev = "451bbd1ae74d569ed3d8e170a71a63d45d586f66", optional = true }
-i-slint-backend-winit = { git = "https://github.com/slint-ui/slint.git", rev = "451bbd1ae74d569ed3d8e170a71a63d45d586f66" }
-i-slint-common = { git = "https://github.com/slint-ui/slint.git", rev = "451bbd1ae74d569ed3d8e170a71a63d45d586f66" }
-i-slint-core = { git = "https://github.com/slint-ui/slint.git", rev = "451bbd1ae74d569ed3d8e170a71a63d45d586f66" }
-slint = { git = "https://github.com/slint-ui/slint.git", rev = "451bbd1ae74d569ed3d8e170a71a63d45d586f66", features = [
+i-slint-backend-qt = { git = "https://github.com/slint-ui/slint.git", rev = "6f785ba7f67bd22830a21698cccc331f3fc104fd", optional = true }
+i-slint-backend-winit = { git = "https://github.com/slint-ui/slint.git", rev = "6f785ba7f67bd22830a21698cccc331f3fc104fd" }
+i-slint-common = { git = "https://github.com/slint-ui/slint.git", rev = "6f785ba7f67bd22830a21698cccc331f3fc104fd" }
+i-slint-core = { git = "https://github.com/slint-ui/slint.git", rev = "6f785ba7f67bd22830a21698cccc331f3fc104fd" }
+slint = { git = "https://github.com/slint-ui/slint.git", rev = "6f785ba7f67bd22830a21698cccc331f3fc104fd", features = [
     "raw-window-handle-06",
     "unstable-winit-030",
 ] }
@@ -107,7 +107,7 @@ test-case = "3.4.0"
 [build-dependencies]
 cpp_build = "0.5.11"
 ico = "0.6.0"
-slint-build = { git = "https://github.com/slint-ui/slint.git", rev = "451bbd1ae74d569ed3d8e170a71a63d45d586f66" }
+slint-build = { git = "https://github.com/slint-ui/slint.git", rev = "6f785ba7f67bd22830a21698cccc331f3fc104fd" }
 winresource = "0.1.34"
 
 [profile.dev]
