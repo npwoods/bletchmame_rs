@@ -257,9 +257,9 @@ mod test {
 
 	use super::process_xml;
 
-	#[test_case(0, include_str!("test_data/softlist_coco_cart.xml"), ("coco_cart", "Tandy Radio Shack Color Computer cartridges", 112))]
-	#[test_case(1, include_str!("test_data/softlist_msx1_cart.xml"), ("msx1_cart", "MSX1 cartridges", 1230))]
-	pub fn general(_index: usize, xml: &str, expected: (&str, &str, usize)) {
+	#[test_case(include_str!("test_data/softlist_coco_cart.xml"), ("coco_cart", "Tandy Radio Shack Color Computer cartridges", 112))]
+	#[test_case(include_str!("test_data/softlist_msx1_cart.xml"), ("msx1_cart", "MSX1 cartridges", 1230))]
+	pub fn general(xml: &str, expected: (&str, &str, usize)) {
 		let reader = BufReader::new(xml.as_bytes());
 		let software_list = process_xml(reader);
 		let actual = software_list
@@ -269,8 +269,8 @@ mod test {
 		assert_eq!(Ok(expected), actual);
 	}
 
-	#[test_case(0, include_str!("test_data/softlist_coco_cart.xml"), "clowns", ("Clowns & Balloons", "1982", "Tandy"))]
-	pub fn software(_index: usize, xml: &str, name: &str, expected: (&str, &str, &str)) {
+	#[test_case(include_str!("test_data/softlist_coco_cart.xml"), "clowns", ("Clowns & Balloons", "1982", "Tandy"))]
+	pub fn software(xml: &str, name: &str, expected: (&str, &str, &str)) {
 		let reader = BufReader::new(xml.as_bytes());
 		let software_list = process_xml(reader).unwrap();
 		let software = software_list.software.iter().find(|x| x.name == name).unwrap().as_ref();
@@ -283,10 +283,9 @@ mod test {
 	}
 
 	#[allow(clippy::too_many_arguments)]
-	#[test_case(0, include_str!("test_data/softlist_msx1_cart.xml"), "fsfd1", "fs_fd1.rom", 0x4000, Some("4c9b8214"), Some("8e3f6f08309f082a82be8298a66c9b90f2d34ad4"), AssetStatus::Good)]
-	#[test_case(1, include_str!("test_data/softlist_msx1_cart.xml"), "vy0010", "27128q25-8.ic2", 0x4000, Some("164f5a6d"), Some("8924e3e11eb1c8c1edcb7efa63c26d2bdc142473"), AssetStatus::BadDump)]
+	#[test_case(include_str!("test_data/softlist_msx1_cart.xml"), "fsfd1", "fs_fd1.rom", 0x4000, Some("4c9b8214"), Some("8e3f6f08309f082a82be8298a66c9b90f2d34ad4"), AssetStatus::Good)]
+	#[test_case(include_str!("test_data/softlist_msx1_cart.xml"), "vy0010", "27128q25-8.ic2", 0x4000, Some("164f5a6d"), Some("8924e3e11eb1c8c1edcb7efa63c26d2bdc142473"), AssetStatus::BadDump)]
 	pub fn asset(
-		_index: usize,
 		xml: &str,
 		software_name: &str,
 		asset_name: &str,

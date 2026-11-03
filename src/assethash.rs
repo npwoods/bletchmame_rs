@@ -104,11 +104,11 @@ mod test {
 	}
 
 	#[rustfmt::skip]
-	#[test_case(0, None, None, "<<NONE>>")]
-	#[test_case(1, None, Some("99887766554433221100998877665544332211FF"), "SHA1(99887766554433221100998877665544332211ff)")]
-	#[test_case(2, Some("ABC45678"), None, "CRC(abc45678)")]
-	#[test_case(3, Some("F2345678"), Some("EDE87766554433221100998877665544332211FF"), "CRC(f2345678) SHA1(ede87766554433221100998877665544332211ff)")]
-	pub fn display(_index: usize, crc_string: Option<&str>, sha1_string: Option<&str>, expected: &str) {
+	#[test_case(None, None, "<<NONE>>")]
+	#[test_case(None, Some("99887766554433221100998877665544332211FF"), "SHA1(99887766554433221100998877665544332211ff)")]
+	#[test_case(Some("ABC45678"), None, "CRC(abc45678)")]
+	#[test_case(Some("F2345678"), Some("EDE87766554433221100998877665544332211FF"), "CRC(f2345678) SHA1(ede87766554433221100998877665544332211ff)")]
+	pub fn display(crc_string: Option<&str>, sha1_string: Option<&str>, expected: &str) {
 		let actual = AssetHash::from_hex_strings(crc_string, sha1_string).unwrap();
 		assert_eq!(expected, format!("{actual}"));
 		assert_eq!(expected, format!("{actual:?}"));

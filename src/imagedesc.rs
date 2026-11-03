@@ -306,68 +306,59 @@ mod test {
 	use super::ImageDescStringType;
 	use super::ThisError;
 
-	#[allow(clippy::zero_prefixed_literal)]
-	#[test_case(00, ImageDesc::File("/foo/bar.img".into()), ImageDescStringType::ImageDesc, "/foo/bar.img")]
-	#[test_case(01, ImageDesc::File("/foo/bar.img".into()), ImageDescStringType::StartArgument, "/foo/bar.img")]
-	#[test_case(02, ImageDesc::Software{ list: None, name: "abcde".into(), part: None }, ImageDescStringType::ImageDesc, "abcde")]
-	#[test_case(03, ImageDesc::Software{ list: Some("abc".into()), name: "def".into(), part: None }, ImageDescStringType::ImageDesc, "abc:def")]
-	#[test_case(04, ImageDesc::Software{ list: Some("abc".into()), name: "def".into(), part: Some("ghi".into()) }, ImageDescStringType::ImageDesc, "abc:def:ghi")]
-	#[test_case(05, ImageDesc::Software{ list: Some("abc".into()), name: "def".into(), part: Some("ghi".into()) }, ImageDescStringType::StartArgument, "?abc:def:ghi")]
-	#[test_case(06, ImageDesc::socket("contoso.com", 8888).unwrap(), ImageDescStringType::ImageDesc, "socket.contoso.com:8888")]
-	fn image_desc_to_string(_index: usize, desc: ImageDesc, string_type: ImageDescStringType, expected: &str) {
+	#[test_case(ImageDesc::File("/foo/bar.img".into()), ImageDescStringType::ImageDesc, "/foo/bar.img")]
+	#[test_case(ImageDesc::File("/foo/bar.img".into()), ImageDescStringType::StartArgument, "/foo/bar.img")]
+	#[test_case(ImageDesc::Software{ list: None, name: "abcde".into(), part: None }, ImageDescStringType::ImageDesc, "abcde")]
+	#[test_case(ImageDesc::Software{ list: Some("abc".into()), name: "def".into(), part: None }, ImageDescStringType::ImageDesc, "abc:def")]
+	#[test_case(ImageDesc::Software{ list: Some("abc".into()), name: "def".into(), part: Some("ghi".into()) }, ImageDescStringType::ImageDesc, "abc:def:ghi")]
+	#[test_case(ImageDesc::Software{ list: Some("abc".into()), name: "def".into(), part: Some("ghi".into()) }, ImageDescStringType::StartArgument, "?abc:def:ghi")]
+	#[test_case(ImageDesc::socket("contoso.com", 8888).unwrap(), ImageDescStringType::ImageDesc, "socket.contoso.com:8888")]
+	fn image_desc_to_string(desc: ImageDesc, string_type: ImageDescStringType, expected: &str) {
 		let actual = super::image_desc_to_string(&desc, string_type);
 		assert_eq!(expected, &*actual);
 	}
 
-	#[allow(clippy::zero_prefixed_literal)]
-	#[test_case(00, "/foo/bar.img", None, Ok(ImageDesc::File("/foo/bar.img".into())))]
-	#[test_case(01, "abcde", None, Ok(ImageDesc::Software { list: None, name: "abcde".into(), part: None }))]
-	#[test_case(02, "abc:def", None, Ok(ImageDesc::Software { list: Some("abc".into()), name: "def".into(), part: None }))]
-	#[test_case(03, "abc:def:ghi", None, Ok(ImageDesc::Software { list: Some("abc".into()), name: "def".into(), part: Some("ghi".into()) }))]
-	#[test_case(04, "socket.contoso.com:8888", None, Ok(ImageDesc::socket("contoso.com", 8888).unwrap()))]
-	#[test_case(05, "", None, Err(ThisError::InvalidEmptyString))]
-	#[test_case(06, "socket.INVALID", None, Err(ThisError::CannotParseSocketString("socket.INVALID".into())))]
-	#[test_case(07, "socket.------:8888", None, Err(ThisError::InvalidHostName("------".into())))]
-	#[test_case(08, "socket.contoso.com:", None, Err(ThisError::CannotParsePortNumber))]
-	#[test_case(09, "socket.contoso.com:INVALID", None, Err(ThisError::CannotParsePortNumber))]
-	#[test_case(10, "socket.contoso.com:888888", None, Err(ThisError::CannotParsePortNumber))]
-	fn from_mame_image_desc(
-		_index: usize,
-		s: &str,
-		loaded_through_softlist: Option<bool>,
-		expected: Result<ImageDesc, ThisError>,
-	) {
+	#[test_case("/foo/bar.img", None, Ok(ImageDesc::File("/foo/bar.img".into())))]
+	#[test_case("abcde", None, Ok(ImageDesc::Software { list: None, name: "abcde".into(), part: None }))]
+	#[test_case("abc:def", None, Ok(ImageDesc::Software { list: Some("abc".into()), name: "def".into(), part: None }))]
+	#[test_case("abc:def:ghi", None, Ok(ImageDesc::Software { list: Some("abc".into()), name: "def".into(), part: Some("ghi".into()) }))]
+	#[test_case("socket.contoso.com:8888", None, Ok(ImageDesc::socket("contoso.com", 8888).unwrap()))]
+	#[test_case("", None, Err(ThisError::InvalidEmptyString))]
+	#[test_case("socket.INVALID", None, Err(ThisError::CannotParseSocketString("socket.INVALID".into())))]
+	#[test_case("socket.------:8888", None, Err(ThisError::InvalidHostName("------".into())))]
+	#[test_case("socket.contoso.com:", None, Err(ThisError::CannotParsePortNumber))]
+	#[test_case("socket.contoso.com:INVALID", None, Err(ThisError::CannotParsePortNumber))]
+	#[test_case("socket.contoso.com:888888", None, Err(ThisError::CannotParsePortNumber))]
+	fn from_mame_image_desc(s: &str, loaded_through_softlist: Option<bool>, expected: Result<ImageDesc, ThisError>) {
 		let actual = super::from_mame_image_desc(s, loaded_through_softlist);
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, ImageDesc::File("/foo/bar.img".into()), r#"{"type":"file","filename":"/foo/bar.img"}"#)]
-	#[test_case(1, ImageDesc::Software { list: None, name: "abcde".into(), part: None }, r#"{"type":"software","desc":"abcde"}"#)]
-	#[test_case(2, ImageDesc::socket("contoso.com", 8888).unwrap(), r#"{"type":"socket","hostname":"contoso.com","port":8888}"#)]
-	fn serialize(_index: usize, desc: ImageDesc, expected: &str) {
+	#[test_case(ImageDesc::File("/foo/bar.img".into()), r#"{"type":"file","filename":"/foo/bar.img"}"#)]
+	#[test_case(ImageDesc::Software { list: None, name: "abcde".into(), part: None }, r#"{"type":"software","desc":"abcde"}"#)]
+	#[test_case(ImageDesc::socket("contoso.com", 8888).unwrap(), r#"{"type":"socket","hostname":"contoso.com","port":8888}"#)]
+	fn serialize(desc: ImageDesc, expected: &str) {
 		let actual = serde_json::to_string(&desc).unwrap();
 		assert_eq!(expected, &actual);
 	}
 
-	#[test_case(0, r#"{"type":"file","filename":"/alpha/bravo.img"}"#, ImageDesc::File("/alpha/bravo.img".into()))]
-	#[test_case(1, r#"{"type":"software","name":"fghijk"}"#, ImageDesc::Software { list: None, name: "fghijk".into(), part: None })]
-	#[test_case(1, r#"{"type":"software","desc":"fghijk"}"#, ImageDesc::Software { list: None, name: "fghijk".into(), part: None })]
-	#[test_case(1, r#"{"type":"software","desc":"fgh:ijk"}"#, ImageDesc::Software { list: Some("fgh".into()), name: "ijk".into(), part: None })]
-	#[test_case(1, r#"{"type":"software","desc":"fgh:ijk:lmn"}"#, ImageDesc::Software { list: Some("fgh".into()), name: "ijk".into(), part: Some("lmn".into()) })]
-	#[test_case(2, r#"{"type":"socket","hostname":"litware.com","port":7777}"#, ImageDesc::socket("litware.com", 7777).unwrap())]
-	#[test_case(3, "\"/foo/bar.img\"", ImageDesc::File("/foo/bar.img".into()))]
-	#[test_case(4, "\"abcde\"", ImageDesc::Software { list: None, name: "abcde".into(), part: None })]
-	#[test_case(5, "\"socket.contoso.com:8888\"", ImageDesc::socket("contoso.com", 8888).unwrap())]
-	fn deserialize(_index: usize, json: &str, expected: ImageDesc) {
+	#[test_case(r#"{"type":"file","filename":"/alpha/bravo.img"}"#, ImageDesc::File("/alpha/bravo.img".into()))]
+	#[test_case(r#"{"type":"software","name":"fghijk"}"#, ImageDesc::Software { list: None, name: "fghijk".into(), part: None })]
+	#[test_case(r#"{"type":"software","desc":"fghijk"}"#, ImageDesc::Software { list: None, name: "fghijk".into(), part: None })]
+	#[test_case(r#"{"type":"software","desc":"fgh:ijk"}"#, ImageDesc::Software { list: Some("fgh".into()), name: "ijk".into(), part: None })]
+	#[test_case(r#"{"type":"software","desc":"fgh:ijk:lmn"}"#, ImageDesc::Software { list: Some("fgh".into()), name: "ijk".into(), part: Some("lmn".into()) })]
+	#[test_case(r#"{"type":"socket","hostname":"litware.com","port":7777}"#, ImageDesc::socket("litware.com", 7777).unwrap())]
+	#[test_case("\"/foo/bar.img\"", ImageDesc::File("/foo/bar.img".into()))]
+	#[test_case("\"abcde\"", ImageDesc::Software { list: None, name: "abcde".into(), part: None })]
+	#[test_case("\"socket.contoso.com:8888\"", ImageDesc::socket("contoso.com", 8888).unwrap())]
+	fn deserialize(json: &str, expected: ImageDesc) {
 		let actual = serde_json::from_str(json).unwrap();
 		assert_eq!(&expected, &actual);
 	}
 
-	#[allow(clippy::zero_prefixed_literal)]
-	#[test_case(00, include_str!("./info/test_data/listxml_coco.xml"), include_str!("./software/test_data/softlist_coco_flop.xml"), "coco2b", "zonx", &[("ext:fdc:wd17xx:0:525dd", "coco_flop:zonx:flop0")])]
-	#[test_case(01, include_str!("./info/test_data/listxml_coco.xml"), include_str!("./software/test_data/softlist_coco_flop.xml"), "coco2b", "rbwd1086", &[("ext:fdc:wd17xx:0:525dd", "coco_flop:rbwd1086:flop0"), ("ext:fdc:wd17xx:1:525dd", "coco_flop:rbwd1086:flop1")])]
+	#[test_case(include_str!("./info/test_data/listxml_coco.xml"), include_str!("./software/test_data/softlist_coco_flop.xml"), "coco2b", "zonx", &[("ext:fdc:wd17xx:0:525dd", "coco_flop:zonx:flop0")])]
+	#[test_case(include_str!("./info/test_data/listxml_coco.xml"), include_str!("./software/test_data/softlist_coco_flop.xml"), "coco2b", "rbwd1086", &[("ext:fdc:wd17xx:0:525dd", "coco_flop:rbwd1086:flop0"), ("ext:fdc:wd17xx:1:525dd", "coco_flop:rbwd1086:flop1")])]
 	fn from_software(
-		_index: usize,
 		info_xml: &str,
 		software_list_xml: &str,
 		machine_name: &str,

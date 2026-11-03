@@ -736,11 +736,10 @@ mod test {
 	use super::InfoDb;
 	use super::View;
 
-	#[test_case(0, include_str!("test_data/listxml_alienar.xml"), "0.229 (mame0229)", 13, 1, &["alienar", "ipt_merge_any_hi", "ls157"])]
-	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "0.284 (mame0284)", 211, 10, &["93c06_16", "acia6850", "adaptator_multitap"])]
-	#[test_case(2, include_str!("test_data/listxml_fake.xml"), "<<fake build>>", 9, 6, &["blah", "fake", "fakefake", "floppy_525_dd", "floppy_connector", "mc6809e"])]
+	#[test_case(include_str!("test_data/listxml_alienar.xml"), "0.229 (mame0229)", 13, 1, &["alienar", "ipt_merge_any_hi", "ls157"])]
+	#[test_case(include_str!("test_data/listxml_coco.xml"), "0.284 (mame0284)", 211, 10, &["93c06_16", "acia6850", "adaptator_multitap"])]
+	#[test_case(include_str!("test_data/listxml_fake.xml"), "<<fake build>>", 9, 6, &["blah", "fake", "fakefake", "floppy_525_dd", "floppy_connector", "mc6809e"])]
 	pub fn test(
-		_index: usize,
 		xml: &str,
 		expected_build: &str,
 		expected_machines_count: usize,
@@ -775,13 +774,12 @@ mod test {
 	}
 
 	#[allow(clippy::too_many_arguments)]
-	#[test_case(0, include_str!("test_data/listxml_alienar.xml"), "alienar", "Alien Arena", "1985", "Duncan Brown", "williams.cpp", None, None)]
-	#[test_case(1, include_str!("test_data/listxml_c64.xml"), "c64", "Commodore 64 (NTSC)", "1982", "Commodore Business Machines", "commodore/c64.cpp", None, None)]
-	#[test_case(2, include_str!("test_data/listxml_coco.xml"), "coco2b", "Color Computer 2B", "1985?", "Tandy Radio Shack", "trs/coco12.cpp", Some("coco"), Some("coco"))]
-	#[test_case(3, include_str!("test_data/listxml_bbcm.xml"), "bbcm", "BBC Master 128", "1986", "Acorn Computers", "acorn/bbcm.cpp", None, None)]
-	#[test_case(4, include_str!("test_data/listxml_fake.xml"), "fake", "Fake Machine", "2021", "<Bletch>", "fake_machine.cpp", None, None)]
+	#[test_case(include_str!("test_data/listxml_alienar.xml"), "alienar", "Alien Arena", "1985", "Duncan Brown", "williams.cpp", None, None)]
+	#[test_case(include_str!("test_data/listxml_c64.xml"), "c64", "Commodore 64 (NTSC)", "1982", "Commodore Business Machines", "commodore/c64.cpp", None, None)]
+	#[test_case(include_str!("test_data/listxml_coco.xml"), "coco2b", "Color Computer 2B", "1985?", "Tandy Radio Shack", "trs/coco12.cpp", Some("coco"), Some("coco"))]
+	#[test_case(include_str!("test_data/listxml_bbcm.xml"), "bbcm", "BBC Master 128", "1986", "Acorn Computers", "acorn/bbcm.cpp", None, None)]
+	#[test_case(include_str!("test_data/listxml_fake.xml"), "fake", "Fake Machine", "2021", "<Bletch>", "fake_machine.cpp", None, None)]
 	pub fn machine(
-		_index: usize,
 		xml: &str,
 		name: &str,
 		expected_description: &str,
@@ -818,10 +816,10 @@ mod test {
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, include_str!("test_data/listxml_alienar.xml"), 0, Some(("alienar", "1985")))]
-	#[test_case(1, include_str!("test_data/listxml_alienar.xml"), 5, Some(("mc6809e", "")))]
-	#[test_case(2, include_str!("test_data/listxml_alienar.xml"), 4242, None)]
-	pub fn machines_get(_index: usize, xml: &str, index: usize, expected: Option<(&str, &str)>) {
+	#[test_case(include_str!("test_data/listxml_alienar.xml"), 0, Some(("alienar", "1985")))]
+	#[test_case(include_str!("test_data/listxml_alienar.xml"), 5, Some(("mc6809e", "")))]
+	#[test_case(include_str!("test_data/listxml_alienar.xml"), 4242, None)]
+	pub fn machines_get(xml: &str, index: usize, expected: Option<(&str, &str)>) {
 		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| ControlFlow::Continue(()))
 			.unwrap()
 			.unwrap();
@@ -834,12 +832,12 @@ mod test {
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, include_str!("test_data/listxml_alienar.xml"), "alienar", Some(("Duncan Brown", "1985")))]
-	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "coco", Some(("Tandy Radio Shack", "1980")))]
-	#[test_case(2, include_str!("test_data/listxml_coco.xml"), "coco2b", Some(("Tandy Radio Shack", "1985?")))]
-	#[test_case(3, include_str!("test_data/listxml_fake.xml"), "fake", Some(("<Bletch>", "2021")))]
-	#[test_case(4, include_str!("test_data/listxml_fake.xml"), "NONEXISTANT", None)]
-	pub fn machines_find(_index: usize, xml: &str, target: &str, expected: Option<(&str, &str)>) {
+	#[test_case(include_str!("test_data/listxml_alienar.xml"), "alienar", Some(("Duncan Brown", "1985")))]
+	#[test_case(include_str!("test_data/listxml_coco.xml"), "coco", Some(("Tandy Radio Shack", "1980")))]
+	#[test_case(include_str!("test_data/listxml_coco.xml"), "coco2b", Some(("Tandy Radio Shack", "1985?")))]
+	#[test_case(include_str!("test_data/listxml_fake.xml"), "fake", Some(("<Bletch>", "2021")))]
+	#[test_case(include_str!("test_data/listxml_fake.xml"), "NONEXISTANT", None)]
+	pub fn machines_find(xml: &str, target: &str, expected: Option<(&str, &str)>) {
 		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| ControlFlow::Continue(()))
 			.unwrap()
 			.unwrap();
@@ -853,8 +851,8 @@ mod test {
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, include_str!("test_data/listxml_alienar.xml"))]
-	pub fn machines_find_everything(_index: usize, xml: &str) {
+	#[test_case(include_str!("test_data/listxml_alienar.xml"))]
+	pub fn machines_find_everything(xml: &str) {
 		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| ControlFlow::Continue(()))
 			.unwrap()
 			.unwrap();
@@ -864,10 +862,9 @@ mod test {
 		}
 	}
 
-	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", DriverQuality::Good, DriverQuality::Good, DriverSavestate::Supported)]
-	#[test_case(1, include_str!("test_data/listxml_fake.xml"), "fake", DriverQuality::Preliminary, DriverQuality::Preliminary, DriverSavestate::Unsupported)]
+	#[test_case(include_str!("test_data/listxml_coco.xml"), "coco2b", DriverQuality::Good, DriverQuality::Good, DriverSavestate::Supported)]
+	#[test_case(include_str!("test_data/listxml_fake.xml"), "fake", DriverQuality::Preliminary, DriverQuality::Preliminary, DriverSavestate::Unsupported)]
 	pub fn driver(
-		_index: usize,
 		xml: &str,
 		machine: &str,
 		expected_status: DriverQuality,
@@ -887,12 +884,11 @@ mod test {
 	}
 
 	#[allow(clippy::too_many_arguments)]
-	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", "bas13.rom", Some("d8f4d15e"), Some("28b92bebe35fa4f026a084416d6ea3b1552b63d3"), AssetStatus::Good, false)]
-	#[test_case(1, include_str!("test_data/listxml_fake.xml"), "blah", "garbage.bin", Some("0faf9fdb"), Some("c27909184ee9170707c1be9a4cfbe83b359672e1"), AssetStatus::Good, true)]
-	#[test_case(2, include_str!("test_data/listxml_fake.xml"), "blah", "nodump.bin", None, None, AssetStatus::NoDump, false)]
-	#[test_case(3, include_str!("test_data/listxml_fake.xml"), "blah", "baddump.bin", None, None, AssetStatus::BadDump, false)]
+	#[test_case(include_str!("test_data/listxml_coco.xml"), "coco2b", "bas13.rom", Some("d8f4d15e"), Some("28b92bebe35fa4f026a084416d6ea3b1552b63d3"), AssetStatus::Good, false)]
+	#[test_case(include_str!("test_data/listxml_fake.xml"), "blah", "garbage.bin", Some("0faf9fdb"), Some("c27909184ee9170707c1be9a4cfbe83b359672e1"), AssetStatus::Good, true)]
+	#[test_case(include_str!("test_data/listxml_fake.xml"), "blah", "nodump.bin", None, None, AssetStatus::NoDump, false)]
+	#[test_case(include_str!("test_data/listxml_fake.xml"), "blah", "baddump.bin", None, None, AssetStatus::BadDump, false)]
 	pub fn roms(
-		_index: usize,
 		xml: &str,
 		machine: &str,
 		rom: &str,
@@ -916,14 +912,8 @@ mod test {
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco_scii", 1, &[("cdos", "Disto C-DOS v4.0 for the CoCo 1/2"), ("cdos3", "Disto C-DOS 3 v1.2 for the CoCo 3")])]
-	pub fn biossets(
-		_index: usize,
-		xml: &str,
-		machine: &str,
-		expected_default_biosset_index: usize,
-		expected: &[(&str, &str)],
-	) {
+	#[test_case(include_str!("test_data/listxml_coco.xml"), "coco_scii", 1, &[("cdos", "Disto C-DOS v4.0 for the CoCo 1/2"), ("cdos3", "Disto C-DOS 3 v1.2 for the CoCo 3")])]
+	pub fn biossets(xml: &str, machine: &str, expected_default_biosset_index: usize, expected: &[(&str, &str)]) {
 		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| ControlFlow::Continue(()))
 			.unwrap()
 			.unwrap();
@@ -941,9 +931,9 @@ mod test {
 		);
 	}
 
-	#[test_case(0, include_str!("test_data/listxml_alienar.xml"), "alienar", &[(ChipType::Cpu, "maincpu"), (ChipType::Cpu, "soundcpu"), (ChipType::Audio, "speaker"), (ChipType::Audio, "dac")])]
-	#[test_case(1, include_str!("test_data/listxml_fake.xml"), "fake", &[(ChipType::Cpu, "maincpu")])]
-	pub fn chips(_index: usize, xml: &str, machine: &str, expected: &[(ChipType, &str)]) {
+	#[test_case(include_str!("test_data/listxml_alienar.xml"), "alienar", &[(ChipType::Cpu, "maincpu"), (ChipType::Cpu, "soundcpu"), (ChipType::Audio, "speaker"), (ChipType::Audio, "dac")])]
+	#[test_case(include_str!("test_data/listxml_fake.xml"), "fake", &[(ChipType::Cpu, "maincpu")])]
+	pub fn chips(xml: &str, machine: &str, expected: &[(ChipType, &str)]) {
 		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| ControlFlow::Continue(()))
 			.unwrap()
 			.unwrap();
@@ -963,12 +953,11 @@ mod test {
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", "ext:fdc:wd17xx:0:525dd", crate::info::DeviceType::FloppyDisk, &["floppy_5_25"],
+	#[test_case(include_str!("test_data/listxml_coco.xml"), "coco2b", "ext:fdc:wd17xx:0:525dd", crate::info::DeviceType::FloppyDisk, &["floppy_5_25"],
 		&["1dd", "86f", "cqi", "cqm", "d77", "d88", "dfi", "dmk", "dsk", "imd", "jvc", "mfi", "mfm", "os9", "sdf", "td0", "vdk"])]
-	#[test_case(1, include_str!("test_data/listxml_c64.xml"), "c64", "exp", crate::info::DeviceType::Cartridge, &["c64_cart" ,"vic10_cart"],
+	#[test_case(include_str!("test_data/listxml_c64.xml"), "c64", "exp", crate::info::DeviceType::Cartridge, &["c64_cart" ,"vic10_cart"],
 		&["80", "a0", "crt", "e0"])]
 	pub fn devices(
-		_index: usize,
 		xml: &str,
 		machine: &str,
 		device_tag: &str,
@@ -1003,13 +992,13 @@ mod test {
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", "mc6809e", 1)]
-	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "coco2b", "pia6821", 2)]
-	#[test_case(2, include_str!("test_data/listxml_coco.xml"), "coco2b", "floppy_connector", 0)]
-	#[test_case(3, include_str!("test_data/listxml_fake.xml"), "fake", "mc6809e", 1)]
-	#[test_case(4, include_str!("test_data/listxml_fake.xml"), "fake", "floppy_connector", 0)]
-	#[test_case(5, include_str!("test_data/listxml_fake.xml"), "fake", "floppy_525_dd", 0)]
-	pub fn device_refs(_index: usize, xml: &str, machine: &str, device_ref_name: &str, expected_count: usize) {
+	#[test_case(include_str!("test_data/listxml_coco.xml"), "coco2b", "mc6809e", 1)]
+	#[test_case(include_str!("test_data/listxml_coco.xml"), "coco2b", "pia6821", 2)]
+	#[test_case(include_str!("test_data/listxml_coco.xml"), "coco2b", "floppy_connector", 0)]
+	#[test_case(include_str!("test_data/listxml_fake.xml"), "fake", "mc6809e", 1)]
+	#[test_case(include_str!("test_data/listxml_fake.xml"), "fake", "floppy_connector", 0)]
+	#[test_case(include_str!("test_data/listxml_fake.xml"), "fake", "floppy_525_dd", 0)]
+	pub fn device_refs(xml: &str, machine: &str, device_ref_name: &str, expected_count: usize) {
 		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| ControlFlow::Continue(()))
 			.unwrap()
 			.unwrap();
@@ -1021,9 +1010,9 @@ mod test {
 		assert_eq!(expected_count, actual_count);
 	}
 
-	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", &["rs232", "ext"])]
-	#[test_case(1, include_str!("test_data/listxml_fake.xml"), "fake", &["ext"])]
-	pub fn slots(_index: usize, xml: &str, machine: &str, expected: &[&str]) {
+	#[test_case(include_str!("test_data/listxml_coco.xml"), "coco2b", &["rs232", "ext"])]
+	#[test_case(include_str!("test_data/listxml_fake.xml"), "fake", &["ext"])]
+	pub fn slots(xml: &str, machine: &str, expected: &[&str]) {
 		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| ControlFlow::Continue(()))
 			.unwrap()
 			.unwrap();
@@ -1040,9 +1029,8 @@ mod test {
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", "ext", Some(17), &[("scii", "coco_scii"), ("cp450_fdc", "cp450_fdc"), ("cd6809_fdc", "cd6809_fdc"), ("sym12", "coco_symphony_twelve")])]
+	#[test_case(include_str!("test_data/listxml_coco.xml"), "coco2b", "ext", Some(17), &[("scii", "coco_scii"), ("cp450_fdc", "cp450_fdc"), ("cd6809_fdc", "cd6809_fdc"), ("sym12", "coco_symphony_twelve")])]
 	pub fn slot_options(
-		_index: usize,
 		xml: &str,
 		machine: &str,
 		slot: &str,
@@ -1079,8 +1067,8 @@ mod test {
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", &[("coco_cart_list", "coco_cart"), ("coco_flop_list", "coco_flop"), ("dragon_cart_list", "dragon_cart")])]
-	pub fn machine_software_lists(_index: usize, xml: &str, machine: &str, expected: &[(&str, &str)]) {
+	#[test_case(include_str!("test_data/listxml_coco.xml"), "coco2b", &[("coco_cart_list", "coco_cart"), ("coco_flop_list", "coco_flop"), ("dragon_cart_list", "dragon_cart")])]
+	pub fn machine_software_lists(xml: &str, machine: &str, expected: &[(&str, &str)]) {
 		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| ControlFlow::Continue(()))
 			.unwrap()
 			.unwrap();
@@ -1100,10 +1088,9 @@ mod test {
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco_cart", &["coco", "coco2b", "coco2bh", "coco3"], &[])]
-	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "dragon_cart", &[], &["coco", "coco2b", "coco2bh", "cocoh"])]
+	#[test_case(include_str!("test_data/listxml_coco.xml"), "coco_cart", &["coco", "coco2b", "coco2bh", "coco3"], &[])]
+	#[test_case(include_str!("test_data/listxml_coco.xml"), "dragon_cart", &[], &["coco", "coco2b", "coco2bh", "cocoh"])]
 	pub fn software_lists(
-		_index: usize,
 		xml: &str,
 		software_list_name: &str,
 		expected_originals: &[&str],
@@ -1139,9 +1126,9 @@ mod test {
 		);
 	}
 
-	#[test_case(0, include_str!("test_data/listxml_coco.xml"), "coco2b", &[("beckerport", 1, 0), ("ctrl_sel", 15, 1), ("ctrl_sel", 240, 1), ("dwsock:drivewire_port", 65535, 4), ("hires_intf", 7, 0), ("rs232:rs_printer:RS232_DATABITS", 255, 3), ("rs232:rs_printer:RS232_PARITY", 255, 0), ("rs232:rs_printer:RS232_RXBAUD", 255, 7), ("rs232:rs_printer:RS232_STOPBITS", 255, 1), ("vdg:artifacting", 3, 1)])]
-	#[test_case(1, include_str!("test_data/listxml_coco.xml"), "coco3", &[("beckerport", 1, 0), ("ctrl_sel", 15, 1), ("ctrl_sel", 240, 1), ("dwsock:drivewire_port", 65535, 4), ("gime:artifacting", 3, 1), ("hires_intf", 7, 0), ("rs232:rs_printer:RS232_DATABITS", 255, 3), ("rs232:rs_printer:RS232_PARITY", 255, 0), ("rs232:rs_printer:RS232_RXBAUD", 255, 7), ("rs232:rs_printer:RS232_STOPBITS", 255, 1), ("screen_config", 1, 0)])]
-	fn configurations(_index: usize, xml: &str, machine_name: &str, expected: &[(&str, u32, usize)]) {
+	#[test_case(include_str!("test_data/listxml_coco.xml"), "coco2b", &[("beckerport", 1, 0), ("ctrl_sel", 15, 1), ("ctrl_sel", 240, 1), ("dwsock:drivewire_port", 65535, 4), ("hires_intf", 7, 0), ("rs232:rs_printer:RS232_DATABITS", 255, 3), ("rs232:rs_printer:RS232_PARITY", 255, 0), ("rs232:rs_printer:RS232_RXBAUD", 255, 7), ("rs232:rs_printer:RS232_STOPBITS", 255, 1), ("vdg:artifacting", 3, 1)])]
+	#[test_case(include_str!("test_data/listxml_coco.xml"), "coco3", &[("beckerport", 1, 0), ("ctrl_sel", 15, 1), ("ctrl_sel", 240, 1), ("dwsock:drivewire_port", 65535, 4), ("gime:artifacting", 3, 1), ("hires_intf", 7, 0), ("rs232:rs_printer:RS232_DATABITS", 255, 3), ("rs232:rs_printer:RS232_PARITY", 255, 0), ("rs232:rs_printer:RS232_RXBAUD", 255, 7), ("rs232:rs_printer:RS232_STOPBITS", 255, 1), ("screen_config", 1, 0)])]
+	fn configurations(xml: &str, machine_name: &str, expected: &[(&str, u32, usize)]) {
 		let db = InfoDb::from_listxml_output(xml.as_bytes(), |_| ControlFlow::Continue(()))
 			.unwrap()
 			.unwrap();
@@ -1154,13 +1141,13 @@ mod test {
 		assert_eq!(expected, actual.as_slice());
 	}
 
-	#[test_case(0, "alpha:bravo:charlie", "alpha", Some("bravo:charlie"))]
-	#[test_case(1, "alpha:bravo:charlie", "alpha:bravo", Some("charlie"))]
-	#[test_case(2, "alpha:bravo:charlie", "alpha:bravo:charlie", Some(""))]
-	#[test_case(3, "alpha:bravo:charlie", "delta", None)]
-	#[test_case(4, "alpha:bravo:charlie", "alp", None)]
-	#[test_case(5, "alpha:bravo:charlie", "alpha:bra", None)]
-	pub fn strip_tag_prefix(_index: usize, tag: &str, target: &str, expected: Option<&str>) {
+	#[test_case("alpha:bravo:charlie", "alpha", Some("bravo:charlie"))]
+	#[test_case("alpha:bravo:charlie", "alpha:bravo", Some("charlie"))]
+	#[test_case("alpha:bravo:charlie", "alpha:bravo:charlie", Some(""))]
+	#[test_case("alpha:bravo:charlie", "delta", None)]
+	#[test_case("alpha:bravo:charlie", "alp", None)]
+	#[test_case("alpha:bravo:charlie", "alpha:bra", None)]
+	pub fn strip_tag_prefix(tag: &str, target: &str, expected: Option<&str>) {
 		let actual = super::strip_tag_prefix(tag, target);
 		assert_eq!(expected, actual);
 	}

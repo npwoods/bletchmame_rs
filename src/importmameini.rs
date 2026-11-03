@@ -230,14 +230,14 @@ mod test {
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, "", None)]
-	#[test_case(1, "   ", None)]
-	#[test_case(2, "# COMMENT", None)]
-	#[test_case(3, "alpha bravo", Some(("alpha", "bravo")))]
-	#[test_case(4, "alpha bravo # COMMENT", Some(("alpha", "bravo")))]
-	#[test_case(5, "alpha \"bravo\" # COMMENT", Some(("alpha", "bravo")))]
-	#[test_case(6, "alpha \"bravo charlie\" # COMMENT", Some(("alpha", "bravo charlie")))]
-	fn parse_mame_ini_line(_index: usize, line: &str, expected: Option<(&str, &str)>) {
+	#[test_case("", None)]
+	#[test_case("   ", None)]
+	#[test_case("# COMMENT", None)]
+	#[test_case("alpha bravo", Some(("alpha", "bravo")))]
+	#[test_case("alpha bravo # COMMENT", Some(("alpha", "bravo")))]
+	#[test_case("alpha \"bravo\" # COMMENT", Some(("alpha", "bravo")))]
+	#[test_case("alpha \"bravo charlie\" # COMMENT", Some(("alpha", "bravo charlie")))]
+	fn parse_mame_ini_line(line: &str, expected: Option<(&str, &str)>) {
 		let actual = super::parse_mame_ini_line(line);
 		assert_eq!(expected, actual);
 	}

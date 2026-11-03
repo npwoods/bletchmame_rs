@@ -87,12 +87,12 @@ pub async fn dialog_rename_collection(
 mod test {
 	use test_case::test_case;
 
-	#[test_case(0, &[], "", false)]
-	#[test_case(1, &[], "Foo", true)]
-	#[test_case(2, &[], "New Collection", true)]
-	#[test_case(3, &["New Collection"], "New Collection", false)]
-	#[test_case(4, &["New Collection"], "New Collection 2", true)]
-	fn is_good_new_name(_index: usize, existing_names: &[&str], new_name: &str, expected: bool) {
+	#[test_case(&[], "", false)]
+	#[test_case(&[], "Foo", true)]
+	#[test_case(&[], "New Collection", true)]
+	#[test_case(&["New Collection"], "New Collection", false)]
+	#[test_case(&["New Collection"], "New Collection 2", true)]
+	fn is_good_new_name(existing_names: &[&str], new_name: &str, expected: bool) {
 		let existing_names = existing_names.iter().map(|x| x.to_string()).collect::<Vec<_>>();
 		let actual = super::is_good_new_name(&existing_names, new_name);
 		assert_eq!(expected, actual);

@@ -170,20 +170,19 @@ pub fn is_valid_software_list_name(s: &str) -> bool {
 mod test {
 	use test_case::test_case;
 
-	#[allow(clippy::zero_prefixed_literal)]
-	#[test_case(00, "", false)]
-	#[test_case(01, "abcde", true)]
-	#[test_case(02, "abc:def", true)]
-	#[test_case(03, "abc:def:ghi", true)]
-	#[test_case(04, "abc:def:ghi:jkl", false)]
-	#[test_case(05, "Abcde", false)]
-	#[test_case(06, "ABCDE", false)]
-	#[test_case(07, "abcde_fghij", true)]
-	#[test_case(08, "abcde fghij", false)]
-	#[test_case(09, "foo.img", false)]
-	#[test_case(10, "/foo/bar.img", false)]
-	#[test_case(11, "C:\\foo\\bar.img", false)]
-	fn is_valid_software_list_name(_index: usize, s: &str, expected: bool) {
+	#[test_case("", false)]
+	#[test_case("abcde", true)]
+	#[test_case("abc:def", true)]
+	#[test_case("abc:def:ghi", true)]
+	#[test_case("abc:def:ghi:jkl", false)]
+	#[test_case("Abcde", false)]
+	#[test_case("ABCDE", false)]
+	#[test_case("abcde_fghij", true)]
+	#[test_case("abcde fghij", false)]
+	#[test_case("foo.img", false)]
+	#[test_case("/foo/bar.img", false)]
+	#[test_case("C:\\foo\\bar.img", false)]
+	fn is_valid_software_list_name(s: &str, expected: bool) {
 		let actual = super::is_valid_software_list_name(s);
 		assert_eq!(expected, actual);
 	}

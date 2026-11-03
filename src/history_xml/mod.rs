@@ -41,10 +41,10 @@ mod tests {
 
 	use super::parse_from_reader;
 
-	#[test_case(0, include_str!("test_data/history.xml"), "litware64", Some("The \"Litware 64\" and \"Litware 128\" never existed"))]
-	#[test_case(1, include_str!("test_data/history.xml"), "litware128", Some("The \"Litware 64\" and \"Litware 128\" never existed"))]
-	#[test_case(2, include_str!("test_data/history.xml"), "DOESNT_EXIST", None)]
-	fn by_system(_index: usize, xml: &str, system: &str, expected: Option<&str>) {
+	#[test_case(include_str!("test_data/history.xml"), "litware64", Some("The \"Litware 64\" and \"Litware 128\" never existed"))]
+	#[test_case(include_str!("test_data/history.xml"), "litware128", Some("The \"Litware 64\" and \"Litware 128\" never existed"))]
+	#[test_case(include_str!("test_data/history.xml"), "DOESNT_EXIST", None)]
+	fn by_system(xml: &str, system: &str, expected: Option<&str>) {
 		let history = parse_from_reader(xml.as_bytes(), || false).unwrap().unwrap();
 		let actual = history.by_system(system);
 
@@ -52,10 +52,10 @@ mod tests {
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, include_str!("test_data/history.xml"), "contoso_flop", "contoso_alpha01", Some("Contoso's alpha invaders never existed either"))]
-	#[test_case(1, include_str!("test_data/history.xml"), "contoso_flop", "contoso_alpha02", Some("Contoso's alpha invaders never existed either"))]
-	#[test_case(2, include_str!("test_data/history.xml"), "contoso_flop", "DOESNT_EXIST", None)]
-	fn by_software(_index: usize, xml: &str, list: &str, name: &str, expected: Option<&str>) {
+	#[test_case(include_str!("test_data/history.xml"), "contoso_flop", "contoso_alpha01", Some("Contoso's alpha invaders never existed either"))]
+	#[test_case(include_str!("test_data/history.xml"), "contoso_flop", "contoso_alpha02", Some("Contoso's alpha invaders never existed either"))]
+	#[test_case(include_str!("test_data/history.xml"), "contoso_flop", "DOESNT_EXIST", None)]
+	fn by_software(xml: &str, list: &str, name: &str, expected: Option<&str>) {
 		let history = parse_from_reader(xml.as_bytes(), || false).unwrap().unwrap();
 		let actual = history.by_software(list, name);
 

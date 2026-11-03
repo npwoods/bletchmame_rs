@@ -885,22 +885,21 @@ mod test {
 
 	use super::InputSourceToken;
 
-	#[allow(clippy::zero_prefixed_literal)]
-	#[test_case(00, "", None)]
-	#[test_case(01, "KEYCODE_A", None)]
-	#[test_case(02, "KEYCODE_LEFT", Some(InputSourceToken::Left))]
-	#[test_case(03, "KEYCODE_RIGHT", Some(InputSourceToken::Right))]
-	#[test_case(04, "KEYCODE_UP", Some(InputSourceToken::Up))]
-	#[test_case(05, "KEYCODE_DOWN", Some(InputSourceToken::Down))]
-	#[test_case(06, "JOYCODE_1_BUTTON256", None)]
-	#[test_case(07, "JOYCODE_BUTTON1", None)]
-	#[test_case(08, "JOYCODE_1_BUTTON1", Some(InputSourceToken::Button(1)))]
-	#[test_case(09, "MOUSECODE_2_BUTTON3", Some(InputSourceToken::Button(3)))]
-	#[test_case(10, "JOYCODE_1_XAXIS", Some(InputSourceToken::XAxis))]
-	#[test_case(11, "MOUSECODE_1_YAXIS", Some(InputSourceToken::YAxis))]
-	#[test_case(12, "JOYCODE_1_ZAXIS", Some(InputSourceToken::ZAxis))]
-	#[test_case(13, "JOYCODE_1_RZAXIS", Some(InputSourceToken::RZAxis))]
-	fn parse_single_input_token(_index: usize, input: &str, expected: Option<InputSourceToken>) {
+	#[test_case("", None)]
+	#[test_case("KEYCODE_A", None)]
+	#[test_case("KEYCODE_LEFT", Some(InputSourceToken::Left))]
+	#[test_case("KEYCODE_RIGHT", Some(InputSourceToken::Right))]
+	#[test_case("KEYCODE_UP", Some(InputSourceToken::Up))]
+	#[test_case("KEYCODE_DOWN", Some(InputSourceToken::Down))]
+	#[test_case("JOYCODE_1_BUTTON256", None)]
+	#[test_case("JOYCODE_BUTTON1", None)]
+	#[test_case("JOYCODE_1_BUTTON1", Some(InputSourceToken::Button(1)))]
+	#[test_case("MOUSECODE_2_BUTTON3", Some(InputSourceToken::Button(3)))]
+	#[test_case("JOYCODE_1_XAXIS", Some(InputSourceToken::XAxis))]
+	#[test_case("MOUSECODE_1_YAXIS", Some(InputSourceToken::YAxis))]
+	#[test_case("JOYCODE_1_ZAXIS", Some(InputSourceToken::ZAxis))]
+	#[test_case("JOYCODE_1_RZAXIS", Some(InputSourceToken::RZAxis))]
+	fn parse_single_input_token(input: &str, expected: Option<InputSourceToken>) {
 		let actual = super::parse_single_input_token(input);
 		assert_eq!(expected, actual);
 	}

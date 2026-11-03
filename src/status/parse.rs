@@ -639,28 +639,28 @@ mod test {
 
 	use super::parse_update;
 
-	#[test_case(0, include_str!("test_data/status_mame0226_coco2b_1.xml"))]
-	#[test_case(1, include_str!("test_data/status_mame0227_coco2b_1.xml"))]
-	#[test_case(2, include_str!("test_data/status_mame0270_1.xml"))]
-	#[test_case(3, include_str!("test_data/status_mame0270_coco2b_1.xml"))]
-	#[test_case(4, include_str!("test_data/status_mame0270_coco2b_2.xml"))]
-	#[test_case(5, include_str!("test_data/status_mame0270_coco2b_3.xml"))]
-	#[test_case(6, include_str!("test_data/status_mame0270_coco2b_4.xml"))]
-	#[test_case(7, include_str!("test_data/status_mame0270_coco2b_5.xml"))]
-	#[test_case(8, include_str!("test_data/status_mame0273_c64_1.xml"))]
-	fn general(_index: usize, xml: &str) {
+	#[test_case(include_str!("test_data/status_mame0226_coco2b_1.xml"))]
+	#[test_case(include_str!("test_data/status_mame0227_coco2b_1.xml"))]
+	#[test_case(include_str!("test_data/status_mame0270_1.xml"))]
+	#[test_case(include_str!("test_data/status_mame0270_coco2b_1.xml"))]
+	#[test_case(include_str!("test_data/status_mame0270_coco2b_2.xml"))]
+	#[test_case(include_str!("test_data/status_mame0270_coco2b_3.xml"))]
+	#[test_case(include_str!("test_data/status_mame0270_coco2b_4.xml"))]
+	#[test_case(include_str!("test_data/status_mame0270_coco2b_5.xml"))]
+	#[test_case(include_str!("test_data/status_mame0273_c64_1.xml"))]
+	fn general(xml: &str) {
 		let reader = BufReader::new(xml.as_bytes());
 		let result = parse_update(reader);
 		assert_matches!(result, Ok(_));
 	}
 
-	#[test_case(0, include_str!("test_data/status_mame0226_coco2b_1.xml"), Some(true), Some(1.0))]
-	#[test_case(1, include_str!("test_data/status_mame0227_coco2b_1.xml"), Some(true), Some(1.0))]
-	#[test_case(2, include_str!("test_data/status_mame0270_coco2b_1.xml"), Some(true), Some(1.0))]
-	#[test_case(3, include_str!("test_data/status_mame0270_coco2b_2.xml"), Some(true), Some(1.0))]
-	#[test_case(4, include_str!("test_data/status_mame0270_coco2b_3.xml"), None, None)]
-	#[test_case(5, include_str!("test_data/status_mame0270_coco2b_4.xml"), Some(false), Some(3.0))]
-	fn throttling(_index: usize, xml: &str, expected_is_throttled: Option<bool>, expected_throttle_rate: Option<f32>) {
+	#[test_case(include_str!("test_data/status_mame0226_coco2b_1.xml"), Some(true), Some(1.0))]
+	#[test_case(include_str!("test_data/status_mame0227_coco2b_1.xml"), Some(true), Some(1.0))]
+	#[test_case(include_str!("test_data/status_mame0270_coco2b_1.xml"), Some(true), Some(1.0))]
+	#[test_case(include_str!("test_data/status_mame0270_coco2b_2.xml"), Some(true), Some(1.0))]
+	#[test_case(include_str!("test_data/status_mame0270_coco2b_3.xml"), None, None)]
+	#[test_case(include_str!("test_data/status_mame0270_coco2b_4.xml"), Some(false), Some(3.0))]
+	fn throttling(xml: &str, expected_is_throttled: Option<bool>, expected_throttle_rate: Option<f32>) {
 		let expected = (expected_is_throttled, expected_throttle_rate);
 
 		let reader = BufReader::new(xml.as_bytes());
@@ -670,12 +670,11 @@ mod test {
 	}
 
 	#[allow(clippy::too_many_arguments)]
-	#[test_case(0, include_str!("test_data/status_mame0226_coco2b_1.xml"), "row0", 128, InputClass::Keyboard, 11, 49, 0, false, 
+	#[test_case(include_str!("test_data/status_mame0226_coco2b_1.xml"), "row0", 128, InputClass::Keyboard, 11, 49, 0, false, 
 		"g  G", Some(103), Some("KEYCODE_G"), None, None)]
-	#[test_case(1, include_str!("test_data/status_mame0226_coco2b_1.xml"), "joystick_rx", 255, InputClass::Controller, 1, 152, 0, true,
+	#[test_case(include_str!("test_data/status_mame0226_coco2b_1.xml"), "joystick_rx", 255, InputClass::Controller, 1, 152, 0, true,
 		"Right Joystick X", None, Some("JOYCODE_1_XAXIS"), Some("KEYCODE_6PAD OR JOYCODE_1_XAXIS_RIGHT_SWITCH"), Some("KEYCODE_4PAD OR JOYCODE_1_XAXIS_LEFT_SWITCH"))]
 	fn inputs(
-		_index: usize,
 		xml: &str,
 		port_tag: &str,
 		mask: u32,

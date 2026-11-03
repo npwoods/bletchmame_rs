@@ -81,10 +81,10 @@ mod test {
 
 	use test_case::test_case;
 
-	#[test_case(0, "/foo", Some("/foo"))]
-	#[test_case(1, "$(FOO)", Some("/path/foo"))]
-	#[test_case(2, "$(FOO)/bar", Some("/path/foo/bar"))]
-	pub fn resolve_path_core(_index: usize, path: &str, expected: Option<impl AsRef<Path>>) {
+	#[test_case("/foo", Some("/foo"))]
+	#[test_case("$(FOO)", Some("/path/foo"))]
+	#[test_case("$(FOO)/bar", Some("/path/foo/bar"))]
+	pub fn resolve_path_core(path: &str, expected: Option<impl AsRef<Path>>) {
 		let actual = super::resolve_path_core(path, &|var| match var {
 			"FOO" => Some("/path/foo".into()),
 			"BAR" => Some("/path/bar".into()),
@@ -95,14 +95,14 @@ mod test {
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, &["/foo"], "/foo")]
-	#[test_case(1, &["/foo", "/bar"], "/foo;/bar")]
-	#[test_case(2, &["/foo", "/bar", "/baz"], "/foo;/bar;/baz")]
-	#[test_case(3, &["$(FOO)", "/bar", "/baz"], "/path/foo/;/bar;/baz")]
-	#[test_case(4, &["/foo", "$(BAR)", "/baz"], "/foo;/path/bar/;/baz")]
-	#[test_case(5, &["/foo", "$(INVALID)", "/baz"], "/foo;/baz")]
-	#[test_case(6, &["$(FOO)/bar", "/baz"], "/path/foo/bar;/baz")]
-	pub fn resolve_paths_string_core(_index: usize, paths: &[&str], expected: &str) {
+	#[test_case(&["/foo"], "/foo")]
+	#[test_case(&["/foo", "/bar"], "/foo;/bar")]
+	#[test_case(&["/foo", "/bar", "/baz"], "/foo;/bar;/baz")]
+	#[test_case(&["$(FOO)", "/bar", "/baz"], "/path/foo/;/bar;/baz")]
+	#[test_case(&["/foo", "$(BAR)", "/baz"], "/foo;/path/bar/;/baz")]
+	#[test_case(&["/foo", "$(INVALID)", "/baz"], "/foo;/baz")]
+	#[test_case(&["$(FOO)/bar", "/baz"], "/path/foo/bar;/baz")]
+	pub fn resolve_paths_string_core(paths: &[&str], expected: &str) {
 		let actual = super::resolve_paths_string_core(paths, &|var| match var {
 			"FOO" => Some("/path/foo".into()),
 			"BAR" => Some("/path/bar".into()),
@@ -114,11 +114,11 @@ mod test {
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, "", None)]
-	#[test_case(1, "foo", None)]
-	#[test_case(2, "foo/bar", None)]
-	#[test_case(3, "$(FOO)/bar", Some(("FOO", "bar")))]
-	pub fn get_var_name(_index: usize, s: &str, expected: Option<(&str, &str)>) {
+	#[test_case("", None)]
+	#[test_case("foo", None)]
+	#[test_case("foo/bar", None)]
+	#[test_case("$(FOO)/bar", Some(("FOO", "bar")))]
+	pub fn get_var_name(s: &str, expected: Option<(&str, &str)>) {
 		let actual = super::get_var_name(s);
 		assert_eq!(expected, actual)
 	}

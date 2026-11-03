@@ -50,21 +50,21 @@ mod test {
 		position: Option<PhysicalPosition>,
 	}
 
-	#[test_case(0, None, json!({}))]
-	#[test_case(1, Some(PhysicalPosition { x: 100, y: 200 }), json!({"x": 100, "y": 200}))]
-	#[test_case(2, Some(PhysicalPosition { x: -25, y: 180 }), json!({"x": -25, "y": 180}))]
-	fn serialize(_index: usize, position: Option<PhysicalPosition>, expected: Value) {
+	#[test_case(None, json!({}))]
+	#[test_case(Some(PhysicalPosition { x: 100, y: 200 }), json!({"x": 100, "y": 200}))]
+	#[test_case(Some(PhysicalPosition { x: -25, y: 180 }), json!({"x": -25, "y": 180}))]
+	fn serialize(position: Option<PhysicalPosition>, expected: Value) {
 		let obj = Dummy { position };
 		let actual = serde_json::to_value(&obj).unwrap();
 		assert_eq!(expected, actual);
 	}
 
-	#[test_case(0, json!({}), None)]
-	#[test_case(1, json!({"x": 100, "y": 200}), Some(PhysicalPosition { x: 100, y: 200 }))]
-	#[test_case(2, json!({"x": -25, "y": 180}), Some(PhysicalPosition { x: -25, y: 180 }))]
-	#[test_case(3, json!({"x": 100.0, "y": 200.0}), Some(PhysicalPosition { x: 100, y: 200 }))]
-	#[test_case(4, json!({"x": -25.0, "y": 180.0}), Some(PhysicalPosition { x: -25, y: 180 }))]
-	fn deserialize(_index: usize, json: Value, expected: Option<PhysicalPosition>) {
+	#[test_case(json!({}), None)]
+	#[test_case(json!({"x": 100, "y": 200}), Some(PhysicalPosition { x: 100, y: 200 }))]
+	#[test_case(json!({"x": -25, "y": 180}), Some(PhysicalPosition { x: -25, y: 180 }))]
+	#[test_case(json!({"x": 100.0, "y": 200.0}), Some(PhysicalPosition { x: 100, y: 200 }))]
+	#[test_case(json!({"x": -25.0, "y": 180.0}), Some(PhysicalPosition { x: -25, y: 180 }))]
+	fn deserialize(json: Value, expected: Option<PhysicalPosition>) {
 		let actual = serde_json::from_value::<Dummy>(json).unwrap().position;
 		assert_eq!(expected, actual);
 	}

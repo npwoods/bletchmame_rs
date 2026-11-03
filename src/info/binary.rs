@@ -530,10 +530,10 @@ mod test {
 
 	use super::ChipType;
 
-	#[test_case(0, "cpu", Ok(ChipType::Cpu))]
-	#[test_case(1, "audio", Ok(ChipType::Audio))]
-	#[test_case(2, "<<invalid>>", Err(()))]
-	pub fn chip_type_from_str(_index: usize, s: &str, expected: std::result::Result<ChipType, ()>) {
+	#[test_case("cpu", Ok(ChipType::Cpu))]
+	#[test_case("audio", Ok(ChipType::Audio))]
+	#[test_case("<<invalid>>", Err(()))]
+	pub fn chip_type_from_str(s: &str, expected: std::result::Result<ChipType, ()>) {
 		let actual = ChipType::from_str(s).map_err(|_| ());
 		assert_eq!(expected, actual);
 	}

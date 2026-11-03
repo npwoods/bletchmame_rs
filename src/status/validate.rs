@@ -52,10 +52,10 @@ mod test {
 		MameVersion::parse_simple(s).unwrap()
 	}
 
-	#[test_case(0, include_str!("../info/test_data/listxml_c64.xml"), include_str!("test_data/status_mame0273_c64_1.xml"), Ok(()))]
-	#[test_case(1, include_str!("../info/test_data/listxml_alienar.xml"), include_str!("test_data/status_mame0273_c64_1.xml"), Err(VersionMismatch(vers("0.273"), vers("0.229"))))]
-	#[test_case(2, include_str!("../info/test_data/listxml_c64.xml"), include_str!("test_data/status_mame0273_alienar_1.xml"), Err(Invalid(vec![UnknownMachine("alienar".into())])))]
-	pub fn test(_index: usize, info_xml: &str, update_xml: &str, expected: Result<(), ValidationError>) {
+	#[test_case(include_str!("../info/test_data/listxml_c64.xml"), include_str!("test_data/status_mame0273_c64_1.xml"), Ok(()))]
+	#[test_case(include_str!("../info/test_data/listxml_alienar.xml"), include_str!("test_data/status_mame0273_c64_1.xml"), Err(VersionMismatch(vers("0.273"), vers("0.229"))))]
+	#[test_case(include_str!("../info/test_data/listxml_c64.xml"), include_str!("test_data/status_mame0273_alienar_1.xml"), Err(Invalid(vec![UnknownMachine("alienar".into())])))]
+	pub fn test(info_xml: &str, update_xml: &str, expected: Result<(), ValidationError>) {
 		let info_db = InfoDb::from_listxml_output(info_xml.as_bytes(), |_| ControlFlow::Continue(()))
 			.unwrap()
 			.unwrap();

@@ -207,12 +207,12 @@ mod tests {
 	use super::Archive;
 	use super::ArchiveFormat;
 
-	#[test_case(0, "correct_name.bin", None, Some(0x3b5b2bc1))]
-	#[test_case(1, "nonexistent_name.bin", Some(0x098825db), Some(0x098825db))]
-	#[test_case(2, "correct_name.bin", Some(0x098825db), Some(0x3b5b2bc1))]
-	#[test_case(3, "nonexistent.bin", None, None)]
-	#[test_case(4, "nonexistent.bin", Some(0xdeadbeef), None)]
-	fn read_by_name_or_crc(_index: usize, name: &str, crc: Option<u32>, expected: Option<u32>) {
+	#[test_case("correct_name.bin", None, Some(0x3b5b2bc1))]
+	#[test_case("nonexistent_name.bin", Some(0x098825db), Some(0x098825db))]
+	#[test_case("correct_name.bin", Some(0x098825db), Some(0x3b5b2bc1))]
+	#[test_case("nonexistent.bin", None, None)]
+	#[test_case("nonexistent.bin", Some(0xdeadbeef), None)]
+	fn read_by_name_or_crc(name: &str, crc: Option<u32>, expected: Option<u32>) {
 		// helper to read an entry to completion and identify it by CRC
 		fn get_crc<R: std::io::Read + std::io::Seek>(
 			archive: &mut Archive<R>,
@@ -236,9 +236,9 @@ mod tests {
 		assert_eq!(expected, get_crc(&mut archive, name, crc));
 	}
 
-	#[test_case(0, include_bytes!("test_data/ziparchive01.zip"), ArchiveFormat::Zip, &["correct_name.bin", "wrong_name.bin"])]
-	#[test_case(1, include_bytes!("test_data/7zarchive01.7z"), ArchiveFormat::SevenZ, &["correct_name.bin", "wrong_name.bin"])]
-	fn list_filenames(_index: usize, bytes: &[u8], format: ArchiveFormat, expected: &[&str]) {
+	#[test_case(include_bytes!("test_data/ziparchive01.zip"), ArchiveFormat::Zip, &["correct_name.bin", "wrong_name.bin"])]
+	#[test_case(include_bytes!("test_data/7zarchive01.7z"), ArchiveFormat::SevenZ, &["correct_name.bin", "wrong_name.bin"])]
+	fn list_filenames(bytes: &[u8], format: ArchiveFormat, expected: &[&str]) {
 		let cursor = Cursor::new(bytes);
 		let archive = Archive::new(cursor, format).unwrap();
 		let actual = archive
