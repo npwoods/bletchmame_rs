@@ -7,7 +7,6 @@ use std::sync::Arc;
 
 use itertools::Either;
 use itertools::Itertools;
-use regex::regex;
 use slint::CloseRequestResponse;
 use slint::ComponentHandle;
 use slint::Model;
@@ -44,6 +43,7 @@ use crate::status::InputDevice;
 use crate::status::InputDeviceClass;
 use crate::status::InputDeviceClassName;
 use crate::status::InputDeviceToken;
+use crate::status::InputTypeToken;
 use crate::status::Status;
 use crate::ui::InputDialog;
 use crate::ui::InputDialogCategory;
@@ -612,11 +612,10 @@ impl<'a> InputSource<'a> {
 		unclustered_input_type: UnclusteredInputType,
 		seq_type: SeqType,
 	) -> &'a str {
-		let default_tokens = input.seq_default_tokens(seq_type);
-		let token = InputSourceToken::new(default_tokens, unclustered_input_type, seq_type);
+		let token = InputSourceToken::new(&input.input_type, unclustered_input_type, seq_type);
 
 		let result = match (self, &token) {
-			(InputSource::Default, _) => default_tokens,
+			(InputSource::Default, _) => input.seq_default_tokens(seq_type),
 			(InputSource::ArrowKeys, InputSourceToken::Left) => "KEYCODE_LEFT",
 			(InputSource::ArrowKeys, InputSourceToken::Right) => "KEYCODE_RIGHT",
 			(InputSource::ArrowKeys, InputSourceToken::Up) => "KEYCODE_UP",
@@ -669,19 +668,27 @@ enum InputSourceToken {
 }
 
 impl InputSourceToken {
-	pub fn new(default_tokens: &str, unclustered_input_type: UnclusteredInputType, seq_type: SeqType) -> Self {
-		match (unclustered_input_type, seq_type) {
-			(UnclusteredInputType::XAxis, SeqType::Standard) => Self::XAxis,
-			(UnclusteredInputType::XAxis, SeqType::Decrement) => Self::Left,
-			(UnclusteredInputType::XAxis, SeqType::Increment) => Self::Right,
-			(UnclusteredInputType::YAxis, SeqType::Standard) => Self::YAxis,
-			(UnclusteredInputType::YAxis, SeqType::Decrement) => Self::Up,
-			(UnclusteredInputType::YAxis, SeqType::Increment) => Self::Down,
-			(UnclusteredInputType::Standard, SeqType::Standard) => default_tokens
-				.split(" OR ")
-				.filter_map(parse_single_input_token)
-				.next()
-				.unwrap_or(Self::Unknown),
+	pub fn new(input_type: &InputTypeToken, unclustered_input_type: UnclusteredInputType, seq_type: SeqType) -> Self {
+		match (unclustered_input_type, seq_type, input_type) {
+			(UnclusteredInputType::XAxis, SeqType::Standard, _) => Self::XAxis,
+			(UnclusteredInputType::XAxis, SeqType::Decrement, _) => Self::Left,
+			(UnclusteredInputType::XAxis, SeqType::Increment, _) => Self::Right,
+			(UnclusteredInputType::YAxis, SeqType::Standard, _) => Self::YAxis,
+			(UnclusteredInputType::YAxis, SeqType::Decrement, _) => Self::Up,
+			(UnclusteredInputType::YAxis, SeqType::Increment, _) => Self::Down,
+			(UnclusteredInputType::Standard, SeqType::Standard, InputTypeToken::JoystickLeft(_player)) => Self::Left,
+			(UnclusteredInputType::Standard, SeqType::Standard, InputTypeToken::JoystickRight(_player)) => Self::Right,
+			(UnclusteredInputType::Standard, SeqType::Standard, InputTypeToken::JoystickUp(_player)) => Self::Up,
+			(UnclusteredInputType::Standard, SeqType::Standard, InputTypeToken::JoystickDown(_player)) => Self::Down,
+			(UnclusteredInputType::Standard, SeqType::Standard, InputTypeToken::JoystickXAxis(_player)) => Self::XAxis,
+			(UnclusteredInputType::Standard, SeqType::Standard, InputTypeToken::JoystickYAxis(_player)) => Self::YAxis,
+			(UnclusteredInputType::Standard, SeqType::Standard, InputTypeToken::JoystickZAxis(_player)) => Self::ZAxis,
+			(UnclusteredInputType::Standard, SeqType::Standard, InputTypeToken::JoystickRZAxis(_player)) => {
+				Self::RZAxis
+			}
+			(UnclusteredInputType::Standard, SeqType::Standard, InputTypeToken::JoystickButton(_player, button)) => {
+				Self::Button(*button)
+			}
 			_ => Self::Unknown,
 		}
 	}
@@ -699,34 +706,6 @@ impl InputSourceToken {
 			InputSourceToken::Down => Some(InputDeviceToken::HatDown(1)),
 			_ => None,
 		}
-	}
-}
-
-fn parse_single_input_token(token: &str) -> Option<InputSourceToken> {
-	// use a regular expression to parse the string
-	let input_source_token_regex = regex!(
-		r"^(?:KEYCODE_(?<direction>LEFT|RIGHT|UP|DOWN)|(?:JOYCODE|MOUSECODE)_[0-9]+_(?:BUTTON(?<button>[0-9]+)|(?<axis>XAXIS|YAXIS|ZAXIS|RZAXIS)))$"
-	);
-
-	// parse the string using the regex and dissect the results
-	let captures = input_source_token_regex.captures(token);
-	let captures = captures.as_ref();
-	let direction = captures.and_then(|c| c.name("direction").map(|m| m.as_str()));
-	let button = captures.and_then(|c| c.name("button").and_then(|m| m.as_str().parse::<u8>().ok()));
-	let axis = captures.and_then(|c| c.name("axis").map(|m| m.as_str()));
-
-	// and match all the things
-	match (direction, button, axis) {
-		(Some("LEFT"), _, _) => Some(InputSourceToken::Left),
-		(Some("RIGHT"), _, _) => Some(InputSourceToken::Right),
-		(Some("UP"), _, _) => Some(InputSourceToken::Up),
-		(Some("DOWN"), _, _) => Some(InputSourceToken::Down),
-		(_, Some(button), _) => Some(InputSourceToken::Button(button)),
-		(_, _, Some("XAXIS")) => Some(InputSourceToken::XAxis),
-		(_, _, Some("YAXIS")) => Some(InputSourceToken::YAxis),
-		(_, _, Some("ZAXIS")) => Some(InputSourceToken::ZAxis),
-		(_, _, Some("RZAXIS")) => Some(InputSourceToken::RZAxis),
-		_ => None,
 	}
 }
 
@@ -880,31 +859,5 @@ fn dump_clusters_trace(inputs: &[Input], clusters: &[InputCluster]) {
 				}
 			}
 		}
-	}
-}
-
-#[cfg(test)]
-mod test {
-	use test_case::test_case;
-
-	use super::InputSourceToken;
-
-	#[test_case("", None)]
-	#[test_case("KEYCODE_A", None)]
-	#[test_case("KEYCODE_LEFT", Some(InputSourceToken::Left))]
-	#[test_case("KEYCODE_RIGHT", Some(InputSourceToken::Right))]
-	#[test_case("KEYCODE_UP", Some(InputSourceToken::Up))]
-	#[test_case("KEYCODE_DOWN", Some(InputSourceToken::Down))]
-	#[test_case("JOYCODE_1_BUTTON256", None)]
-	#[test_case("JOYCODE_BUTTON1", None)]
-	#[test_case("JOYCODE_1_BUTTON1", Some(InputSourceToken::Button(1)))]
-	#[test_case("MOUSECODE_2_BUTTON3", Some(InputSourceToken::Button(3)))]
-	#[test_case("JOYCODE_1_XAXIS", Some(InputSourceToken::XAxis))]
-	#[test_case("MOUSECODE_1_YAXIS", Some(InputSourceToken::YAxis))]
-	#[test_case("JOYCODE_1_ZAXIS", Some(InputSourceToken::ZAxis))]
-	#[test_case("JOYCODE_1_RZAXIS", Some(InputSourceToken::RZAxis))]
-	fn parse_single_input_token(input: &str, expected: Option<InputSourceToken>) {
-		let actual = super::parse_single_input_token(input);
-		assert_eq!(expected, actual);
 	}
 }
