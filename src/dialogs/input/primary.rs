@@ -20,6 +20,7 @@ use smol_str::SmolStr;
 use strum::EnumProperty;
 use strum::VariantArray;
 use tokio::sync::mpsc;
+use tracing::debug;
 use tracing::info;
 use tracing::trace;
 use tracing::trace_span;
@@ -437,6 +438,7 @@ fn build_categories(
 			let info = player.map(|player| {
 				build_player_category_info(inputs, input_device_classes, clusters, &cluster_indices, player)
 			});
+			debug!(?player, ?info, "build_categories()");
 			let cluster_indices = cluster_indices.into();
 			InputCategory { info, cluster_indices }
 		})
@@ -613,7 +615,7 @@ impl<'a> InputSource<'a> {
 		let default_tokens = input.seq_default_tokens(seq_type);
 		let token = InputSourceToken::new(default_tokens, unclustered_input_type, seq_type);
 
-		match (self, token) {
+		let result = match (self, &token) {
 			(InputSource::Default, _) => default_tokens,
 			(InputSource::ArrowKeys, InputSourceToken::Left) => "KEYCODE_LEFT",
 			(InputSource::ArrowKeys, InputSourceToken::Right) => "KEYCODE_RIGHT",
@@ -638,7 +640,9 @@ impl<'a> InputSource<'a> {
 					.unwrap_or_default()
 			}
 			(_, _) => "",
-		}
+		};
+		trace!(?self, ?input.input_type, ?token, ?result, "InputSource::find_code()");
+		result
 	}
 
 	pub fn from_status_devices(input_device_classes: &'a [InputDeviceClass]) -> impl Iterator<Item = InputSource<'a>> {
