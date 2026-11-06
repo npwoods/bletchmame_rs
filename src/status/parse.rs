@@ -454,8 +454,9 @@ impl State {
 				let class = class.ok_or(ThisError::MissingMandatoryAttribute("class"))?.parse().ok();
 				let group = group.ok_or(ThisError::MissingMandatoryAttribute("group"))?.parse()?;
 				let input_type = input_type
+					.as_deref()
 					.ok_or(ThisError::MissingMandatoryAttribute("type"))?
-					.parse()?;
+					.into();
 				let player = player.ok_or(ThisError::MissingMandatoryAttribute("player"))?.parse()?;
 				let is_analog = parse_mame_bool(is_analog.ok_or(ThisError::MissingMandatoryAttribute("is_analog"))?)?;
 				let name = name.ok_or(ThisError::MissingMandatoryAttribute("name"))?.into();
@@ -635,7 +636,7 @@ mod test {
 	use test_case::test_case;
 
 	use crate::runtime::command::SeqType;
-	use crate::status::InputClass;
+	use crate::status::{InputClass, InputTypeToken};
 
 	use super::parse_update;
 
@@ -670,9 +671,9 @@ mod test {
 	}
 
 	#[allow(clippy::too_many_arguments)]
-	#[test_case(include_str!("test_data/status_mame0226_coco2b_1.xml"), "row0", 128, InputClass::Keyboard, 11, 49, 0, false, 
+	#[test_case(include_str!("test_data/status_mame0226_coco2b_1.xml"), "row0", 128, InputClass::Keyboard, 11, InputTypeToken::Other("49".into()), 0, false, 
 		"g  G", Some(103), Some("KEYCODE_G"), None, None)]
-	#[test_case(include_str!("test_data/status_mame0226_coco2b_1.xml"), "joystick_rx", 255, InputClass::Controller, 1, 152, 0, true,
+	#[test_case(include_str!("test_data/status_mame0226_coco2b_1.xml"), "joystick_rx", 255, InputClass::Controller, 1, InputTypeToken::Other("152".into()), 0, true,
 		"Right Joystick X", None, Some("JOYCODE_1_XAXIS"), Some("KEYCODE_6PAD OR JOYCODE_1_XAXIS_RIGHT_SWITCH"), Some("KEYCODE_4PAD OR JOYCODE_1_XAXIS_LEFT_SWITCH"))]
 	fn inputs(
 		xml: &str,
@@ -680,7 +681,7 @@ mod test {
 		mask: u32,
 		expected_class: InputClass,
 		expected_group: u8,
-		expected_type: u32,
+		expected_type: InputTypeToken,
 		expected_player: u8,
 		expected_is_analog: bool,
 		expected_name: &str,
@@ -692,7 +693,7 @@ mod test {
 		let expected = (
 			Some(expected_class),
 			expected_group,
-			expected_type,
+			&expected_type,
 			expected_player,
 			expected_is_analog,
 			expected_name,
@@ -721,7 +722,7 @@ mod test {
 		let actual = (
 			input.class,
 			input.group,
-			input.input_type,
+			&input.input_type,
 			input.player,
 			input.is_analog,
 			input.name.as_ref(),

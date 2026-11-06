@@ -555,7 +555,7 @@ function emit_status(light, out)
 							.. " mask=\"" .. tostring(field.mask) .. "\""
 							.. " class=\"" .. type_class .. "\""
 							.. " group=\"" .. tostring(manager.machine.ioport:type_group(field.type, field.player)) .. "\""
-							.. " type=\"" .. field.type .. "\""
+							.. " type=\"" .. tostring(manager.machine.ioport:input_type_to_token(field.type)) .. "\""
 							.. " player=\"" .. field.player .. "\""
 							.. " is_analog=\"" .. string_from_bool(field.is_analog) .. "\""
 							.. " name=\"" .. xml_encode(field.name) .. "\"")
