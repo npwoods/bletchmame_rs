@@ -285,13 +285,13 @@ pub struct SlotOption {
 	pub selectable: bool,
 }
 
-#[derive(Clone, Deserialize, Serialize, PartialEq, Default)]
+#[derive(Clone, Deserialize, Serialize, PartialEq)]
 pub struct Input {
 	pub port_tag: SmolStr,
 	pub mask: u32,
 	pub class: Option<InputClass>,
 	pub group: u8,
-	pub input_type: u32,
+	pub input_type: InputTypeToken,
 	pub player: u8,
 	pub is_analog: bool,
 	pub name: SmolStr,
@@ -357,7 +357,57 @@ impl Debug for Input {
 	}
 }
 
-#[derive(Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+pub enum InputTypeToken {
+	Keyboard,
+	DipSwitch,
+	JoystickLeft(u8),
+	JoystickRight(u8),
+	JoystickUp(u8),
+	JoystickDown(u8),
+	JoystickButton(u8, u8),
+	JoystickXAxis(u8),
+	JoystickYAxis(u8),
+	JoystickZAxis(u8),
+	JoystickRZAxis(u8),
+	Other(SmolStr),
+}
+
+impl From<&str> for InputTypeToken {
+	fn from(s: &str) -> Self {
+		let kind_regex = regex!(
+			r"^P(?<player>[0-9]+)_(?<kind>JOYSTICK_LEFT|JOYSTICK_RIGHT|JOYSTICK_UP|JOYSTICK_DOWN|AD_STICK_X|AD_STICK_Y|AD_STICK_Z|AD_STICK_RZ|BUTTON)(?<button>[0-9]*)$"
+		);
+		let kind_regex_captures = kind_regex.captures(s);
+		let kind_regex_captures = kind_regex_captures.as_ref();
+		let player = kind_regex_captures
+			.and_then(|c| c.name("player"))
+			.and_then(|m| m.as_str().parse::<u8>().ok());
+		let kind = kind_regex_captures.and_then(|c| c.name("kind")).map(|m| m.as_str());
+		let button_index = kind_regex_captures
+			.and_then(|c| c.name("button"))
+			.and_then(|m| m.as_str().parse::<u8>().ok());
+
+		let kind = kind.unwrap_or(s);
+
+		match (kind, player, button_index) {
+			("KEYBOARD", None, None) => Self::Keyboard,
+			("DIPSWITCH", None, None) => Self::DipSwitch,
+			("JOYSTICK_LEFT", Some(player), None) => Self::JoystickLeft(player),
+			("JOYSTICK_RIGHT", Some(player), None) => Self::JoystickRight(player),
+			("JOYSTICK_UP", Some(player), None) => Self::JoystickUp(player),
+			("JOYSTICK_DOWN", Some(player), None) => Self::JoystickDown(player),
+			("AD_STICK_X", Some(player), None) => Self::JoystickXAxis(player),
+			("AD_STICK_Y", Some(player), None) => Self::JoystickYAxis(player),
+			("AD_STICK_Z", Some(player), None) => Self::JoystickZAxis(player),
+			("AD_STICK_RZ", Some(player), None) => Self::JoystickRZAxis(player),
+			("BUTTON", Some(player), Some(button_index)) => Self::JoystickButton(player, button_index),
+			(_, _, _) => Self::Other(s.into()),
+		}
+	}
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct InputSeq {
 	pub seq_type: SeqType,
 	pub tokens: SmolStr,
@@ -508,6 +558,7 @@ mod test {
 
 	use super::InputDeviceClassName;
 	use super::InputDeviceToken;
+	use super::InputTypeToken;
 
 	#[test]
 	fn session() {
@@ -589,5 +640,23 @@ mod test {
 	fn input_device_token(s: &str, expected: InputDeviceToken, expected_is_axis: bool) {
 		let actual = InputDeviceToken::from(s);
 		assert_eq!((&expected, expected_is_axis), (&actual, actual.is_axis()));
+	}
+
+	#[test_case("KEYBOARD", InputTypeToken::Keyboard)]
+	#[test_case("DIPSWITCH", InputTypeToken::DipSwitch)]
+	#[test_case("P1_JOYSTICK_LEFT", InputTypeToken::JoystickLeft(1))]
+	#[test_case("P2_JOYSTICK_RIGHT", InputTypeToken::JoystickRight(2))]
+	#[test_case("P3_JOYSTICK_UP", InputTypeToken::JoystickUp(3))]
+	#[test_case("P4_JOYSTICK_DOWN", InputTypeToken::JoystickDown(4))]
+	#[test_case("P1_BUTTON2", InputTypeToken::JoystickButton(1, 2))]
+	#[test_case("P2_BUTTON3", InputTypeToken::JoystickButton(2, 3))]
+	#[test_case("P1_AD_STICK_X", InputTypeToken::JoystickXAxis(1))]
+	#[test_case("P2_AD_STICK_Y", InputTypeToken::JoystickYAxis(2))]
+	#[test_case("P3_AD_STICK_Z", InputTypeToken::JoystickZAxis(3))]
+	#[test_case("P4_AD_STICK_RZ", InputTypeToken::JoystickRZAxis(4))]
+	#[test_case("ZYXZYX", InputTypeToken::Other("ZYXZYX".into()))]
+	fn input_type_token(s: &str, expected: InputTypeToken) {
+		let actual = InputTypeToken::from(s);
+		assert_eq!(expected, actual);
 	}
 }

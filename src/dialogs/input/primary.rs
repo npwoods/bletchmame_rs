@@ -402,7 +402,7 @@ fn build_clusters(inputs: &[Input], class: InputClass) -> Box<[InputCluster]> {
 		.sorted_by_key(|(_, input)| {
 			(
 				input.group,
-				input.input_type,
+				&input.input_type,
 				input.first_keyboard_code.unwrap_or_default(),
 				&input.name,
 			)
