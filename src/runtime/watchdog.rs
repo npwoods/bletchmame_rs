@@ -66,7 +66,13 @@ impl Drop for Watchdog {
 }
 
 fn thread_proc(receiver: Receiver<Option<WatchdogState>>, pid: u32, timeout: Duration, timed_out: Arc<AtomicBool>) {
-	let mut sys = System::new_all();
+	let mut sys = match System::new_all() {
+		Ok(x) => x,
+		Err(e) => {
+			warn!(?e, "Error initializing sysinfo; watchdog will not be functional");
+			return;
+		}
+	};
 	sys.refresh_processes(ProcessesToUpdate::All, true);
 	let Some(process) = sys.process(Pid::from_u32(pid)) else {
 		warn!("Process with PID {} not found; watchdog will not be functional", pid);
