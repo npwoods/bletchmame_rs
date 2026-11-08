@@ -308,6 +308,10 @@ function reset_emulation(is_hard)
 end
 
 function emit_status(light, out)
+	-- capture a timestamp so that the front end can measure how long it takes
+	-- MAME to generate and emit the status payload
+	local start_time = os.clock()
+
 	if light == nil then
 		light = false
 	end
@@ -625,6 +629,10 @@ function emit_status(light, out)
 			end
 			emit("\t</input_devices>")
 		end
+
+		-- emit timing information; the front end can derive the elapsed time
+		-- from the difference between the two timestamps
+		emit(string.format("\t<timing start=\"%.6f\" end=\"%.6f\"/>", start_time, os.clock()))
 
 		emit("</status>");
 	end

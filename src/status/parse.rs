@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::io::BufRead;
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::Error;
 use anyhow::Result;
@@ -26,6 +27,7 @@ use crate::status::InputSeq;
 use crate::status::RunningUpdate;
 use crate::status::Slot;
 use crate::status::SlotOption;
+use crate::status::Timing;
 use crate::status::Update;
 use crate::version::MameVersion;
 use crate::xml::XmlElement;
@@ -60,6 +62,7 @@ const TEXT_CAPTURE_PHASES: &[Phase] = &[Phase::ImageDetailsFormatExtension];
 struct State {
 	phase_stack: Vec<Phase>,
 	build: Option<MameVersion>,
+	timing: Option<Timing>,
 	running: RunningUpdate,
 	phase_specific: Option<PhaseSpecificState>,
 	all_formats: HashSet<Arc<[ImageFormat]>>,
@@ -176,6 +179,13 @@ impl State {
 			(Phase::Status, "input_devices") => {
 				self.running.input_device_classes = Some(Vec::new());
 				Some(Phase::StatusInputDevices)
+			}
+			(Phase::Status, "timing") => {
+				let [start, end] = evt.find_attributes(["start", "end"])?;
+				let start = parse_duration(&start.ok_or(ThisError::MissingMandatoryAttribute("start"))?)?;
+				let end = parse_duration(&end.ok_or(ThisError::MissingMandatoryAttribute("end"))?)?;
+				self.timing = Some(Timing { start, end });
+				None
 			}
 			(Phase::StatusCheats, "cheat") => {
 				let [
@@ -579,12 +589,18 @@ impl State {
 	}
 }
 
+fn parse_duration(value: &str) -> Result<Duration> {
+	let secs = value.parse::<f64>()?;
+	Ok(Duration::try_from_secs_f64(secs)?)
+}
+
 pub fn parse_update(reader: impl BufRead) -> Result<Update> {
 	let mut reader = XmlReader::from_reader(reader, false);
 	let mut buf = Vec::with_capacity(1024);
 	let mut state = State {
 		phase_stack: Vec::with_capacity(32),
 		build: None,
+		timing: None,
 		running: RunningUpdate::default(),
 		phase_specific: None,
 		all_formats: HashSet::new(),
@@ -619,7 +635,8 @@ pub fn parse_update(reader: impl BufRead) -> Result<Update> {
 		let message = "Could not identify build";
 		Error::msg(message)
 	})?;
-	let result = Update { running, build };
+	let timing = state.timing.take();
+	let result = Update { running, build, timing };
 	Ok(result)
 }
 
