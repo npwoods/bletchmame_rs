@@ -6,6 +6,7 @@ use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::io::BufRead;
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::Result;
 use itertools::Itertools;
@@ -212,10 +213,18 @@ pub struct Cassette {
 	pub length: f32,
 }
 
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+pub struct Timing {
+	pub start: Duration,
+	pub end: Duration,
+}
+
 #[derive(Clone, Deserialize, Serialize, PartialEq)]
 pub struct Update {
 	running: Option<RunningUpdate>,
 	build: MameVersion,
+	#[serde(default)]
+	timing: Option<Timing>,
 }
 
 impl Update {
@@ -230,6 +239,10 @@ impl Update {
 	pub fn is_running(&self) -> bool {
 		self.running.is_some()
 	}
+
+	pub fn timing(&self) -> Option<&Timing> {
+		self.timing.as_ref()
+	}
 }
 
 impl Debug for Update {
@@ -237,6 +250,7 @@ impl Debug for Update {
 		fmt.debug_struct("Update")
 			.field("running", &self.running.as_ref().map(DebugString::elipsis))
 			.field("build", &self.build)
+			.field("timing", &self.timing)
 			.finish()
 	}
 }

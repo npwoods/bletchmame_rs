@@ -38,6 +38,7 @@ use tracing::debug;
 use tracing::debug_span;
 use tracing::info;
 use tracing::info_span;
+use tracing::trace;
 use tracing::warn;
 
 use crate::action::Action;
@@ -796,7 +797,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 				.with_items_table_model(|x| x.get_row_tooltip(row))
 				.unwrap_or_default()
 				.into();
-			debug!("on_items_row_pointer_event(): setting tool tip for row {row}: {text:?}");
+			trace!("on_items_row_pointer_event(): setting tool tip for row {row}: {text:?}");
 			model_clone.app_window().set_items_view_tooltip(text);
 		}
 	});
@@ -1312,12 +1313,20 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 			model.update_state_possible_shutdown(AppState::session_ended);
 		}
 		Action::MameStatusUpdate(update) => {
+			// timing related
+			let start = Instant::now();
+			let emit_elapsed = update.timing().map(|t| t.end - t.start);
+
 			model.update_state(|state| state.status_update(*update));
 
 			// special check to restore the menu bar if we're not in the emulation
 			if model.state.borrow().status().is_none_or(|s| s.running.is_none()) {
 				model.app_window().set_menubar_visible(true);
 			}
+
+			// now emit timing info
+			let update_elapsed = start.elapsed();
+			debug!(?emit_elapsed, ?update_elapsed, "Finished status update");
 		}
 		Action::MameStartupScreens => {
 			model.update_state(AppState::startup_screens);
