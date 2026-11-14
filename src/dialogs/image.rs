@@ -4,9 +4,7 @@ use std::path::Path;
 
 use rfd::AsyncFileDialog;
 use slint::ComponentHandle;
-use slint::ModelRc;
 use slint::StandardListViewItem;
-use slint::VecModel;
 use smol_str::SmolStr;
 use strum::VariantArray as _;
 use tokio::sync::mpsc;
@@ -18,6 +16,7 @@ use crate::dialogs::SenderExt;
 use crate::guiutils::modal::ModalStack;
 use crate::imagedesc::ImageDesc;
 use crate::ui::ImageArchiveDialog;
+use crate::util::IteratorExt as _;
 
 #[derive(Clone, Debug)]
 pub struct Format {
@@ -133,8 +132,8 @@ async fn dialog_image_archive(
 	let list_model = entries
 		.iter()
 		.map(|entry| StandardListViewItem::from(entry.as_ref()))
-		.collect::<VecModel<_>>();
-	modal.dialog().set_list_model(ModelRc::new(list_model));
+		.collect_model_rc();
+	modal.dialog().set_list_model(list_model);
 
 	// set up the "ok" button
 	let tx_clone = tx.clone();

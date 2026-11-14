@@ -1,15 +1,14 @@
 use std::fmt::Display;
 
 use slint::CloseRequestResponse;
-use slint::ModelRc;
 use slint::SharedString;
-use slint::VecModel;
 use strum::VariantArray;
 use tokio::sync::mpsc;
 
 use crate::dialogs::SenderExt;
 use crate::guiutils::modal::ModalStack;
 use crate::ui::MessageBoxDialog;
+use crate::util::IteratorExt as _;
 
 pub trait MessageBoxDefaults: VariantArray {
 	fn accept() -> Self;
@@ -89,8 +88,7 @@ async fn internal_dialog_message_box(
 	let (tx, mut rx) = mpsc::channel(1);
 
 	// turn value_texts into a model
-	let value_texts = VecModel::from(value_texts);
-	let value_texts = ModelRc::new(value_texts);
+	let value_texts = value_texts.collect_model_rc();
 
 	// set the dialog properties
 	modal.dialog().set_title_text(title);

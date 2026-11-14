@@ -27,7 +27,6 @@ use slint::ModelRc;
 use slint::SharedString;
 use slint::TableColumn;
 use slint::ToSharedString;
-use slint::VecModel;
 use slint::Weak;
 use slint::invoke_from_event_loop;
 use slint::quit_event_loop;
@@ -354,8 +353,7 @@ impl AppModel {
 				.collect::<Vec<_>>();
 			if app_window.get_statusbar_cassette_tags().iter().collect::<Vec<_>>() != statusbar_cassette_tags {
 				// only update if changed; unnecessary changes will disrupt the tape control
-				let statusbar_cassette_tags = VecModel::from(statusbar_cassette_tags);
-				let statusbar_cassette_tags = ModelRc::new(statusbar_cassette_tags);
+				let statusbar_cassette_tags = statusbar_cassette_tags.collect_model_rc();
 				app_window.set_statusbar_cassette_tags(statusbar_cassette_tags);
 			}
 			app_window.on_get_statusbar_cassette(move |tag| {
@@ -707,11 +705,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 
 	// set up search bar
 	let model_clone = model.clone();
-	app_window.on_get_searchbar_items(move |text| {
-		let items = searchbar_items(&model_clone, &text);
-		let model = VecModel::from(items);
-		ModelRc::new(model)
-	});
+	app_window.on_get_searchbar_items(move |text| searchbar_items(&model_clone, &text).collect_model_rc());
 	app_window.on_translate_searchbar_items(translate_searchbar_items);
 
 	// set up items columns
@@ -1936,9 +1930,7 @@ fn update_builtin_collections_menu_checked(model: &AppModel, prefs: &Preferences
 				.iter()
 				.any(|c| matches!(c.as_ref(), PrefsCollection::Builtin(x) if *x == b))
 		})
-		.collect::<Vec<_>>();
-	let builtin_collections_checked = VecModel::from(builtin_collections_checked);
-	let builtin_collections_checked = ModelRc::new(builtin_collections_checked);
+		.collect_model_rc();
 	model
 		.app_window()
 		.set_menu_entries_builtin_collections_checked(builtin_collections_checked);

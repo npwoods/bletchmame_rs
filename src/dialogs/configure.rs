@@ -188,8 +188,7 @@ pub async fn dialog_configure(
 
 	// BIOS options
 	if let Some((bios_option_texts, current_index)) = state.bios_options() {
-		let bios_option_texts = VecModel::from(bios_option_texts);
-		let bios_option_texts = ModelRc::new(bios_option_texts);
+		let bios_option_texts = bios_option_texts.collect_model_rc();
 		modal.dialog().set_bios_selection_model(bios_option_texts);
 
 		let current_index = current_index.try_into().unwrap();
