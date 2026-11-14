@@ -329,16 +329,16 @@ impl Input {
 		})
 	}
 
-	pub fn seq_default_tokens(&self, seq_type: SeqType) -> &str {
-		self.try_seq_default_tokens(seq_type).expect("invalid seq_type")
+	pub fn seq_is_default(&self, seq_type: SeqType) -> bool {
+		self.try_seq_is_default(seq_type).expect("invalid seq_type")
 	}
 
-	pub fn try_seq_default_tokens(&self, seq_type: SeqType) -> Option<&str> {
+	pub fn try_seq_is_default(&self, seq_type: SeqType) -> Option<bool> {
 		(self.is_analog || seq_type == SeqType::Standard).then(|| {
 			self.seqs
 				.iter()
 				.find(|seq| seq.seq_type == seq_type)
-				.map(|seq| seq.default_tokens.as_str())
+				.map(|seq| seq.is_default)
 				.unwrap_or_default()
 		})
 	}
@@ -425,7 +425,7 @@ impl From<&str> for InputTypeToken {
 pub struct InputSeq {
 	pub seq_type: SeqType,
 	pub tokens: SmolStr,
-	pub default_tokens: SmolStr,
+	pub is_default: bool,
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash, EnumProperty, EnumString)]

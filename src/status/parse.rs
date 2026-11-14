@@ -491,17 +491,15 @@ impl State {
 				Some(Phase::Input)
 			}
 			(Phase::Input, "seq") => {
-				let [seq_type, tokens, default_tokens] = evt.find_attributes(["type", "tokens", "default_tokens"])?;
+				let [seq_type, tokens, is_default] = evt.find_attributes(["type", "tokens", "is_default"])?;
 				let seq_type = seq_type.ok_or(ThisError::MissingMandatoryAttribute("seq_type"))?;
 				let seq_type = seq_type.parse::<SeqType>()?;
 				let tokens = tokens.ok_or(ThisError::MissingMandatoryAttribute("tokens"))?.into();
-				let default_tokens = default_tokens
-					.map(|t| t.into())
-					.unwrap_or_else(|| SmolStr::clone(&tokens));
+				let is_default = is_default.map(parse_mame_bool).transpose()?.unwrap_or(true);
 				let seq = InputSeq {
 					seq_type,
 					tokens,
-					default_tokens,
+					is_default,
 				};
 				self.running.inputs.as_mut().unwrap().last_mut().unwrap().seqs.push(seq);
 				None
@@ -720,11 +718,6 @@ mod test {
 				expected_seq_increment_tokens,
 				expected_seq_decrement_tokens,
 			),
-			(
-				expected_seq_standard_tokens,
-				expected_seq_increment_tokens,
-				expected_seq_decrement_tokens,
-			),
 		);
 
 		let reader = BufReader::new(xml.as_bytes());
@@ -748,11 +741,6 @@ mod test {
 				input.try_seq_tokens(SeqType::Standard),
 				input.try_seq_tokens(SeqType::Increment),
 				input.try_seq_tokens(SeqType::Decrement),
-			),
-			(
-				input.try_seq_default_tokens(SeqType::Standard),
-				input.try_seq_default_tokens(SeqType::Increment),
-				input.try_seq_default_tokens(SeqType::Decrement),
 			),
 		);
 
