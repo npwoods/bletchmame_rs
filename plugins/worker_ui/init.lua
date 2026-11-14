@@ -353,8 +353,10 @@ function emit_status(light, out)
 		get_is_recording			= function() return manager.machine.video.is_recording end
 	end
 
-	-- we don't always want to send details
-	local emit_details = not light or manager.machine.paused or is_polling_input_seq()
+	-- we don't always want to send details; details are only omitted for "light"
+	-- updates, and light updates are only sent when we know that no detail
+	-- information can have changed (or will be refreshed by a later command)
+	local emit_details = not light or is_polling_input_seq()
 
 	-- start emitting status
 	emit("<status");
@@ -719,14 +721,16 @@ end
 function command_pause(args)
 	emu.pause()
 	print("@OK STATUS ### Paused")
-	emit_status()
+	emit_status(true)
 end
 
 -- RESUME command
 function command_resume(args)
 	emu.unpause()
 	print("@OK STATUS ### Resumed")
-	emit_status()
+	-- see command_pause(): a light update is enough, and avoids delaying the
+	-- emulation from actually resuming
+	emit_status(true)
 end
 
 -- DEBUGGER command
@@ -751,14 +755,14 @@ end
 function command_throttled(args)
 	manager.machine.video.throttled = toboolean(args[2])
 	print("@OK STATUS ### Throttled set to " .. tostring(manager.machine.video.throttled))
-	emit_status()
+	emit_status(true)
 end
 
 -- THROTTLE_RATE command
 function command_throttle_rate(args)
 	manager.machine.video.throttle_rate = tonumber(args[2])
 	print("@OK STATUS ### Throttle rate set to " .. tostring(manager.machine.video.throttle_rate))
-	emit_status()
+	emit_status(true)
 end
 
 -- FRAMESKIP command
@@ -771,7 +775,7 @@ function command_frameskip(args)
 	end
 	manager.machine.video.frameskip = frameskip
 	print("@OK STATUS ### Frame skip rate set to " .. tostring(manager.machine.video.frameskip))
-	emit_status()
+	emit_status(true)
 end
 
 -- INPUT command
