@@ -1294,7 +1294,9 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 			spawn_local(fut).unwrap();
 		}
 		Action::HelpResetMame => {
-			model.update_state(AppState::reset);
+			model.maybe_stop_warning(|model| {
+				model.update_state(AppState::reset);
+			});
 		}
 		Action::HelpRefreshInfoDb => {
 			model.update_state(AppState::infodb_rebuild);

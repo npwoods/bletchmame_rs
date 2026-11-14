@@ -684,7 +684,7 @@ export component AppWindow inherits Window {
             title: @tr("MenuBar" => "&Help");
             MenuItem {
                 title: @tr("MenuBar" => "&Reset MAME");
-                enabled: mode() == "ready";
+                enabled: mode() == "ready" || mode() == "running";
                 activated => {
                     menu-item-action(root.menu-action-help-reset-mame);
                 }
