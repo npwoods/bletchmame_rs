@@ -524,7 +524,7 @@ fn build_player_category_info(
 					// find the code with the pertinent token on the device, and does it match what is
 					// currently on the input?
 					let code = source.find_code(input, unclustered_input_type, seq_type);
-					let is_match = input.seq_tokens(seq_type) == code;
+					let is_match = source.is_match(input, seq_type, code);
 					(input.port_tag.as_str(), input.mask, seq_type, code, is_match)
 				})
 				.collect::<Vec<_>>();
@@ -615,7 +615,7 @@ impl<'a> InputSource<'a> {
 		let token = InputSourceToken::new(&input.input_type, unclustered_input_type, seq_type);
 
 		let result = match (self, &token) {
-			(InputSource::Default, _) => input.seq_default_tokens(seq_type),
+			(InputSource::Default, _) => "*",
 			(InputSource::ArrowKeys, InputSourceToken::Left) => "KEYCODE_LEFT",
 			(InputSource::ArrowKeys, InputSourceToken::Right) => "KEYCODE_RIGHT",
 			(InputSource::ArrowKeys, InputSourceToken::Up) => "KEYCODE_UP",
@@ -642,6 +642,13 @@ impl<'a> InputSource<'a> {
 		};
 		trace!(?self, ?input.input_type, ?token, ?result, "InputSource::find_code()");
 		result
+	}
+
+	pub fn is_match(&self, input: &Input, seq_type: SeqType, code: &str) -> bool {
+		match self {
+			InputSource::Default => input.seq_is_default(seq_type),
+			_ => input.seq_tokens(seq_type) == code,
+		}
 	}
 
 	pub fn from_status_devices(input_device_classes: &'a [InputDeviceClass]) -> impl Iterator<Item = InputSource<'a>> {

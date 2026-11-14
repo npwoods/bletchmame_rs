@@ -597,9 +597,11 @@ function emit_status(light, out)
 							end
 
 							for _,seq_type in pairs(seq_types) do
+								local tokens = manager.machine.input:seq_to_tokens(field:input_seq(seq_type))
+								local default_tokens = manager.machine.input:seq_to_tokens(field:default_input_seq(seq_type))
 								emit("\t\t\t<seq type=\"" .. seq_type
-									.. "\" tokens=\"" .. xml_encode(manager.machine.input:seq_to_tokens(field:input_seq(seq_type)))
-									.. "\" default_tokens=\"" .. xml_encode(manager.machine.input:seq_to_tokens(field:default_input_seq(seq_type)))
+									.. "\" tokens=\"" .. xml_encode(tokens)
+									.. "\" is_default=\"" .. string_from_bool(tokens == default_tokens)
 									.. "\"/>")
 							end
 						end
