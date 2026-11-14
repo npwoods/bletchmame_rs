@@ -5,9 +5,7 @@ use itertools::Itertools;
 use serde::Deserialize;
 use serde::Serialize;
 use slint::CloseRequestResponse;
-use slint::ModelRc;
 use slint::SharedString;
-use slint::VecModel;
 use tokio::sync::mpsc;
 
 use crate::action::Action;
@@ -21,6 +19,7 @@ use crate::status::InputDeviceClass;
 use crate::status::InputDeviceClassName;
 use crate::status::Status;
 use crate::ui::SeqPollDialog;
+use crate::util::IteratorExt as _;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SeqPollDialogType {
@@ -98,8 +97,7 @@ pub async fn dialog_seq_poll(
 		.collect::<(Vec<_>, Vec<_>)>();
 
 	// set up the mouse input items menu...
-	let mouse_input_titles = VecModel::from(mouse_input_titles);
-	let mouse_input_titles = ModelRc::new(mouse_input_titles);
+	let mouse_input_titles = mouse_input_titles.collect_model_rc();
 	modal.dialog().set_mouse_input_titles(mouse_input_titles);
 
 	// ...and also the corresponding callback

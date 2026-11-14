@@ -11,7 +11,6 @@ use slint::ModelNotify;
 use slint::ModelRc;
 use slint::ModelTracker;
 use slint::ToSharedString;
-use slint::VecModel;
 use slint::Weak;
 use tokio::sync::mpsc;
 
@@ -28,6 +27,7 @@ use crate::status::InputClass;
 use crate::status::Status;
 use crate::ui::SwitchesDialog;
 use crate::ui::SwitchesDialogEntry;
+use crate::util::IteratorExt as _;
 
 struct SwitchesDialogModel {
 	dialog_weak: Weak<SwitchesDialog>,
@@ -207,13 +207,11 @@ impl Model for SwitchesDialogModel {
 					.option_indexes
 					.iter()
 					.map(|&setting_index| settings.get(setting_index).unwrap().name().to_shared_string())
-					.collect::<Vec<_>>();
+					.collect_model_rc();
 				let current_options_index = settings.iter().position(|s| input.value == Some(s.value()));
 				(options, current_options_index)
 			})
-			.unwrap_or((Vec::new(), None));
-		let options = VecModel::from(options);
-		let options = ModelRc::new(options);
+			.unwrap_or((Default::default(), None));
 		let current_option_index = current_option_index.map(|x| x.try_into().unwrap()).unwrap_or(-1);
 
 		let entry = SwitchesDialogEntry {
