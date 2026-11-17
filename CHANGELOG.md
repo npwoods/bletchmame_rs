@@ -11,6 +11,7 @@ All notable changes to this project are documented in this file.
 - Now only showing the tape control if a cassette image is actually loaded
 - The "Reset MAME" menu option is enabled when an emulation is running (with a warning)
 - Simplifications to `worker_ui` LUA plugin (removing support for older MAMEs, moving startup orchestration to core application)
+- Now using an off the shelf version of Slint (1.19); no more hacked builds
 - Various cosmetic improvements
 
 ## [3.0] - 2026-09-04
