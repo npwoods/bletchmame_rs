@@ -7,6 +7,7 @@ All notable changes to this project are documented in this file.
 - The "Joysticks and Controllers" dialog can now set inputs on a device (player in MAME terms) basis
 - Image loading now supports Zip and 7z archives, including multi file archives
 - Snapshot loading will now recognize parent snapshots in absence of clone-specific snapshots, and loading is now asynchronous
+- Double clicking on an item will now run it
 - Removing support for RAM sizes (which was merged into general device configurations in MAME 0.290)
 - Now only showing the tape control if a cassette image is actually loaded
 - The "Reset MAME" menu option is enabled when an emulation is running (with a warning)
@@ -21,7 +22,7 @@ All notable changes to this project are documented in this file.
 - Very fast system and software list lookup
 - Dark mode support
 - Too many other user interface changes to list; this is a completely new application
-- Special thanks to "nerd4gw" for collaborating with this complete reinvension of BletchMAME
+- Special thanks to "nerd4gw" for collaborating with this complete reinvention of BletchMAME
 
 ## [2.17] - 2023-07-13
 - Maintenance release
