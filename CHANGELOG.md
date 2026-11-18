@@ -10,6 +10,7 @@ All notable changes to this project are documented in this file.
 - Removing support for RAM sizes (which was merged into general device configurations in MAME 0.290)
 - Now only showing the tape control if a cassette image is actually loaded
 - The "Reset MAME" menu option is enabled when an emulation is running (with a warning)
+- Searching will ignore leading and trailing whitespace for the target text
 - Simplifications to `worker_ui` LUA plugin (removing support for older MAMEs, moving startup orchestration to core application)
 - Now using an off the shelf version of Slint (1.19); no more hacked builds
 - Various cosmetic improvements

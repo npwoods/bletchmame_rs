@@ -1349,8 +1349,9 @@ fn handle_action(model: &Rc<AppModel>, action: Action) {
 			model.modify_prefs(|prefs| {
 				// modify the search text
 				let current_entry = prefs.current_history_entry_mut();
+				let search = search.trim();
 				current_entry.sort_suppressed = !search.is_empty();
-				current_entry.search = search;
+				current_entry.search = search.into();
 			});
 		}
 		Action::ItemsSort(column_index, order) => {
