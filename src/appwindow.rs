@@ -12,6 +12,8 @@ use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 use std::time::Instant;
 
+use i_slint_core::SlintContext;
+use i_slint_core::input::DEFAULT_CLICK_INTERVAL;
 use i_slint_core::items::PointerEventKind;
 use itertools::Itertools;
 use levenshtein::levenshtein;
@@ -29,6 +31,7 @@ use slint::TableColumn;
 use slint::ToSharedString;
 use slint::Weak;
 use slint::invoke_from_event_loop;
+use slint::platform::PointerEventButton;
 use slint::quit_event_loop;
 use slint::spawn_local;
 use strum::EnumString;
@@ -180,6 +183,7 @@ struct AppModel {
 	snap_image_request_id: Arc<AtomicU64>,
 	searchbar_actions: RefCell<Vec<SharedString>>,
 	shutting_down: Cell<bool>,
+	items_last_click: Cell<Option<(usize, Instant)>>,
 }
 
 impl AppModel {
@@ -519,6 +523,10 @@ impl AppModel {
 		let Some(row) = self.app_window().get_items_view_selected_row().try_into().ok() else {
 			return;
 		};
+		self.run_item(row);
+	}
+
+	pub fn run_item(self: &Rc<Self>, row: usize) {
 		if let Some(action) = self.with_items_table_model(|items_model| items_model.singular_run_action(row)) {
 			handle_action(self, action);
 		} else {
@@ -615,6 +623,7 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		snap_image_request_id: Arc::new(AtomicU64::new(0)),
 		searchbar_actions: RefCell::new([].into()),
 		shutting_down: Cell::new(false),
+		items_last_click: Cell::new(None),
 	};
 	let model = Rc::new(model);
 
@@ -784,6 +793,25 @@ pub async fn start(app_window: &AppWindow, args: AppArgs) {
 		if is_context_menu_event(&evt) {
 			let row = usize::try_from(row).unwrap();
 			model_clone.item_context_menu(Some(row), Some(position));
+		}
+		if evt.button == PointerEventButton::Left && evt.kind == PointerEventKind::Down {
+			// Slint's StandardTableView does not expose a double click event; detect it ourselves
+			let row = usize::try_from(row).unwrap();
+			let click_interval = SlintContext::current()
+				.map(|ctx| ctx.platform().click_interval())
+				.unwrap_or(DEFAULT_CLICK_INTERVAL);
+			let now = Instant::now();
+			let is_double_click =
+				model_clone
+					.items_last_click
+					.replace(Some((row, now)))
+					.is_some_and(|(last_row, last_click)| {
+						last_row == row && now.duration_since(last_click) < click_interval
+					});
+			if is_double_click {
+				model_clone.items_last_click.set(None);
+				model_clone.run_item(row);
+			}
 		}
 		if evt.kind == PointerEventKind::Move {
 			let row = usize::try_from(row).unwrap();
