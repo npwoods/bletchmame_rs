@@ -1,6 +1,9 @@
 [package]
 authors = ["Bletch"]
+description = "A point and click front end for MAME"
 edition = "2024"
+homepage = "https://www.bletchmame.org"
+license = "GPL-3.0-only"
 name = "bletchmame"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
