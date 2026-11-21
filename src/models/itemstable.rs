@@ -236,8 +236,12 @@ impl ItemsTableModel {
 	}
 
 	pub fn singular_run_action(&self, row: usize) -> Option<Action> {
-		let (_, run_descs, _, _, _) = self.row_run_info(row)?;
-		run_descs.into_iter().exactly_one().ok().and_then(|desc| desc.action)
+		let info = self.row_info(row)?;
+		info.run_descs
+			.into_iter()
+			.exactly_one()
+			.ok()
+			.and_then(|desc| desc.action)
 	}
 
 	pub fn context_commands(
@@ -246,9 +250,13 @@ impl ItemsTableModel {
 		folder_info: &[(usize, Rc<PrefsCollection>)],
 		has_mame_initialized: bool,
 	) -> Option<ItemContextMenuInfo> {
-		// access the InfoDB
-		let info_db = self.info_db.borrow();
-		let info_db = info_db.as_ref()?;
+		let ItemRowInfo {
+			run_title,
+			run_descs,
+			browse_target,
+			can_configure,
+			prefs_item,
+		} = self.row_info(row)?;
 
 		// find the current folder (if any)
 		let folder_name =
@@ -257,6 +265,71 @@ impl ItemsTableModel {
 			} else {
 				None
 			};
+
+		// access the selection
+		let index = *self.items_map.borrow().get(row).unwrap();
+		let index = usize::try_from(index).unwrap();
+
+		let prefs_items = Arc::<[_]>::from([prefs_item]);
+
+		// now actually build the context menu
+		let configure_action = can_configure
+			.then_some(folder_name.as_ref())
+			.flatten()
+			.cloned()
+			.map(|folder_name| Action::Configure { folder_name, index });
+		let browse_action = browse_target.map(Action::Browse);
+
+		// add to folder
+		let add_to_existing_folder_descs = folder_info
+			.iter()
+			.map(|(index, col)| {
+				let PrefsCollection::Folder {
+					name,
+					items: folder_items,
+				} = &**col
+				else {
+					panic!("Expected PrefsCollection::Folder");
+				};
+
+				let folder_contains_all_items = prefs_items.iter().all(|x| folder_items.contains(x));
+				let action =
+					(!folder_contains_all_items).then(|| Action::AddToExistingFolder(*index, prefs_items.clone()));
+
+				let title = name.into();
+				MenuDesc { action, title }
+			})
+			.collect::<Vec<_>>();
+		let new_folder_action = Action::AddToNewFolderDialog(prefs_items.clone());
+
+		// remove from this folder
+		let remove_from_folder_desc = folder_name.map(|folder_name| {
+			let title = format!("Remove From \"{folder_name}\"").into();
+			let ids = prefs_items.iter().filter_map(|item| item.id.get_opt()).collect::<_>();
+			let action = Some(Action::RemoveFromFolder(folder_name, ids));
+			MenuDesc { action, title }
+		});
+
+		// can't run if MAME is not initialized!
+		let run_descs = if has_mame_initialized { run_descs } else { [].into() };
+
+		// and return!
+		let result = LocalItemContextMenuInfo {
+			run_title,
+			run_descs,
+			configure_action,
+			browse_action,
+			add_to_existing_folder_descs,
+			new_folder_action,
+			remove_from_folder_desc,
+		};
+		Some(result.into())
+	}
+
+	fn row_info(&self, row: usize) -> Option<ItemRowInfo> {
+		// access the InfoDB
+		let info_db = self.info_db.borrow();
+		let info_db = info_db.as_ref()?;
 
 		// access the selection
 		let items = self.items.borrow();
@@ -398,215 +471,14 @@ impl ItemsTableModel {
 				details,
 			}
 		});
-		let prefs_items = Arc::<[_]>::from([prefs_item]);
 
-		// now actually build the context menu
-		let configure_action = can_configure
-			.then_some(folder_name.as_ref())
-			.flatten()
-			.cloned()
-			.map(|folder_name| Action::Configure { folder_name, index });
-		let browse_action = browse_target.map(Action::Browse);
-
-		// add to folder
-		let add_to_existing_folder_descs = folder_info
-			.iter()
-			.map(|(index, col)| {
-				let PrefsCollection::Folder {
-					name,
-					items: folder_items,
-				} = &**col
-				else {
-					panic!("Expected PrefsCollection::Folder");
-				};
-
-				let folder_contains_all_items = prefs_items.iter().all(|x| folder_items.contains(x));
-				let action =
-					(!folder_contains_all_items).then(|| Action::AddToExistingFolder(*index, prefs_items.clone()));
-
-				let title = name.into();
-				MenuDesc { action, title }
-			})
-			.collect::<Vec<_>>();
-		let new_folder_action = Action::AddToNewFolderDialog(prefs_items.clone());
-
-		// remove from this folder
-		let remove_from_folder_desc = folder_name.map(|folder_name| {
-			let title = format!("Remove From \"{folder_name}\"").into();
-			let ids = prefs_items.iter().filter_map(|item| item.id.get_opt()).collect::<_>();
-			let action = Some(Action::RemoveFromFolder(folder_name, ids));
-			MenuDesc { action, title }
-		});
-
-		// can't run if MAME is not initialized!
-		let run_descs = if has_mame_initialized { run_descs } else { [].into() };
-
-		// and return!
-		let result = LocalItemContextMenuInfo {
+		Some(ItemRowInfo {
 			run_title,
 			run_descs,
-			configure_action,
-			browse_action,
-			add_to_existing_folder_descs,
-			new_folder_action,
-			remove_from_folder_desc,
-		};
-		Some(result.into())
-	}
-
-	#[allow(clippy::type_complexity)]
-	fn row_run_info(
-		&self,
-		row: usize,
-	) -> Option<(SharedString, Vec<MenuDesc>, Option<PrefsCollection>, bool, PrefsItem)> {
-		// access the InfoDB
-		let info_db = self.info_db.borrow();
-		let info_db = info_db.as_ref()?;
-
-		// access the selection
-		let items = self.items.borrow();
-		let index = *self.items_map.borrow().get(row).unwrap();
-		let index = usize::try_from(index).unwrap();
-		let item = items.get(index)?;
-
-		// find the prefs item referenced by the Id, if appropriate
-		let current_collection = self.current_collection.borrow().clone();
-		let prefs_item = item.id.as_ref().and_then(|id| {
-			current_collection
-				.as_ref()
-				.and_then(|collection| match collection.as_ref() {
-					PrefsCollection::Folder { name: _, items } => {
-						items.iter().find(|x| x.id.get_opt().as_ref() == Some(id))
-					}
-					_ => None,
-				})
-		});
-		let video = prefs_item.and_then(|item| item.video.clone());
-
-		// get the critical information - the description and where (if anyplace) "Browse" would go to
-		let (run_title, run_descs, browse_target, can_configure) = match &item.details {
-			ItemDetails::Machine {
-				machine_config,
-				images,
-				bios,
-			} => {
-				let machine = machine_config.machine();
-				assert!(machine.runnable());
-				let machine_name = machine.name().into();
-				let bios = bios.clone();
-
-				let slots = machine_config
-					.changed_slots(None)
-					.into_iter()
-					.map(|(slot_name, slot_value)| {
-						(format!("&{slot_name}").into(), slot_value.unwrap_or_default().into())
-					})
-					.collect::<Vec<_>>();
-				let images = images
-					.iter()
-					.map(|(tag, image_desc)| (tag.as_str().into(), image_desc.clone()))
-					.collect::<Vec<_>>();
-
-				let start_args = MameStartArgs {
-					machine_name,
-					bios,
-					slots,
-					images,
-					video,
-				};
-				let action = Action::Start(start_args.into());
-				let run_title = run_item_text(machine.description()).into();
-				let run_descs = vec![MenuDesc {
-					title: "".into(),
-					action: Some(action),
-				}];
-				let browse_target =
-					(!machine.machine_software_lists().is_empty()).then(|| PrefsCollection::MachineSoftware {
-						machine_name: machine.name().to_string(),
-					});
-
-				(run_title, run_descs, browse_target, true)
-			}
-			ItemDetails::Software {
-				software_list,
-				software,
-				machine_indexes,
-				..
-			} => {
-				let run_descs = machine_indexes
-					.iter()
-					.filter_map(|&index| {
-						// get the machine out of the InfoDB
-						let machine = info_db.machines().get(index).unwrap();
-						assert!(
-							machine.runnable(),
-							"software item {} from software list {}is associated with machine {} which is not runnable",
-							software.name,
-							software_list.name,
-							machine.name()
-						);
-
-						// identify all parts of the software
-						ImageDesc::from_software(&machine, Some(&software_list.name), software)
-							.ok()
-							.map(|images| {
-								let start_args = MameStartArgs {
-									machine_name: machine.name().into(),
-									bios: None,
-									slots: [].into(),
-									images,
-									video: video.clone(),
-								};
-								let action = Some(Action::Start(start_args.into()));
-								let title = machine.description().into();
-								MenuDesc { action, title }
-							})
-					})
-					.collect::<Vec<_>>();
-				let run_title = run_item_text(&software.description).into();
-				(run_title, run_descs, None, true)
-			}
-			ItemDetails::Unrecognized { error, .. } => {
-				let run_title = error.to_string().into();
-				let run_descs = Vec::new();
-				(run_title, run_descs, None, false)
-			}
-		};
-
-		// figure out the PrefsItem we would create if we were to add this to a folder
-		let prefs_item = prefs_item.cloned().unwrap_or_else(|| {
-			let details = match &item.details {
-				ItemDetails::Machine { machine_config, .. } => PrefsItemDetails::Machine(PrefsMachineItem {
-					machine_name: machine_config.machine().name().to_string(),
-					slots: [].into(),
-					images: [].into(),
-					bios: None,
-				}),
-				ItemDetails::Software {
-					software_list,
-					software,
-					..
-				} => {
-					let software_list = software_list.name.as_str().into();
-					let software = software.name.as_str().into();
-					PrefsItemDetails::Software(PrefsSoftwareItem {
-						software_list,
-						software,
-						preferred_machines: None,
-					})
-				}
-				ItemDetails::Unrecognized { .. } => {
-					unreachable!("Cannot create PrefsItemDetails for unrecognized item");
-				}
-			};
-			PrefsItem {
-				id: Default::default(),
-				video: None,
-				details,
-			}
-		});
-
-		Some((run_title, run_descs, browse_target, can_configure, prefs_item))
+			browse_target,
+			can_configure,
+			prefs_item,
+		})
 	}
 
 	fn refresh_map(&self) {
@@ -1124,6 +996,15 @@ fn item_info_display(item: &Item) -> Option<InfoDisplay> {
 	Some(result.brief())
 }
 
+/// Information about a row that is common to both the context menu and running the item
+struct ItemRowInfo {
+	run_title: SharedString,
+	run_descs: Vec<MenuDesc>,
+	browse_target: Option<PrefsCollection>,
+	can_configure: bool,
+	prefs_item: PrefsItem,
+}
+
 /// Rust friendly equivalent of ItemContextMenuInfo
 struct LocalItemContextMenuInfo {
 	run_title: SharedString,
@@ -1199,12 +1080,18 @@ mod test {
 	use itertools::Itertools;
 	use test_case::test_case;
 
+	use crate::action::Action;
 	use crate::info::InfoDb;
 	use crate::info::View;
 	use crate::prefs::Preferences;
 	use crate::prefs::PrefsCollection;
+	use crate::prefs::PrefsItem;
+	use crate::prefs::PrefsItemDetails;
+	use crate::prefs::PrefsMachineItem;
 	use crate::selection::SelectionManager;
 	use crate::software::SoftwareList;
+	use slint::Model;
+	use smol_str::SmolStr;
 
 	use super::ItemDetails;
 	use super::ItemsTableModel;
@@ -1332,6 +1219,56 @@ mod test {
 			.exactly_one()
 			.unwrap();
 		assert_eq!(expected_machine_names, actual_item_machine_names.as_slice());
+	}
+
+	#[test]
+	pub fn run_action_matches_context_menu_for_machine_with_changed_slot() {
+		// prepare an InfoDb with a machine that has a slot ("tape") that can be changed
+		let info_db = InfoDb::from_listxml_output(include_str!("../info/test_data/listxml_c64.xml").as_bytes(), |_| {
+			ControlFlow::Continue(())
+		})
+		.unwrap()
+		.unwrap();
+		let info_db = Rc::new(info_db);
+
+		// put a machine with a changed slot into a folder
+		let item = PrefsItem {
+			id: Default::default(),
+			video: None,
+			details: PrefsItemDetails::Machine(PrefsMachineItem {
+				machine_name: "c64".into(),
+				slots: vec![("tape".into(), Some("c2n".into()))],
+				images: [].into(),
+				bios: None,
+			}),
+		};
+		let collection = Rc::new(PrefsCollection::Folder {
+			name: "Favorites".into(),
+			items: vec![item],
+		});
+
+		// set up the model
+		let selection = SelectionManager::new_internal(|| 0, |_| {});
+		let model = ItemsTableModel::new(selection, |_| {});
+		model.update(Some(Some(info_db)), None, Some(collection), None, None, None, None);
+
+		// the singular run action (Enter/double click) must be the same as the context menu's run item
+		let singular_action = model.singular_run_action(0).unwrap();
+		let context_menu = model.context_commands(0, &[], true).unwrap();
+		let context_menu_actions = context_menu
+			.run_descs
+			.iter()
+			.map(|entry| Action::decode_from_slint(entry.action.clone()).unwrap())
+			.collect::<Vec<_>>();
+		assert_eq!(1, context_menu_actions.len());
+		assert_eq!(Some(&singular_action), context_menu_actions.first());
+
+		// and the slot name must not have a stray "&" prefix, which MAME cannot resolve
+		let Action::Start(start_args) = &singular_action else {
+			panic!("expected Start action");
+		};
+		let expected_slots: &[(SmolStr, SmolStr)] = &[("tape".into(), "c2n".into())];
+		assert_eq!(expected_slots, start_args.slots.as_slice());
 	}
 
 	#[test_case(include_str!("../info/test_data/listxml_coco.xml"), "coco2b", 112)]
