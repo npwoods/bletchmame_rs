@@ -3,12 +3,14 @@
 ########################################
 
 on:
-    push:
-        branches:
-        - master
-    pull_request:
-        branches:
-        - master
+  push:
+    branches:
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - master
 
 name: Diagnostics
 
@@ -24,11 +26,7 @@ jobs:
       - uses: actions/checkout@v2
 
       # Install Rust toolchain
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
+      - uses: dtolnay/rust-toolchain@stable
 
       # Install MSYS2
       - name: Install MSYS2
@@ -45,10 +43,7 @@ jobs:
 
       # Build
       - name: Build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --locked --release
+        run: cargo build --locked --release
 
       # Run integration testing with actual MAME
       - name: Run integration testing with actual MAME

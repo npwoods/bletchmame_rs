@@ -3,12 +3,14 @@
 ############################################
 
 on:
-    push:
-        branches:
-        - master
-    pull_request:
-        branches:
-        - master
+  push:
+    branches:
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - master
 
 name: Windows Release
 
@@ -23,11 +25,7 @@ jobs:
           fetch-depth: 0
 
       # Install Rust toolchain
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
+      - uses: dtolnay/rust-toolchain@stable
 
       # Caching
       - name: Caching
@@ -46,10 +44,7 @@ jobs:
 
       # Build
       - name: Build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --locked --no-default-features --release
+        run: cargo build --locked --no-default-features --release
 
       # Install PanDoc
       - name: Install PanDoc

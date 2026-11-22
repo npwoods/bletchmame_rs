@@ -3,12 +3,14 @@
 ########################################
 
 on:
-    push:
-        branches:
-        - master
-    pull_request:
-        branches:
-        - master
+  push:
+    branches:
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - master
 
 name: Linting (Clippy and Rustfmt)
 
@@ -28,11 +30,7 @@ jobs:
       - uses: actions/checkout@v2
 
       # Install Rust toolchain
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
+      - uses: dtolnay/rust-toolchain@stable
 
       # Install Rust Components
       - name: Install Rust Components
@@ -56,10 +54,7 @@ jobs:
 
       # Run Clippy
       - name: Clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --locked ${{ matrix.features }} --all-targets -- -D warnings
+        run: cargo clippy --locked ${{ matrix.features }} --all-targets -- -D warnings
 
   fmt:
     name: Rustfmt
@@ -69,17 +64,10 @@ jobs:
       - uses: actions/checkout@v2
 
       # Install Rust toolchain
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
+      - uses: dtolnay/rust-toolchain@stable
 
       # Install Rust Components
       - run: rustup component add rustfmt
 
       # Rustfmt
-      - uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+      - run: cargo fmt --all -- --check
