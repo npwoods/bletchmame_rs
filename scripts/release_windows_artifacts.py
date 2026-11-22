@@ -70,13 +70,23 @@ def main():
         "icon:auto-resize=256,128,64,48,32,16",
         str(icon),
     ])
+    # WixUIDialogBmp is stretched to fill the welcome/completion dialogs.  Keep
+    # the icon small and in the left panel so the text on the right is legible.
     run([
         magick,
+        "-size",
+        "493x312",
+        "xc:white",
+        "(",
         str(root / "ui" / "icons" / "bletchmame.png"),
-        "-background",
-        "white",
-        "-alpha",
-        "remove",
+        "-resize",
+        "100x100",
+        ")",
+        "-gravity",
+        "northwest",
+        "-geometry",
+        "+40+106",
+        "-composite",
         str(dialog_bitmap),
     ])
     run([
