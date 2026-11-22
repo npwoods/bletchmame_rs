@@ -33,7 +33,7 @@ jobs:
       SLINT_WINIT_RENDERER: software
     steps:
       # Checks out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v5
 
       # Install Rust toolchain
       - uses: dtolnay/rust-toolchain@stable
@@ -155,7 +155,7 @@ jobs:
       # Upload screenshots directory so artifacts are available to workflow users
       - name: Upload GUI Test recordings
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: guitest-recordings
           path: ${{ github.workspace }}\test-recordings
