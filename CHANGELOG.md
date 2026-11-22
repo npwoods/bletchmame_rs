@@ -1,6 +1,8 @@
 # Changelog
 All notable changes to this project are documented in this file.
 
+## [3.2] - Unreleased
+
 ## [3.1] - 2026-11-22
 - Adding support for configuring MAME "Artwork" and "BGFX" paths and MAME video options (`-video` at the command line)
 - Created a "recently loaded images" feature that tracks up to ten images for quick access (without going through a file dialog)

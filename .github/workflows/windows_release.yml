@@ -20,7 +20,7 @@ jobs:
     runs-on: windows-latest
     steps:
       # Checks out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -83,7 +83,7 @@ jobs:
 
       # Upload build output MSI
       - name: Upload build output MSI
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if: success() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
         with:
           name: ${{ env.ARTIFACT_NAME }}.msi
@@ -91,7 +91,7 @@ jobs:
 
       # Upload build output ZIP
       - name: Upload build output ZIP
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if: success() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
         with:
           name: ${{ env.ARTIFACT_NAME }}.zip
