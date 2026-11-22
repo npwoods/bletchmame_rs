@@ -3,12 +3,14 @@
 ########################################
 
 on:
-    push:
-        branches:
-        - master
-    pull_request:
-        branches:
-        - master
+  push:
+    branches:
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - master
 
 name: Test Suite
 
@@ -28,11 +30,7 @@ jobs:
       - uses: actions/checkout@v2
 
       # Install Rust toolchain
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
+      - uses: dtolnay/rust-toolchain@stable
 
       # Install Linux Dependencies
       - name: Install Linux Dependencies
@@ -52,7 +50,4 @@ jobs:
 
       # Test Suite
       - name: Test Suite
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --locked ${{ matrix.features }}
+        run: cargo test --locked ${{ matrix.features }}
