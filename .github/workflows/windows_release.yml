@@ -84,7 +84,7 @@ jobs:
       # Upload build output MSI
       - name: Upload build output MSI
         uses: actions/upload-artifact@v4
-        if: success() && github.ref == 'refs/heads/master'
+        if: success() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
         with:
           name: ${{ env.ARTIFACT_NAME }}.msi
           path: rel/msi/
@@ -92,7 +92,7 @@ jobs:
       # Upload build output ZIP
       - name: Upload build output ZIP
         uses: actions/upload-artifact@v4
-        if: success() && github.ref == 'refs/heads/master'
+        if: success() && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
         with:
           name: ${{ env.ARTIFACT_NAME }}.zip
           path: rel/zip/
